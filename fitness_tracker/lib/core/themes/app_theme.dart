@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Claude Sonnet inspired minimalistic theme
 class AppTheme {
-  // Claude Sonnet color palette
+  // Claude Sonnet color palette - Dark theme
   static const Color primaryOrange = Color(0xFFCC785C);
-  static const Color backgroundCream = Color(0xFFFAF7F5);
-  static const Color surfaceWhite = Color(0xFFFFFFFF);
-  static const Color textDark = Color(0xFF1A1A1A);
-  static const Color textMedium = Color(0xFF666666);
-  static const Color textLight = Color(0xFF999999);
-  static const Color borderLight = Color(0xFFE5E5E5);
+  static const Color backgroundDark = Color(0xFF2B2B2B);
+  static const Color surfaceDark = Color(0xFF353535);
+  static const Color textLight = Color(0xFFF5F5F5);
+  static const Color textMedium = Color(0xFFB0B0B0);
+  static const Color textDim = Color(0xFF808080);
+  static const Color borderDark = Color(0xFF404040);
   static const Color successGreen = Color(0xFF4CAF50);
   static const Color warningAmber = Color(0xFFFFA726);
   static const Color errorRed = Color(0xFFEF5350);
@@ -17,33 +17,33 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
+      brightness: Brightness.dark,
       
       // Color scheme
-      colorScheme: const ColorScheme.light(
+      colorScheme: const ColorScheme.dark(
         primary: primaryOrange,
         secondary: primaryOrange,
-        surface: surfaceWhite,
-        background: backgroundCream,
+        surface: surfaceDark,
+        background: backgroundDark,
         error: errorRed,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
-        onSurface: textDark,
-        onBackground: textDark,
+        onSurface: textLight,
+        onBackground: textLight,
         onError: Colors.white,
       ),
 
       // Scaffold
-      scaffoldBackgroundColor: backgroundCream,
+      scaffoldBackgroundColor: backgroundDark,
 
       // AppBar
       appBarTheme: const AppBarTheme(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: backgroundCream,
-        foregroundColor: textDark,
+        backgroundColor: backgroundDark,
+        foregroundColor: textLight,
         titleTextStyle: TextStyle(
-          color: textDark,
+          color: textLight,
           fontSize: 24,
           fontWeight: FontWeight.w600,
           letterSpacing: -0.5,
@@ -51,12 +51,12 @@ class AppTheme {
       ),
 
       // Card
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
-        color: surfaceWhite,
+        color: surfaceDark,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: borderLight, width: 1),
+          side: const BorderSide(color: borderDark, width: 1),
         ),
       ),
 
@@ -65,40 +65,40 @@ class AppTheme {
         displayLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.w700,
-          color: textDark,
+          color: textLight,
           letterSpacing: -1,
         ),
         displayMedium: TextStyle(
           fontSize: 28,
           fontWeight: FontWeight.w600,
-          color: textDark,
+          color: textLight,
           letterSpacing: -0.5,
         ),
         displaySmall: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w600,
-          color: textDark,
+          color: textLight,
           letterSpacing: -0.5,
         ),
         headlineMedium: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: textDark,
+          color: textLight,
         ),
         titleLarge: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: textDark,
+          color: textLight,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: textDark,
+          color: textLight,
         ),
         bodyLarge: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w400,
-          color: textDark,
+          color: textLight,
           height: 1.5,
         ),
         bodyMedium: TextStyle(
@@ -110,21 +110,21 @@ class AppTheme {
         labelLarge: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
-          color: textDark,
+          color: textLight,
         ),
       ),
 
       // Input decoration
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceWhite,
+        fillColor: surfaceDark,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderLight),
+          borderSide: const BorderSide(color: borderDark),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderLight),
+          borderSide: const BorderSide(color: borderDark),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -175,9 +175,9 @@ class AppTheme {
 
       // Bottom navigation bar
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: surfaceWhite,
+        backgroundColor: surfaceDark,
         selectedItemColor: primaryOrange,
-        unselectedItemColor: textLight,
+        unselectedItemColor: textDim,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
         selectedLabelStyle: TextStyle(
@@ -192,7 +192,7 @@ class AppTheme {
 
       // Divider
       dividerTheme: const DividerThemeData(
-        color: borderLight,
+        color: borderDark,
         thickness: 1,
         space: 1,
       ),
