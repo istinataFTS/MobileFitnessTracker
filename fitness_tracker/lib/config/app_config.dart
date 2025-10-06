@@ -1,0 +1,44 @@
+class EnvConfig {
+  // App Configuration
+  static const String appName = String.fromEnvironment(
+    'APP_NAME',
+    defaultValue: 'Fitness Tracker',
+  );
+  
+  static const String appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.0.0',
+  );
+  
+  // Environment
+  static const String environment = String.fromEnvironment(
+    'ENVIRONMENT',
+    defaultValue: 'development',
+  );
+  
+  static bool get isDevelopment => environment == 'development';
+  static bool get isProduction => environment == 'production';
+  
+  // Feature Flags
+  static const bool enableDevicePreview = bool.fromEnvironment(
+    'ENABLE_DEVICE_PREVIEW',
+    defaultValue: true,
+  );
+  
+  // Database Configuration
+  static const String databaseName = String.fromEnvironment(
+    'DATABASE_NAME',
+    defaultValue: 'fitness_tracker.db',
+  );
+  
+  static const int databaseVersion = int.fromEnvironment(
+    'DATABASE_VERSION',
+    defaultValue: 1,
+  );
+  
+  // API Configuration (for future use)
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api.yourapp.com',
+  );
+}

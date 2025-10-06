@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:device_preview/device_preview.dart';
 import 'core/themes/app_theme.dart';
+import 'config/env_config.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Set system UI overlay style for status bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,
     ),
   );
 
-  // Initialize database and dependencies here
-  // await initializeDependencies();
-  
-  runApp(const FitnessTrackerApp());
+  runApp(
+    DevicePreview(
+      enabled: EnvConfig.enableDevicePreview,
+      builder: (context) => const FitnessTrackerApp(),
+    ),
+  );
 }
 
 class FitnessTrackerApp extends StatelessWidget {
@@ -26,7 +29,9 @@ class FitnessTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fitness Tracker',
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
+      title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const BottomNavigation(),
