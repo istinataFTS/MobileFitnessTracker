@@ -21,6 +21,13 @@ class _BottomNavigationState extends State<BottomNavigation> {
     SettingsPage(),
   ];
 
+  final List<String> _pageTitles = const [
+    'Home',
+    'Add Workout',
+    'History',
+    'Settings',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,7 +39,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -45,16 +52,12 @@ class _BottomNavigationState extends State<BottomNavigation> {
               _currentIndex = index;
             });
           },
+          type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              activeIcon: Icon(Icons.add_circle),
-              label: 'Add Workout',
+              label: 'H.Page',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.history_outlined),
@@ -62,9 +65,14 @@ class _BottomNavigationState extends State<BottomNavigation> {
               label: 'History',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+              icon: Icon(Icons.flag_outlined),
+              activeIcon: Icon(Icons.flag),
+              label: 'Goals',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
         ),
