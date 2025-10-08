@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../pages/home/home_page.dart';
-import '../pages/add_workout/add_workout_page.dart';
 import '../pages/history/history_page.dart';
-import '../pages/settings/settings_page.dart';
+import '../pages/targets/targets_page.dart';
+import '../pages/profile/profile_page.dart';
 
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});
@@ -16,16 +16,9 @@ class _BottomNavigationState extends State<BottomNavigation> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    AddWorkoutPage(),
     HistoryPage(),
-    SettingsPage(),
-  ];
-
-  final List<String> _pageTitles = const [
-    'Home',
-    'Add Workout',
-    'History',
-    'Settings',
+    TargetsPage(),
+    ProfilePage(),
   ];
 
   @override
@@ -67,7 +60,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.flag_outlined),
               activeIcon: Icon(Icons.flag),
-              label: 'Goals',
+              label: 'Targets',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

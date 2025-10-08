@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:device_preview/device_preview.dart';
 import 'core/themes/app_theme.dart';
-import 'config/env_config.dart';
+import 'config/app_config.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 
 void main() async {

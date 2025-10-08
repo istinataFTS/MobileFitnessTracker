@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/goals_manager.dart';
-import '../../../config/env_config.dart';
+import '../../../config/app_config.dart';
 import 'package:intl/intl.dart';
 
 class HomePage extends StatelessWidget {
@@ -77,7 +77,7 @@ class HomePage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Username: ${EnvConfig.userName}',
+                  EnvConfig.userName,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../core/utils/goals_manager.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -181,12 +182,13 @@ class _EditGoalsDialog extends StatefulWidget {
 
 class _EditGoalsDialogState extends State<_EditGoalsDialog> {
   late Map<String, int> _goals;
+  final _goalsManager = GoalsManager();
 
   @override
   void initState() {
     super.initState();
-    // TODO: Load actual goals from BLoC/database
-    _goals = Map.from(MuscleGroups.defaultWeeklyGoals);
+    // Load actual goals from GoalsManager
+    _goals = Map.from(_goalsManager.goals);
   }
 
   @override
@@ -260,7 +262,8 @@ class _EditGoalsDialogState extends State<_EditGoalsDialog> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // TODO: Save goals with BLoC
+                        // Save goals to GoalsManager
+                        _goalsManager.updateAllGoals(_goals);
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
