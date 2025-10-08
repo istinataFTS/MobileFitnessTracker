@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../pages/home/home_page.dart';
 import '../pages/history/history_page.dart';
+import '../pages/log_set/log_set_page.dart';
 import '../pages/targets/targets_page.dart';
 import '../pages/profile/profile_page.dart';
 
@@ -17,6 +18,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
   final List<Widget> _pages = const [
     HomePage(),
     HistoryPage(),
+    LogSetPage(),
     TargetsPage(),
     ProfilePage(),
   ];
@@ -50,12 +52,17 @@ class _BottomNavigationState extends State<BottomNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
-              label: 'H.Page',
+              label: 'Home',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.history_outlined),
               activeIcon: Icon(Icons.history),
               label: 'History',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.add_circle_outline),
+              activeIcon: Icon(Icons.add_circle),
+              label: 'Log Set',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.flag_outlined),

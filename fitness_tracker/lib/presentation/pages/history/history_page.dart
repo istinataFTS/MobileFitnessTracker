@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/muscle_groups.dart';
-import '../../../core/themes/app_theme.dart';   
+import '../../../core/themes/app_theme.dart';
+import '../../../core/utils/workout_sets_manager.dart';
+import '../../../domain/entities/workout_set.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -17,7 +19,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workout History'),
+        title: const Text('History'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -25,13 +27,18 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_selectedFilter != 'All') _buildFilterChip(),
-          Expanded(
-            child: _buildWorkoutsList(),
-          ),
-        ],
+      body: ListenableBuilder(
+        listenable: WorkoutSetsManager(),
+        builder: (context, child) {
+          return Column(
+            children: [
+              if (_selectedFilter != 'All') _buildFilterChip(),
+              Expanded(
+                child: _buildSetsList(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -60,11 +67,19 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildWorkoutsList() {
-    // TODO: Replace with actual data from BLoC
-    final mockWorkouts = _generateMockWorkouts();
+  Widget _buildSetsList() {
+    final setsManager = WorkoutSetsManager();
+    final allSets = setsManager.allSets;
+    
+    // Filter sets
+    final filteredSets = _selectedFilter == 'All'
+        ? allSets
+        : allSets.where((set) {
+            final displayName = MuscleGroups.getDisplayName(set.muscleGroup);
+            return displayName == _selectedFilter;
+          }).toList();
 
-    if (mockWorkouts.isEmpty) {
+    if (filteredSets.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -72,18 +87,18 @@ class _HistoryPageState extends State<HistoryPage> {
             const Icon(
               Icons.fitness_center_outlined,
               size: 64,
-              color: AppTheme.textLight,
+              color: AppTheme.textDim,
             ),
             const SizedBox(height: 16),
             Text(
-              'No workouts yet',
+              'No sets logged yet',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppTheme.textMedium,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Start logging your workouts to see them here',
+              'Start logging sets to see them here',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -91,27 +106,41 @@ class _HistoryPageState extends State<HistoryPage> {
       );
     }
 
+    // Group by date
+    final grouped = <DateTime, List<WorkoutSet>>{};
+    for (final set in filteredSets) {
+      final date = DateTime(set.date.year, set.date.month, set.date.day);
+      if (!grouped.containsKey(date)) {
+        grouped[date] = [];
+      }
+      grouped[date]!.add(set);
+    }
+
+    // Sort dates descending
+    final sortedDates = grouped.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: mockWorkouts.length,
+      itemCount: sortedDates.length,
       itemBuilder: (context, index) {
-        final workout = mockWorkouts[index];
-        return _buildWorkoutCard(workout);
+        final date = sortedDates[index];
+        final sets = grouped[date]!;
+        return _buildDateCard(date, sets);
       },
     );
   }
 
-  Widget _buildWorkoutCard(Map<String, dynamic> workout) {
-    final date = workout['date'] as DateTime;
-    final sets = workout['sets'] as Map<String, int>;
-    final totalSets = sets.values.fold(0, (sum, count) => sum + count);
+  Widget _buildDateCard(DateTime date, List<WorkoutSet> sets) {
     final isToday = DateFormat('yyyy-MM-dd').format(date) ==
         DateFormat('yyyy-MM-dd').format(DateTime.now());
+    
+    final totalSets = sets.length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => _showWorkoutDetails(workout),
+        onTap: () => _showDayDetails(date, sets),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -133,7 +162,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          DateFormat('h:mm a').format(date),
+                          DateFormat('h:mm a').format(sets.first.createdAt),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -149,7 +178,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '$totalSets sets',
+                      '$totalSets set${totalSets != 1 ? 's' : ''}',
                       style: const TextStyle(
                         color: AppTheme.primaryOrange,
                         fontWeight: FontWeight.w600,
@@ -162,24 +191,45 @@ class _HistoryPageState extends State<HistoryPage> {
               const SizedBox(height: 12),
               const Divider(),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: sets.entries.map((entry) {
-                  final displayName = MuscleGroups.getDisplayName(entry.key);
-                  return Chip(
-                    label: Text('$displayName (${entry.value})'),
-                    backgroundColor: AppTheme.surfaceDark,
-                    side: const BorderSide(color: AppTheme.borderDark),
-                    labelStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+              ...sets.take(3).map((set) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.primaryOrange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${set.exerciseName} - ${set.reps} reps @ ${set.weight}kg',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        Text(
+                          MuscleGroups.getDisplayName(set.muscleGroup),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textMedium,
+                              ),
+                        ),
+                      ],
                     ),
-                    padding: EdgeInsets.zero,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  );
-                }).toList(),
-              ),
+                  )),
+              if (sets.length > 3)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '+ ${sets.length - 3} more set${sets.length - 3 != 1 ? 's' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryOrange,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -236,11 +286,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  void _showWorkoutDetails(Map<String, dynamic> workout) {
-    final date = workout['date'] as DateTime;
-    final sets = workout['sets'] as Map<String, int>;
-    final totalSets = sets.values.fold(0, (sum, count) => sum + count);
-
+  void _showDayDetails(DateTime date, List<WorkoutSet> sets) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -270,127 +316,62 @@ class _HistoryPageState extends State<HistoryPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('EEEE, MMMM d, y').format(date),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.fitness_center, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$totalSets total sets',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
               Text(
-                'Muscle Groups',
-                style: Theme.of(context).textTheme.titleMedium,
+                DateFormat('EEEE, MMMM d, y').format(date),
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
-              const SizedBox(height: 12),
-              ...sets.entries.map((entry) {
-                final displayName = MuscleGroups.getDisplayName(entry.key);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        displayName,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      Text(
-                        '${entry.value} sets',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primaryOrange,
-                            ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _deleteWorkout(workout);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.errorRed,
-                        side: const BorderSide(color: AppTheme.errorRed),
-                      ),
-                      child: const Text('Delete'),
+              ...sets.map((set) => Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundDark,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.borderDark),
                     ),
-                  ),
-                ],
-              ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              set.exerciseName,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Chip(
+                              label: Text(
+                                MuscleGroups.getDisplayName(set.muscleGroup),
+                              ),
+                              backgroundColor:
+                                  AppTheme.primaryOrange.withOpacity(0.1),
+                              labelStyle: const TextStyle(
+                                color: AppTheme.primaryOrange,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.repeat, size: 16),
+                            const SizedBox(width: 4),
+                            Text('${set.reps} reps'),
+                            const SizedBox(width: 16),
+                            const Icon(Icons.monitor_weight, size: 16),
+                            const SizedBox(width: 4),
+                            Text('${set.weight}kg'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )),
               SizedBox(height: MediaQuery.of(context).padding.bottom),
             ],
           ),
         );
       },
     );
-  }
-
-  void _deleteWorkout(Map<String, dynamic> workout) {
-    // TODO: Implement delete logic with BLoC
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Workout deleted'),
-        backgroundColor: AppTheme.errorRed,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _generateMockWorkouts() {
-    // Mock data for demonstration - replace with actual data from BLoC
-    return [
-      {
-        'date': DateTime.now(),
-        'sets': {
-          'chest': 4,
-          'triceps': 3,
-          'shoulder': 2,
-        },
-      },
-      {
-        'date': DateTime.now().subtract(const Duration(days: 1)),
-        'sets': {
-          'lats': 5,
-          'biceps': 4,
-          'abs': 3,
-        },
-      },
-      {
-        'date': DateTime.now().subtract(const Duration(days: 2)),
-        'sets': {
-          'quads': 4,
-          'hamstring': 3,
-          'glutes': 3,
-        },
-      },
-      {
-        'date': DateTime.now().subtract(const Duration(days: 4)),
-        'sets': {
-          'shoulder': 5,
-          'traps': 3,
-          'triceps': 4,
-        },
-      },
-    ];
   }
 }

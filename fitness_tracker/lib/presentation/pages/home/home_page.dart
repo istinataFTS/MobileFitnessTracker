@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/goals_manager.dart';
+import '../../../core/utils/targets_manager.dart';
+import '../../../core/utils/workout_sets_manager.dart';
 import '../../../config/app_config.dart';
 import 'package:intl/intl.dart';
 
@@ -11,9 +12,13 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: GoalsManager(),
+      listenable: Listenable.merge([
+        TargetsManager(),
+        WorkoutSetsManager(),
+      ]),
       builder: (context, child) {
-        final goalsManager = GoalsManager();
+        final targetsManager = TargetsManager();
+        final setsManager = WorkoutSetsManager();
         
         return Scaffold(
           body: SafeArea(
@@ -28,11 +33,11 @@ class HomePage extends StatelessWidget {
                       children: [
                         _buildTodaySection(context),
                         const SizedBox(height: 24),
-                        _buildWeekSummaryCard(context, goalsManager),
+                        _buildWeekSummaryCard(context, targetsManager, setsManager),
                         const SizedBox(height: 32),
-                        _buildSectionHeader(context, 'Muscle Groups'),
+                        _buildSectionHeader(context, 'Target Progress'),
                         const SizedBox(height: 16),
-                        _buildMuscleGroupsList(context, goalsManager),
+                        _buildTargetsList(context, targetsManager, setsManager),
                       ],
                     ),
                   ),
@@ -85,12 +90,6 @@ class HomePage extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // Navigate to settings - will be handled by bottom nav
-            },
-          ),
         ],
       ),
     );
@@ -103,7 +102,7 @@ class HomePage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Today's Day + Date",
+          "Today",
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -119,10 +118,42 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildWeekSummaryCard(BuildContext context, GoalsManager goalsManager) {
-    // TODO: Replace with actual completed sets data
-    const totalSets = 45;
-    final goalSets = goalsManager.totalWeeklyGoal;
+  Widget _buildWeekSummaryCard(
+    BuildContext context,
+    TargetsManager targetsManager,
+    WorkoutSetsManager setsManager,
+  ) {
+    final totalSets = setsManager.totalWeeklySets;
+    final goalSets = targetsManager.totalWeeklyTarget;
+    
+    if (goalSets == 0) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(
+                Icons.flag_outlined,
+                size: 48,
+                color: AppTheme.textDim,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No Targets Set',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Add targets to track your weekly progress',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final progress = totalSets / goalSets;
 
     return Container(
@@ -136,7 +167,7 @@ class HomePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Weekly Goals',
+            'Weekly Progress',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -174,7 +205,7 @@ class HomePage extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: progress,
+              value: progress.clamp(0.0, 1.0),
               minHeight: 12,
               backgroundColor: AppTheme.borderDark,
               valueColor: const AlwaysStoppedAnimation<Color>(
@@ -191,7 +222,7 @@ class HomePage extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
-                '${goalSets - totalSets} sets remaining',
+                '${(goalSets - totalSets).clamp(0, goalSets)} sets remaining',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -210,32 +241,43 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildMuscleGroupsList(BuildContext context, GoalsManager goalsManager) {
-    // TODO: Replace with actual completed sets data
-    final muscleGroupsData = MuscleGroups.all.map((muscle) {
-      final goal = goalsManager.getGoal(muscle);
-      // Mock data - replace with actual progress
-      final completed = (goal * 0.3).round(); // 30% completed for demo
-      return {
-        'muscle': muscle,
-        'completed': completed,
-        'goal': goal,
-      };
-    }).toList();
+  Widget _buildTargetsList(
+    BuildContext context,
+    TargetsManager targetsManager,
+    WorkoutSetsManager setsManager,
+  ) {
+    final targets = targetsManager.targets;
+
+    if (targets.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Text(
+              'Add targets to see your progress here',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: AppTheme.textMedium,
+                  ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Column(
-      children: muscleGroupsData.map((data) {
-        return _buildMuscleGroupCard(
+      children: targets.map((target) {
+        final completed = setsManager.getWeeklySetsForMuscle(target.muscleGroup);
+        return _buildTargetCard(
           context,
-          data['muscle'] as String,
-          data['completed'] as int,
-          data['goal'] as int,
+          target.muscleGroup,
+          completed,
+          target.weeklyGoal,
         );
       }).toList(),
     );
   }
 
-  Widget _buildMuscleGroupCard(
+  Widget _buildTargetCard(
     BuildContext context,
     String muscleGroup,
     int completed,
@@ -308,7 +350,7 @@ class HomePage extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  'Goal completed!',
+                  'Target completed!',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.successGreen,
                         fontWeight: FontWeight.w500,
