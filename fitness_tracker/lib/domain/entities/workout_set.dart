@@ -1,9 +1,10 @@
 import 'package:equatable/equatable.dart';
 
+/// Represents a single set performed in a workout
+/// Links to an Exercise entity via exerciseId
 class WorkoutSet extends Equatable {
   final String id;
-  final String muscleGroup;
-  final String exerciseName;
+  final String exerciseId; // Reference to Exercise entity
   final int reps;
   final double weight;
   final DateTime date;
@@ -11,8 +12,7 @@ class WorkoutSet extends Equatable {
 
   const WorkoutSet({
     required this.id,
-    required this.muscleGroup,
-    required this.exerciseName,
+    required this.exerciseId,
     required this.reps,
     required this.weight,
     required this.date,
@@ -21,8 +21,7 @@ class WorkoutSet extends Equatable {
 
   WorkoutSet copyWith({
     String? id,
-    String? muscleGroup,
-    String? exerciseName,
+    String? exerciseId,
     int? reps,
     double? weight,
     DateTime? date,
@@ -30,8 +29,7 @@ class WorkoutSet extends Equatable {
   }) {
     return WorkoutSet(
       id: id ?? this.id,
-      muscleGroup: muscleGroup ?? this.muscleGroup,
-      exerciseName: exerciseName ?? this.exerciseName,
+      exerciseId: exerciseId ?? this.exerciseId,
       reps: reps ?? this.reps,
       weight: weight ?? this.weight,
       date: date ?? this.date,
@@ -42,8 +40,7 @@ class WorkoutSet extends Equatable {
   @override
   List<Object?> get props => [
         id,
-        muscleGroup,
-        exerciseName,
+        exerciseId,
         reps,
         weight,
         date,

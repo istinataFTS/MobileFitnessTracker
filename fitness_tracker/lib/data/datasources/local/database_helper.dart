@@ -39,12 +39,11 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create workout_sets table
+    // Create workout_sets table with exerciseId instead of muscleGroup
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
-        ${DatabaseTables.setMuscleGroup} TEXT NOT NULL,
-        ${DatabaseTables.setExerciseName} TEXT NOT NULL,
+        ${DatabaseTables.setExerciseId} TEXT NOT NULL,
         ${DatabaseTables.setReps} INTEGER NOT NULL,
         ${DatabaseTables.setWeight} REAL NOT NULL,
         ${DatabaseTables.setDate} TEXT NOT NULL,
@@ -54,8 +53,8 @@ class DatabaseHelper {
 
     // Create indexes for better query performance
     await db.execute('''
-      CREATE INDEX idx_workout_sets_muscle_group 
-      ON ${DatabaseTables.workoutSets}(${DatabaseTables.setMuscleGroup})
+      CREATE INDEX idx_workout_sets_exercise_id 
+      ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
     ''');
 
     await db.execute('''
@@ -68,6 +67,29 @@ class DatabaseHelper {
     // Handle database migrations here
     if (oldVersion < 2) {
       // Migration logic for version 2
+      // Drop old table and recreate with new schema
+      await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
+      
+      await db.execute('''
+        CREATE TABLE ${DatabaseTables.workoutSets} (
+          ${DatabaseTables.setId} TEXT PRIMARY KEY,
+          ${DatabaseTables.setExerciseId} TEXT NOT NULL,
+          ${DatabaseTables.setReps} INTEGER NOT NULL,
+          ${DatabaseTables.setWeight} REAL NOT NULL,
+          ${DatabaseTables.setDate} TEXT NOT NULL,
+          ${DatabaseTables.setCreatedAt} TEXT NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE INDEX idx_workout_sets_exercise_id 
+        ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
+      ''');
+
+      await db.execute('''
+        CREATE INDEX idx_workout_sets_date 
+        ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
+      ''');
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,8 +14,10 @@ import 'presentation/pages/home/bloc/home_bloc.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize dependency injection
-  await di.init();
+  // Initialize dependency injection (only for mobile - database doesn't work on web)
+  if (!kIsWeb) {
+    await di.init();
+  }
   
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -23,6 +26,7 @@ void main() async {
     ),
   );
 
+  // DevicePreview automatically enabled in debug mode via EnvConfig
   runApp(
     DevicePreview(
       enabled: EnvConfig.enableDevicePreview,
@@ -36,6 +40,20 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On web: Use in-memory managers (TargetsManager, WorkoutSetsManager)
+    // On mobile: Use BLoC with database
+    if (kIsWeb) {
+      return MaterialApp(
+        locale: DevicePreview.locale(context),
+        builder: DevicePreview.appBuilder,
+        title: EnvConfig.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const BottomNavigation(),
+      );
+    }
+
+    // Mobile: Use BLoC providers with database
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<TargetsBloc>()..add(LoadTargetsEvent())),

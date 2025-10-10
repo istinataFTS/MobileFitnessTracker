@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 class EnvConfig {
   // App Configuration
   static const String appName = String.fromEnvironment(
@@ -25,11 +27,8 @@ class EnvConfig {
   static bool get isDevelopment => environment == 'development';
   static bool get isProduction => environment == 'production';
   
-  // Feature Flags
-  static const bool enableDevicePreview = bool.fromEnvironment(
-    'ENABLE_DEVICE_PREVIEW',
-    defaultValue: true,
-  );
+  // Feature Flags - Automatically enabled in debug mode
+  static bool get enableDevicePreview => kDebugMode;
   
   // Database Configuration
   static const String databaseName = String.fromEnvironment(

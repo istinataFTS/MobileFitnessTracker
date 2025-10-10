@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/workout_sets_manager.dart';
+import '../../../core/utils/exercises_manager.dart';
 import '../../../domain/entities/workout_set.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -28,7 +29,10 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
       body: ListenableBuilder(
-        listenable: WorkoutSetsManager(),
+        listenable: Listenable.merge([
+          WorkoutSetsManager(),
+          ExercisesManager(),
+        ]),
         builder: (context, child) {
           return Column(
             children: [
@@ -69,14 +73,18 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildSetsList() {
     final setsManager = WorkoutSetsManager();
+    final exercisesManager = ExercisesManager();
     final allSets = setsManager.allSets;
     
-    // Filter sets
+    // Filter sets based on muscle group
     final filteredSets = _selectedFilter == 'All'
         ? allSets
         : allSets.where((set) {
-            final displayName = MuscleGroups.getDisplayName(set.muscleGroup);
-            return displayName == _selectedFilter;
+            final exercise = exercisesManager.getExerciseById(set.exerciseId);
+            if (exercise == null) return false;
+            
+            return exercise.muscleGroups.any((mg) =>
+                MuscleGroups.getDisplayName(mg) == _selectedFilter);
           }).toList();
 
     if (filteredSets.isEmpty) {
@@ -132,6 +140,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildDateCard(DateTime date, List<WorkoutSet> sets) {
+    final exercisesManager = ExercisesManager();
     final isToday = DateFormat('yyyy-MM-dd').format(date) ==
         DateFormat('yyyy-MM-dd').format(DateTime.now());
     
@@ -191,34 +200,33 @@ class _HistoryPageState extends State<HistoryPage> {
               const SizedBox(height: 12),
               const Divider(),
               const SizedBox(height: 8),
-              ...sets.take(3).map((set) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.primaryOrange,
-                            shape: BoxShape.circle,
-                          ),
+              ...sets.take(3).map((set) {
+                final exercise = exercisesManager.getExerciseById(set.exerciseId);
+                final exerciseName = exercise?.name ?? 'Unknown Exercise';
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryOrange,
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${set.exerciseName} - ${set.reps} reps @ ${set.weight}kg',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$exerciseName - ${set.reps} reps @ ${set.weight}kg',
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                        Text(
-                          MuscleGroups.getDisplayName(set.muscleGroup),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textMedium,
-                              ),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
               if (sets.length > 3)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -287,6 +295,8 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _showDayDetails(DateTime date, List<WorkoutSet> sets) {
+    final exercisesManager = ExercisesManager();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -321,52 +331,68 @@ class _HistoryPageState extends State<HistoryPage> {
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
-              ...sets.map((set) => Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.backgroundDark,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.borderDark),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              set.exerciseName,
+              ...sets.map((set) {
+                final exercise = exercisesManager.getExerciseById(set.exerciseId);
+                final exerciseName = exercise?.name ?? 'Unknown Exercise';
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.backgroundDark,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.borderDark),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              exerciseName,
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
-                            Chip(
-                              label: Text(
-                                MuscleGroups.getDisplayName(set.muscleGroup),
-                              ),
-                              backgroundColor:
-                                  AppTheme.primaryOrange.withOpacity(0.1),
-                              labelStyle: const TextStyle(
-                                color: AppTheme.primaryOrange,
-                                fontSize: 12,
-                              ),
+                          ),
+                          if (exercise != null)
+                            Wrap(
+                              spacing: 4,
+                              children: exercise.muscleGroups.take(2).map((mg) {
+                                return Chip(
+                                  label: Text(
+                                    MuscleGroups.getDisplayName(mg),
+                                  ),
+                                  backgroundColor:
+                                      AppTheme.primaryOrange.withOpacity(0.1),
+                                  labelStyle: const TextStyle(
+                                    color: AppTheme.primaryOrange,
+                                    fontSize: 10,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                );
+                              }).toList(),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.repeat, size: 16),
-                            const SizedBox(width: 4),
-                            Text('${set.reps} reps'),
-                            const SizedBox(width: 16),
-                            const Icon(Icons.monitor_weight, size: 16),
-                            const SizedBox(width: 4),
-                            Text('${set.weight}kg'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.repeat, size: 16),
+                          const SizedBox(width: 4),
+                          Text('${set.reps} reps'),
+                          const SizedBox(width: 16),
+                          const Icon(Icons.monitor_weight, size: 16),
+                          const SizedBox(width: 4),
+                          Text('${set.weight}kg'),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
               SizedBox(height: MediaQuery.of(context).padding.bottom),
             ],
           ),

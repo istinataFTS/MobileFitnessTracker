@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/themes/app_theme.dart';
 import '../pages/home/home_page.dart';
 import '../pages/history/history_page.dart';
 import '../pages/targets/targets_page.dart';
 import '../pages/profile/profile_page.dart';
+import '../pages/log_set/log_set_page.dart';
 
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});
@@ -28,6 +30,18 @@ class _BottomNavigationState extends State<BottomNavigation> {
         index: _currentIndex,
         children: _pages,
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LogSetPage()),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Log Set'),
+        backgroundColor: AppTheme.primaryOrange,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),

@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/workout_sets_manager.dart';
-import '../../../core/utils/targets_manager.dart';
+import '../../../core/utils/exercises_manager.dart';
+import '../../../domain/entities/exercise.dart';
 import 'package:intl/intl.dart';
 
 class LogSetPage extends StatefulWidget {
@@ -15,16 +16,14 @@ class LogSetPage extends StatefulWidget {
 
 class _LogSetPageState extends State<LogSetPage> {
   final _formKey = GlobalKey<FormState>();
-  final _exerciseController = TextEditingController();
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
   
-  String? _selectedMuscle;
+  Exercise? _selectedExercise;
   DateTime _selectedDate = DateTime.now();
 
   @override
   void dispose() {
-    _exerciseController.dispose();
     _repsController.dispose();
     _weightController.dispose();
     super.dispose();
@@ -47,9 +46,11 @@ class _LogSetPageState extends State<LogSetPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMuscleGroupDropdown(),
-                    const SizedBox(height: 20),
-                    _buildExerciseNameField(),
+                    _buildExerciseDropdown(),
+                    if (_selectedExercise != null) ...[
+                      const SizedBox(height: 16),
+                      _buildMuscleGroupsDisplay(),
+                    ],
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -58,8 +59,6 @@ class _LogSetPageState extends State<LogSetPage> {
                         Expanded(child: _buildWeightField()),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    _buildTargetProgress(),
                   ],
                 ),
               ),
@@ -113,37 +112,67 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildMuscleGroupDropdown() {
+  Widget _buildExerciseDropdown() {
+    final exercises = ExercisesManager().exercises;
+
+    if (exercises.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.fitness_center_outlined,
+                size: 48,
+                color: AppTheme.textDim,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No Exercises Available',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create exercises first in the Exercises page',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Muscle Group',
+          'Exercise',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: _selectedMuscle,
+        DropdownButtonFormField<Exercise>(
+          value: _selectedExercise,
           decoration: InputDecoration(
-            hintText: 'Select muscle group',
+            hintText: 'Select exercise',
             prefixIcon: const Icon(Icons.fitness_center),
             filled: true,
             fillColor: AppTheme.surfaceDark,
           ),
-          items: MuscleGroups.all.map((muscle) {
+          items: exercises.map((exercise) {
             return DropdownMenuItem(
-              value: muscle,
-              child: Text(MuscleGroups.getDisplayName(muscle)),
+              value: exercise,
+              child: Text(exercise.name),
             );
           }).toList(),
           onChanged: (value) {
             setState(() {
-              _selectedMuscle = value;
+              _selectedExercise = value;
             });
           },
           validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a muscle group';
+            if (value == null) {
+              return 'Please select an exercise';
             }
             return null;
           },
@@ -152,30 +181,55 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildExerciseNameField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Exercise Name',
-          style: Theme.of(context).textTheme.titleMedium,
+  Widget _buildMuscleGroupsDisplay() {
+    if (_selectedExercise == null) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: AppTheme.primaryOrange,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Muscle Groups Worked',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedExercise!.muscleGroups.map((mg) {
+                return Chip(
+                  label: Text(MuscleGroups.getDisplayName(mg)),
+                  backgroundColor: AppTheme.primaryOrange.withOpacity(0.1),
+                  labelStyle: const TextStyle(
+                    color: AppTheme.primaryOrange,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This set will count toward all muscle groups above',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textMedium,
+                  ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _exerciseController,
-          decoration: const InputDecoration(
-            hintText: 'e.g., Bench Press',
-            prefixIcon: Icon(Icons.directions_run),
-          ),
-          textCapitalization: TextCapitalization.words,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter exercise name';
-            }
-            return null;
-          },
-        ),
-      ],
+      ),
     );
   }
 
@@ -245,83 +299,6 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildTargetProgress() {
-    if (_selectedMuscle == null) return const SizedBox.shrink();
-
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        WorkoutSetsManager(),
-        TargetsManager(),
-      ]),
-      builder: (context, child) {
-        final target = TargetsManager().getTarget(_selectedMuscle!);
-        final currentSets = WorkoutSetsManager().getWeeklySetsForMuscle(_selectedMuscle!);
-
-        if (target == null) {
-          return Card(
-            color: AppTheme.warningAmber.withOpacity(0.1),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: AppTheme.warningAmber),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No target set for ${MuscleGroups.getDisplayName(_selectedMuscle!)}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final progress = currentSets / target.weeklyGoal;
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Weekly Progress',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      '$currentSets / ${target.weeklyGoal} sets',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.primaryOrange,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress.clamp(0.0, 1.0),
-                    minHeight: 8,
-                    backgroundColor: AppTheme.borderDark,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppTheme.primaryOrange,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildSaveButton(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -372,34 +349,38 @@ class _LogSetPageState extends State<LogSetPage> {
   }
 
   void _saveSet() {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState!.validate() && _selectedExercise != null) {
       final reps = int.parse(_repsController.text);
       final weight = double.parse(_weightController.text);
 
       WorkoutSetsManager().addSet(
-        muscleGroup: _selectedMuscle!,
-        exerciseName: _exerciseController.text.trim(),
+        exerciseId: _selectedExercise!.id,
         reps: reps,
         weight: weight,
         date: _selectedDate,
       );
 
+      final muscleGroupsList = _selectedExercise!.muscleGroups
+          .map((mg) => MuscleGroups.getDisplayName(mg))
+          .join(', ');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Set logged: ${_exerciseController.text} - $reps reps @ ${weight}kg',
+            'Set logged: ${_selectedExercise!.name} - $reps reps @ ${weight}kg\n'
+            'Counted for: $muscleGroupsList',
           ),
           backgroundColor: AppTheme.successGreen,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
         ),
       );
 
       // Clear form
       setState(() {
-        _exerciseController.clear();
         _repsController.clear();
         _weightController.clear();
-        _selectedMuscle = null;
+        _selectedExercise = null;
       });
     }
   }

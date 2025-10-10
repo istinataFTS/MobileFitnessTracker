@@ -14,8 +14,7 @@ class DatabaseTables {
 
   // Workout Sets Table Columns
   static const String setId = 'id';
-  static const String setMuscleGroup = 'muscle_group';
-  static const String setExerciseName = 'exercise_name';
+  static const String setExerciseId = 'exercise_id'; // Changed from muscleGroup
   static const String setReps = 'reps';
   static const String setWeight = 'weight';
   static const String setDate = 'date';

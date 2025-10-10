@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/workout_set.dart';
-import '../constants/muscle_groups.dart';
+import 'exercises_manager.dart';
 import 'package:uuid/uuid.dart';
 
 /// Simple state management for workout sets
@@ -15,18 +15,14 @@ class WorkoutSetsManager extends ChangeNotifier {
   List<WorkoutSet> get allSets => List.unmodifiable(_sets);
 
   void addSet({
-    required String muscleGroup,
-    required String exerciseName,
+    required String exerciseId,
     required int reps,
     required double weight,
     DateTime? date,
   }) {
-    if (!MuscleGroups.isValid(muscleGroup)) return;
-
     final set = WorkoutSet(
       id: _uuid.v4(),
-      muscleGroup: muscleGroup,
-      exerciseName: exerciseName,
+      exerciseId: exerciseId,
       reps: reps,
       weight: weight,
       date: date ?? DateTime.now(),
@@ -47,9 +43,9 @@ class WorkoutSetsManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Get sets for a specific muscle group
-  List<WorkoutSet> getSetsForMuscle(String muscleGroup) {
-    return _sets.where((set) => set.muscleGroup == muscleGroup).toList();
+  // Get sets for a specific exercise
+  List<WorkoutSet> getSetsForExercise(String exerciseId) {
+    return _sets.where((set) => set.exerciseId == exerciseId).toList();
   }
 
   // Get sets for current week
@@ -64,18 +60,29 @@ class WorkoutSetsManager extends ChangeNotifier {
     }).toList();
   }
 
-  // Get weekly progress for a specific muscle
+  /// Get weekly sets count for a specific muscle group
+  /// This counts ALL sets from exercises that work this muscle
   int getWeeklySetsForMuscle(String muscleGroup) {
     final weeklySets = getSetsForCurrentWeek();
-    return weeklySets.where((set) => set.muscleGroup == muscleGroup).length;
+    final exercisesManager = ExercisesManager();
+    
+    int count = 0;
+    for (final set in weeklySets) {
+      final exercise = exercisesManager.getExerciseById(set.exerciseId);
+      if (exercise != null && exercise.muscleGroups.contains(muscleGroup)) {
+        count++;
+      }
+    }
+    
+    return count;
   }
 
-  // Get total weekly sets
+  /// Get total weekly sets across all muscles
   int get totalWeeklySets {
     return getSetsForCurrentWeek().length;
   }
 
-  // Get sets grouped by date
+  /// Get sets grouped by date
   Map<DateTime, List<WorkoutSet>> getSetsGroupedByDate() {
     final Map<DateTime, List<WorkoutSet>> grouped = {};
     
@@ -90,12 +97,31 @@ class WorkoutSetsManager extends ChangeNotifier {
     return grouped;
   }
 
-  // Get sets for a specific date
+  /// Get sets for a specific date
   List<WorkoutSet> getSetsForDate(DateTime date) {
     final targetDate = DateTime(date.year, date.month, date.day);
     return _sets.where((set) {
       final setDate = DateTime(set.date.year, set.date.month, set.date.day);
       return setDate == targetDate;
     }).toList();
+  }
+
+  /// Get muscle groups breakdown for weekly sets
+  /// Returns map of muscle group -> set count
+  Map<String, int> getWeeklyMuscleBreakdown() {
+    final weeklySets = getSetsForCurrentWeek();
+    final exercisesManager = ExercisesManager();
+    final Map<String, int> breakdown = {};
+    
+    for (final set in weeklySets) {
+      final exercise = exercisesManager.getExerciseById(set.exerciseId);
+      if (exercise != null) {
+        for (final muscleGroup in exercise.muscleGroups) {
+          breakdown[muscleGroup] = (breakdown[muscleGroup] ?? 0) + 1;
+        }
+      }
+    }
+    
+    return breakdown;
   }
 }

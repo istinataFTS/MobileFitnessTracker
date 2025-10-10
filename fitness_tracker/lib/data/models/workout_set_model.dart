@@ -1,31 +1,22 @@
-import 'package:json_annotation/json_annotation.dart';
 import '../../core/constants/database_tables.dart';
 import '../../domain/entities/workout_set.dart';
 
-part 'workout_set_model.g.dart';
-
-@JsonSerializable()
+/// Data model for WorkoutSet with database serialization
 class WorkoutSetModel extends WorkoutSet {
   const WorkoutSetModel({
     required super.id,
-    required super.muscleGroup,
-    required super.exerciseName,
+    required super.exerciseId,
     required super.reps,
     required super.weight,
     required super.date,
     required super.createdAt,
   });
 
-  factory WorkoutSetModel.fromJson(Map<String, dynamic> json) =>
-      _$WorkoutSetModelFromJson(json);
-
-  Map<String, dynamic> toJson() => _$WorkoutSetModelToJson(this);
-
+  /// Create model from entity
   factory WorkoutSetModel.fromEntity(WorkoutSet set) {
     return WorkoutSetModel(
       id: set.id,
-      muscleGroup: set.muscleGroup,
-      exerciseName: set.exerciseName,
+      exerciseId: set.exerciseId,
       reps: set.reps,
       weight: set.weight,
       date: set.date,
@@ -33,11 +24,11 @@ class WorkoutSetModel extends WorkoutSet {
     );
   }
 
+  /// Create model from database map
   factory WorkoutSetModel.fromMap(Map<String, dynamic> map) {
     return WorkoutSetModel(
       id: map[DatabaseTables.setId] as String,
-      muscleGroup: map[DatabaseTables.setMuscleGroup] as String,
-      exerciseName: map[DatabaseTables.setExerciseName] as String,
+      exerciseId: map[DatabaseTables.setExerciseId] as String,
       reps: map[DatabaseTables.setReps] as int,
       weight: (map[DatabaseTables.setWeight] as num).toDouble(),
       date: DateTime.parse(map[DatabaseTables.setDate] as String),
@@ -45,15 +36,39 @@ class WorkoutSetModel extends WorkoutSet {
     );
   }
 
+  /// Convert model to database map
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.setId: id,
-      DatabaseTables.setMuscleGroup: muscleGroup,
-      DatabaseTables.setExerciseName: exerciseName,
+      DatabaseTables.setExerciseId: exerciseId,
       DatabaseTables.setReps: reps,
       DatabaseTables.setWeight: weight,
       DatabaseTables.setDate: date.toIso8601String(),
       DatabaseTables.setCreatedAt: createdAt.toIso8601String(),
+    };
+  }
+
+  /// Create model from JSON (for API compatibility)
+  factory WorkoutSetModel.fromJson(Map<String, dynamic> json) {
+    return WorkoutSetModel(
+      id: json['id'] as String,
+      exerciseId: json['exerciseId'] as String,
+      reps: json['reps'] as int,
+      weight: (json['weight'] as num).toDouble(),
+      date: DateTime.parse(json['date'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
+  /// Convert model to JSON (for API compatibility)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'exerciseId': exerciseId,
+      'reps': reps,
+      'weight': weight,
+      'date': date.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

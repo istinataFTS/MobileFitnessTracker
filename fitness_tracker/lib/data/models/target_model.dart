@@ -1,10 +1,7 @@
-import 'package:json_annotation/json_annotation.dart';
 import '../../core/constants/database_tables.dart';
 import '../../domain/entities/target.dart';
 
-part 'target_model.g.dart';
-
-@JsonSerializable()
+/// Data model for Target with database serialization
 class TargetModel extends Target {
   const TargetModel({
     required super.id,
@@ -13,11 +10,7 @@ class TargetModel extends Target {
     required super.createdAt,
   });
 
-  factory TargetModel.fromJson(Map<String, dynamic> json) =>
-      _$TargetModelFromJson(json);
-
-  Map<String, dynamic> toJson() => _$TargetModelToJson(this);
-
+  /// Create model from entity
   factory TargetModel.fromEntity(Target target) {
     return TargetModel(
       id: target.id,
@@ -27,6 +20,7 @@ class TargetModel extends Target {
     );
   }
 
+  /// Create model from database map
   factory TargetModel.fromMap(Map<String, dynamic> map) {
     return TargetModel(
       id: map[DatabaseTables.targetId] as String,
@@ -36,12 +30,33 @@ class TargetModel extends Target {
     );
   }
 
+  /// Convert model to database map
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.targetId: id,
       DatabaseTables.targetMuscleGroup: muscleGroup,
       DatabaseTables.targetWeeklyGoal: weeklyGoal,
       DatabaseTables.targetCreatedAt: createdAt.toIso8601String(),
+    };
+  }
+
+  /// Create model from JSON (for API compatibility)
+  factory TargetModel.fromJson(Map<String, dynamic> json) {
+    return TargetModel(
+      id: json['id'] as String,
+      muscleGroup: json['muscleGroup'] as String,
+      weeklyGoal: json['weeklyGoal'] as int,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
+  /// Convert model to JSON (for API compatibility)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'muscleGroup': muscleGroup,
+      'weeklyGoal': weeklyGoal,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

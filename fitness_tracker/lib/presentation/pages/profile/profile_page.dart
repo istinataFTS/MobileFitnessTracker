@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../config/app_config.dart';
+import '../exercises/exercises_page.dart';
+import '../settings/settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -19,6 +21,41 @@ class ProfilePage extends StatelessWidget {
             _buildProfileHeader(context),
             const SizedBox(height: 32),
             _buildStatsCards(context),
+            const SizedBox(height: 24),
+            _buildSection(
+              context,
+              title: 'Workout Management',
+              children: [
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.fitness_center_outlined,
+                  title: 'Manage Exercises',
+                  subtitle: 'Create and edit exercises',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ExercisesPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  subtitle: 'Weekly goals and preferences',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 24),
             _buildSection(
               context,

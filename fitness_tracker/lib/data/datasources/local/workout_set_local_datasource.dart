@@ -6,7 +6,7 @@ import 'database_helper.dart';
 
 abstract class WorkoutSetLocalDataSource {
   Future<List<WorkoutSetModel>> getAllSets();
-  Future<List<WorkoutSetModel>> getSetsByMuscleGroup(String muscleGroup);
+  Future<List<WorkoutSetModel>> getSetsByExerciseId(String exerciseId);
   Future<List<WorkoutSetModel>> getSetsByDateRange(
     DateTime startDate,
     DateTime endDate,
@@ -36,18 +36,18 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   @override
-  Future<List<WorkoutSetModel>> getSetsByMuscleGroup(String muscleGroup) async {
+  Future<List<WorkoutSetModel>> getSetsByExerciseId(String exerciseId) async {
     try {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setMuscleGroup} = ?',
-        whereArgs: [muscleGroup],
+        where: '${DatabaseTables.setExerciseId} = ?',
+        whereArgs: [exerciseId],
         orderBy: '${DatabaseTables.setDate} DESC',
       );
       return maps.map((map) => WorkoutSetModel.fromMap(map)).toList();
     } catch (e) {
-      throw CacheDatabaseException('Failed to get sets by muscle group: $e');
+      throw CacheDatabaseException('Failed to get sets by exercise: $e');
     }
   }
 
