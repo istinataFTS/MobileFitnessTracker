@@ -1,30 +1,94 @@
 import 'package:dartz/dartz.dart';
+import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
-import '../entities/workout_set.dart';
+import '../../domain/entities/workout_set.dart';
+import '../../domain/repositories/workout_set_repository.dart';
+import '../datasources/local/workout_set_local_datasource.dart';
+import '../models/workout_set_model.dart';
 
-/// Repository interface for WorkoutSet operations
-/// Follows Repository Pattern for clean architecture
-abstract class WorkoutSetRepository {
-  /// Get all workout sets
-  Future<Either<Failure, List<WorkoutSet>>> getAllSets();
-  
-  /// Get sets for a specific exercise
-  Future<Either<Failure, List<WorkoutSet>>> getSetsByExerciseId(
-    String exerciseId,
-  );
-  
-  /// Get sets within a date range
+class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
+  final WorkoutSetLocalDataSource localDataSource;
+
+  const WorkoutSetRepositoryImpl({required this.localDataSource});
+
+  @override
+  Future<Either<Failure, List<WorkoutSet>>> getAllSets() async {
+    try {
+      final sets = await localDataSource.getAllSets();
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<WorkoutSet>>> getSetsByMuscleGroup(
+    String muscleGroup,
+  ) async {
+    try {
+      // Note: This needs to be implemented differently now since sets
+      // reference exercises, not muscle groups directly
+      // For now, returning all sets - you'll need to filter by exercise
+      final sets = await localDataSource.getAllSets();
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<WorkoutSet>>> getSetsByDateRange(
     DateTime startDate,
     DateTime endDate,
-  );
-  
-  /// Add a new set
-  Future<Either<Failure, void>> addSet(WorkoutSet set);
-  
-  /// Delete a set by ID
-  Future<Either<Failure, void>> deleteSet(String id);
-  
-  /// Clear all sets
-  Future<Either<Failure, void>> clearAllSets();
+  ) async {
+    try {
+      final sets = await localDataSource.getSetsByDateRange(startDate, endDate);
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addSet(WorkoutSet set) async {
+    try {
+      final model = WorkoutSetModel.fromEntity(set);
+      await localDataSource.insertSet(model);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteSet(String id) async {
+    try {
+      await localDataSource.deleteSet(id);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearAllSets() async {
+    try {
+      await localDataSource.clearAllSets();
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
 }

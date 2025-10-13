@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../config/app_config.dart';
-import '../exercises/exercises_page.dart';
+import '../targets/targets_page.dart';
 import '../settings/settings_page.dart';
 
+/// Simplified Profile page - stats and settings access only
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text(AppStrings.profileTitle),
+        automaticallyImplyLeading: false, // No back button - it's a main tab
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -21,30 +25,30 @@ class ProfilePage extends StatelessWidget {
             _buildProfileHeader(context),
             const SizedBox(height: 32),
             _buildStatsCards(context),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             _buildSection(
               context,
-              title: 'Workout Management',
+              title: AppStrings.workoutManagement,
               children: [
-                _buildSettingsTile(
+                _buildNavigationTile(
                   context,
-                  icon: Icons.fitness_center_outlined,
-                  title: 'Manage Exercises',
-                  subtitle: 'Create and edit exercises',
+                  icon: Icons.flag_outlined,
+                  title: AppStrings.manageTargets,
+                  subtitle: AppStrings.manageTargetsDesc,
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ExercisesPage(),
+                        builder: (context) => const TargetsPage(),
                       ),
                     );
                   },
                 ),
-                _buildSettingsTile(
+                _buildNavigationTile(
                   context,
                   icon: Icons.settings_outlined,
-                  title: 'Settings',
-                  subtitle: 'Weekly goals and preferences',
+                  title: AppStrings.settings,
+                  subtitle: AppStrings.settingsDesc,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -59,24 +63,24 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSection(
               context,
-              title: 'Account',
+              title: AppStrings.account,
               children: [
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.person_outline,
-                  title: 'Edit Profile',
+                  title: AppStrings.editProfile,
                   onTap: () => _showComingSoon(context),
                 ),
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.lock_outline,
-                  title: 'Change Password',
+                  title: AppStrings.changePassword,
                   onTap: () => _showComingSoon(context),
                 ),
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.notifications_outlined,
-                  title: 'Notifications',
+                  title: AppStrings.notifications,
                   onTap: () => _showComingSoon(context),
                 ),
               ],
@@ -84,20 +88,20 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSection(
               context,
-              title: 'Preferences',
+              title: AppStrings.preferences,
               children: [
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.dark_mode_outlined,
-                  title: 'Theme',
-                  subtitle: 'Dark',
+                  title: AppStrings.theme,
+                  subtitle: AppStrings.dark,
                   onTap: () => _showComingSoon(context),
                 ),
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.language_outlined,
-                  title: 'Language',
-                  subtitle: 'English',
+                  title: AppStrings.language,
+                  subtitle: AppStrings.english,
                   onTap: () => _showComingSoon(context),
                 ),
               ],
@@ -105,39 +109,31 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSection(
               context,
-              title: 'Support',
+              title: AppStrings.support,
               children: [
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.help_outline,
-                  title: 'Help & Support',
+                  title: AppStrings.helpSupport,
                   onTap: () => _showComingSoon(context),
                 ),
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.feedback_outlined,
-                  title: 'Send Feedback',
+                  title: AppStrings.sendFeedback,
                   onTap: () => _showComingSoon(context),
                 ),
-                _buildSettingsTile(
+                _buildActionTile(
                   context,
                   icon: Icons.info_outline,
-                  title: 'About',
-                  subtitle: 'Version ${EnvConfig.appVersion}',
-                  onTap: () => _showComingSoon(context),
+                  title: AppStrings.about,
+                  subtitle: '${AppStrings.version} ${EnvConfig.appVersion}',
+                  onTap: () => _showAboutDialog(context),
                 ),
               ],
             ),
             const SizedBox(height: 32),
-            OutlinedButton(
-              onPressed: () => _showComingSoon(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.errorRed,
-                side: const BorderSide(color: AppTheme.errorRed),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: const Text('Sign Out'),
-            ),
+            _buildSignOutButton(context),
             const SizedBox(height: 20),
           ],
         ),
@@ -155,7 +151,7 @@ class ProfilePage extends StatelessWidget {
             color: AppTheme.primaryOrange,
             shape: BoxShape.circle,
             border: Border.all(
-              color: AppTheme.borderDark,
+              color: AppTheme.primaryOrange.withOpacity(0.3),
               width: 4,
             ),
           ),
@@ -171,12 +167,12 @@ class ProfilePage extends StatelessWidget {
         Text(
           EnvConfig.userName,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
         ),
         const SizedBox(height: 4),
         Text(
-          'Fitness Enthusiast',
+          AppStrings.fitnessEnthusiast,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textMedium,
               ),
@@ -191,27 +187,30 @@ class ProfilePage extends StatelessWidget {
         Expanded(
           child: _buildStatCard(
             context,
-            label: 'Total Workouts',
+            label: AppStrings.totalWorkouts,
             value: '24',
             icon: Icons.fitness_center,
+            color: AppTheme.primaryOrange,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
             context,
-            label: 'This Week',
+            label: AppStrings.thisWeek,
             value: '5',
             icon: Icons.calendar_today,
+            color: AppTheme.successGreen,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
             context,
-            label: 'Streak',
+            label: AppStrings.streak,
             value: '7',
             icon: Icons.local_fire_department,
+            color: AppTheme.warningAmber,
           ),
         ),
       ],
@@ -223,35 +222,45 @@ class ProfilePage extends StatelessWidget {
     required String label,
     required String value,
     required IconData icon,
+    required Color color,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.borderDark, width: 1),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: AppTheme.primaryOrange,
-            size: 24,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.primaryOrange,
+                  color: color,
                 ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             textAlign: TextAlign.center,
+            maxLines: 2,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppTheme.textMedium,
+                  height: 1.2,
                 ),
           ),
         ],
@@ -271,7 +280,9 @@ class ProfilePage extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
         ...children,
@@ -279,7 +290,37 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsTile(
+  Widget _buildNavigationTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppTheme.primaryOrange, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.textDim),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildActionTile(
     BuildContext context, {
     required IconData icon,
     required String title,
@@ -289,7 +330,7 @@ class ProfilePage extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(icon, color: AppTheme.primaryOrange),
+        leading: Icon(icon, color: AppTheme.textMedium),
         title: Text(title),
         subtitle: subtitle != null ? Text(subtitle) : null,
         trailing: const Icon(Icons.chevron_right, color: AppTheme.textDim),
@@ -298,11 +339,61 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Widget _buildSignOutButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showComingSoon(context),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.errorRed,
+          side: const BorderSide(color: AppTheme.errorRed),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        icon: const Icon(Icons.logout),
+        label: const Text(
+          AppStrings.signOut,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Coming soon!'),
+        content: Text(AppStrings.comingSoon),
         behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(20),
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(EnvConfig.appName),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${AppStrings.version}: ${EnvConfig.appVersion}'),
+            const SizedBox(height: 8),
+            Text(
+              'A personal fitness tracking app to monitor weekly muscle group training goals.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(AppStrings.gotIt),
+          ),
+        ],
       ),
     );
   }

@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/targets_manager.dart';
 import '../../../domain/entities/target.dart';
 
+/// Clean targets management page - now a main tab for quick access
 class TargetsPage extends StatelessWidget {
   const TargetsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text('Targets'),
+        title: const Text(AppStrings.targetsTitle),
+        automaticallyImplyLeading: false, // No back button - it's a main tab
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showInfoDialog(context),
+            tooltip: AppStrings.aboutTargets,
           ),
         ],
       ),
@@ -27,11 +32,12 @@ class TargetsPage extends StatelessWidget {
 
           return Column(
             children: [
-              if (targets.isEmpty)
-                Expanded(child: _buildEmptyState(context))
-              else
-                Expanded(child: _buildTargetsList(context, targets)),
-              _buildAddTargetButton(context, targetsManager),
+              Expanded(
+                child: targets.isEmpty
+                    ? _buildEmptyState(context)
+                    : _buildTargetsList(context, targets),
+              ),
+              _buildAddButton(context, targetsManager),
             ],
           );
         },
@@ -46,21 +52,29 @@ class TargetsPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.flag_outlined,
-              size: 80,
-              color: AppTheme.textDim,
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryOrange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.flag_outlined,
+                size: 60,
+                color: AppTheme.primaryOrange,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
-              'No Targets Yet',
+              AppStrings.noTargetsYet,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Add muscle groups you want to focus on and set weekly rep targets for each',
+              AppStrings.noTargetsDescription,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppTheme.textMedium,
@@ -70,7 +84,7 @@ class TargetsPage extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: () => _showAddTargetDialog(context),
               icon: const Icon(Icons.add),
-              label: const Text('Add Your First Target'),
+              label: const Text(AppStrings.addFirstTarget),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -100,49 +114,90 @@ class TargetsPage extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryOrange.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _showEditTargetDialog(context, target),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.flag,
+                  color: AppTheme.primaryOrange,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${target.weeklyGoal} ${AppStrings.setsPerWeek}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.textMedium,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppTheme.textDim),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _showEditTargetDialog(context, target);
+                  } else if (value == 'delete') {
+                    _confirmDeleteTarget(context, target);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 12),
+                        Text(AppStrings.edit),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
+                        SizedBox(width: 12),
+                        Text(AppStrings.remove, style: TextStyle(color: AppTheme.errorRed)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          child: const Icon(
-            Icons.fitness_center,
-            color: AppTheme.primaryOrange,
-            size: 24,
-          ),
-        ),
-        title: Text(
-          displayName,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: Text(
-          '${target.weeklyGoal} sets per week',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              color: AppTheme.primaryOrange,
-              onPressed: () => _showEditTargetDialog(context, target),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              color: AppTheme.errorRed,
-              onPressed: () => _confirmDeleteTarget(context, target),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildAddTargetButton(
-      BuildContext context, TargetsManager targetsManager) {
+  Widget _buildAddButton(
+    BuildContext context,
+    TargetsManager targetsManager,
+  ) {
     final hasAvailableMuscles = targetsManager.availableMuscleGroups.isNotEmpty;
 
     return Container(
@@ -162,7 +217,16 @@ class TargetsPage extends StatelessWidget {
                 : null,
             icon: const Icon(Icons.add),
             label: Text(
-              hasAvailableMuscles ? 'Add Target' : 'All Muscle Groups Added',
+              hasAvailableMuscles
+                  ? AppStrings.addTarget
+                  : AppStrings.allMuscleGroupsAdded,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
         ),
@@ -177,8 +241,9 @@ class TargetsPage extends StatelessWidget {
     if (availableMuscles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('All muscle groups have been added as targets!'),
+          content: Text(AppStrings.allMuscleGroupsAdded),
           behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(20),
         ),
       );
       return;
@@ -203,12 +268,12 @@ class TargetsPage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Target'),
-        content: Text('Remove $displayName from your targets?'),
+        title: const Text(AppStrings.removeTarget),
+        content: Text('${AppStrings.removeTargetConfirm}\n\n$displayName'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(AppStrings.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -216,13 +281,14 @@ class TargetsPage extends StatelessWidget {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('$displayName removed from targets'),
+                  content: Text('$displayName ${AppStrings.targetRemoved}'),
                   behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.all(20),
                 ),
               );
             },
             style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
-            child: const Text('Remove'),
+            child: const Text(AppStrings.remove),
           ),
         ],
       ),
@@ -233,16 +299,12 @@ class TargetsPage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('About Targets'),
-        content: const Text(
-          'Targets let you focus on specific muscle groups. '
-          'Add the muscles you want to train and set weekly rep goals for each. '
-          'Track your progress on the home page!',
-        ),
+        title: const Text(AppStrings.aboutTargets),
+        content: const Text(AppStrings.aboutTargetsDescription),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
+            child: const Text(AppStrings.gotIt),
           ),
         ],
       ),
@@ -250,6 +312,7 @@ class TargetsPage extends StatelessWidget {
   }
 }
 
+// Add Target Dialog
 class _AddTargetDialog extends StatefulWidget {
   final List<String> availableMuscles;
 
@@ -265,103 +328,137 @@ class _AddTargetDialogState extends State<_AddTargetDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Target'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Muscle Group',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _selectedMuscle,
-            decoration: InputDecoration(
-              hintText: 'Choose a muscle group',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            items: widget.availableMuscles.map((muscle) {
-              return DropdownMenuItem(
-                value: muscle,
-                child: Text(MuscleGroups.getDisplayName(muscle)),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedMuscle = value;
-              });
-            },
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Weekly Rep Goal',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 12),
-          Row(
+    return Dialog(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                onPressed: _weeklyGoal > 1
-                    ? () => setState(() => _weeklyGoal--)
-                    : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                color: AppTheme.primaryOrange,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppStrings.addTarget,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    '$_weeklyGoal sets',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+              const SizedBox(height: 24),
+              Text(
+                AppStrings.selectMuscleGroup,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _selectedMuscle,
+                decoration: InputDecoration(
+                  hintText: 'Choose a muscle group',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                items: widget.availableMuscles.map((muscle) {
+                  return DropdownMenuItem(
+                    value: muscle,
+                    child: Text(MuscleGroups.getDisplayName(muscle)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedMuscle = value;
+                  });
+                },
               ),
-              IconButton(
-                onPressed: () => setState(() => _weeklyGoal++),
-                icon: const Icon(Icons.add_circle_outline),
-                color: AppTheme.primaryOrange,
+              const SizedBox(height: 24),
+              Text(
+                AppStrings.weeklyRepGoal,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: _weeklyGoal > 1
+                        ? () => setState(() => _weeklyGoal--)
+                        : null,
+                    icon: const Icon(Icons.remove_circle_outline),
+                    color: AppTheme.primaryOrange,
+                    iconSize: 32,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      '$_weeklyGoal ${AppStrings.sets}',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _weeklyGoal++),
+                    icon: const Icon(Icons.add_circle_outline),
+                    color: AppTheme.primaryOrange,
+                    iconSize: 32,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _selectedMuscle != null
+                          ? () {
+                              TargetsManager().addTarget(_selectedMuscle!, _weeklyGoal);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${MuscleGroups.getDisplayName(_selectedMuscle!)} ${AppStrings.targetAdded}',
+                                  ),
+                                  backgroundColor: AppTheme.successGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  margin: const EdgeInsets.all(20),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: const Text(AppStrings.add),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _selectedMuscle != null
-              ? () {
-                  TargetsManager().addTarget(_selectedMuscle!, _weeklyGoal);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${MuscleGroups.getDisplayName(_selectedMuscle!)} added to targets!',
-                      ),
-                      backgroundColor: AppTheme.successGreen,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              : null,
-          child: const Text('Add Target'),
-        ),
-      ],
     );
   }
 }
 
+// Edit Target Dialog
 class _EditTargetDialog extends StatefulWidget {
   final Target target;
 
@@ -384,67 +481,100 @@ class _EditTargetDialogState extends State<_EditTargetDialog> {
   Widget build(BuildContext context) {
     final displayName = MuscleGroups.getDisplayName(widget.target.muscleGroup);
 
-    return AlertDialog(
-      title: Text('Edit $displayName'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Weekly Rep Goal',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 12),
-          Row(
+    return Dialog(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                onPressed: _weeklyGoal > 1
-                    ? () => setState(() => _weeklyGoal--)
-                    : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                color: AppTheme.primaryOrange,
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    '$_weeklyGoal sets',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${AppStrings.edit} $displayName',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
-                ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              IconButton(
-                onPressed: () => setState(() => _weeklyGoal++),
-                icon: const Icon(Icons.add_circle_outline),
-                color: AppTheme.primaryOrange,
+              const SizedBox(height: 24),
+              Text(
+                AppStrings.weeklyRepGoal,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: _weeklyGoal > 1
+                        ? () => setState(() => _weeklyGoal--)
+                        : null,
+                    icon: const Icon(Icons.remove_circle_outline),
+                    color: AppTheme.primaryOrange,
+                    iconSize: 32,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      '$_weeklyGoal ${AppStrings.sets}',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _weeklyGoal++),
+                    icon: const Icon(Icons.add_circle_outline),
+                    color: AppTheme.primaryOrange,
+                    iconSize: 32,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        TargetsManager().updateTarget(
+                          widget.target.muscleGroup,
+                          _weeklyGoal,
+                        );
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('$displayName ${AppStrings.targetUpdated}'),
+                            backgroundColor: AppTheme.successGreen,
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(20),
+                          ),
+                        );
+                      },
+                      child: const Text(AppStrings.save),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            TargetsManager().updateTarget(
-              widget.target.muscleGroup,
-              _weeklyGoal,
-            );
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$displayName updated!'),
-                backgroundColor: AppTheme.successGreen,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }

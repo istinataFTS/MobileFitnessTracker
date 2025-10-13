@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/workout_sets_manager.dart';
 import '../../../core/utils/exercises_manager.dart';
 import '../../../domain/entities/exercise.dart';
-import 'package:intl/intl.dart';
 
+/// Clean, straightforward logging interface as a main tab
 class LogSetPage extends StatefulWidget {
   const LogSetPage({super.key});
 
@@ -32,110 +34,122 @@ class _LogSetPageState extends State<LogSetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text('Log Set'),
+        title: const Text(AppStrings.logSetTitle),
+        automaticallyImplyLeading: false, // No back button - it's a main tab
       ),
       body: Form(
         key: _formKey,
         child: Column(
           children: [
-            _buildDateSelector(context),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildExerciseDropdown(),
+                    _buildDateCard(),
+                    const SizedBox(height: 24),
+                    _buildExerciseSection(),
                     if (_selectedExercise != null) ...[
-                      const SizedBox(height: 16),
-                      _buildMuscleGroupsDisplay(),
+                      const SizedBox(height: 20),
+                      _buildMuscleGroupsCard(),
+                      const SizedBox(height: 24),
+                      _buildInputFields(),
                     ],
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: _buildRepsField()),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildWeightField()),
-                      ],
-                    ),
                   ],
                 ),
               ),
             ),
-            _buildSaveButton(context),
+            _buildSaveButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDateSelector(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: AppTheme.surfaceDark,
-        border: Border(
-          bottom: BorderSide(color: AppTheme.borderDark),
+  Widget _buildDateCard() {
+    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) ==
+        DateFormat('yyyy-MM-dd').format(DateTime.now());
+    
+    return Card(
+      child: InkWell(
+        onTap: () => _selectDate(context),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.calendar_today,
+                  color: AppTheme.primaryOrange,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.workoutDate,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isToday
+                          ? '${AppStrings.today} - ${DateFormat(AppStrings.dateFormatDate).format(_selectedDate)}'
+                          : DateFormat(AppStrings.dateFormatFull).format(_selectedDate),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppTheme.textDim,
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.calendar_today,
-            size: 20,
-            color: AppTheme.textMedium,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Workout Date',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat('EEEE, MMMM d, y').format(_selectedDate),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => _selectDate(context),
-            child: const Text('Change'),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildExerciseDropdown() {
+  Widget _buildExerciseSection() {
     final exercises = ExercisesManager().exercises;
 
     if (exercises.isEmpty) {
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(32),
           child: Column(
             children: [
               const Icon(
                 Icons.fitness_center_outlined,
-                size: 48,
+                size: 64,
                 color: AppTheme.textDim,
               ),
               const SizedBox(height: 16),
               Text(
-                'No Exercises Available',
-                style: Theme.of(context).textTheme.titleMedium,
+                AppStrings.noExercisesAvailable,
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Create exercises first in the Exercises page',
+                AppStrings.createExercisesFirst,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textMedium,
+                    ),
               ),
             ],
           ),
@@ -147,46 +161,58 @@ class _LogSetPageState extends State<LogSetPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Exercise',
-          style: Theme.of(context).textTheme.titleMedium,
+          AppStrings.exercise,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<Exercise>(
-          value: _selectedExercise,
-          decoration: InputDecoration(
-            hintText: 'Select exercise',
-            prefixIcon: const Icon(Icons.fitness_center),
-            filled: true,
-            fillColor: AppTheme.surfaceDark,
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: DropdownButtonFormField<Exercise>(
+              value: _selectedExercise,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: AppStrings.selectExercise,
+                prefixIcon: Icon(
+                  Icons.fitness_center,
+                  color: AppTheme.primaryOrange,
+                ),
+              ),
+              items: exercises.map((exercise) {
+                return DropdownMenuItem(
+                  value: exercise,
+                  child: Text(
+                    exercise.name,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedExercise = value;
+                });
+              },
+              validator: (value) {
+                if (value == null) {
+                  return AppStrings.pleaseSelectExercise;
+                }
+                return null;
+              },
+              dropdownColor: AppTheme.surfaceDark,
+            ),
           ),
-          items: exercises.map((exercise) {
-            return DropdownMenuItem(
-              value: exercise,
-              child: Text(exercise.name),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedExercise = value;
-            });
-          },
-          validator: (value) {
-            if (value == null) {
-              return 'Please select an exercise';
-            }
-            return null;
-          },
         ),
       ],
     );
   }
 
-  Widget _buildMuscleGroupsDisplay() {
-    if (_selectedExercise == null) return const SizedBox.shrink();
-
+  Widget _buildMuscleGroupsCard() {
     return Card(
+      color: AppTheme.primaryOrange.withOpacity(0.05),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -194,13 +220,15 @@ class _LogSetPageState extends State<LogSetPage> {
               children: [
                 const Icon(
                   Icons.info_outline,
-                  size: 18,
+                  size: 20,
                   color: AppTheme.primaryOrange,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Muscle Groups Worked',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  AppStrings.muscleGroupsWorked,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.primaryOrange,
+                      ),
                 ),
               ],
             ),
@@ -209,20 +237,32 @@ class _LogSetPageState extends State<LogSetPage> {
               spacing: 8,
               runSpacing: 8,
               children: _selectedExercise!.muscleGroups.map((mg) {
-                return Chip(
-                  label: Text(MuscleGroups.getDisplayName(mg)),
-                  backgroundColor: AppTheme.primaryOrange.withOpacity(0.1),
-                  labelStyle: const TextStyle(
-                    color: AppTheme.primaryOrange,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppTheme.primaryOrange.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    MuscleGroups.getDisplayName(mg),
+                    style: const TextStyle(
+                      color: AppTheme.primaryOrange,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
-              'This set will count toward all muscle groups above',
+              AppStrings.setWillCountToward,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textMedium,
                   ),
@@ -233,30 +273,57 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildRepsField() {
+  Widget _buildInputFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Reps',
-          style: Theme.of(context).textTheme.titleMedium,
+          'Set Details',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildRepsField()),
+            const SizedBox(width: 12),
+            Expanded(child: _buildWeightField()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRepsField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            AppStrings.reps,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ),
         TextFormField(
           controller: _repsController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: '12',
-            prefixIcon: Icon(Icons.repeat),
+            prefixIcon: const Icon(Icons.repeat),
+            filled: true,
+            fillColor: AppTheme.surfaceDark,
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: Theme.of(context).textTheme.titleLarge,
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Required';
+              return AppStrings.required;
             }
             final reps = int.tryParse(value);
             if (reps == null || reps < 1) {
-              return 'Invalid';
+              return AppStrings.invalid;
             }
             return null;
           },
@@ -269,28 +336,33 @@ class _LogSetPageState extends State<LogSetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Weight (kg)',
-          style: Theme.of(context).textTheme.titleMedium,
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            AppStrings.weight,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
         ),
-        const SizedBox(height: 8),
         TextFormField(
           controller: _weightController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: '75',
-            prefixIcon: Icon(Icons.monitor_weight),
+            prefixIcon: const Icon(Icons.monitor_weight),
+            filled: true,
+            fillColor: AppTheme.surfaceDark,
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
           ],
+          style: Theme.of(context).textTheme.titleLarge,
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Required';
+              return AppStrings.required;
             }
             final weight = double.tryParse(value);
             if (weight == null || weight <= 0) {
-              return 'Invalid';
+              return AppStrings.invalid;
             }
             return null;
           },
@@ -299,25 +371,30 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildSaveButton(BuildContext context) {
+  Widget _buildSaveButton() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
+        border: Border(
+          top: BorderSide(color: AppTheme.borderDark, width: 1),
+        ),
       ),
       child: SafeArea(
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _saveSet,
-            child: const Text('Log Set'),
+            onPressed: _selectedExercise != null ? _saveSet : null,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text(
+              AppStrings.logSetButton,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ),
@@ -335,6 +412,7 @@ class _LogSetPageState extends State<LogSetPage> {
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
               primary: AppTheme.primaryOrange,
+              surface: AppTheme.surfaceDark,
             ),
           ),
           child: child!,
@@ -366,17 +444,27 @@ class _LogSetPageState extends State<LogSetPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Set logged: ${_selectedExercise!.name} - $reps reps @ ${weight}kg\n'
-            'Counted for: $muscleGroupsList',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                AppStrings.setLoggedSuccess,
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text('${_selectedExercise!.name} - $reps reps @ ${weight}kg'),
+              Text('${AppStrings.countedFor}: $muscleGroupsList'),
+            ],
           ),
           backgroundColor: AppTheme.successGreen,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 4),
+          margin: const EdgeInsets.all(20),
         ),
       );
 
-      // Clear form
+      // Clear form for next entry
       setState(() {
         _repsController.clear();
         _weightController.clear();
