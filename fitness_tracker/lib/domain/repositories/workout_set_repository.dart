@@ -4,8 +4,8 @@ import '../entities/workout_set.dart';
 
 abstract class WorkoutSetRepository {
   Future<Either<Failure, List<WorkoutSet>>> getAllSets();
-  Future<Either<Failure, List<WorkoutSet>>> getSetsByMuscleGroup(
-    String muscleGroup,
+  Future<Either<Failure, List<WorkoutSet>>> getSetsByExerciseId(
+    String exerciseId,
   );
   Future<Either<Failure, List<WorkoutSet>>> getSetsByDateRange(
     DateTime startDate,

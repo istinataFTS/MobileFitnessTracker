@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/goals_manager.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -17,14 +15,6 @@ class SettingsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSection(              
-              context,
-              title: 'Weekly Goals',
-              children: [
-                _buildGoalsCard(context),
-              ],
-            ),
-            const SizedBox(height: 24),
             _buildSection(
               context,
               title: 'General',
@@ -104,37 +94,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildGoalsCard(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Muscle Group Goals',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                TextButton(
-                  onPressed: () => _showEditGoalsDialog(context),
-                  child: const Text('Edit'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Customize your weekly set targets for each muscle group',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSettingsTile(
     BuildContext context, {
     required IconData icon,
@@ -156,190 +115,11 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showEditGoalsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return _EditGoalsDialog();
-      },
-    );
-  }
-
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Coming soon!'),
         behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-}
-
-class _EditGoalsDialog extends StatefulWidget {
-  @override
-  State<_EditGoalsDialog> createState() => _EditGoalsDialogState();
-}
-
-class _EditGoalsDialogState extends State<_EditGoalsDialog> {
-  late Map<String, int> _goals;
-  final _goalsManager = GoalsManager();
-
-  @override
-  void initState() {
-    super.initState();
-    // Load actual goals from GoalsManager
-    _goals = Map.from(_goalsManager.goals);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Edit Weekly Goals',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.all(20),
-                itemCount: MuscleGroups.all.length,
-                itemBuilder: (context, index) {
-                  final muscle = MuscleGroups.all[index];
-                  final displayName = MuscleGroups.getDisplayName(muscle);
-                  final currentGoal = _goals[muscle] ?? 10;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayName,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
-                        _buildGoalCounter(muscle, currentGoal),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _goals = Map.from(MuscleGroups.defaultWeeklyGoals);
-                        });
-                      },
-                      child: const Text('Reset to Default'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Save goals to GoalsManager
-                        _goalsManager.updateAllGoals(_goals);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Goals updated!'),
-                            backgroundColor: AppTheme.successGreen,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGoalCounter(String muscle, int currentGoal) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.borderDark),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildCounterButton(
-            icon: Icons.remove,
-            onPressed: currentGoal > 0
-                ? () {
-                    setState(() {
-                      _goals[muscle] = currentGoal - 1;
-                    });
-                  }
-                : null,
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              currentGoal.toString(),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-          _buildCounterButton(
-            icon: Icons.add,
-            onPressed: () {
-              setState(() {
-                _goals[muscle] = currentGoal + 1;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCounterButton({
-    required IconData icon,
-    required VoidCallback? onPressed,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          size: 20,
-          color: onPressed != null ? AppTheme.primaryOrange : AppTheme.textLight,
-        ),
       ),
     );
   }

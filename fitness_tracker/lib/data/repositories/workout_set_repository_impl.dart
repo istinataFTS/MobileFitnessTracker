@@ -24,14 +24,11 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   }
 
   @override
-  Future<Either<Failure, List<WorkoutSet>>> getSetsByMuscleGroup(
-    String muscleGroup,
+  Future<Either<Failure, List<WorkoutSet>>> getSetsByExerciseId(
+    String exerciseId,
   ) async {
     try {
-      // Note: This needs to be implemented differently now since sets
-      // reference exercises, not muscle groups directly
-      // For now, returning all sets - you'll need to filter by exercise
-      final sets = await localDataSource.getAllSets();
+      final sets = await localDataSource.getSetsByExerciseId(exerciseId);
       return Right(sets);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
