@@ -1,7 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/constants/database_tables.dart';
-import '../../../config/app_config.dart';
+import '../../../config/env_config.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -11,12 +12,21 @@ class DatabaseHelper {
   static Database? _database;
 
   Future<Database> get database async {
+    // Return a dummy database on web
+    if (kIsWeb) {
+      throw UnsupportedError('Database is not supported on web');
+    }
+    
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
+    if (kIsWeb) {
+      throw UnsupportedError('Database is not supported on web');
+    }
+    
     final databasesPath = await getDatabasesPath();
     final path = join(databasesPath, EnvConfig.databaseName);
 
@@ -39,7 +49,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create workout_sets table with exerciseId instead of muscleGroup
+    // Create workout_sets table with exerciseId
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -94,6 +104,8 @@ class DatabaseHelper {
   }
 
   Future<void> close() async {
+    if (kIsWeb) return;
+    
     final db = await database;
     await db.close();
     _database = null;
