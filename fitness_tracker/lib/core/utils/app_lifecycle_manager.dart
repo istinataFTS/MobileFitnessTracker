@@ -1,61 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import '../../data/datasources/local/database_helper.dart';
+import '../datasources/local/database_helper.dart';
 import 'performance_monitor.dart';
 
-/// Manages app lifecycle events and resources
+/// Manages app lifecycle events and performs appropriate actions
 class AppLifecycleManager with WidgetsBindingObserver {
   static final AppLifecycleManager _instance = AppLifecycleManager._internal();
   factory AppLifecycleManager() => _instance;
   AppLifecycleManager._internal();
 
-  bool _isInitialized = false;
   DateTime? _lastPauseTime;
   final List<VoidCallback> _resumeCallbacks = [];
   final List<VoidCallback> _pauseCallbacks = [];
 
-  /// Initialize lifecycle management
+  /// Initialize the lifecycle manager
   void initialize() {
-    if (_isInitialized) return;
-    
     WidgetsBinding.instance.addObserver(this);
-    _isInitialized = true;
-    debugPrint('AppLifecycleManager initialized');
+    debugPrint('✅ App lifecycle manager initialized');
   }
 
   /// Clean up resources
   void dispose() {
-    if (!_isInitialized) return;
-    
     WidgetsBinding.instance.removeObserver(this);
-    _isInitialized = false;
     _resumeCallbacks.clear();
     _pauseCallbacks.clear();
   }
 
-  /// Register callback for app resume
-  void onResume(VoidCallback callback) {
+  /// Register a callback to be called when app resumes
+  void addResumeCallback(VoidCallback callback) {
     _resumeCallbacks.add(callback);
   }
 
-  /// Register callback for app pause
-  void onPause(VoidCallback callback) {
+  /// Register a callback to be called when app pauses
+  void addPauseCallback(VoidCallback callback) {
     _pauseCallbacks.add(callback);
-  }
-
-  /// Remove resume callback
-  void removeResumeCallback(VoidCallback callback) {
-    _resumeCallbacks.remove(callback);
-  }
-
-  /// Remove pause callback
-  void removePauseCallback(VoidCallback callback) {
-    _pauseCallbacks.remove(callback);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    debugPrint('App lifecycle state: $state');
+    super.didChangeAppLifecycleState(state);
     
     switch (state) {
       case AppLifecycleState.resumed:
@@ -64,14 +46,14 @@ class AppLifecycleManager with WidgetsBindingObserver {
       case AppLifecycleState.paused:
         _handleAppPaused();
         break;
-      case AppLifecycleState.detached:
-        _handleAppDetached();
-        break;
       case AppLifecycleState.inactive:
         _handleAppInactive();
         break;
+      case AppLifecycleState.detached:
+        _handleAppDetached();
+        break;
       case AppLifecycleState.hidden:
-        // Handle hidden state (newer Flutter versions)
+        // App is hidden but still running
         break;
     }
   }
@@ -79,7 +61,7 @@ class AppLifecycleManager with WidgetsBindingObserver {
   void _handleAppResumed() {
     debugPrint('App resumed');
     
-    // Log resume time if app was paused
+    // Calculate pause duration if available
     if (_lastPauseTime != null) {
       final pauseDuration = DateTime.now().difference(_lastPauseTime!);
       debugPrint('App was paused for: ${pauseDuration.inSeconds} seconds');
@@ -112,10 +94,8 @@ class AppLifecycleManager with WidgetsBindingObserver {
       }
     }
     
-    // Compact database on mobile when app is paused
-    if (!kIsWeb) {
-      _compactDatabase();
-    }
+    // Compact database when app is paused
+    _compactDatabase();
   }
 
   void _handleAppInactive() {
@@ -127,9 +107,7 @@ class AppLifecycleManager with WidgetsBindingObserver {
     debugPrint('App detached');
     
     // Clean up resources
-    if (!kIsWeb) {
-      _closeDatabase();
-    }
+    _closeDatabase();
     
     // Clear performance metrics
     PerformanceMonitor.clearMetrics();
@@ -137,12 +115,11 @@ class AppLifecycleManager with WidgetsBindingObserver {
 
   /// Compact database to optimize storage
   Future<void> _compactDatabase() async {
-    if (kIsWeb) return;
-    
     try {
       debugPrint('Compacting database...');
       // Database compaction would go here
       // For SQLite, this might involve VACUUM command
+      // Example: await database.execute('VACUUM');
     } catch (e) {
       debugPrint('Failed to compact database: $e');
     }
@@ -150,8 +127,6 @@ class AppLifecycleManager with WidgetsBindingObserver {
 
   /// Close database connection
   Future<void> _closeDatabase() async {
-    if (kIsWeb) return;
-    
     try {
       debugPrint('Closing database...');
       await DatabaseHelper().close();

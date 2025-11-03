@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/workout_sets_manager.dart';
 import '../../../core/utils/exercises_manager.dart';
 import '../../../domain/entities/exercise.dart';
+import '../../../domain/entities/workout_set.dart';
+import 'bloc/log_set_bloc.dart';
 
-/// Clean, straightforward logging interface as a main tab
+/// Clean, straightforward logging interface using BLoC pattern with database persistence
 class LogSetPage extends StatefulWidget {
   const LogSetPage({super.key});
 
@@ -20,7 +23,7 @@ class _LogSetPageState extends State<LogSetPage> {
   final _formKey = GlobalKey<FormState>();
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
-  
+
   Exercise? _selectedExercise;
   DateTime _selectedDate = DateTime.now();
 
@@ -37,33 +40,49 @@ class _LogSetPageState extends State<LogSetPage> {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text(AppStrings.logSetTitle),
-        automaticallyImplyLeading: false, // No back button - it's a main tab
+        automaticallyImplyLeading: false,
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDateCard(),
-                    const SizedBox(height: 24),
-                    _buildExerciseSection(),
-                    if (_selectedExercise != null) ...[
-                      const SizedBox(height: 20),
-                      _buildMuscleGroupsCard(),
+      body: BlocListener<LogSetBloc, LogSetState>(
+        listener: (context, state) {
+          if (state is SetLoggedSuccess) {
+            _handleSetLoggedSuccess();
+          } else if (state is LogSetError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.errorRed,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(20),
+              ),
+            );
+          }
+        },
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDateCard(),
                       const SizedBox(height: 24),
-                      _buildInputFields(),
+                      _buildExerciseSection(),
+                      if (_selectedExercise != null) ...[
+                        const SizedBox(height: 20),
+                        _buildMuscleGroupsCard(),
+                        const SizedBox(height: 24),
+                        _buildInputFields(),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            _buildSaveButton(),
-          ],
+              _buildSaveButton(),
+            ],
+          ),
         ),
       ),
     );
@@ -72,7 +91,7 @@ class _LogSetPageState extends State<LogSetPage> {
   Widget _buildDateCard() {
     final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) ==
         DateFormat('yyyy-MM-dd').format(DateTime.now());
-    
+
     return Card(
       child: InkWell(
         onTap: () => _selectDate(context),
@@ -106,7 +125,8 @@ class _LogSetPageState extends State<LogSetPage> {
                     Text(
                       isToday
                           ? '${AppStrings.today} - ${DateFormat(AppStrings.dateFormatDate).format(_selectedDate)}'
-                          : DateFormat(AppStrings.dateFormatFull).format(_selectedDate),
+                          : DateFormat(AppStrings.dateFormatFull)
+                              .format(_selectedDate),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -228,6 +248,7 @@ class _LogSetPageState extends State<LogSetPage> {
                   AppStrings.muscleGroupsWorked,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppTheme.primaryOrange,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ],
@@ -419,6 +440,7 @@ class _LogSetPageState extends State<LogSetPage> {
         );
       },
     );
+
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
@@ -427,49 +449,63 @@ class _LogSetPageState extends State<LogSetPage> {
   }
 
   void _saveSet() {
-    if (_formKey.currentState!.validate() && _selectedExercise != null) {
-      final reps = int.parse(_repsController.text);
-      final weight = double.parse(_weightController.text);
-
-      WorkoutSetsManager().addSet(
-        exerciseId: _selectedExercise!.id,
-        reps: reps,
-        weight: weight,
-        date: _selectedDate,
-      );
-
-      final muscleGroupsList = _selectedExercise!.muscleGroups
-          .map((mg) => MuscleGroups.getDisplayName(mg))
-          .join(', ');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                AppStrings.setLoggedSuccess,
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text('${_selectedExercise!.name} - $reps reps @ ${weight}kg'),
-              Text('${AppStrings.countedFor}: $muscleGroupsList'),
-            ],
-          ),
-          backgroundColor: AppTheme.successGreen,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-          margin: const EdgeInsets.all(20),
-        ),
-      );
-
-      // Clear form for next entry
-      setState(() {
-        _repsController.clear();
-        _weightController.clear();
-        _selectedExercise = null;
-      });
+    if (!_formKey.currentState!.validate() || _selectedExercise == null) {
+      return;
     }
+
+    final reps = int.parse(_repsController.text);
+    final weight = double.parse(_weightController.text);
+
+    final workoutSet = WorkoutSet(
+      id: const Uuid().v4(),
+      exerciseId: _selectedExercise!.id,
+      reps: reps,
+      weight: weight,
+      date: _selectedDate,
+      createdAt: DateTime.now(),
+    );
+
+    context.read<LogSetBloc>().add(AddSetEvent(workoutSet));
+  }
+
+  void _handleSetLoggedSuccess() {
+    if (_selectedExercise == null) return;
+
+    final reps = int.tryParse(_repsController.text) ?? 0;
+    final weight = double.tryParse(_weightController.text) ?? 0.0;
+
+    final muscleGroupsList = _selectedExercise!.muscleGroups
+        .map((mg) => MuscleGroups.getDisplayName(mg))
+        .join(', ');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              AppStrings.setLoggedSuccess,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text('${_selectedExercise!.name} - $reps reps @ ${weight}kg'),
+            Text('${AppStrings.countedFor}: $muscleGroupsList'),
+          ],
+        ),
+        backgroundColor: AppTheme.successGreen,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(20),
+      ),
+    );
+
+    // Clear form for next entry
+    setState(() {
+      _repsController.clear();
+      _weightController.clear();
+      _selectedExercise = null;
+      _selectedDate = DateTime.now();
+    });
   }
 }

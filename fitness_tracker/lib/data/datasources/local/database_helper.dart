@@ -32,7 +32,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: EnvConfig.databaseVersion,
+      version: 3, // Increment version to trigger migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -49,7 +49,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create workout_sets table with exerciseId
+    // Create workout_sets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -58,6 +58,16 @@ class DatabaseHelper {
         ${DatabaseTables.setWeight} REAL NOT NULL,
         ${DatabaseTables.setDate} TEXT NOT NULL,
         ${DatabaseTables.setCreatedAt} TEXT NOT NULL
+      )
+    ''');
+
+    // Create exercises table
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.exercises} (
+        ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
+        ${DatabaseTables.exerciseName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
+        ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL
       )
     ''');
 
@@ -71,13 +81,17 @@ class DatabaseHelper {
       CREATE INDEX idx_workout_sets_date 
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
     ''');
+
+    await db.execute('''
+      CREATE INDEX idx_exercises_name 
+      ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Handle database migrations here
     if (oldVersion < 2) {
       // Migration logic for version 2
-      // Drop old table and recreate with new schema
       await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
       
       await db.execute('''
@@ -99,6 +113,23 @@ class DatabaseHelper {
       await db.execute('''
         CREATE INDEX idx_workout_sets_date 
         ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      // Migration logic for version 3 - add exercises table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ${DatabaseTables.exercises} (
+          ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
+          ${DatabaseTables.exerciseName} TEXT NOT NULL UNIQUE,
+          ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
+          ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_exercises_name 
+        ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
       ''');
     }
   }

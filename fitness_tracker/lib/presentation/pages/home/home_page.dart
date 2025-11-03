@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/targets_manager.dart';
-import '../../../core/utils/workout_sets_manager.dart';
 import '../../../core/utils/exercises_manager.dart';
 import '../../../config/app_config.dart';
 import 'package:intl/intl.dart';
@@ -22,19 +19,12 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     // Refresh data when page is shown
-    if (!kIsWeb) {
-      context.read<HomeBloc>().add(LoadHomeDataEvent());
-    }
+    context.read<HomeBloc>().add(LoadHomeDataEvent());
   }
 
   @override
   Widget build(BuildContext context) {
-    // Web: Use in-memory managers
-    if (kIsWeb) {
-      return _buildWebVersion(context);
-    }
-
-    // Mobile: Use BLoC with database
+    // Always use BLoC with database
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (context, state) {
         if (state is HomeLoading) {
@@ -99,38 +89,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWebVersion(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        TargetsManager(),
-        WorkoutSetsManager(),
-      ]),
-      builder: (context, child) {
-        final targetsManager = TargetsManager();
-        final setsManager = WorkoutSetsManager();
-        
-        return Scaffold(
-          body: SafeArea(
-            child: RefreshIndicator(
-              color: AppTheme.primaryOrange,
-              onRefresh: () async {
-                // On web, just a small delay for UX
-                await Future.delayed(const Duration(seconds: 1));
-              },
-              child: _buildContent(
-                context,
-                targetsManager.targets,
-                targetsManager.totalWeeklyTarget,
-                setsManager.totalWeeklySets,
-                setsManager.getWeeklyMuscleBreakdown(),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildLoadedState(BuildContext context, HomeLoaded state) {
     // Calculate totals from BLoC state
     final totalWeeklyTarget = state.targets.fold<int>(
@@ -150,19 +108,23 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-
+    
+    final totalWeeklySets = state.weeklySets.length;
+    
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
           color: AppTheme.primaryOrange,
           onRefresh: () async {
             context.read<HomeBloc>().add(LoadHomeDataEvent());
+            // Wait a moment for the bloc to process
+            await Future.delayed(const Duration(milliseconds: 500));
           },
           child: _buildContent(
             context,
             state.targets,
             totalWeeklyTarget,
-            state.weeklySets.length,
+            totalWeeklySets,
             muscleBreakdown,
           ),
         ),
@@ -172,125 +134,205 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildContent(
     BuildContext context,
-    List<dynamic> targets,
+    List targets,
     int totalWeeklyTarget,
     int totalWeeklySets,
     Map<String, int> muscleBreakdown,
   ) {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTodaySection(context),
-                    const SizedBox(height: 24),
-                    _buildWeekSummaryCard(
-                      context,
-                      totalWeeklyTarget,
-                      totalWeeklySets,
-                    ),
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(context, 'Target Progress'),
-                    const SizedBox(height: 16),
-                  ],
-                ),
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // Header
+        Text(
+          AppConfig.greeting,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: _buildTargetsList(context, targets, muscleBreakdown),
+        const SizedBox(height: 8),
+        Text(
+          _getWeekRangeString(),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: AppTheme.textMedium,
+              ),
         ),
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 20),
-        ),
-      ],
-    );
-  }
+        const SizedBox(height: 24),
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        border: Border(
-          bottom: BorderSide(color: AppTheme.borderDark, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primaryOrange,
-                  AppTheme.primaryOrange.withOpacity(0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+        // Weekly Overview Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  EnvConfig.userName,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Weekly Progress',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
+                      decoration: BoxDecoration(
+                        color: _getProgressColor(
+                          totalWeeklySets,
+                          totalWeeklyTarget,
+                        ).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _getProgressPercentage(
+                          totalWeeklySets,
+                          totalWeeklyTarget,
+                        ),
+                        style: TextStyle(
+                          color: _getProgressColor(
+                            totalWeeklySets,
+                            totalWeeklyTarget,
+                          ),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatColumn(
+                        context,
+                        'Sets',
+                        totalWeeklySets.toString(),
+                        Icons.fitness_center,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: AppTheme.borderDark,
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        context,
+                        'Target',
+                        totalWeeklyTarget.toString(),
+                        Icons.flag,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: AppTheme.borderDark,
+                    ),
+                    Expanded(
+                      child: _buildStatColumn(
+                        context,
+                        'Muscles',
+                        targets.length.toString(),
+                        Icons.auto_awesome,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: totalWeeklyTarget > 0
+                        ? (totalWeeklySets / totalWeeklyTarget).clamp(0.0, 1.0)
+                        : 0.0,
+                    minHeight: 8,
+                    backgroundColor: AppTheme.surfaceDark,
+                    color: _getProgressColor(totalWeeklySets, totalWeeklyTarget),
+                  ),
                 ),
               ],
             ),
           ),
-          if (!kIsWeb)
-            IconButton(
-              icon: const Icon(Icons.refresh, size: 20),
-              onPressed: () {
-                context.read<HomeBloc>().add(LoadHomeDataEvent());
-              },
-              tooltip: 'Refresh data',
+        ),
+        const SizedBox(height: 24),
+
+        // Muscle Groups Section
+        if (targets.isNotEmpty) ...[
+          Text(
+            'Muscle Groups',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 12),
+          ...targets.map((target) {
+            final currentSets = muscleBreakdown[target.muscleGroup] ?? 0;
+            return _buildMuscleGroupCard(
+              context,
+              target.muscleGroup,
+              currentSets,
+              target.weeklyGoal,
+            );
+          }).toList(),
+        ] else ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.target,
+                    size: 64,
+                    color: AppTheme.textDim,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Targets Set',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add muscle group targets to track your progress',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textMedium,
+                        ),
+                  ),
+                ],
+              ),
             ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
-  Widget _buildTodaySection(BuildContext context) {
-    final today = DateFormat('EEEE, MMMM d').format(DateTime.now());
-    
+  Widget _buildStatColumn(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Icon(icon, color: AppTheme.primaryOrange, size: 20),
+        const SizedBox(height: 8),
         Text(
-          "Today",
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+          value,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryOrange,
               ),
         ),
         const SizedBox(height: 4),
         Text(
-          today,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.textMedium,
               ),
         ),
@@ -298,315 +340,93 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWeekSummaryCard(
+  Widget _buildMuscleGroupCard(
     BuildContext context,
-    int goalSets,
-    int totalSets,
+    String muscleGroup,
+    int currentSets,
+    int targetSets,
   ) {
-    if (goalSets == 0) {
-      return Card(
-        child: InkWell(
-          onTap: () {
-            // Navigate to targets tab
-            final scaffold = Scaffold.of(context);
-            if (scaffold.hasDrawer) {
-              scaffold.openDrawer();
-            }
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
+    final progress = targetSets > 0 ? currentSets / targetSets : 0.0;
+    final percentage = (progress * 100).clamp(0, 100).toInt();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.flag_outlined,
-                  size: 48,
-                  color: AppTheme.textDim,
-                ),
-                const SizedBox(height: 16),
                 Text(
-                  'No Targets Set',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  MuscleGroups.getDisplayName(muscleGroup),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-                const SizedBox(height: 8),
                 Text(
-                  'Add targets to track your weekly progress',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Tap to add targets →',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryOrange,
+                  '$currentSets / $targetSets',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppTheme.textMedium,
                       ),
                 ),
               ],
             ),
-          ),
-        ),
-      );
-    }
-
-    final progress = totalSets / goalSets;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.surfaceDark,
-            AppTheme.surfaceDark.withOpacity(0.95),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderDark, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Weekly Progress',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              TweenAnimationBuilder<int>(
-                tween: IntTween(begin: 0, end: totalSets),
-                duration: const Duration(milliseconds: 1000),
-                builder: (context, value, child) {
-                  return Text(
-                    '$value',
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primaryOrange,
-                        ),
-                  );
-                },
-              ),
-              Text(
-                ' / $goalSets',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.textMedium,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              'sets completed',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-          const SizedBox(height: 20),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: progress.clamp(0.0, 1.0)),
-              duration: const Duration(milliseconds: 1500),
-              builder: (context, value, child) {
-                return LinearProgressIndicator(
-                  value: value,
-                  minHeight: 12,
-                  backgroundColor: AppTheme.borderDark,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    _getProgressColor(value),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}% Complete',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-              Text(
-                '${(goalSets - totalSets).clamp(0, goalSets)} sets remaining',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-    );
-  }
-
-  Widget _buildTargetsList(
-    BuildContext context,
-    List<dynamic> targets,
-    Map<String, int> muscleBreakdown,
-  ) {
-    if (targets.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Center(
-              child: Text(
-                'Add targets to see your progress here',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textMedium,
-                    ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final target = targets[index];
-          final completed = muscleBreakdown[target.muscleGroup] ?? 0;
-          return _buildTargetCard(
-            context,
-            target.muscleGroup,
-            completed,
-            target.weeklyGoal,
-          );
-        },
-        childCount: targets.length,
-      ),
-    );
-  }
-
-  Widget _buildTargetCard(
-    BuildContext context,
-    String muscleGroup,
-    int completed,
-    int goal,
-  ) {
-    final progress = completed / goal;
-    final remaining = goal - completed;
-    final displayName = MuscleGroups.getDisplayName(muscleGroup);
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 500),
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: value,
-          child: Opacity(
-            opacity: value,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceDark,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: progress >= 1.0
-                      ? AppTheme.successGreen.withOpacity(0.3)
-                      : AppTheme.borderDark,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        displayName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getProgressColor(progress).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$completed / $goal',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: _getProgressColor(progress),
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
                     child: LinearProgressIndicator(
                       value: progress.clamp(0.0, 1.0),
-                      minHeight: 6,
-                      backgroundColor: AppTheme.borderDark,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _getProgressColor(progress),
-                      ),
+                      minHeight: 8,
+                      backgroundColor: AppTheme.surfaceDark,
+                      color: _getProgressColor(currentSets, targetSets),
                     ),
                   ),
-                  if (remaining > 0) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      '$remaining sets remaining',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          size: 16,
-                          color: AppTheme.successGreen,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Target completed!',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppTheme.successGreen,
-                                fontWeight: FontWeight.w500,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$percentage%',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: _getProgressColor(currentSets, targetSets),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
-  Color _getProgressColor(double progress) {
-    if (progress >= 1.0) return AppTheme.successGreen;
-    if (progress >= 0.7) return AppTheme.primaryOrange;
-    if (progress >= 0.4) return AppTheme.warningAmber;
+  String _getWeekRangeString() {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+
+    final startFormat = DateFormat('MMM d');
+    final endFormat = DateFormat('MMM d, y');
+
+    return '${startFormat.format(weekStart)} - ${endFormat.format(weekEnd)}';
+  }
+
+  Color _getProgressColor(int current, int target) {
+    if (target == 0) return AppTheme.textDim;
+    final percentage = (current / target) * 100;
+
+    if (percentage >= 100) return AppTheme.successGreen;
+    if (percentage >= 75) return AppTheme.primaryOrange;
+    if (percentage >= 50) return AppTheme.accentYellow;
     return AppTheme.textDim;
+  }
+
+  String _getProgressPercentage(int current, int target) {
+    if (target == 0) return '0%';
+    final percentage = ((current / target) * 100).clamp(0, 100).toInt();
+    return '$percentage%';
   }
 }

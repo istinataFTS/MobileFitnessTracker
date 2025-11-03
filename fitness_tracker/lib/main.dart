@@ -7,12 +7,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/themes/app_theme.dart';
 import 'core/utils/app_lifecycle_manager.dart';
 import 'core/utils/performance_monitor.dart';
+import 'core/utils/database_seeder.dart';
 import 'config/env_config.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 import 'injection/injection_container.dart' as di;
 import 'presentation/pages/targets/bloc/targets_bloc.dart';
 import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
+import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
+import 'domain/repositories/exercise_repository.dart';
 
 void main() async {
   // Start initialization timer
@@ -26,8 +29,19 @@ void main() async {
   // Initialize dependency injection (only for mobile - database doesn't work on web)
   if (!kIsWeb) {
     try {
+      // Initialize DI container
       await di.init();
       debugPrint('✅ Dependency injection initialized');
+      
+      // Seed database with default exercises
+      try {
+        final seeder = DatabaseSeeder(di.sl<ExerciseRepository>());
+        await seeder.seedDefaultExercises();
+        debugPrint('✅ Database seeded with default exercises');
+      } catch (e) {
+        debugPrint('⚠️ Failed to seed database: $e');
+        // Continue anyway - seeding is not critical
+      }
     } catch (e) {
       debugPrint('❌ Failed to initialize DI: $e');
       // Continue anyway for web or if database fails
@@ -46,41 +60,25 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
-      systemNavigationBarColor: AppTheme.surfaceDark,
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
   
   // End initialization timer
   final initDuration = PerformanceMonitor.endTimer('app_initialization');
   if (initDuration != null) {
-    debugPrint('App initialization took: ${initDuration.inMilliseconds}ms');
+    debugPrint('App initialization completed in: ${initDuration.inMilliseconds}ms');
   }
   
-  // Error handling for Flutter framework
-  FlutterError.onError = (FlutterErrorDetails details) {
-    if (kDebugMode) {
-      // In debug mode, show the error
-      FlutterError.presentError(details);
-    } else {
-      // In release mode, log to crash reporting service
-      debugPrint('Flutter error: ${details.exception}');
-    }
-  };
+  // Start first frame timer
+  PerformanceMonitor.startTimer('first_frame');
   
-  // Error handling for async errors
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('Async error: $error');
-    // In production, send to crash reporting service
-    return true;
-  };
-  
-  // Run app with error boundary
+  // Run app with or without device preview based on debug mode
   runApp(
     DevicePreview(
-      enabled: kDebugMode && EnvConfig.enableDevicePreview,
+      enabled: kDebugMode && !kIsWeb,
       builder: (context) => const FitnessTrackerApp(),
     ),
   );
@@ -91,11 +89,7 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Track app startup
-    PerformanceMonitor.startTimer('first_frame');
-    
-    // On web: Use in-memory managers (TargetsManager, WorkoutSetsManager)
-    // On mobile: Use BLoC with database
+    // Web: Simple MaterialApp without BLoC providers (uses in-memory managers)
     if (kIsWeb) {
       return _buildWebApp(context);
     }
@@ -103,14 +97,24 @@ class FitnessTrackerApp extends StatelessWidget {
     // Mobile: Use BLoC providers with database
     return MultiBlocProvider(
       providers: [
+        // Targets BLoC
         BlocProvider(
           create: (_) => di.sl<TargetsBloc>()..add(LoadTargetsEvent()),
         ),
+        
+        // Log Set BLoC
         BlocProvider(
           create: (_) => di.sl<LogSetBloc>()..add(LoadLogSetDataEvent()),
         ),
+        
+        // Home BLoC
         BlocProvider(
           create: (_) => di.sl<HomeBloc>()..add(LoadHomeDataEvent()),
+        ),
+        
+        // Exercise BLoC (NEW!)
+        BlocProvider(
+          create: (_) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
         ),
       ],
       child: _buildMobileApp(context),
@@ -153,15 +157,24 @@ class FitnessTrackerApp extends StatelessWidget {
       home: const BottomNavigation(),
       onGenerateTitle: (context) => EnvConfig.appName,
       
-      // Navigation observer for tracking
+      // Navigation observer for tracking (debug mode only)
       navigatorObservers: kDebugMode 
         ? [NavigationObserver()] 
         : [],
+      
+      // Scroll behavior configuration
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+        },
+      ),
     );
   }
 }
 
-/// Custom navigation observer for debugging
+/// Custom navigation observer for debugging and performance tracking
 class NavigationObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
@@ -169,6 +182,7 @@ class NavigationObserver extends NavigatorObserver {
     final from = previousRoute?.settings.name ?? 'root';
     final to = route.settings.name ?? 'unnamed';
     PerformanceMonitor.trackScreenTransition(from, to);
+    debugPrint('📍 Navigation: $from → $to');
   }
   
   @override
@@ -177,5 +191,20 @@ class NavigationObserver extends NavigatorObserver {
     final from = route.settings.name ?? 'unnamed';
     final to = previousRoute?.settings.name ?? 'root';
     PerformanceMonitor.trackScreenTransition(from, to);
+    debugPrint('📍 Navigation: $from ← $to');
+  }
+  
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    final from = oldRoute?.settings.name ?? 'unknown';
+    final to = newRoute?.settings.name ?? 'unknown';
+    debugPrint('📍 Navigation replaced: $from → $to');
+  }
+  
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    debugPrint('📍 Route removed: ${route.settings.name ?? "unknown"}');
   }
 }

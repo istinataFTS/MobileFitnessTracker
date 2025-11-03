@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/targets_manager.dart';
 import '../../../domain/entities/target.dart';
+import 'bloc/targets_bloc.dart';
 
-/// Clean targets management page - now a main tab for quick access
+/// Clean targets management page using BLoC pattern with database persistence
 class TargetsPage extends StatelessWidget {
   const TargetsPage({super.key});
 
@@ -15,7 +17,7 @@ class TargetsPage extends StatelessWidget {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text(AppStrings.targetsTitle),
-        automaticallyImplyLeading: false, // No back button - it's a main tab
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -24,11 +26,73 @@ class TargetsPage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: TargetsManager(),
-        builder: (context, child) {
-          final targetsManager = TargetsManager();
-          final targets = targetsManager.targets;
+      body: BlocConsumer<TargetsBloc, TargetsState>(
+        listener: (context, state) {
+          if (state is TargetOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.successGreen,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(20),
+              ),
+            );
+          } else if (state is TargetsError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.errorRed,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(20),
+              ),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is TargetsLoading) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: AppTheme.primaryOrange,
+              ),
+            );
+          }
+
+          if (state is TargetsError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppTheme.errorRed,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading targets',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.message,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.read<TargetsBloc>().add(LoadTargetsEvent());
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final targets = state is TargetsLoaded ? state.targets : <Target>[];
+          final availableMuscles = _getAvailableMuscleGroups(targets);
 
           return Column(
             children: [
@@ -37,12 +101,19 @@ class TargetsPage extends StatelessWidget {
                     ? _buildEmptyState(context)
                     : _buildTargetsList(context, targets),
               ),
-              _buildAddButton(context, targetsManager),
+              _buildAddButton(context, availableMuscles),
             ],
           );
         },
       ),
     );
+  }
+
+  List<String> _getAvailableMuscleGroups(List<Target> targets) {
+    final targetedMuscles = targets.map((t) => t.muscleGroup).toSet();
+    return MuscleGroups.all
+        .where((muscle) => !targetedMuscles.contains(muscle))
+        .toList();
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -179,9 +250,11 @@ class TargetsPage extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
+                        Icon(Icons.delete_outline,
+                            size: 20, color: AppTheme.errorRed),
                         SizedBox(width: 12),
-                        Text(AppStrings.remove, style: TextStyle(color: AppTheme.errorRed)),
+                        Text(AppStrings.remove,
+                            style: TextStyle(color: AppTheme.errorRed)),
                       ],
                     ),
                   ),
@@ -194,11 +267,8 @@ class TargetsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAddButton(
-    BuildContext context,
-    TargetsManager targetsManager,
-  ) {
-    final hasAvailableMuscles = targetsManager.availableMuscleGroups.isNotEmpty;
+  Widget _buildAddButton(BuildContext context, List<String> availableMuscles) {
+    final hasAvailableMuscles = availableMuscles.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -235,8 +305,10 @@ class TargetsPage extends StatelessWidget {
   }
 
   void _showAddTargetDialog(BuildContext context) {
-    final targetsManager = TargetsManager();
-    final availableMuscles = targetsManager.availableMuscleGroups;
+    final state = context.read<TargetsBloc>().state;
+    if (state is! TargetsLoaded) return;
+
+    final availableMuscles = _getAvailableMuscleGroups(state.targets);
 
     if (availableMuscles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -251,14 +323,20 @@ class TargetsPage extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => _AddTargetDialog(availableMuscles: availableMuscles),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<TargetsBloc>(),
+        child: _AddTargetDialog(availableMuscles: availableMuscles),
+      ),
     );
   }
 
   void _showEditTargetDialog(BuildContext context, Target target) {
     showDialog(
       context: context,
-      builder: (context) => _EditTargetDialog(target: target),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<TargetsBloc>(),
+        child: _EditTargetDialog(target: target),
+      ),
     );
   }
 
@@ -277,15 +355,10 @@ class TargetsPage extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              TargetsManager().removeTarget(target.muscleGroup);
+              context
+                  .read<TargetsBloc>()
+                  .add(DeleteTargetEvent(target.muscleGroup));
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$displayName ${AppStrings.targetRemoved}'),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(20),
-                ),
-              );
             },
             style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
             child: const Text(AppStrings.remove),
@@ -324,137 +397,114 @@ class _AddTargetDialog extends StatefulWidget {
 
 class _AddTargetDialogState extends State<_AddTargetDialog> {
   String? _selectedMuscle;
-  int _weeklyGoal = 10;
+  int _weeklyGoal = 12;
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AlertDialog(
+      title: Text(
+        AppStrings.addTarget,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.selectMuscleGroup,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _selectedMuscle,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+            ),
+            items: widget.availableMuscles.map((muscle) {
+              return DropdownMenuItem(
+                value: muscle,
+                child: Text(MuscleGroups.getDisplayName(muscle)),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedMuscle = value;
+              });
+            },
+            dropdownColor: AppTheme.surfaceDark,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            AppStrings.weeklyRepGoal,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 12),
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppStrings.addTarget,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                AppStrings.selectMuscleGroup,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _selectedMuscle,
-                decoration: InputDecoration(
-                  hintText: 'Choose a muscle group',
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+              Expanded(
+                child: Slider(
+                  value: _weeklyGoal.toDouble(),
+                  min: 1,
+                  max: 30,
+                  divisions: 29,
+                  label: _weeklyGoal.toString(),
+                  activeColor: AppTheme.primaryOrange,
+                  onChanged: (value) {
+                    setState(() {
+                      _weeklyGoal = value.toInt();
+                    });
+                  },
                 ),
-                items: widget.availableMuscles.map((muscle) {
-                  return DropdownMenuItem(
-                    value: muscle,
-                    child: Text(MuscleGroups.getDisplayName(muscle)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedMuscle = value;
-                  });
-                },
               ),
-              const SizedBox(height: 24),
-              Text(
-                AppStrings.weeklyRepGoal,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: _weeklyGoal > 1
-                        ? () => setState(() => _weeklyGoal--)
-                        : null,
-                    icon: const Icon(Icons.remove_circle_outline),
-                    color: AppTheme.primaryOrange,
-                    iconSize: 32,
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      '$_weeklyGoal ${AppStrings.sets}',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() => _weeklyGoal++),
-                    icon: const Icon(Icons.add_circle_outline),
-                    color: AppTheme.primaryOrange,
-                    iconSize: 32,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(AppStrings.cancel),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectedMuscle != null
-                          ? () {
-                              TargetsManager().addTarget(_selectedMuscle!, _weeklyGoal);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${MuscleGroups.getDisplayName(_selectedMuscle!)} ${AppStrings.targetAdded}',
-                                  ),
-                                  backgroundColor: AppTheme.successGreen,
-                                  behavior: SnackBarBehavior.floating,
-                                  margin: const EdgeInsets.all(20),
-                                ),
-                              );
-                            }
-                          : null,
-                      child: const Text(AppStrings.add),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_weeklyGoal',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppTheme.primaryOrange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(AppStrings.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _selectedMuscle != null ? _handleAddTarget : null,
+          child: const Text(AppStrings.add),
+        ),
+      ],
     );
+  }
+
+  void _handleAddTarget() {
+    if (_selectedMuscle == null) return;
+
+    final target = Target(
+      id: const Uuid().v4(),
+      muscleGroup: _selectedMuscle!,
+      weeklyGoal: _weeklyGoal,
+      createdAt: DateTime.now(),
+    );
+
+    context.read<TargetsBloc>().add(AddTargetEvent(target));
+    Navigator.pop(context);
   }
 }
 
@@ -481,100 +531,77 @@ class _EditTargetDialogState extends State<_EditTargetDialog> {
   Widget build(BuildContext context) {
     final displayName = MuscleGroups.getDisplayName(widget.target.muscleGroup);
 
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    return AlertDialog(
+      title: Text(
+        '${AppStrings.editTarget}: $displayName',
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.weeklyRepGoal,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 12),
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${AppStrings.edit} $displayName',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+              Expanded(
+                child: Slider(
+                  value: _weeklyGoal.toDouble(),
+                  min: 1,
+                  max: 30,
+                  divisions: 29,
+                  label: _weeklyGoal.toString(),
+                  activeColor: AppTheme.primaryOrange,
+                  onChanged: (value) {
+                    setState(() {
+                      _weeklyGoal = value.toInt();
+                    });
+                  },
+                ),
               ),
-              const SizedBox(height: 24),
-              Text(
-                AppStrings.weeklyRepGoal,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: _weeklyGoal > 1
-                        ? () => setState(() => _weeklyGoal--)
-                        : null,
-                    icon: const Icon(Icons.remove_circle_outline),
-                    color: AppTheme.primaryOrange,
-                    iconSize: 32,
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      '$_weeklyGoal ${AppStrings.sets}',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() => _weeklyGoal++),
-                    icon: const Icon(Icons.add_circle_outline),
-                    color: AppTheme.primaryOrange,
-                    iconSize: 32,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(AppStrings.cancel),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        TargetsManager().updateTarget(
-                          widget.target.muscleGroup,
-                          _weeklyGoal,
-                        );
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('$displayName ${AppStrings.targetUpdated}'),
-                            backgroundColor: AppTheme.successGreen,
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(20),
-                          ),
-                        );
-                      },
-                      child: const Text(AppStrings.save),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_weeklyGoal',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppTheme.primaryOrange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(AppStrings.cancel),
+        ),
+        ElevatedButton(
+          onPressed: _handleUpdateTarget,
+          child: const Text(AppStrings.saveChanges),
+        ),
+      ],
     );
+  }
+
+  void _handleUpdateTarget() {
+    final updatedTarget = widget.target.copyWith(weeklyGoal: _weeklyGoal);
+    context.read<TargetsBloc>().add(UpdateTargetEvent(updatedTarget));
+    Navigator.pop(context);
   }
 }
