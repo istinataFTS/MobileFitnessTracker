@@ -16,6 +16,8 @@ import '../domain/usecases/targets/update_target.dart';
 import '../domain/usecases/workout_sets/add_workout_set.dart';
 import '../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../domain/usecases/workout_sets/get_weekly_sets.dart';
+import '../domain/usecases/workout_sets/get_sets_by_date_range.dart';
+import '../domain/usecases/workout_sets/delete_workout_set.dart';
 import '../domain/usecases/exercises/get_all_exercises.dart';
 import '../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../domain/usecases/exercises/get_exercises_for_muscle.dart';
@@ -26,6 +28,7 @@ import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/log_set/bloc/log_set_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../presentation/pages/history/bloc/history_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -58,6 +61,12 @@ Future<void> init() async {
         deleteExercise: sl(),
       ));
 
+  sl.registerFactory(() => HistoryBloc(
+        getAllWorkoutSets: sl(),
+        getSetsByDateRange: sl(),
+        deleteWorkoutSet: sl(),
+      ));
+
   // ==================== Use Cases ====================
   
   // Targets
@@ -70,6 +79,11 @@ Future<void> init() async {
   sl.registerLazySingleton(() => AddWorkoutSet(sl()));
   sl.registerLazySingleton(() => GetAllWorkoutSets(sl()));
   sl.registerLazySingleton(() => GetWeeklySets(sl()));
+  sl.registerLazySingleton(() => GetSetsByDateRange(
+        workoutSetRepository: sl(),
+        exerciseRepository: sl(),
+      ));
+  sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
 
   // Exercises
   sl.registerLazySingleton(() => GetAllExercises(sl()));

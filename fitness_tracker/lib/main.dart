@@ -15,6 +15,7 @@ import 'presentation/pages/targets/bloc/targets_bloc.dart';
 import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
+import 'presentation/pages/history/bloc/history_bloc.dart';
 import 'domain/repositories/exercise_repository.dart';
 
 void main() async {
@@ -112,9 +113,14 @@ class FitnessTrackerApp extends StatelessWidget {
           create: (_) => di.sl<HomeBloc>()..add(LoadHomeDataEvent()),
         ),
         
-        // Exercise BLoC (NEW!)
+        // Exercise BLoC
         BlocProvider(
           create: (_) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
+        ),
+        
+        // History BLoC (NEW!)
+        BlocProvider(
+          create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
         ),
       ],
       child: _buildMobileApp(context),
