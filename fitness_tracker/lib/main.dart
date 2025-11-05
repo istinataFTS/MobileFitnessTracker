@@ -4,11 +4,10 @@ import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'config/env_config.dart'; 
 import 'core/themes/app_theme.dart';
 import 'core/utils/app_lifecycle_manager.dart';
 import 'core/utils/performance_monitor.dart';
-import 'core/utils/database_seeder.dart';
-import 'config/env_config.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 import 'injection/injection_container.dart' as di;
 import 'presentation/pages/targets/bloc/targets_bloc.dart';
@@ -16,13 +15,20 @@ import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
 import 'presentation/pages/history/bloc/history_bloc.dart';
-import 'domain/repositories/exercise_repository.dart';
+import 'domain/usecases/exercises/seed_exercises.dart'; 
 
 void main() async {
   // Start initialization timer
   PerformanceMonitor.startTimer('app_initialization');
   
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 
+  if (kDebugMode) {
+    EnvConfig.printConfig();
+  }
+  
+  EnvConfig.validateProductionConfig();
   
   // Initialize app lifecycle manager
   AppLifecycleManager().initialize();
@@ -31,18 +37,44 @@ void main() async {
   if (!kIsWeb) {
     try {
       // Initialize DI container
+      debugPrint('Initializing dependencies...');
+      final initStart = DateTime.now();
       await di.init();
-      debugPrint('✅ Dependency injection initialized');
+      final initDuration = DateTime.now().difference(initStart);
+      debugPrint('✅ Dependencies initialized in: ${initDuration.inMilliseconds}ms');
       
-      // Seed database with default exercises
-      try {
-        final seeder = DatabaseSeeder(di.sl<ExerciseRepository>());
-        await seeder.seedDefaultExercises();
-        debugPrint('✅ Database seeded with default exercises');
-      } catch (e) {
-        debugPrint('⚠️ Failed to seed database: $e');
-        // Continue anyway - seeding is not critical
+      // ==================== ⭐ NEW: DATABASE SEEDING ====================
+      // Seed default exercises if configured to do so
+      if (EnvConfig.seedDefaultData) {
+        debugPrint('Seeding database with default data...');
+        final seedStart = DateTime.now();
+        
+        try {
+          final seedExercises = di.sl<SeedExercises>();
+          final result = await seedExercises();
+          
+          result.fold(
+            (failure) {
+              debugPrint('❌ Seeding failed: ${failure.message}');
+            },
+            (count) {
+              if (count > 0) {
+                final seedDuration = DateTime.now().difference(seedStart);
+                debugPrint('✅ Seeded $count exercises in ${seedDuration.inMilliseconds}ms');
+              } else {
+                debugPrint('ℹ️  No seeding performed (data already exists)');
+              }
+            },
+          );
+        } catch (e) {
+          debugPrint('❌ Unexpected error during seeding: $e');
+          // Don't prevent app from starting if seeding fails
+        }
+      } else {
+        debugPrint('ℹ️  Database seeding disabled in environment config');
       }
+      // ================================================================
+      
     } catch (e) {
       debugPrint('❌ Failed to initialize DI: $e');
       // Continue anyway for web or if database fails
@@ -118,7 +150,7 @@ class FitnessTrackerApp extends StatelessWidget {
           create: (_) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
         ),
         
-        // History BLoC (NEW!)
+        // History BLoC
         BlocProvider(
           create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
         ),
@@ -165,52 +197,22 @@ class FitnessTrackerApp extends StatelessWidget {
       
       // Navigation observer for tracking (debug mode only)
       navigatorObservers: kDebugMode 
-        ? [NavigationObserver()] 
+        ? [_NavigationObserver()]
         : [],
-      
-      // Scroll behavior configuration
-      scrollBehavior: const MaterialScrollBehavior().copyWith(
-        dragDevices: {
-          PointerDeviceKind.touch,
-          PointerDeviceKind.mouse,
-          PointerDeviceKind.trackpad,
-        },
-      ),
     );
   }
 }
 
-/// Custom navigation observer for debugging and performance tracking
-class NavigationObserver extends NavigatorObserver {
+/// Custom navigation observer for performance tracking
+class _NavigationObserver extends NavigatorObserver {
   @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+  void didPush(Route route, Route? previousRoute) {
     super.didPush(route, previousRoute);
-    final from = previousRoute?.settings.name ?? 'root';
-    final to = route.settings.name ?? 'unnamed';
-    PerformanceMonitor.trackScreenTransition(from, to);
-    debugPrint('📍 Navigation: $from → $to');
-  }
-  
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    super.didPop(route, previousRoute);
-    final from = route.settings.name ?? 'unnamed';
-    final to = previousRoute?.settings.name ?? 'root';
-    PerformanceMonitor.trackScreenTransition(from, to);
-    debugPrint('📍 Navigation: $from ← $to');
-  }
-  
-  @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    final from = oldRoute?.settings.name ?? 'unknown';
-    final to = newRoute?.settings.name ?? 'unknown';
-    debugPrint('📍 Navigation replaced: $from → $to');
-  }
-  
-  @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    super.didRemove(route, previousRoute);
-    debugPrint('📍 Route removed: ${route.settings.name ?? "unknown"}');
+    if (route.settings.name != null && previousRoute?.settings.name != null) {
+      PerformanceMonitor.trackScreenTransition(
+        previousRoute!.settings.name!,
+        route.settings.name!,
+      );
+    }
   }
 }

@@ -24,6 +24,7 @@ import '../domain/usecases/exercises/get_exercises_for_muscle.dart';
 import '../domain/usecases/exercises/add_exercise.dart';
 import '../domain/usecases/exercises/update_exercise.dart';
 import '../domain/usecases/exercises/delete_exercise.dart';
+import '../domain/usecases/exercises/seed_exercises.dart'; // ⭐ NEW: Seeding use case
 import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/log_set/bloc/log_set_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
@@ -92,6 +93,9 @@ Future<void> init() async {
   sl.registerLazySingleton(() => AddExercise(sl()));
   sl.registerLazySingleton(() => UpdateExercise(sl()));
   sl.registerLazySingleton(() => DeleteExercise(sl()));
+  
+  // ⭐ NEW: Database Seeding
+  sl.registerLazySingleton(() => SeedExercises(sl()));
 
   // ==================== Repositories ====================
   sl.registerLazySingleton<TargetRepository>(
