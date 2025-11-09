@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/exercises_manager.dart';
 import '../../../domain/entities/exercise.dart';
+import 'bloc/exercise_bloc.dart';
 
-/// Clean exercises management page - main tab for creating/editing exercises
+
 class ExercisesPage extends StatelessWidget {
   const ExercisesPage({super.key});
 
@@ -24,10 +26,49 @@ class ExercisesPage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: ExercisesManager(),
-        builder: (context, child) {
-          final exercises = ExercisesManager().exercises;
+      body: BlocConsumer<ExerciseBloc, ExerciseState>(
+        listener: (context, state) {
+          // Handle success feedback
+          if (state is ExerciseOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.successGreen,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(20),
+              ),
+            );
+          }
+          
+          // Handle errors
+          if (state is ExerciseError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.errorRed,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(20),
+              ),
+            );
+          }
+        },
+        builder: (context, state) {
+          // Show loading state
+          if (state is ExerciseLoading) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: AppTheme.primaryOrange,
+              ),
+            );
+          }
+
+          // Show error state with retry option
+          if (state is ExerciseError) {
+            return _buildErrorState(context, state.message);
+          }
+
+          // Show loaded state (empty or with exercises)
+          final exercises = state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
           return Column(
             children: [
@@ -90,6 +131,46 @@ class ExercisesPage extends StatelessWidget {
                   vertical: 16,
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppTheme.errorRed,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Error Loading Exercises',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textMedium,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                context.read<ExerciseBloc>().add(LoadExercisesEvent());
+              },
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -253,39 +334,39 @@ class ExercisesPage extends StatelessWidget {
   void _showAddExerciseDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => const _ExerciseDialog(),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<ExerciseBloc>(),
+        child: const _ExerciseDialog(),
+      ),
     );
   }
 
   void _showEditExerciseDialog(BuildContext context, Exercise exercise) {
     showDialog(
       context: context,
-      builder: (context) => _ExerciseDialog(exercise: exercise),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<ExerciseBloc>(),
+        child: _ExerciseDialog(exercise: exercise),
+      ),
     );
   }
 
   void _confirmDeleteExercise(BuildContext context, Exercise exercise) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text(AppStrings.deleteExercise),
         content: Text('${AppStrings.deleteExerciseConfirm}\n\n${exercise.name}'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text(AppStrings.cancel),
           ),
           TextButton(
             onPressed: () {
-              ExercisesManager().deleteExercise(exercise.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${exercise.name} ${AppStrings.exerciseDeleted}'),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(20),
-                ),
-              );
+              // Dispatch delete event to bloc
+              context.read<ExerciseBloc>().add(DeleteExerciseEvent(exercise.id));
+              Navigator.pop(dialogContext);
             },
             style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
             child: const Text(AppStrings.delete),
@@ -312,7 +393,10 @@ class ExercisesPage extends StatelessWidget {
   }
 }
 
-// Unified dialog for adding and editing exercises
+// ==================== Exercise Dialog ====================
+
+/// Unified dialog for adding and editing exercises
+/// Now uses ExerciseBloc instead of ExercisesManager
 class _ExerciseDialog extends StatefulWidget {
   final Exercise? exercise; // null for add, non-null for edit
 
@@ -325,6 +409,7 @@ class _ExerciseDialog extends StatefulWidget {
 class _ExerciseDialogState extends State<_ExerciseDialog> {
   late final TextEditingController _nameController;
   late final Set<String> _selectedMuscles;
+  final _uuid = const Uuid(); // UUID generator for new exercises
 
   bool get isEditing => widget.exercise != null;
 
@@ -462,29 +547,25 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
 
   void _handleSave() {
     final name = _nameController.text.trim();
-    
+
     if (isEditing) {
-      ExercisesManager().updateExercise(
-        widget.exercise!.id,
-        name,
-        _selectedMuscles.toList(),
+      // Update existing exercise
+      final updatedExercise = widget.exercise!.copyWith(
+        name: name,
+        muscleGroups: _selectedMuscles.toList(),
       );
+      context.read<ExerciseBloc>().add(UpdateExerciseEvent(updatedExercise));
     } else {
-      ExercisesManager().addExercise(name, _selectedMuscles.toList());
+      // Create new exercise with UUID
+      final newExercise = Exercise(
+        id: _uuid.v4(), // Generate unique ID
+        name: name,
+        muscleGroups: _selectedMuscles.toList(),
+        createdAt: DateTime.now(),
+      );
+      context.read<ExerciseBloc>().add(AddExerciseEvent(newExercise));
     }
 
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isEditing
-              ? '$name ${AppStrings.exerciseUpdated}'
-              : '$name ${AppStrings.exerciseAdded}',
-        ),
-        backgroundColor: AppTheme.successGreen,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-      ),
-    );
   }
 }

@@ -9,12 +9,7 @@ import '../../../domain/entities/workout_set.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/history_bloc.dart';
 
-/// HistoryPage - Displays workout history with BLoC pattern
-/// Features:
-/// - View all workout sets sorted by date
-/// - Filter by muscle group
-/// - View detailed workout information
-/// - Delete individual sets
+
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
 
@@ -146,24 +141,20 @@ class HistoryPage extends StatelessWidget {
       itemBuilder: (context, index) {
         final date = sortedDates[index];
         final dateSets = grouped[date]!;
+
         return _buildDateCard(context, date, dateSets);
       },
     );
   }
 
-  /// Build a card for a specific date with its workout sets
+  /// Build a card showing sets for a specific date
   Widget _buildDateCard(
     BuildContext context,
     DateTime date,
     List<WorkoutSet> sets,
   ) {
-    final isToday = DateFormat('yyyy-MM-dd').format(date) ==
-        DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    final totalSets = sets.length;
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () => _showDayDetails(context, date, sets),
         borderRadius: BorderRadius.circular(16),
@@ -172,39 +163,26 @@ class HistoryPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header: Date and set count
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isToday
-                              ? 'Today'
-                              : DateFormat('EEEE, MMM d').format(date),
-                          style: Theme.of(context).textTheme.titleMedium,
+                  Text(
+                    DateFormat('EEEE, MMM d').format(date),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('h:mm a').format(sets.first.createdAt),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 8,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryOrange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '$totalSets set${totalSets != 1 ? 's' : ''}',
+                      '${sets.length} set${sets.length != 1 ? 's' : ''}',
                       style: const TextStyle(
                         color: AppTheme.primaryOrange,
                         fontWeight: FontWeight.w600,
@@ -238,18 +216,33 @@ class HistoryPage extends StatelessWidget {
     );
   }
 
-  /// Build a preview of a single set
+  /// Build a preview of a single set with improved error handling
   Widget _buildSetPreview(BuildContext context, WorkoutSet set) {
     return BlocBuilder<ExerciseBloc, ExerciseState>(
       builder: (context, exerciseState) {
-        String exerciseName = 'Unknown Exercise';
-        
-        if (exerciseState is ExercisesLoaded) {
-          final exercise = exerciseState.exercises.firstWhere(
-            (e) => e.id == set.exerciseId,
-            orElse: () => exerciseState.exercises.first, // Fallback
-          );
-          exerciseName = exercise.name;
+        // Handle different exercise states
+        String exerciseName;
+        bool isMissing = false;
+
+        if (exerciseState is ExerciseLoading) {
+          exerciseName = 'Loading...';
+        } else if (exerciseState is ExerciseError) {
+          exerciseName = 'Error loading exercises';
+        } else if (exerciseState is ExercisesLoaded) {
+          // Try to find the exercise
+          try {
+            final exercise = exerciseState.exercises.firstWhere(
+              (e) => e.id == set.exerciseId,
+            );
+            exerciseName = exercise.name;
+          } catch (_) {
+            // Exercise not found - better fallback
+            exerciseName = 'Deleted Exercise';
+            isMissing = true;
+          }
+        } else {
+          exerciseName = 'Unknown Exercise';
+          isMissing = true;
         }
 
         return Padding(
@@ -259,108 +252,37 @@ class HistoryPage extends StatelessWidget {
               Container(
                 width: 4,
                 height: 4,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryOrange,
+                decoration: BoxDecoration(
+                  color: isMissing ? AppTheme.textDim : AppTheme.primaryOrange,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  '$exerciseName - ${set.reps} reps @ ${set.weight}kg',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                child: Row(
+                  children: [
+                    if (isMissing)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Icon(
+                          Icons.help_outline,
+                          size: 14,
+                          color: AppTheme.textDim,
+                        ),
+                      ),
+                    Expanded(
+                      child: Text(
+                        '$exerciseName - ${set.reps} reps @ ${set.weight}kg',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: isMissing ? AppTheme.textDim : null,
+                              fontStyle: isMissing ? FontStyle.italic : null,
+                            ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Build error state UI
-  Widget _buildErrorState(BuildContext context, String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: AppTheme.errorRed,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Error Loading History',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              context.read<HistoryBloc>().add(RefreshHistoryEvent());
-            },
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Show filter dialog for muscle group selection
-  void _showFilterDialog(BuildContext context) {
-    final currentBloc = context.read<HistoryBloc>();
-    String? selectedFilter;
-    
-    if (currentBloc.state is HistoryLoaded) {
-      selectedFilter = (currentBloc.state as HistoryLoaded).currentMuscleFilter;
-    }
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text(AppStrings.filterByMuscleGroup),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // "All" option
-                ListTile(
-                  title: const Text(AppStrings.all),
-                  leading: Radio<String?>(
-                    value: null,
-                    groupValue: selectedFilter,
-                    onChanged: (value) {
-                      currentBloc.add(FilterByMuscleGroupEvent(value));
-                      Navigator.pop(dialogContext);
-                    },
-                    activeColor: AppTheme.primaryOrange,
-                  ),
-                ),
-                // Muscle group options
-                ...MuscleGroups.all.map((muscle) {
-                  final displayName = MuscleGroups.getDisplayName(muscle);
-                  return ListTile(
-                    title: Text(displayName),
-                    leading: Radio<String?>(
-                      value: displayName,
-                      groupValue: selectedFilter,
-                      onChanged: (value) {
-                        currentBloc.add(FilterByMuscleGroupEvent(value));
-                        Navigator.pop(dialogContext);
-                      },
-                      activeColor: AppTheme.primaryOrange,
-                    ),
-                  );
-                }),
-              ],
-            ),
           ),
         );
       },
@@ -421,7 +343,7 @@ class HistoryPage extends StatelessWidget {
     );
   }
 
-  /// Build a detailed tile for a single set with delete option
+  /// Build a detailed tile for a single set with improved error handling
   Widget _buildSetDetailTile(
     BuildContext context,
     BuildContext bottomSheetContext,
@@ -429,10 +351,15 @@ class HistoryPage extends StatelessWidget {
   ) {
     return BlocBuilder<ExerciseBloc, ExerciseState>(
       builder: (context, exerciseState) {
-        String exerciseName = 'Unknown Exercise';
+        String exerciseName;
         List<String> muscleGroups = [];
+        bool isMissing = false;
 
-        if (exerciseState is ExercisesLoaded) {
+        if (exerciseState is ExerciseLoading) {
+          exerciseName = 'Loading...';
+        } else if (exerciseState is ExerciseError) {
+          exerciseName = 'Error loading exercises';
+        } else if (exerciseState is ExercisesLoaded) {
           try {
             final exercise = exerciseState.exercises.firstWhere(
               (e) => e.id == set.exerciseId,
@@ -442,8 +369,13 @@ class HistoryPage extends StatelessWidget {
                 .map((mg) => MuscleGroups.getDisplayName(mg))
                 .toList();
           } catch (_) {
-            // Exercise not found
+            // Exercise not found - provide helpful fallback
+            exerciseName = 'Deleted Exercise';
+            isMissing = true;
           }
+        } else {
+          exerciseName = 'Unknown Exercise';
+          isMissing = true;
         }
 
         return Card(
@@ -456,9 +388,27 @@ class HistoryPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        exerciseName,
-                        style: Theme.of(context).textTheme.titleMedium,
+                      Row(
+                        children: [
+                          if (isMissing)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Icon(
+                                Icons.help_outline,
+                                size: 18,
+                                color: AppTheme.textDim,
+                              ),
+                            ),
+                          Expanded(
+                            child: Text(
+                              exerciseName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: isMissing ? AppTheme.textDim : null,
+                                    fontStyle: isMissing ? FontStyle.italic : null,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -471,28 +421,49 @@ class HistoryPage extends StatelessWidget {
                       if (muscleGroups.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: muscleGroups
-                              .map((mg) => Chip(
-                                    label: Text(
-                                      mg,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    visualDensity: VisualDensity.compact,
-                                  ))
-                              .toList(),
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: muscleGroups.map((mg) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryOrange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                mg,
+                                style: const TextStyle(
+                                  color: AppTheme.primaryOrange,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
+                      if (isMissing)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'This exercise has been deleted',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textDim,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: AppTheme.errorRed),
+                  icon: const Icon(Icons.delete_outline),
+                  color: AppTheme.errorRed,
                   onPressed: () {
-                    Navigator.pop(bottomSheetContext);
-                    _confirmDeleteSet(context, set);
+                    _confirmDeleteSet(context, bottomSheetContext, set);
                   },
                 ),
               ],
@@ -503,18 +474,122 @@ class HistoryPage extends StatelessWidget {
     );
   }
 
-  /// Show confirmation dialog before deleting a set
-  Future<void> _confirmDeleteSet(BuildContext context, WorkoutSet set) async {
-    final confirmed = await ErrorHandler.showConfirmDialog(
-      context,
-      title: 'Delete Set',
-      message: 'Are you sure you want to delete this set? This cannot be undone.',
-      confirmText: 'Delete',
-      isDestructive: true,
+  /// Build error state UI
+  Widget _buildErrorState(BuildContext context, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            size: 64,
+            color: AppTheme.errorRed,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error Loading History',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              context.read<HistoryBloc>().add(RefreshHistoryEvent());
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
     );
+  }
 
-    if (confirmed && context.mounted) {
-      context.read<HistoryBloc>().add(DeleteSetEvent(set.id));
-    }
+  /// Show filter dialog for muscle group selection
+  void _showFilterDialog(BuildContext context) {
+    final currentBloc = context.read<HistoryBloc>();
+    String? selectedFilter;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(AppStrings.filterByMuscleGroup),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String?>(
+                  title: const Text(AppStrings.all),
+                  value: null,
+                  groupValue: selectedFilter,
+                  onChanged: (value) {
+                    setState(() => selectedFilter = value);
+                  },
+                ),
+                ...MuscleGroups.all.map((muscle) {
+                  return RadioListTile<String?>(
+                    title: Text(MuscleGroups.getDisplayName(muscle)),
+                    value: muscle,
+                    groupValue: selectedFilter,
+                    onChanged: (value) {
+                      setState(() => selectedFilter = value);
+                    },
+                  );
+                }).toList(),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(AppStrings.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              currentBloc.add(FilterByMuscleGroupEvent(selectedFilter));
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Confirm deletion of a workout set
+  void _confirmDeleteSet(
+    BuildContext context,
+    BuildContext bottomSheetContext,
+    WorkoutSet set,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Set'),
+        content: const Text('Are you sure you want to delete this set?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(AppStrings.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<HistoryBloc>().add(DeleteSetEvent(set.id));
+              Navigator.pop(dialogContext); // Close dialog
+              Navigator.pop(bottomSheetContext); // Close bottom sheet
+            },
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            child: const Text(AppStrings.delete),
+          ),
+        ],
+      ),
+    );
   }
 }
+
+

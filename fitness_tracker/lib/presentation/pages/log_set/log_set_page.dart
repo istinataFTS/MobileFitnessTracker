@@ -6,12 +6,13 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/exercises_manager.dart';
 import '../../../domain/entities/exercise.dart';
 import '../../../domain/entities/workout_set.dart';
+import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/log_set_bloc.dart';
 
 /// Clean, straightforward logging interface using BLoC pattern with database persistence
+/// Migrated to use ExerciseBloc for exercise selector instead of ExercisesManager
 class LogSetPage extends StatefulWidget {
   const LogSetPage({super.key});
 
@@ -67,14 +68,14 @@ class _LogSetPageState extends State<LogSetPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDateCard(),
-                      const SizedBox(height: 24),
                       _buildExerciseSection(),
                       if (_selectedExercise != null) ...[
-                        const SizedBox(height: 20),
-                        _buildMuscleGroupsCard(),
+                        const SizedBox(height: 24),
+                        _buildMuscleGroupsWorked(),
                         const SizedBox(height: 24),
                         _buildInputFields(),
+                        const SizedBox(height: 24),
+                        _buildDateSection(),
                       ],
                     ],
                   ),
@@ -88,158 +89,168 @@ class _LogSetPageState extends State<LogSetPage> {
     );
   }
 
-  Widget _buildDateCard() {
-    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) ==
-        DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    return Card(
-      child: InkWell(
-        onTap: () => _selectDate(context),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryOrange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.calendar_today,
-                  color: AppTheme.primaryOrange,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
+  /// Exercise section now uses ExerciseBloc instead of ExercisesManager
+  Widget _buildExerciseSection() {
+    return BlocBuilder<ExerciseBloc, ExerciseState>(
+      builder: (context, state) {
+        // Handle loading state
+        if (state is ExerciseLoading) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      AppStrings.workoutDate,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    const CircularProgressIndicator(
+                      color: AppTheme.primaryOrange,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 16),
                     Text(
-                      isToday
-                          ? '${AppStrings.today} - ${DateFormat(AppStrings.dateFormatDate).format(_selectedDate)}'
-                          : DateFormat(AppStrings.dateFormatFull)
-                              .format(_selectedDate),
-                      style: Theme.of(context).textTheme.titleMedium,
+                      'Loading exercises...',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.textMedium,
+                          ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: AppTheme.textDim,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+            ),
+          );
+        }
 
-  Widget _buildExerciseSection() {
-    final exercises = ExercisesManager().exercises;
+        // Handle error state
+        if (state is ExerciseError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppTheme.errorRed,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Failed to load exercises',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.message,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textMedium,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.read<ExerciseBloc>().add(LoadExercisesEvent());
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    if (exercises.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.fitness_center_outlined,
-                size: 64,
-                color: AppTheme.textDim,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                AppStrings.noExercisesAvailable,
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                AppStrings.createExercisesFirst,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textMedium,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+        // Get exercises from loaded state
+        final exercises = state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.exercise,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+        // Handle empty exercises
+        if (exercises.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.fitness_center_outlined,
+                    size: 64,
+                    color: AppTheme.textDim,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    AppStrings.noExercisesAvailable,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    AppStrings.createExercisesFirst,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textMedium,
+                        ),
+                  ),
+                ],
               ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: DropdownButtonFormField<Exercise>(
-              value: _selectedExercise,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                hintText: AppStrings.selectExercise,
-                prefixIcon: Icon(
-                  Icons.fitness_center,
-                  color: AppTheme.primaryOrange,
+            ),
+          );
+        }
+
+        // Display exercise selector with exercises
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppStrings.exercise,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<Exercise>(
+                    value: _selectedExercise,
+                    isExpanded: true,
+                    hint: const Text(AppStrings.selectExercise),
+                    icon: const Icon(Icons.arrow_drop_down),
+                    style: Theme.of(context).textTheme.titleMedium,
+                    items: exercises.map((exercise) {
+                      return DropdownMenuItem<Exercise>(
+                        value: exercise,
+                        child: Text(exercise.name),
+                      );
+                    }).toList(),
+                    onChanged: (Exercise? value) {
+                      setState(() {
+                        _selectedExercise = value;
+                      });
+                    },
+                  ),
                 ),
               ),
-              items: exercises.map((exercise) {
-                return DropdownMenuItem(
-                  value: exercise,
-                  child: Text(
-                    exercise.name,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedExercise = value;
-                });
-              },
-              validator: (value) {
-                if (value == null) {
-                  return AppStrings.pleaseSelectExercise;
-                }
-                return null;
-              },
-              dropdownColor: AppTheme.surfaceDark,
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildMuscleGroupsCard() {
+  Widget _buildMuscleGroupsWorked() {
+    if (_selectedExercise == null) return const SizedBox.shrink();
+
     return Card(
-      color: AppTheme.primaryOrange.withOpacity(0.05),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 const Icon(
-                  Icons.info_outline,
+                  Icons.fitness_center,
                   size: 20,
                   color: AppTheme.primaryOrange,
                 ),
@@ -247,7 +258,6 @@ class _LogSetPageState extends State<LogSetPage> {
                 Text(
                   AppStrings.muscleGroupsWorked,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.primaryOrange,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -387,6 +397,61 @@ class _LogSetPageState extends State<LogSetPage> {
             }
             return null;
           },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateSection() {
+    final isToday = DateTime.now().year == _selectedDate.year &&
+        DateTime.now().month == _selectedDate.month &&
+        DateTime.now().day == _selectedDate.day;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.workoutDate,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: InkWell(
+            onTap: () => _selectDate(context),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryOrange,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isToday
+                              ? '${AppStrings.today} - ${DateFormat(AppStrings.dateFormatDate).format(_selectedDate)}'
+                              : DateFormat(AppStrings.dateFormatFull)
+                                  .format(_selectedDate),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppTheme.textDim,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

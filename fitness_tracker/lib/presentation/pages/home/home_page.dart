@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/exercises_manager.dart';
 import '../../../config/app_config.dart';
-import 'package:intl/intl.dart';
+import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 
-class HomePage extends StatefulWidget {
+
   const HomePage({super.key});
 
   @override
@@ -24,7 +24,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Always use BLoC with database
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (context, state) {
         if (state is HomeLoading) {
@@ -89,47 +88,79 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Build loaded state - now uses ExerciseBloc instead of ExercisesManager
   Widget _buildLoadedState(BuildContext context, HomeLoaded state) {
     // Calculate totals from BLoC state
     final totalWeeklyTarget = state.targets.fold<int>(
       0,
       (sum, target) => sum + target.weeklyGoal,
     );
-    
-    // Calculate weekly sets per muscle using exercise information
-    final exercisesManager = ExercisesManager();
+
+    final totalWeeklySets = state.weeklySets.length;
+
+    // Use BlocBuilder to get exercises and calculate muscle breakdown
+    return BlocBuilder<ExerciseBloc, ExerciseState>(
+      builder: (context, exerciseState) {
+        // Calculate muscle breakdown using ExerciseBloc
+        final muscleBreakdown = _calculateMuscleBreakdown(
+          state.weeklySets,
+          exerciseState,
+        );
+
+        return Scaffold(
+          body: SafeArea(
+            child: RefreshIndicator(
+              color: AppTheme.primaryOrange,
+              onRefresh: () async {
+                context.read<HomeBloc>().add(LoadHomeDataEvent());
+                // Wait a moment for the bloc to process
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: _buildContent(
+                context,
+                state.targets,
+                totalWeeklyTarget,
+                totalWeeklySets,
+                muscleBreakdown,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Calculate muscle breakdown from ExerciseBloc state
+  /// This replaces the ExercisesManager approach
+  Map<String, int> _calculateMuscleBreakdown(
+    List weeklySets,
+    ExerciseState exerciseState,
+  ) {
     final muscleBreakdown = <String, int>{};
-    
-    for (final set in state.weeklySets) {
-      final exercise = exercisesManager.getExerciseById(set.exerciseId);
-      if (exercise != null) {
-        for (final muscle in exercise.muscleGroups) {
-          muscleBreakdown[muscle] = (muscleBreakdown[muscle] ?? 0) + 1;
+
+    // Only calculate if exercises are loaded
+    if (exerciseState is ExercisesLoaded) {
+      final exercises = exerciseState.exercises;
+
+      for (final set in weeklySets) {
+        // Find exercise by ID from BLoC state
+        try {
+          final exercise = exercises.firstWhere(
+            (e) => e.id == set.exerciseId,
+          );
+
+          // Count sets for each muscle group in the exercise
+          for (final muscle in exercise.muscleGroups) {
+            muscleBreakdown[muscle] = (muscleBreakdown[muscle] ?? 0) + 1;
+          }
+        } catch (_) {
+          // Exercise not found - skip this set
+          // This handles cases where exercise was deleted but sets remain
         }
       }
     }
-    
-    final totalWeeklySets = state.weeklySets.length;
-    
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppTheme.primaryOrange,
-          onRefresh: () async {
-            context.read<HomeBloc>().add(LoadHomeDataEvent());
-            // Wait a moment for the bloc to process
-            await Future.delayed(const Duration(milliseconds: 500));
-          },
-          child: _buildContent(
-            context,
-            state.targets,
-            totalWeeklyTarget,
-            totalWeeklySets,
-            muscleBreakdown,
-          ),
-        ),
-      ),
-    );
+
+    return muscleBreakdown;
   }
 
   Widget _buildContent(
@@ -166,40 +197,25 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryOrange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.analytics,
+                        color: AppTheme.primaryOrange,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Text(
                       'Weekly Progress',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getProgressColor(
-                          totalWeeklySets,
-                          totalWeeklyTarget,
-                        ).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _getProgressPercentage(
-                          totalWeeklySets,
-                          totalWeeklyTarget,
-                        ),
-                        style: TextStyle(
-                          color: _getProgressColor(
-                            totalWeeklySets,
-                            totalWeeklyTarget,
-                          ),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -271,11 +287,100 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 12),
           ...targets.map((target) {
             final currentSets = muscleBreakdown[target.muscleGroup] ?? 0;
-            return _buildMuscleGroupCard(
-              context,
-              target.muscleGroup,
-              currentSets,
-              target.weeklyGoal,
+            final progress = currentSets / target.weeklyGoal;
+            final isComplete = currentSets >= target.weeklyGoal;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            MuscleGroups.getDisplayName(target.muscleGroup),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                        if (isComplete)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.successGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 16,
+                                  color: AppTheme.successGreen,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Complete',
+                                  style: TextStyle(
+                                    color: AppTheme.successGreen,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          '$currentSets / ${target.weeklyGoal} sets',
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: AppTheme.textMedium,
+                                  ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(progress * 100).clamp(0, 100).toInt()}%',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isComplete
+                                    ? AppTheme.successGreen
+                                    : AppTheme.primaryOrange,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progress.clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: AppTheme.surfaceDark,
+                        color: isComplete
+                            ? AppTheme.successGreen
+                            : AppTheme.primaryOrange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             );
           }).toList(),
         ] else ...[
@@ -284,8 +389,8 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.target,
+                  Icon(
+                    Icons.flag_outlined,
                     size: 64,
                     color: AppTheme.textDim,
                   ),
@@ -297,7 +402,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Add muscle group targets to track your progress',
+                    'Add targets to track your weekly progress',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textMedium,
@@ -320,7 +425,11 @@ class _HomePageState extends State<HomePage> {
   ) {
     return Column(
       children: [
-        Icon(icon, color: AppTheme.primaryOrange, size: 20),
+        Icon(
+          icon,
+          size: 20,
+          color: AppTheme.textDim,
+        ),
         const SizedBox(height: 8),
         Text(
           value,
@@ -333,74 +442,19 @@ class _HomePageState extends State<HomePage> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textMedium,
+                color: AppTheme.textDim,
               ),
         ),
       ],
     );
   }
 
-  Widget _buildMuscleGroupCard(
-    BuildContext context,
-    String muscleGroup,
-    int currentSets,
-    int targetSets,
-  ) {
-    final progress = targetSets > 0 ? currentSets / targetSets : 0.0;
-    final percentage = (progress * 100).clamp(0, 100).toInt();
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  MuscleGroups.getDisplayName(muscleGroup),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                Text(
-                  '$currentSets / $targetSets',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppTheme.textMedium,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: progress.clamp(0.0, 1.0),
-                      minHeight: 8,
-                      backgroundColor: AppTheme.surfaceDark,
-                      color: _getProgressColor(currentSets, targetSets),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '$percentage%',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: _getProgressColor(currentSets, targetSets),
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  Color _getProgressColor(int current, int target) {
+    if (target == 0) return AppTheme.primaryOrange;
+    final ratio = current / target;
+    if (ratio >= 1.0) return AppTheme.successGreen;
+    if (ratio >= 0.7) return AppTheme.primaryOrange;
+    return AppTheme.warningYellow;
   }
 
   String _getWeekRangeString() {
@@ -408,25 +462,7 @@ class _HomePageState extends State<HomePage> {
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
     final weekEnd = weekStart.add(const Duration(days: 6));
 
-    final startFormat = DateFormat('MMM d');
-    final endFormat = DateFormat('MMM d, y');
-
-    return '${startFormat.format(weekStart)} - ${endFormat.format(weekEnd)}';
-  }
-
-  Color _getProgressColor(int current, int target) {
-    if (target == 0) return AppTheme.textDim;
-    final percentage = (current / target) * 100;
-
-    if (percentage >= 100) return AppTheme.successGreen;
-    if (percentage >= 75) return AppTheme.primaryOrange;
-    if (percentage >= 50) return AppTheme.accentYellow;
-    return AppTheme.textDim;
-  }
-
-  String _getProgressPercentage(int current, int target) {
-    if (target == 0) return '0%';
-    final percentage = ((current / target) * 100).clamp(0, 100).toInt();
-    return '$percentage%';
+    final formatter = DateFormat('MMM d');
+    return '${formatter.format(weekStart)} - ${formatter.format(weekEnd)}';
   }
 }
