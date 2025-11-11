@@ -8,6 +8,7 @@ import '../../../core/utils/error_handler.dart';
 import '../../../domain/entities/workout_set.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/history_bloc.dart';
+import 'package:flutter/material.dart' hide Text, TextButton;
 
 
 class HistoryPage extends StatelessWidget {

@@ -1,10 +1,8 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 
 class EnvConfig {
-  EnvConfig._(); // Private constructor to prevent instantiation
+  EnvConfig._();
 
-  // ==================== App Configuration ====================
-  
   static const String appName = String.fromEnvironment(
     'APP_NAME',
     defaultValue: 'Fitness Tracker',
@@ -15,14 +13,10 @@ class EnvConfig {
     defaultValue: '1.0.0',
   );
   
-  // ==================== User Configuration ====================
-  
   static const String userName = String.fromEnvironment(
     'USER_NAME',
     defaultValue: 'Fitness User',
   );
-  
-  // ==================== Environment ====================
   
   static const String environment = String.fromEnvironment(
     'ENVIRONMENT',
@@ -33,18 +27,12 @@ class EnvConfig {
   static bool get isProduction => environment == 'production';
   static bool get isStaging => environment == 'staging';
   
-  // ==================== Feature Flags ====================
-  
-  /// Enable device preview in debug mode
   static bool get enableDevicePreview => kDebugMode;
   
-  /// Enable performance monitoring
   static const bool enablePerformanceMonitoring = bool.fromEnvironment(
     'ENABLE_PERFORMANCE_MONITORING',
     defaultValue: true,
   );
-  
-  // ==================== Database Configuration ====================
   
   static const String databaseName = String.fromEnvironment(
     'DATABASE_NAME',
@@ -56,36 +44,25 @@ class EnvConfig {
     defaultValue: 3,
   );
   
-  // ==================== Seeding Configuration ====================
-  
-  /// Enable automatic database seeding on first launch
-  /// Set to false in production to prevent accidental data seeding
   static const bool seedDefaultData = bool.fromEnvironment(
     'SEED_DEFAULT_DATA',
-    defaultValue: true, // Default true for development convenience
+    defaultValue: true,
   );
   
-  /// Seed data version - increment when default data changes
-  /// This allows re-seeding when seed data is updated
   static const int seedDataVersion = int.fromEnvironment(
     'SEED_DATA_VERSION',
     defaultValue: 1,
   );
   
-  /// Enable detailed seeding logs for debugging
   static const bool enableSeedingLogs = bool.fromEnvironment(
     'ENABLE_SEEDING_LOGS',
-    defaultValue: true, // Enabled in development by default
+    defaultValue: true,
   );
   
-  /// Force re-seeding even if data exists (dangerous in production!)
-  /// Should ONLY be true in development/testing environments
   static const bool forceReseed = bool.fromEnvironment(
     'FORCE_RESEED',
     defaultValue: false,
   );
-  
-  // ==================== API Configuration ====================
   
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -102,20 +79,13 @@ class EnvConfig {
     defaultValue: 30,
   );
   
-  // ==================== Logging Configuration ====================
-  
-  /// Enable debug logging
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
   
-  /// Log level: 'verbose', 'debug', 'info', 'warning', 'error'
   static const String logLevel = String.fromEnvironment(
     'LOG_LEVEL',
     defaultValue: 'debug',
   );
   
-  // ==================== Validation Helpers ====================
-  
-  /// Validate that production environment has correct settings
   static void validateProductionConfig() {
     if (isProduction) {
       assert(
@@ -129,7 +99,6 @@ class EnvConfig {
     }
   }
   
-  /// Print current configuration (for debugging)
   static void printConfig() {
     if (!enableDebugLogs) return;
     

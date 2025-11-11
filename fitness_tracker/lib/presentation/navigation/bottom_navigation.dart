@@ -26,7 +26,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
   int _previousIndex = 0;
 
   // All 6 pages - each equally important and directly accessible
-  final List<Widget> _pages = const [
+  final List<Widget> _pages = [
     HomePage(),      // 1. Dashboard with weekly progress overview
     LogSetPage(),    // 2. Main logging interface for workouts
     HistoryPage(),   // 3. Past workout history and filtering

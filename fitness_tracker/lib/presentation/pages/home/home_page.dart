@@ -8,6 +8,7 @@ import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 
 
+  class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
@@ -175,7 +176,7 @@ class _HomePageState extends State<HomePage> {
       children: [
         // Header
         Text(
-          AppConfig.greeting,
+          'Hello, ${EnvConfig.userName}!',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -454,7 +455,7 @@ class _HomePageState extends State<HomePage> {
     final ratio = current / target;
     if (ratio >= 1.0) return AppTheme.successGreen;
     if (ratio >= 0.7) return AppTheme.primaryOrange;
-    return AppTheme.warningYellow;
+    return AppTheme.warningAmber;
   }
 
   String _getWeekRangeString() {

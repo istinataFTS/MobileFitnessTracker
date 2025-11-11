@@ -8,6 +8,7 @@ import 'config/env_config.dart';
 import 'core/themes/app_theme.dart';
 import 'core/utils/app_lifecycle_manager.dart';
 import 'core/utils/performance_monitor.dart';
+import 'core/utils/app_diagnostics.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 import 'injection/injection_container.dart' as di;
 import 'presentation/pages/targets/bloc/targets_bloc.dart';
@@ -18,33 +19,25 @@ import 'presentation/pages/history/bloc/history_bloc.dart';
 import 'domain/usecases/exercises/seed_exercises.dart'; 
 
 void main() async {
-  // Start initialization timer
   PerformanceMonitor.startTimer('app_initialization');
   
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 
   if (kDebugMode) {
     EnvConfig.printConfig();
   }
   
   EnvConfig.validateProductionConfig();
-  
-  // Initialize app lifecycle manager
   AppLifecycleManager().initialize();
   
-  // Initialize dependency injection (only for mobile - database doesn't work on web)
   if (!kIsWeb) {
     try {
-      // Initialize DI container
       debugPrint('Initializing dependencies...');
       final initStart = DateTime.now();
       await di.init();
       final initDuration = DateTime.now().difference(initStart);
       debugPrint('✅ Dependencies initialized in: ${initDuration.inMilliseconds}ms');
       
-      // ==================== ⭐ NEW: DATABASE SEEDING ====================
-      // Seed default exercises if configured to do so
       if (EnvConfig.seedDefaultData) {
         debugPrint('Seeding database with default data...');
         final seedStart = DateTime.now();
@@ -68,20 +61,29 @@ void main() async {
           );
         } catch (e) {
           debugPrint('❌ Unexpected error during seeding: $e');
-          // Don't prevent app from starting if seeding fails
         }
       } else {
         debugPrint('ℹ️  Database seeding disabled in environment config');
       }
-      // ================================================================
+      
+      if (kDebugMode) {
+        debugPrint('\n');
+        debugPrint('═══════════════════════════════════════');
+        debugPrint('🔍 RUNNING APP DIAGNOSTICS');
+        debugPrint('═══════════════════════════════════════');
+        
+        await AppDiagnostics.fullReport();
+        
+        debugPrint('═══════════════════════════════════════');
+        debugPrint('✅ DIAGNOSTICS COMPLETE');
+        debugPrint('═══════════════════════════════════════\n');
+      }
       
     } catch (e) {
       debugPrint('❌ Failed to initialize DI: $e');
-      // Continue anyway for web or if database fails
     }
   }
   
-  // Set preferred orientations (mobile only)
   if (!kIsWeb) {
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -89,7 +91,6 @@ void main() async {
     ]);
   }
   
-  // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -99,16 +100,13 @@ void main() async {
     ),
   );
   
-  // End initialization timer
   final initDuration = PerformanceMonitor.endTimer('app_initialization');
   if (initDuration != null) {
     debugPrint('App initialization completed in: ${initDuration.inMilliseconds}ms');
   }
   
-  // Start first frame timer
   PerformanceMonitor.startTimer('first_frame');
   
-  // Run app with or without device preview based on debug mode
   runApp(
     DevicePreview(
       enabled: kDebugMode && !kIsWeb,
@@ -122,97 +120,85 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Web: Simple MaterialApp without BLoC providers (uses in-memory managers)
     if (kIsWeb) {
       return _buildWebApp(context);
     }
 
-    // Mobile: Use BLoC providers with database
     return MultiBlocProvider(
       providers: [
-        // Targets BLoC
         BlocProvider(
           create: (_) => di.sl<TargetsBloc>()..add(LoadTargetsEvent()),
         ),
-        
-        // Log Set BLoC
         BlocProvider(
-          create: (_) => di.sl<LogSetBloc>()..add(LoadLogSetDataEvent()),
+          create: (_) => di.sl<LogSetBloc>(),
         ),
-        
-        // Home BLoC
         BlocProvider(
           create: (_) => di.sl<HomeBloc>()..add(LoadHomeDataEvent()),
         ),
-        
-        // Exercise BLoC
         BlocProvider(
           create: (_) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
         ),
-        
-        // History BLoC
         BlocProvider(
           create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
         ),
       ],
-      child: _buildMobileApp(context),
+      child: _buildMaterialApp(context),
+    );
+  }
+
+  Widget _buildMaterialApp(BuildContext context) {
+    return MaterialApp(
+      title: EnvConfig.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
+      home: const BottomNavigation(),
     );
   }
 
   Widget _buildWebApp(BuildContext context) {
     return MaterialApp(
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
       title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const BottomNavigation(),
-      onGenerateTitle: (context) => EnvConfig.appName,
+      home: const Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.phone_android,
+                  size: 64,
+                  color: AppTheme.primaryOrange,
+                ),
+                SizedBox(height: 24),
+                Text(
+                  'Mobile Only App',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'This fitness tracker is designed for mobile devices.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Please install the app on your Android or iOS device.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-  }
-
-  Widget _buildMobileApp(BuildContext context) {
-    return MaterialApp(
-      locale: DevicePreview.locale(context),
-      builder: (context, child) {
-        // Track first frame rendered
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final duration = PerformanceMonitor.endTimer('first_frame');
-          if (duration != null) {
-            debugPrint('First frame rendered in: ${duration.inMilliseconds}ms');
-          }
-        });
-        
-        // Wrap with DevicePreview if enabled
-        if (DevicePreview.isEnabled(context)) {
-          return DevicePreview.appBuilder(context, child);
-        }
-        return child!;
-      },
-      title: EnvConfig.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const BottomNavigation(),
-      onGenerateTitle: (context) => EnvConfig.appName,
-      
-      // Navigation observer for tracking (debug mode only)
-      navigatorObservers: kDebugMode 
-        ? [_NavigationObserver()]
-        : [],
-    );
-  }
-}
-
-/// Custom navigation observer for performance tracking
-class _NavigationObserver extends NavigatorObserver {
-  @override
-  void didPush(Route route, Route? previousRoute) {
-    super.didPush(route, previousRoute);
-    if (route.settings.name != null && previousRoute?.settings.name != null) {
-      PerformanceMonitor.trackScreenTransition(
-        previousRoute!.settings.name!,
-        route.settings.name!,
-      );
-    }
   }
 }

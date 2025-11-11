@@ -156,6 +156,10 @@ class ErrorHandler {
         content: Text(message),
         actions: [
           TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(cancelText),
+          ),
+          TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(
               foregroundColor: isDestructive ? AppTheme.errorRed : AppTheme.primaryOrange,
@@ -209,8 +213,4 @@ class ErrorHandler {
       Navigator.of(context).pop();
     }
   }
-}of(context).pop(false),
-            child: Text(cancelText),
-          ),
-          TextButton(
-            onPressed: () => Navigator.
+}
