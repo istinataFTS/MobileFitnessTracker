@@ -3,6 +3,10 @@ import '../../data/datasources/local/database_helper.dart';
 import 'performance_monitor.dart';
 
 /// Manages app lifecycle events and performs appropriate actions
+/// 
+/// CRITICAL FIX: Database must NOT be closed during pause/inactive states
+/// as it causes DatabaseException(error database_closed) when app resumes.
+/// SQLite databases should remain open throughout the app lifecycle.
 class AppLifecycleManager with WidgetsBindingObserver {
   static final AppLifecycleManager _instance = AppLifecycleManager._internal();
   factory AppLifecycleManager() => _instance;
@@ -62,6 +66,9 @@ class AppLifecycleManager with WidgetsBindingObserver {
       _lastPauseTime = null;
     }
     
+    // Ensure database connection is ready after resume
+    _ensureDatabaseOpen();
+    
     for (final callback in _resumeCallbacks) {
       try {
         callback();
@@ -85,33 +92,37 @@ class AppLifecycleManager with WidgetsBindingObserver {
       }
     }
     
-    _compactDatabase();
+    // CRITICAL: Do NOT close database on pause
+    // Closing the database causes DatabaseException(error database_closed) when app resumes
+    // SQLite connections should remain open for the app lifetime
+    // The OS will handle cleanup when the app is terminated
   }
 
   void _handleAppInactive() {
     debugPrint('App inactive');
+    // No database operations needed during inactive state
   }
 
   void _handleAppDetached() {
     debugPrint('App detached');
-    _closeDatabase();
+    // Clean up performance metrics but do NOT close database
+    // Database closing during detach can cause issues if pages try to save state
     PerformanceMonitor.clearMetrics();
   }
 
-  Future<void> _compactDatabase() async {
+  /// Ensures database is open and ready for use after app resume
+  /// 
+  /// This method verifies the database connection is active.
+  /// DatabaseHelper singleton will automatically reinitialize if needed.
+  Future<void> _ensureDatabaseOpen() async {
     try {
-      debugPrint('Compacting database...');
+      // Access database to trigger initialization if needed
+      // This is a no-op if database is already open
+      await DatabaseHelper().database;
+      debugPrint('✅ Database connection verified');
     } catch (e) {
-      debugPrint('Failed to compact database: $e');
-    }
-  }
-
-  Future<void> _closeDatabase() async {
-    try {
-      debugPrint('Closing database...');
-      await DatabaseHelper().close();
-    } catch (e) {
-      debugPrint('Failed to close database: $e');
+      debugPrint('❌ Failed to verify database connection: $e');
+      // Don't rethrow - allow app to continue and handle errors at usage point
     }
   }
 
@@ -126,8 +137,7 @@ class AppLifecycleManager with WidgetsBindingObserver {
   void didHaveMemoryPressure() {
     super.didHaveMemoryPressure();
     debugPrint('⚠️ Low memory warning!');
+    // Clear performance metrics but NOT database connection
     PerformanceMonitor.clearMetrics();
   }
 }
-
-

@@ -6,6 +6,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 /// Diagnostic utility to verify app configuration and data persistence
+/// 
+/// CRITICAL FIX: Do NOT open separate database connections or close the shared connection
+/// as this causes DatabaseException(error database_closed) errors.
 class AppDiagnostics {
   static Future<void> runDiagnostics() async {
     debugPrint('========================================');
@@ -32,6 +35,8 @@ class AppDiagnostics {
     
     if (EnvConfig.isProduction && EnvConfig.forceReseed) {
       debugPrint('  ❌ ERROR: Force reseed is enabled in production!');
+    } else if (!EnvConfig.isDevelopment && EnvConfig.enableDebugLogs) {
+      debugPrint('  ⚠️  Warning: Debug logs enabled outside development');
     } else {
       debugPrint('  ✅ Production settings OK');
     }
@@ -54,9 +59,7 @@ class AppDiagnostics {
       final databasesPath = await getDatabasesPath();
       final dbPath = join(databasesPath, EnvConfig.databaseName);
       debugPrint('  Location: $dbPath');
-
-      final dbFile = await databaseFactory.openDatabase(dbPath);
-      debugPrint('  ✅ Database file exists');
+      debugPrint('  ✅ Database accessible');
 
       final tables = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
@@ -67,7 +70,11 @@ class AppDiagnostics {
       }
 
       await _checkTableCounts(db);
-      await dbFile.close();
+      
+      // CRITICAL: Do NOT close the database connection
+      // The shared DatabaseHelper singleton manages the connection lifecycle
+      // Closing it here causes DatabaseException(error database_closed) errors
+      
     } catch (e) {
       debugPrint('  ❌ Database error: $e');
     }
@@ -144,6 +151,8 @@ class AppDiagnostics {
       final db = await dbHelper.database;
 
       final testId = 'test_persistence_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Insert test data
       await db.insert('exercises', {
         'id': testId,
         'name': 'Test Exercise - Persistence',
@@ -152,6 +161,7 @@ class AppDiagnostics {
       });
       debugPrint('  ✅ Created test exercise');
 
+      // Verify data persisted
       final result = await db.query(
         'exercises',
         where: 'id = ?',
@@ -160,8 +170,11 @@ class AppDiagnostics {
 
       if (result.isNotEmpty) {
         debugPrint('  ✅ Test exercise persisted successfully');
+        
+        // Clean up test data
         await db.delete('exercises', where: 'id = ?', whereArgs: [testId]);
         debugPrint('  ✅ Cleaned up test data');
+        
         return true;
       } else {
         debugPrint('  ❌ Test exercise not found after insert');
@@ -171,6 +184,9 @@ class AppDiagnostics {
       debugPrint('  ❌ Persistence test failed: $e');
       return false;
     }
+    
+    // CRITICAL: Do NOT close database connection here
+    // Let DatabaseHelper singleton manage the connection lifecycle
   }
 
   static void checkHardcodedValues() {
@@ -224,5 +240,3 @@ class AppDiagnostics {
     checkAppStoreCompliance();
   }
 }
-
-
