@@ -12,7 +12,6 @@ class DatabaseHelper {
   static Database? _database;
 
   Future<Database> get database async {
-    // Return a dummy database on web
     if (kIsWeb) {
       throw UnsupportedError('Database is not supported on web');
     }
@@ -32,14 +31,13 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3, // Increment version to trigger migration
+      version: EnvConfig.databaseVersion, // ✅ FIXED: Now uses EnvConfig
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // Create targets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
@@ -49,7 +47,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create workout_sets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -61,7 +58,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create exercises table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
@@ -71,7 +67,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create indexes for better query performance
     await db.execute('''
       CREATE INDEX idx_workout_sets_exercise_id 
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
@@ -89,9 +84,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle database migrations here
     if (oldVersion < 2) {
-      // Migration logic for version 2
       await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
       
       await db.execute('''
@@ -117,7 +110,6 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 3) {
-      // Migration logic for version 3 - add exercises table
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.exercises} (
           ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,

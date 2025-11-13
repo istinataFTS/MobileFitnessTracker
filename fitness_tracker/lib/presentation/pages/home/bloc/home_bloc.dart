@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/target.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../domain/usecases/targets/get_all_targets.dart';
@@ -67,7 +68,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final setsResult = await getWeeklySets();
     
     if (targetsResult.isLeft() || setsResult.isLeft()) {
-      emit(const HomeError('Failed to load data'));
+      emit(const HomeError(AppStrings.errorLoadData));
       return;
     }
     

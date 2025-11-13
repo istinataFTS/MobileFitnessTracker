@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'config/env_config.dart'; 
+import 'config/env_config.dart';
+import 'core/constants/app_strings.dart'; // ✅ ADDED
 import 'core/themes/app_theme.dart';
 import 'core/utils/app_lifecycle_manager.dart';
 import 'core/utils/performance_monitor.dart';
@@ -16,7 +17,7 @@ import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
 import 'presentation/pages/history/bloc/history_bloc.dart';
-import 'domain/usecases/exercises/seed_exercises.dart'; 
+import 'domain/usecases/exercises/seed_exercises.dart';
 
 void main() async {
   PerformanceMonitor.startTimer('app_initialization');
@@ -162,35 +163,35 @@ class FitnessTrackerApp extends StatelessWidget {
       title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const Scaffold(
+      home: Scaffold(
         body: Center(
           child: Padding(
-            padding: EdgeInsets.all(32.0),
+            padding: const EdgeInsets.all(32.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.phone_android,
                   size: 64,
                   color: AppTheme.primaryOrange,
                 ),
-                SizedBox(height: 24),
-                Text(
-                  'Mobile Only App',
+                const SizedBox(height: 24),
+                const Text(
+                  AppStrings.webMobileOnlyTitle, 
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 16),
-                Text(
-                  'This fitness tracker is designed for mobile devices.',
+                const SizedBox(height: 16),
+                const Text(
+                  AppStrings.webMobileOnlyDescription,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Please install the app on your Android or iOS device.',
+                const SizedBox(height: 8),
+                const Text(
+                  AppStrings.webMobileOnlyInstruction, 
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
                 ),
