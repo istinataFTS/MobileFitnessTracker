@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../config/env_config.dart';
 import '../../data/datasources/local/database_helper.dart';
+import '../../core/constants/database_tables.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-/// Diagnostic utility to verify app configuration and data persistence
-/// 
-/// CRITICAL FIX: Do NOT open separate database connections or close the shared connection
-/// as this causes DatabaseException(error database_closed) errors.
 class AppDiagnostics {
   static Future<void> runDiagnostics() async {
     debugPrint('========================================');
@@ -70,10 +67,6 @@ class AppDiagnostics {
       }
 
       await _checkTableCounts(db);
-      
-      // CRITICAL: Do NOT close the database connection
-      // The shared DatabaseHelper singleton manages the connection lifecycle
-      // Closing it here causes DatabaseException(error database_closed) errors
       
     } catch (e) {
       debugPrint('  ❌ Database error: $e');
@@ -152,27 +145,28 @@ class AppDiagnostics {
 
       final testId = 'test_persistence_${DateTime.now().millisecondsSinceEpoch}';
       
-      // Insert test data
-      await db.insert('exercises', {
-        'id': testId,
-        'name': 'Test Exercise - Persistence',
-        'muscleGroups': '["chest"]',
-        'createdAt': DateTime.now().toIso8601String(),
+      await db.insert(DatabaseTables.exercises, {
+        DatabaseTables.exerciseId: testId,
+        DatabaseTables.exerciseName: 'Test Exercise - Persistence',
+        DatabaseTables.exerciseMuscleGroups: '["chest"]',
+        DatabaseTables.exerciseCreatedAt: DateTime.now().toIso8601String(),
       });
       debugPrint('  ✅ Created test exercise');
 
-      // Verify data persisted
       final result = await db.query(
-        'exercises',
-        where: 'id = ?',
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseId} = ?',
         whereArgs: [testId],
       );
 
       if (result.isNotEmpty) {
         debugPrint('  ✅ Test exercise persisted successfully');
         
-        // Clean up test data
-        await db.delete('exercises', where: 'id = ?', whereArgs: [testId]);
+        await db.delete(
+          DatabaseTables.exercises,
+          where: '${DatabaseTables.exerciseId} = ?',
+          whereArgs: [testId],
+        );
         debugPrint('  ✅ Cleaned up test data');
         
         return true;
@@ -184,9 +178,6 @@ class AppDiagnostics {
       debugPrint('  ❌ Persistence test failed: $e');
       return false;
     }
-    
-    // CRITICAL: Do NOT close database connection here
-    // Let DatabaseHelper singleton manage the connection lifecycle
   }
 
   static void checkHardcodedValues() {
