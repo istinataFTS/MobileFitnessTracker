@@ -1,4 +1,3 @@
-/// Centralized application strings for user-facing text
 class AppStrings {
   AppStrings._();
 
@@ -37,93 +36,55 @@ class AppStrings {
   static const String errorLoadData = 'Failed to load data';
   static const String errorSaveData = 'Failed to save data';
   static const String errorDeleteData = 'Failed to delete data';
-  static const String errorDatabaseConnection = 'Database connection error';
-  static const String errorNoInternet = 'No internet connection';
-  static const String errorTimeout = 'Request timed out';
-  
-  // ==================== Success Messages ====================
-  static const String successSaved = 'Saved successfully';
-  static const String successDeleted = 'Deleted successfully';
-  static const String successUpdated = 'Updated successfully';
+  static const String errorUpdateData = 'Failed to update data';
+  static const String errorNetwork = 'Network connection failed';
+  static const String errorDatabase = 'Database error occurred';
   static const String successSetLogged = 'Set logged successfully';
-  static const String setLoggedSuccess = 'Set logged successfully';
-  static const String successExerciseAdded = 'Exercise added successfully';
-  static const String successTargetSet = 'Target set successfully';
-
-  // ==================== Validation Messages ====================
-  static const String validationRequired = 'This field is required';
-  static const String required = 'Required';
-  static const String validationInvalidNumber = 'Please enter a valid number';
-  static const String invalid = 'Invalid';
-  static const String validationMinValue = 'Value must be greater than 0';
-  static const String validationMaxLength = 'Text is too long';
-  static const String validationDuplicate = 'This already exists';
-
-  // ==================== Loading States ====================
-  static const String loadingData = 'Loading...';
-  static const String loadingPleaseWait = 'Please wait...';
-  static const String processingRequest = 'Processing...';
-
-  // ==================== Empty States ====================
-  static const String emptyNoData = 'No data available';
-  static const String emptyNoExercises = 'No exercises found';
-  static const String noExercisesAvailable = 'No exercises available';
-  static const String createExercisesFirst = 'Create exercises first in the Exercises tab';
-  static const String emptyNoWorkoutSets = 'No workout sets recorded yet';
-  static const String emptyNoTargets = 'No targets set';
-  static const String emptyStartTracking = 'Start tracking your workouts!';
-  static const String noSetsLogged = 'No workout sets logged yet';
-  static const String startLoggingSets = 'Start logging your workout sets!';
-  static const String comingSoon = 'Coming soon!';
-
-  // ==================== Confirmation Messages ====================
-  static const String confirmDelete = 'Are you sure you want to delete this?';
-  static const String confirmDeleteExercise = 'Delete this exercise?';
-  static const String deleteExerciseConfirm = 'Are you sure you want to delete this exercise?';
-  static const String confirmDeleteSet = 'Delete this workout set?';
-  static const String confirmDeleteTarget = 'Delete this target?';
-  static const String confirmClearAll = 'Clear all data?';
-  static const String removeTargetConfirm = 'Remove this target?';
-
-  // ==================== Navigation ====================
-  static const String navHome = 'Home';
-  static const String navLog = 'Log';
-  static const String navHistory = 'History';
-  static const String navExercises = 'Exercises';
-  static const String navTargets = 'Targets';
-  static const String navProfile = 'Profile';
-  static const String navSettings = 'Settings';
-
-  // ==================== Feature Specific ====================
   
-  // Targets
-  static const String targetsTitle = 'Weekly Targets';
-  static const String targetsSetGoal = 'Set Weekly Goal';
-  static const String targetsWeeklySets = 'sets per week';
-  static const String setsPerWeek = 'sets/week';
-  static const String targetsMuscleGroup = 'Muscle Group';
+  // ==================== Home Screen ====================
+  static const String homeTitle = 'Fitness Tracker';
+  static const String homeWeeklySummary = 'Weekly Summary';
+  static const String homeQuickActions = 'Quick Actions';
+  static const String homeRecentActivity = 'Recent Activity';
+  static const String homeNoData = 'No workout data yet';
+  static const String homeGetStarted = 'Start logging workouts to see your progress';
+
+  // ==================== Targets ====================
+  static const String targetsTitle = 'Targets';
   static const String addTarget = 'Add Target';
-  static const String addFirstTarget = 'Add Your First Target';
   static const String editTarget = 'Edit Target';
-  static const String removeTarget = 'Remove Target';
-  static const String noTargetsYet = 'No targets set yet';
-  static const String noTargetsDescription = 'Set weekly goals for muscle groups to track your progress';
-  static const String allMuscleGroupsAdded = 'All muscle groups have targets';
-  static const String selectMuscleGroup = 'Select Muscle Group';
-  static const String weeklyRepGoal = 'Weekly Set Goal';
+  static const String deleteTarget = 'Delete Target';
+  static const String targetMuscleGroup = 'Muscle Group';
+  static const String targetWeeklyGoal = 'Weekly Goal';
+  static const String targetProgress = 'Progress';
+  static const String targetCompleted = 'Completed';
+  static const String targetInProgress = 'In Progress';
+  static const String noTargetsYet = 'No targets yet';
+  static const String createTargetsDescription = 'Set weekly goals for each muscle group';
   static const String aboutTargets = 'About Targets';
-  static const String aboutTargetsDescription = 'Set weekly goals for each muscle group to stay on track with your fitness routine';
-  
-  // Exercises
+  static const String aboutTargetsDescription = 'Set weekly goals for muscle groups and track your progress';
+  static const String targetDeleteConfirm = 'Delete this target?';
+
+  // ==================== History ====================
+  static const String historyTitle = 'History';
+  static const String historyEmpty = 'No workout history';
+  static const String historyEmptyDescription = 'Start logging sets to build your history';
+  static const String viewHistory = 'View History';
+  static const String noSetsLogged = 'No sets logged yet';
+  static const String startLoggingSets = 'Start logging sets to track your progress';
+  static const String filterByMuscle = 'Filter by muscle';
+  static const String filterByDate = 'Filter by date';
+  static const String showAll = 'Show All';
+
+  // ==================== Exercises ====================
   static const String exercisesTitle = 'Exercises';
-  static const String exercisesAddNew = 'Add New Exercise';
-  static const String exercisesEditExercise = 'Edit Exercise';
+  static const String addNewExercise = 'Add New Exercise';
+  static const String editExercise = 'Edit Exercise';
   static const String exercisesName = 'Exercise Name';
   static const String exercisesSelectMuscles = 'Select Muscle Groups';
   static const String exercise = 'Exercise';
   static const String addExercise = 'Add Exercise';
   static const String addFirstExercise = 'Add Your First Exercise';
-  static const String editExercise = 'Edit Exercise';
   static const String deleteExercise = 'Delete Exercise';
   static const String noExercisesYet = 'No exercises yet';
   static const String createExercisesDescription = 'Create custom exercises to track your workouts';
@@ -135,7 +96,7 @@ class AppStrings {
   static const String aboutExercises = 'About Exercises';
   static const String aboutExercisesDescription = 'Create custom exercises and assign them to muscle groups for better tracking';
   
-  // Workout Logging
+  // ==================== Workout Logging ====================
   static const String logSetTitle = 'Log Workout Set';
   static const String logSetExercise = 'Exercise';
   static const String logSetReps = 'Reps';
@@ -148,42 +109,16 @@ class AppStrings {
   static const String setWillCountToward = 'This set will count toward:';
   static const String countedFor = 'Counted for';
   
-  // History
-  static const String historyTitle = 'Workout History';
-  static const String historyFilterByDate = 'Filter by Date';
-  static const String historyNoSets = 'No workout sets recorded';
-  static const String workoutDetails = 'Workout Details';
-  static const String filterByMuscleGroup = 'Filter by Muscle Group';
-  
-  // Profile
+  // ==================== Profile/Settings ====================
   static const String profileTitle = 'Profile';
-  static const String profileEditProfile = 'Edit Profile';
-  static const String editProfile = 'Edit Profile';
-  static const String profileSettings = 'Settings';
-  static const String profileAbout = 'About';
-  static const String about = 'About';
-  static const String fitnessEnthusiast = 'Fitness Enthusiast';
-  static const String totalWorkouts = 'Total Workouts';
-  static const String streak = 'Day Streak';
-  static const String signOut = 'Sign Out';
-  
-  // Profile Sections
-  static const String workoutManagement = 'Workout Management';
-  static const String manageTargets = 'Manage Targets';
-  static const String manageTargetsDesc = 'Set and track your weekly muscle group goals';
-  static const String account = 'Account';
-  static const String changePassword = 'Change Password';
-  static const String preferences = 'Preferences';
-  static const String support = 'Support';
-  static const String helpSupport = 'Help & Support';
-  static const String sendFeedback = 'Send Feedback';
-  
-  // Settings
   static const String settingsTitle = 'Settings';
-  static const String settings = 'Settings';
-  static const String settingsDesc = 'App preferences and options';
-  static const String settingsGeneral = 'General';
-  static const String settingsDatabase = 'Database';
+  static const String settingsAccount = 'Account';
+  static const String settingsPreferences = 'Preferences';
+  static const String settingsAbout = 'About';
+  static const String settingsHelp = 'Help & Support';
+  static const String settingsFeedback = 'Send Feedback';
+  static const String settingsPrivacy = 'Privacy Policy';
+  static const String settingsTerms = 'Terms of Service';
   static const String settingsClearData = 'Clear All Data';
   static const String settingsExportData = 'Export Data';
   static const String settingsImportData = 'Import Data';
@@ -207,6 +142,7 @@ class AppStrings {
   static const String muscleCalves = 'Calves';
   static const String muscleAbs = 'Abs';
   static const String muscleObliques = 'Obliques';
+  static const String muscleTraps = 'Traps';
 
   // ==================== Units ====================
   static const String unitKg = 'kg';
@@ -222,4 +158,56 @@ class AppStrings {
   static const String thisMonth = 'This Month';
   static const String dateFormatDate = 'MMM d';
   static const String dateFormatFull = 'EEEE, MMM d, yyyy';
+
+  // ⭐⭐⭐ NEW: CALENDAR HISTORY STRINGS ⭐⭐⭐
+  // ==================== Calendar Navigation ====================
+  static const String goToToday = 'Go to Today';
+  static const String previousMonth = 'Previous Month';
+  static const String nextMonth = 'Next Month';
+  
+  // ==================== Calendar View ====================
+  static const String selectDate = 'Select a date';
+  static const String noWorkoutsOnDate = 'No workouts logged on this date';
+  static const String workoutsOnDate = 'Workouts on';
+  
+  // ==================== Day Details ====================
+  static const String setsLogged = 'sets logged';
+  static const String setLogged = 'set logged';
+  static const String totalVolume = 'Total Volume';
+  static const String exercisesTrained = 'Exercises Trained';
+  
+  // ==================== Actions ====================
+  static const String editSet = 'Edit Set';
+  static const String deleteSet = 'Delete Set';
+  static const String logWorkoutHere = 'Log Workout';
+  static const String addWorkout = 'Add Workout';
+  
+  // ==================== Edit Dialog ====================
+  static const String editWorkoutSet = 'Edit Workout Set';
+  static const String updateSet = 'Update Set';
+  static const String cancelEdit = 'Cancel';
+  
+  // ==================== Confirmations ====================
+  static const String deleteSetConfirm = 'Delete this set?';
+  static const String deleteSetMessage = 'This action cannot be undone.';
+  static const String setUpdatedSuccess = 'Set updated successfully';
+  static const String setDeletedSuccess = 'Set deleted successfully';
+  
+  // ==================== Weekdays (Short) ====================
+  static const String sun = 'S';
+  static const String mon = 'M';
+  static const String tue = 'T';
+  static const String wed = 'W';
+  static const String thu = 'T';
+  static const String fri = 'F';
+  static const String sat = 'S';
+  
+  // ==================== Weekdays (Full) ====================
+  static const String sunday = 'Sunday';
+  static const String monday = 'Monday';
+  static const String tuesday = 'Tuesday';
+  static const String wednesday = 'Wednesday';
+  static const String thursday = 'Thursday';
+  static const String friday = 'Friday';
+  static const String saturday = 'Saturday';
 }

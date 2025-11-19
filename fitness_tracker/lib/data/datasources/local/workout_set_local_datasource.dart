@@ -1,113 +1,105 @@
-import 'package:sqflite/sqflite.dart';
-import '../../../core/constants/database_tables.dart';
-import '../../../core/errors/exceptions.dart';
-import '../../models/workout_set_model.dart';
-import 'database_helper.dart';
+import 'package:dartz/dartz.dart';
+import '../../core/errors/exceptions.dart';
+import '../../core/errors/failures.dart';
+import '../../domain/entities/workout_set.dart';
+import '../../domain/repositories/workout_set_repository.dart';
+import '../datasources/local/workout_set_local_datasource.dart';
+import '../models/workout_set_model.dart';
 
-abstract class WorkoutSetLocalDataSource {
-  Future<List<WorkoutSetModel>> getAllSets();
-  Future<List<WorkoutSetModel>> getSetsByExerciseId(String exerciseId);
-  Future<List<WorkoutSetModel>> getSetsByDateRange(
-    DateTime startDate,
-    DateTime endDate,
-  );
-  Future<void> insertSet(WorkoutSetModel set);
-  Future<void> deleteSet(String id);
-  Future<void> clearAllSets();
-}
+class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
+  final WorkoutSetLocalDataSource localDataSource;
 
-class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
-  final DatabaseHelper databaseHelper;
-
-  const WorkoutSetLocalDataSourceImpl({required this.databaseHelper});
+  const WorkoutSetRepositoryImpl({required this.localDataSource});
 
   @override
-  Future<List<WorkoutSetModel>> getAllSets() async {
+  Future<Either<Failure, List<WorkoutSet>>> getAllSets() async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.workoutSets,
-        orderBy: '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
-      );
-      return maps.map((map) => WorkoutSetModel.fromMap(map)).toList();
+      final sets = await localDataSource.getAllSets();
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to get sets: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 
   @override
-  Future<List<WorkoutSetModel>> getSetsByExerciseId(String exerciseId) async {
+  Future<Either<Failure, List<WorkoutSet>>> getSetsByExerciseId(
+    String exerciseId,
+  ) async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setExerciseId} = ?',
-        whereArgs: [exerciseId],
-        orderBy: '${DatabaseTables.setDate} DESC',
-      );
-      return maps.map((map) => WorkoutSetModel.fromMap(map)).toList();
+      final sets = await localDataSource.getSetsByExerciseId(exerciseId);
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to get sets by exercise: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 
   @override
-  Future<List<WorkoutSetModel>> getSetsByDateRange(
+  Future<Either<Failure, List<WorkoutSet>>> getSetsByDateRange(
     DateTime startDate,
     DateTime endDate,
   ) async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setDate} BETWEEN ? AND ?',
-        whereArgs: [
-          startDate.toIso8601String(),
-          endDate.toIso8601String(),
-        ],
-        orderBy: '${DatabaseTables.setDate} DESC',
-      );
-      return maps.map((map) => WorkoutSetModel.fromMap(map)).toList();
+      final sets = await localDataSource.getSetsByDateRange(startDate, endDate);
+      return Right(sets);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to get sets by date range: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 
   @override
-  Future<void> insertSet(WorkoutSetModel set) async {
+  Future<Either<Failure, void>> addSet(WorkoutSet set) async {
     try {
-      final db = await databaseHelper.database;
-      await db.insert(
-        DatabaseTables.workoutSets,
-        set.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final model = WorkoutSetModel.fromEntity(set);
+      await localDataSource.insertSet(model);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to insert set: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  // ⭐ NEW: Add updateSet implementation
+  @override
+  Future<Either<Failure, void>> updateSet(WorkoutSet set) async {
+    try {
+      final model = WorkoutSetModel.fromEntity(set);
+      await localDataSource.updateSet(model);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 
   @override
-  Future<void> deleteSet(String id) async {
+  Future<Either<Failure, void>> deleteSet(String id) async {
     try {
-      final db = await databaseHelper.database;
-      await db.delete(
-        DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setId} = ?',
-        whereArgs: [id],
-      );
+      await localDataSource.deleteSet(id);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to delete set: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 
   @override
-  Future<void> clearAllSets() async {
+  Future<Either<Failure, void>> clearAllSets() async {
     try {
-      final db = await databaseHelper.database;
-      await db.delete(DatabaseTables.workoutSets);
+      await localDataSource.clearAllSets();
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
     } catch (e) {
-      throw CacheDatabaseException('Failed to clear sets: $e');
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 }

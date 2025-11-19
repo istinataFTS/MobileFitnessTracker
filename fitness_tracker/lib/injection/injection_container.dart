@@ -18,13 +18,14 @@ import '../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import '../domain/usecases/workout_sets/delete_workout_set.dart';
+import '../domain/usecases/workout_sets/update_workout_set.dart'; 
 import '../domain/usecases/exercises/get_all_exercises.dart';
 import '../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../domain/usecases/exercises/get_exercises_for_muscle.dart';
 import '../domain/usecases/exercises/add_exercise.dart';
 import '../domain/usecases/exercises/update_exercise.dart';
 import '../domain/usecases/exercises/delete_exercise.dart';
-import '../domain/usecases/exercises/seed_exercises.dart'; // ⭐ NEW: Seeding use case
+import '../domain/usecases/exercises/seed_exercises.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/log_set/bloc/log_set_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
@@ -62,10 +63,12 @@ Future<void> init() async {
         deleteExercise: sl(),
       ));
 
+  // ⭐ MODIFIED: Add updateWorkoutSet parameter to HistoryBloc
   sl.registerFactory(() => HistoryBloc(
         getAllWorkoutSets: sl(),
         getSetsByDateRange: sl(),
         deleteWorkoutSet: sl(),
+        updateWorkoutSet: sl(), // 
       ));
 
   // ==================== Use Cases ====================
@@ -85,6 +88,7 @@ Future<void> init() async {
         exerciseRepository: sl(),
       ));
   sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
+  sl.registerLazySingleton(() => UpdateWorkoutSet(sl())); 
 
   // Exercises
   sl.registerLazySingleton(() => GetAllExercises(sl()));
@@ -93,8 +97,6 @@ Future<void> init() async {
   sl.registerLazySingleton(() => AddExercise(sl()));
   sl.registerLazySingleton(() => UpdateExercise(sl()));
   sl.registerLazySingleton(() => DeleteExercise(sl()));
-  
-  // ⭐ NEW: Database Seeding
   sl.registerLazySingleton(() => SeedExercises(sl()));
 
   // ==================== Repositories ====================

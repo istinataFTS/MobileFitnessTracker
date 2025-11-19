@@ -12,6 +12,7 @@ abstract class WorkoutSetRepository {
     DateTime endDate,
   );
   Future<Either<Failure, void>> addSet(WorkoutSet set);
+  Future<Either<Failure, void>> updateSet(WorkoutSet set); 
   Future<Either<Failure, void>> deleteSet(String id);
   Future<Either<Failure, void>> clearAllSets();
 }
