@@ -1,5 +1,3 @@
-/// Database table and column name constants
-/// Following best practices: all strings centralized, no hardcoding
 class DatabaseTables {
   DatabaseTables._();
 
@@ -7,6 +5,8 @@ class DatabaseTables {
   static const String targets = 'targets';
   static const String workoutSets = 'workout_sets';
   static const String exercises = 'exercises';
+  static const String meals = 'meals';
+  static const String nutritionLogs = 'nutrition_logs';
 
   // ==================== Targets Table Columns ====================
   static const String targetId = 'id';
@@ -27,4 +27,23 @@ class DatabaseTables {
   static const String exerciseName = 'name';
   static const String exerciseMuscleGroups = 'muscle_groups'; // Stored as JSON array
   static const String exerciseCreatedAt = 'created_at';
-}
+
+  // ==================== Meals Table Columns ====================
+  static const String mealId = 'id';
+  static const String mealName = 'name';
+  static const String mealCarbsPer100g = 'carbs_per_100g';
+  static const String mealProteinPer100g = 'protein_per_100g';
+  static const String mealFatPer100g = 'fat_per_100g';
+  static const String mealCaloriesPer100g = 'calories_per_100g';
+  static const String mealCreatedAt = 'created_at';
+
+  // ==================== Nutrition Logs Table Columns ====================
+  static const String nutritionLogId = 'id';
+  static const String nutritionLogMealId = 'meal_id'; // Nullable - null for direct macro logs
+  static const String nutritionLogGrams = 'grams'; // Nullable - only for meal logs
+  static const String nutritionLogCarbs = 'carbs';
+  static const String nutritionLogProtein = 'protein';
+  static const String nutritionLogFat = 'fat';
+  static const String nutritionLogCalories = 'calories';
+  static const String nutritionLogDate = 'date';
+  static const String nutritionLogCreatedAt = 'created_at';

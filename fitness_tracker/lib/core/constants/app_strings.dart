@@ -159,7 +159,6 @@ class AppStrings {
   static const String dateFormatDate = 'MMM d';
   static const String dateFormatFull = 'EEEE, MMM d, yyyy';
 
-  // ⭐⭐⭐ NEW: CALENDAR HISTORY STRINGS ⭐⭐⭐
   // ==================== Calendar Navigation ====================
   static const String goToToday = 'Go to Today';
   static const String previousMonth = 'Previous Month';
@@ -210,4 +209,89 @@ class AppStrings {
   static const String thursday = 'Thursday';
   static const String friday = 'Friday';
   static const String saturday = 'Saturday';
+
+  // ==================== Nutrition - Meals ====================
+  static const String mealsTitle = 'Meals';
+  static const String addMeal = 'Add Meal';
+  static const String editMeal = 'Edit Meal';
+  static const String deleteMeal = 'Delete Meal';
+  static const String mealName = 'Meal Name';
+  static const String mealNameHint = 'e.g., Chicken Breast';
+  static const String noMealsYet = 'No meals yet';
+  static const String createMealsDescription = 'Create custom meals to track your nutrition';
+  static const String addFirstMeal = 'Add Your First Meal';
+  static const String aboutMeals = 'About Meals';
+  static const String aboutMealsDescription = 'Create reusable meals with macros per 100g for quick logging';
+  static const String deleteMealConfirm = 'Delete this meal? All nutrition logs using this meal will be unlinked.';
+  static const String mealDeletedSuccess = 'Meal deleted successfully';
+  static const String mealAddedSuccess = 'Meal added successfully';
+  static const String mealUpdatedSuccess = 'Meal updated successfully';
+
+  // ==================== Nutrition - Macros ====================
+  static const String protein = 'Protein';
+  static const String carbs = 'Carbs';
+  static const String fats = 'Fats';
+  static const String calories = 'Calories';
+  static const String macrosPerHundredGrams = 'Macros per 100g';
+  static const String proteinGrams = 'Protein (g)';
+  static const String carbsGrams = 'Carbs (g)';
+  static const String fatsGrams = 'Fats (g)';
+  static const String proteinHint = 'e.g., 25';
+  static const String carbsHint = 'e.g., 0';
+  static const String fatsHint = 'e.g., 5';
+
+  // ==================== Nutrition - Logging ====================
+  static const String nutritionTitle = 'Nutrition';
+  static const String logNutrition = 'Log Nutrition';
+  static const String nutritionLog = 'Nutrition Log';
+  static const String logMeal = 'Log Meal';
+  static const String logDirectMacros = 'Log Direct Macros';
+  static const String selectMeal = 'Select Meal';
+  static const String portionSize = 'Portion Size (g)';
+  static const String portionSizeHint = 'e.g., 150';
+  static const String enterMacros = 'Enter Macros';
+  static const String noNutritionLogsYet = 'No nutrition logs yet';
+  static const String startLoggingNutrition = 'Start logging meals to track your nutrition';
+  static const String nutritionLogAddedSuccess = 'Nutrition log added successfully';
+  static const String nutritionLogUpdatedSuccess = 'Nutrition log updated successfully';
+  static const String nutritionLogDeletedSuccess = 'Nutrition log deleted successfully';
+  static const String deleteNutritionLog = 'Delete Nutrition Log';
+  static const String deleteNutritionLogConfirm = 'Delete this nutrition log?';
+
+  // ==================== Nutrition - Daily Summary ====================
+  static const String dailyMacros = 'Daily Macros';
+  static const String totalProtein = 'Total Protein';
+  static const String totalCarbs = 'Total Carbs';
+  static const String totalFats = 'Total Fats';
+  static const String totalCalories = 'Total Calories';
+  static const String dailyNutritionSummary = 'Daily Nutrition Summary';
+  static const String macroBreakdown = 'Macro Breakdown';
+  static const String caloriesFromProtein = 'Calories from Protein';
+  static const String caloriesFromCarbs = 'Calories from Carbs';
+  static const String caloriesFromFats = 'Calories from Fats';
+
+  // ==================== Nutrition - Validation ====================
+  static const String mealNameRequired = 'Meal name is required';
+  static const String proteinRequired = 'Protein is required';
+  static const String carbsRequired = 'Carbs is required';
+  static const String fatsRequired = 'Fats is required';
+  static const String portionRequired = 'Portion size is required';
+  static const String invalidMacroValue = 'Enter a valid number';
+  static const String macroTooLow = 'Must be 0 or greater';
+  static const String macroTooHigh = 'Value too high';
+  static const String portionTooLow = 'Portion must be greater than 0';
+  static const String portionTooHigh = 'Portion size too large';
+
+  // ==================== Nutrition - Types ====================
+  static const String mealType = 'Meal';
+  static const String directMacrosType = 'Direct Macros';
+  static const String loggedViaMeal = 'Logged via meal';
+  static const String loggedDirectly = 'Logged directly';
+
+  // ==================== Nutrition - Library ====================
+  static const String mealLibrary = 'Meal Library';
+  static const String viewMealLibrary = 'View Meal Library';
+  static const String manageMeals = 'Manage Meals';
+  static const String noMealsAvailable = 'No meals available';
+  static const String createMealsFirst = 'Create meals in the library first';
 }

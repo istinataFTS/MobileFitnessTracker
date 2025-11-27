@@ -31,13 +31,14 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: EnvConfig.databaseVersion, // ✅ FIXED: Now uses EnvConfig
+      version: EnvConfig.databaseVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    // Targets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
@@ -47,6 +48,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // Workout Sets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -58,6 +60,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // Exercises table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
@@ -67,6 +70,38 @@ class DatabaseHelper {
       )
     ''');
 
+    // Meals table
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.meals} (
+        ${DatabaseTables.mealId} TEXT PRIMARY KEY,
+        ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealCaloriesPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealCreatedAt} TEXT NOT NULL
+      )
+    ''');
+
+    // Nutrition Logs table
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.nutritionLogs} (
+        ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
+        ${DatabaseTables.nutritionLogMealId} TEXT,
+        ${DatabaseTables.nutritionLogGrams} REAL,
+        ${DatabaseTables.nutritionLogCarbs} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogProtein} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogFat} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
+        FOREIGN KEY (${DatabaseTables.nutritionLogMealId}) 
+          REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
+          ON DELETE CASCADE
+      )
+    ''');
+
+    // Indexes for workout sets
     await db.execute('''
       CREATE INDEX idx_workout_sets_exercise_id 
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
@@ -77,13 +112,37 @@ class DatabaseHelper {
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
     ''');
 
+    // Indexes for exercises
     await db.execute('''
       CREATE INDEX idx_exercises_name 
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
     ''');
+
+    // Indexes for meals
+    await db.execute('''
+      CREATE INDEX idx_meals_name 
+      ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
+    ''');
+
+    // Indexes for nutrition logs
+    await db.execute('''
+      CREATE INDEX idx_nutrition_logs_meal_id 
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogMealId})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_nutrition_logs_date 
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogDate})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_nutrition_logs_created_at 
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogCreatedAt})
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Migration from v1 to v2: Restructure workout_sets
     if (oldVersion < 2) {
       await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
       
@@ -109,6 +168,7 @@ class DatabaseHelper {
       ''');
     }
 
+    // Migration from v2 to v3: Add exercises table
     if (oldVersion < 3) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.exercises} (
@@ -122,6 +182,62 @@ class DatabaseHelper {
       await db.execute('''
         CREATE INDEX IF NOT EXISTS idx_exercises_name 
         ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
+      ''');
+    }
+
+    // Migration from v3 to v4: Add nutrition tracking (meals + nutrition_logs)
+    if (oldVersion < 4) {
+      // Create meals table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ${DatabaseTables.meals} (
+          ${DatabaseTables.mealId} TEXT PRIMARY KEY,
+          ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+          ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
+          ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
+          ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
+          ${DatabaseTables.mealCaloriesPer100g} REAL NOT NULL,
+          ${DatabaseTables.mealCreatedAt} TEXT NOT NULL
+        )
+      ''');
+
+      // Create nutrition logs table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ${DatabaseTables.nutritionLogs} (
+          ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
+          ${DatabaseTables.nutritionLogMealId} TEXT,
+          ${DatabaseTables.nutritionLogGrams} REAL,
+          ${DatabaseTables.nutritionLogCarbs} REAL NOT NULL,
+          ${DatabaseTables.nutritionLogProtein} REAL NOT NULL,
+          ${DatabaseTables.nutritionLogFat} REAL NOT NULL,
+          ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
+          ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
+          ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
+          FOREIGN KEY (${DatabaseTables.nutritionLogMealId}) 
+            REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
+            ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes for meals
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_meals_name 
+        ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
+      ''');
+
+      // Create indexes for nutrition logs
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id 
+        ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogMealId})
+      ''');
+
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date 
+        ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogDate})
+      ''');
+
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at 
+        ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogCreatedAt})
       ''');
     }
   }
