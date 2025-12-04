@@ -1,3 +1,4 @@
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/database_tables.dart';
 import '../../core/utils/macro_calculator.dart';
 import '../../domain/entities/meal.dart';
@@ -146,21 +147,23 @@ class MealModel extends Meal {
       );
     }
 
-    // If only calories provided, distribute evenly (40/30/30 ratio)
-    // 40% carbs, 30% protein, 30% fat
+    // If only calories provided, use default distribution ratios from AppConstants
     if (carbsPer100g == null && proteinPer100g == null && fatPer100g == null) {
       return MealModel(
         id: id,
         name: name,
-        carbsPer100g: (caloriesPer100g * 0.4) / 4.0, // 40% of calories from carbs
-        proteinPer100g: (caloriesPer100g * 0.3) / 4.0, // 30% from protein
-        fatPer100g: (caloriesPer100g * 0.3) / 9.0, // 30% from fat
+        carbsPer100g: (caloriesPer100g * AppConstants.defaultCarbsRatio) / 
+                      MacroCalculator.caloriesPerGramCarbs,
+        proteinPer100g: (caloriesPer100g * AppConstants.defaultProteinRatio) / 
+                        MacroCalculator.caloriesPerGramProtein,
+        fatPer100g: (caloriesPer100g * AppConstants.defaultFatsRatio) / 
+                    MacroCalculator.caloriesPerGramFat,
         caloriesPer100g: caloriesPer100g,
         createdAt: createdAt,
       );
     }
 
-    // Calculate missing macro(s)
+    // Calculate missing macro(s) using MacroCalculator
     final carbs = carbsPer100g ?? 0.0;
     final protein = proteinPer100g ?? 0.0;
     final fat = fatPer100g ?? 0.0;

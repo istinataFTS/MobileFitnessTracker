@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../core/constants/app_constants.dart';
 
 /// Represents a meal with nutritional information per 100g
 /// 
@@ -44,7 +45,7 @@ class Meal extends Equatable {
 
   /// Calculate macros and calories for a given weight in grams
   MealNutrition calculateForGrams(double grams) {
-    final multiplier = grams / 100.0;
+    final multiplier = grams / AppConstants.baseServingSizeGrams;
     return MealNutrition(
       carbs: carbsPer100g * multiplier,
       protein: proteinPer100g * multiplier,
