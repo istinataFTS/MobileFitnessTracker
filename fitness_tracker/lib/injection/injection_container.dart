@@ -3,12 +3,18 @@ import '../data/datasources/local/database_helper.dart';
 import '../data/datasources/local/target_local_datasource.dart';
 import '../data/datasources/local/workout_set_local_datasource.dart';
 import '../data/datasources/local/exercise_local_datasource.dart';
+import '../data/datasources/local/meal_local_datasource.dart';
+import '../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../data/repositories/target_repository_impl.dart';
 import '../data/repositories/workout_set_repository_impl.dart';
 import '../data/repositories/exercise_repository_impl.dart';
+import '../data/repositories/meal_repository_impl.dart';
+import '../data/repositories/nutrition_log_repository_impl.dart';
 import '../domain/repositories/target_repository.dart';
 import '../domain/repositories/workout_set_repository.dart';
 import '../domain/repositories/exercise_repository.dart';
+import '../domain/repositories/meal_repository.dart';
+import '../domain/repositories/nutrition_log_repository.dart';
 import '../domain/usecases/targets/add_target.dart';
 import '../domain/usecases/targets/delete_target.dart';
 import '../domain/usecases/targets/get_all_targets.dart';
@@ -18,7 +24,7 @@ import '../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import '../domain/usecases/workout_sets/delete_workout_set.dart';
-import '../domain/usecases/workout_sets/update_workout_set.dart'; 
+import '../domain/usecases/workout_sets/update_workout_set.dart';
 import '../domain/usecases/exercises/get_all_exercises.dart';
 import '../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../domain/usecases/exercises/get_exercises_for_muscle.dart';
@@ -26,16 +32,39 @@ import '../domain/usecases/exercises/add_exercise.dart';
 import '../domain/usecases/exercises/update_exercise.dart';
 import '../domain/usecases/exercises/delete_exercise.dart';
 import '../domain/usecases/exercises/seed_exercises.dart';
+import '../domain/usecases/meals/get_all_meals.dart';
+import '../domain/usecases/meals/get_meal_by_id.dart';
+import '../domain/usecases/meals/get_meal_by_name.dart';
+import '../domain/usecases/meals/add_meal.dart';
+import '../domain/usecases/meals/update_meal.dart';
+import '../domain/usecases/meals/delete_meal.dart';
+import '../domain/usecases/nutrition_logs/get_logs_for_date.dart';
+import '../domain/usecases/nutrition_logs/add_nutrition_log.dart';
+import '../domain/usecases/nutrition_logs/update_nutrition_log.dart';
+import '../domain/usecases/nutrition_logs/delete_nutrition_log.dart';
+import '../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/log_set/bloc/log_set_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../presentation/pages/history/bloc/history_bloc.dart';
+import '../presentation/pages/meals/bloc/meal_bloc.dart';
+import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 final sl = GetIt.instance;
 
+/// Initialize all dependencies following Clean Architecture principles
+/// 
+/// Registration order:
+/// 1. BLoCs (Factory - new instance per request)
+/// 2. Use Cases (Lazy Singleton - single instance, created on first use)
+/// 3. Repositories (Lazy Singleton)
+/// 4. Data Sources (Lazy Singleton)
+/// 5. Core/External (Lazy Singleton)
 Future<void> init() async {
   // ==================== BLoCs ====================
+  // Factory registration creates new instance for each BlocProvider
+  
   sl.registerFactory(() => TargetsBloc(
         getAllTargets: sl(),
         addTarget: sl(),
@@ -63,15 +92,33 @@ Future<void> init() async {
         deleteExercise: sl(),
       ));
 
-  // ⭐ MODIFIED: Add updateWorkoutSet parameter to HistoryBloc
   sl.registerFactory(() => HistoryBloc(
         getAllWorkoutSets: sl(),
         getSetsByDateRange: sl(),
         deleteWorkoutSet: sl(),
-        updateWorkoutSet: sl(), // 
+        updateWorkoutSet: sl(),
+      ));
+
+  // ⭐ NEW: Nutrition BLoCs
+  sl.registerFactory(() => MealBloc(
+        getAllMeals: sl(),
+        getMealById: sl(),
+        getMealByName: sl(),
+        addMeal: sl(),
+        updateMeal: sl(),
+        deleteMeal: sl(),
+      ));
+
+  sl.registerFactory(() => NutritionLogBloc(
+        getLogsForDate: sl(),
+        addNutritionLog: sl(),
+        updateNutritionLog: sl(),
+        deleteNutritionLog: sl(),
+        getDailyMacros: sl(),
       ));
 
   // ==================== Use Cases ====================
+  // Lazy Singleton registration creates single instance on first use
   
   // Targets
   sl.registerLazySingleton(() => GetAllTargets(sl()));
@@ -88,7 +135,7 @@ Future<void> init() async {
         exerciseRepository: sl(),
       ));
   sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
-  sl.registerLazySingleton(() => UpdateWorkoutSet(sl())); 
+  sl.registerLazySingleton(() => UpdateWorkoutSet(sl()));
 
   // Exercises
   sl.registerLazySingleton(() => GetAllExercises(sl()));
@@ -99,7 +146,24 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteExercise(sl()));
   sl.registerLazySingleton(() => SeedExercises(sl()));
 
+  // ⭐ NEW: Meals
+  sl.registerLazySingleton(() => GetAllMeals(sl()));
+  sl.registerLazySingleton(() => GetMealById(sl()));
+  sl.registerLazySingleton(() => GetMealByName(sl()));
+  sl.registerLazySingleton(() => AddMeal(sl()));
+  sl.registerLazySingleton(() => UpdateMeal(sl()));
+  sl.registerLazySingleton(() => DeleteMeal(sl()));
+
+  // ⭐ NEW: Nutrition Logs
+  sl.registerLazySingleton(() => GetLogsForDate(sl()));
+  sl.registerLazySingleton(() => AddNutritionLog(sl()));
+  sl.registerLazySingleton(() => UpdateNutritionLog(sl()));
+  sl.registerLazySingleton(() => DeleteNutritionLog(sl()));
+  sl.registerLazySingleton(() => GetDailyMacros(sl()));
+
   // ==================== Repositories ====================
+  // Interface to Implementation mapping
+  
   sl.registerLazySingleton<TargetRepository>(
     () => TargetRepositoryImpl(localDataSource: sl()),
   );
@@ -112,7 +176,18 @@ Future<void> init() async {
     () => ExerciseRepositoryImpl(localDataSource: sl()),
   );
 
+  // ⭐ NEW: Nutrition Repositories
+  sl.registerLazySingleton<MealRepository>(
+    () => MealRepositoryImpl(localDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<NutritionLogRepository>(
+    () => NutritionLogRepositoryImpl(localDataSource: sl()),
+  );
+
   // ==================== Data Sources ====================
+  // Local database access layer
+  
   sl.registerLazySingleton<TargetLocalDataSource>(
     () => TargetLocalDataSourceImpl(databaseHelper: sl()),
   );
@@ -125,9 +200,19 @@ Future<void> init() async {
     () => ExerciseLocalDataSourceImpl(databaseHelper: sl()),
   );
 
+  // ⭐ NEW: Nutrition Data Sources
+  sl.registerLazySingleton<MealLocalDataSource>(
+    () => MealLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<NutritionLogLocalDataSource>(
+    () => NutritionLogLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
   // ==================== Core ====================
+  // Shared database helper
   sl.registerLazySingleton(() => DatabaseHelper());
 
-  // Initialize database
+  // Initialize database (ensures tables are created)
   await sl<DatabaseHelper>().database;
 }

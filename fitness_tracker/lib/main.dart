@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'config/env_config.dart';
-import 'core/constants/app_strings.dart'; // ✅ ADDED
+import 'core/constants/app_strings.dart';
 import 'core/themes/app_theme.dart';
 import 'core/utils/app_lifecycle_manager.dart';
 import 'core/utils/performance_monitor.dart';
@@ -17,6 +17,8 @@ import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
 import 'presentation/pages/history/bloc/history_bloc.dart';
+import 'presentation/pages/meals/bloc/meal_bloc.dart';
+import 'presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import 'domain/usecases/exercises/seed_exercises.dart';
 
 void main() async {
@@ -40,56 +42,29 @@ void main() async {
       debugPrint('✅ Dependencies initialized in: ${initDuration.inMilliseconds}ms');
       
       if (EnvConfig.seedDefaultData) {
-        debugPrint('Seeding database with default data...');
+        debugPrint('Seeding database...');
         final seedStart = DateTime.now();
         
-        try {
-          final seedExercises = di.sl<SeedExercises>();
-          final result = await seedExercises();
-          
-          result.fold(
-            (failure) {
-              debugPrint('❌ Seeding failed: ${failure.message}');
-            },
-            (count) {
-              if (count > 0) {
-                final seedDuration = DateTime.now().difference(seedStart);
-                debugPrint('✅ Seeded $count exercises in ${seedDuration.inMilliseconds}ms');
-              } else {
-                debugPrint('ℹ️  No seeding performed (data already exists)');
-              }
-            },
-          );
-        } catch (e) {
-          debugPrint('❌ Unexpected error during seeding: $e');
-        }
-      } else {
-        debugPrint('ℹ️  Database seeding disabled in environment config');
+        final seedExercises = di.sl<SeedExercises>();
+        final result = await seedExercises();
+        
+        result.fold(
+          (failure) => debugPrint('❌ Seeding failed: ${failure.message}'),
+          (count) {
+            final seedDuration = DateTime.now().difference(seedStart);
+            debugPrint('✅ Seeded $count exercises in: ${seedDuration.inMilliseconds}ms');
+          },
+        );
       }
       
       if (kDebugMode) {
-        debugPrint('\n');
-        debugPrint('═══════════════════════════════════════');
-        debugPrint('🔍 RUNNING APP DIAGNOSTICS');
-        debugPrint('═══════════════════════════════════════');
-        
-        await AppDiagnostics.fullReport();
-        
-        debugPrint('═══════════════════════════════════════');
-        debugPrint('✅ DIAGNOSTICS COMPLETE');
-        debugPrint('═══════════════════════════════════════\n');
+        await AppDiagnostics.runDiagnostics();
       }
-      
-    } catch (e) {
-      debugPrint('❌ Failed to initialize DI: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
     }
-  }
-  
-  if (!kIsWeb) {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
   }
   
   SystemChrome.setSystemUIOverlayStyle(
@@ -125,6 +100,7 @@ class FitnessTrackerApp extends StatelessWidget {
       return _buildWebApp(context);
     }
 
+    // ⭐ UPDATED: Added MealBloc and NutritionLogBloc providers
     return MultiBlocProvider(
       providers: [
         BlocProvider(
@@ -142,6 +118,13 @@ class FitnessTrackerApp extends StatelessWidget {
         BlocProvider(
           create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
         ),
+        // ⭐ NEW: Nutrition BLoCs
+        BlocProvider(
+          create: (_) => di.sl<MealBloc>()..add(LoadMealsEvent()),
+        ),
+        BlocProvider(
+          create: (_) => di.sl<NutritionLogBloc>(),
+        ),
       ],
       child: _buildMaterialApp(context),
     );
@@ -151,52 +134,59 @@ class FitnessTrackerApp extends StatelessWidget {
     return MaterialApp(
       title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.darkTheme,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
       home: const BottomNavigation(),
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.touch,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.unknown,
+        },
+      ),
     );
   }
 
+  /// Web build without database dependencies
   Widget _buildWebApp(BuildContext context) {
     return MaterialApp(
       title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.darkTheme,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       home: Scaffold(
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.phone_android,
-                  size: 64,
-                  color: AppTheme.primaryOrange,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  AppStrings.webMobileOnlyTitle, 
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  AppStrings.webMobileOnlyDescription,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  AppStrings.webMobileOnlyInstruction, 
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
-                ),
-              ],
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.web_outlined,
+                size: 64,
+                color: AppTheme.primaryOrange,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                AppStrings.appName,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Web version coming soon!',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.textMedium,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please use the mobile app for now.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textDim,
+                    ),
+              ),
+            ],
           ),
         ),
       ),
