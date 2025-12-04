@@ -3,8 +3,7 @@ import '../../domain/entities/target.dart';
 import '../constants/muscle_groups.dart';
 import 'package:uuid/uuid.dart';
 
-/// Simple state management for muscle group targets
-/// Following the same pattern as GoalsManager for consistency
+
 class TargetsManager extends ChangeNotifier {
   static final TargetsManager _instance = TargetsManager._internal();
   factory TargetsManager() => _instance;

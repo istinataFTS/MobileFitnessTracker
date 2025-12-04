@@ -23,6 +23,8 @@ class AppStrings {
   static const String remove = 'Remove';
   static const String gotIt = 'Got it';
   static const String all = 'All';
+  static const String required = 'Required';
+  static const String invalid = 'Invalid';
 
   // ==================== Web Platform Messages ====================
   static const String webMobileOnlyTitle = 'Mobile Only App';
@@ -40,6 +42,7 @@ class AppStrings {
   static const String errorNetwork = 'Network connection failed';
   static const String errorDatabase = 'Database error occurred';
   static const String successSetLogged = 'Set logged successfully';
+  static const String comingSoon = 'Coming soon!';
   
   // ==================== Home Screen ====================
   static const String homeTitle = 'Fitness Tracker';
@@ -49,33 +52,20 @@ class AppStrings {
   static const String homeNoData = 'No workout data yet';
   static const String homeGetStarted = 'Start logging workouts to see your progress';
 
-  // ==================== Targets ====================
-  static const String targetsTitle = 'Targets';
-  static const String addTarget = 'Add Target';
-  static const String editTarget = 'Edit Target';
-  static const String deleteTarget = 'Delete Target';
-  static const String targetMuscleGroup = 'Muscle Group';
-  static const String targetWeeklyGoal = 'Weekly Goal';
-  static const String targetProgress = 'Progress';
-  static const String targetCompleted = 'Completed';
-  static const String targetInProgress = 'In Progress';
-  static const String noTargetsYet = 'No targets yet';
-  static const String createTargetsDescription = 'Set weekly goals for each muscle group';
-  static const String aboutTargets = 'About Targets';
-  static const String aboutTargetsDescription = 'Set weekly goals for muscle groups and track your progress';
-  static const String targetDeleteConfirm = 'Delete this target?';
+  // ==================== Navigation ====================
+  static const String navHome = 'Home';
+  static const String navLog = 'Log';
+  static const String navHistory = 'History';
+  static const String navExercises = 'Exercises';
+  static const String navLibrary = 'Library';
+  static const String navTargets = 'Targets';
+  static const String navProfile = 'Profile';
 
-  // ==================== History ====================
-  static const String historyTitle = 'History';
-  static const String historyEmpty = 'No workout history';
-  static const String historyEmptyDescription = 'Start logging sets to build your history';
-  static const String viewHistory = 'View History';
-  static const String noSetsLogged = 'No sets logged yet';
-  static const String startLoggingSets = 'Start logging sets to track your progress';
-  static const String filterByMuscle = 'Filter by muscle';
-  static const String filterByDate = 'Filter by date';
-  static const String showAll = 'Show All';
-
+  // ==================== Library Page ====================
+  static const String libraryTitle = 'Library';
+  static const String exercisesTab = 'Exercises';
+  static const String mealsTab = 'Meals';
+  
   // ==================== Exercises ====================
   static const String exercisesTitle = 'Exercises';
   static const String addNewExercise = 'Add New Exercise';
@@ -95,6 +85,84 @@ class AppStrings {
   static const String muscleGroupsWorked = 'Muscle Groups Worked';
   static const String aboutExercises = 'About Exercises';
   static const String aboutExercisesDescription = 'Create custom exercises and assign them to muscle groups for better tracking';
+  static const String deleteExerciseConfirm = 'Are you sure you want to delete this exercise?';
+  static const String noExercisesAvailable = 'No exercises available';
+  static const String createExercisesFirst = 'Create some exercises first to start logging workouts';
+  
+  // ==================== Meals ====================
+  static const String mealsTitle = 'Meals';
+  static const String addMeal = 'Add Meal';
+  static const String editMeal = 'Edit Meal';
+  static const String deleteMeal = 'Delete Meal';
+  static const String mealName = 'Meal Name';
+  static const String mealNameHint = 'e.g., Chicken Breast';
+  static const String addFirstMeal = 'Add Your First Meal';
+  static const String noMealsYet = 'No meals yet';
+  static const String createMealsDescription = 'Create custom meals with their macros for easy logging';
+  static const String aboutMeals = 'About Meals';
+  static const String aboutMealsDescription = 'Create a library of meals with their nutritional information for quick logging';
+  static const String deleteMealConfirm = 'Are you sure you want to delete this meal?';
+  static const String servingSize = 'Serving Size';
+  static const String servingSizeHint = '100';
+  static const String per100g = 'per 100g';
+  static const String macrosPerServing = 'Macros per Serving';
+  
+  // ==================== Macros ====================
+  static const String protein = 'Protein';
+  static const String carbs = 'Carbs';
+  static const String fats = 'Fats';
+  static const String calories = 'Calories';
+  static const String proteinGrams = 'Protein (g)';
+  static const String carbsGrams = 'Carbs (g)';
+  static const String fatsGrams = 'Fats (g)';
+  static const String caloriesKcal = 'Calories (kcal)';
+  static const String totalCalories = 'Total Calories';
+  static const String macroBreakdown = 'Macro Breakdown';
+  static const String autocalculated = 'Auto-calculated';
+  static const String grams = 'g';
+  static const String kcal = 'kcal';
+
+  // ==================== Targets ====================
+  static const String targetsTitle = 'Targets';
+  static const String addTarget = 'Add Target';
+  static const String editTarget = 'Edit Target';
+  static const String deleteTarget = 'Delete Target';
+  static const String targetMuscleGroup = 'Muscle Group';
+  static const String targetWeeklyGoal = 'Weekly Goal';
+  static const String targetProgress = 'Progress';
+  static const String targetCompleted = 'Completed';
+  static const String targetInProgress = 'In Progress';
+  static const String noTargetsYet = 'No targets yet';
+  static const String noTargetsDescription = 'Set weekly goals for muscle groups to track your progress';
+  static const String createTargetsDescription = 'Set weekly goals for each muscle group';
+  static const String aboutTargets = 'About Targets';
+  static const String aboutTargetsDescription = 'Set weekly goals for muscle groups and track your progress';
+  static const String targetDeleteConfirm = 'Delete this target?';
+  static const String selectMuscleGroup = 'Select Muscle Group';
+  static const String weeklyRepGoal = 'Weekly Rep Goal';
+  static const String setsPerWeek = 'sets/week';
+  static const String removeTarget = 'Remove Target';
+  static const String removeTargetConfirm = 'Are you sure you want to remove this target?';
+  static const String allMuscleGroupsAdded = 'All muscle groups have targets';
+  static const String manageTargets = 'Manage Targets';
+  static const String manageTargetsDesc = 'Set and edit your weekly muscle group goals';
+
+  // ==================== History ====================
+  static const String historyTitle = 'History';
+  static const String historyEmpty = 'No workout history';
+  static const String historyEmptyDescription = 'Start logging sets to build your history';
+  static const String viewHistory = 'View History';
+  static const String noSetsLogged = 'No sets logged yet';
+  static const String startLoggingSets = 'Start logging sets to track your progress';
+  static const String filterByMuscle = 'Filter by muscle';
+  static const String filterByDate = 'Filter by date';
+  static const String showAll = 'Show All';
+
+  // ==================== Log Page ====================
+  static const String logTitle = 'Log';
+  static const String logExerciseTab = 'Exercise';
+  static const String logMealTab = 'Meal';
+  static const String logMacrosTab = 'Macros';
   
   // ==================== Workout Logging ====================
   static const String logSetTitle = 'Log Workout Set';
@@ -109,9 +177,32 @@ class AppStrings {
   static const String setWillCountToward = 'This set will count toward:';
   static const String countedFor = 'Counted for';
   
+  // ==================== Meal Logging ====================
+  static const String logMealTitle = 'Log Meal';
+  static const String selectMeal = 'Select Meal';
+  static const String searchMeals = 'Search meals...';
+  static const String amountGrams = 'Amount (g)';
+  static const String amountGramsHint = 'e.g., 150';
+  static const String logMealButton = 'Log Meal';
+  static const String mealLogged = 'Meal logged successfully';
+  static const String noMealsInLibrary = 'No meals in library';
+  static const String addMealsToLibrary = 'Add meals to your library first';
+  static const String createMealsInLibrary = 'Create meals in Library to start logging';
+  
+  // ==================== Direct Macro Logging ====================
+  static const String logMacrosTitle = 'Log Macros';
+  static const String logMacrosButton = 'Log Macros';
+  static const String enterMacros = 'Enter Macros';
+  static const String macrosLogged = 'Macros logged successfully';
+  static const String enterProtein = 'Enter protein';
+  static const String enterCarbs = 'Enter carbs';
+  static const String enterFats = 'Enter fats';
+  
   // ==================== Profile/Settings ====================
   static const String profileTitle = 'Profile';
   static const String settingsTitle = 'Settings';
+  static const String settings = 'Settings';
+  static const String settingsDesc = 'App preferences and configuration';
   static const String settingsAccount = 'Account';
   static const String settingsPreferences = 'Preferences';
   static const String settingsAbout = 'About';
@@ -129,6 +220,20 @@ class AppStrings {
   static const String dark = 'Dark';
   static const String language = 'Language';
   static const String english = 'English';
+  static const String editProfile = 'Edit Profile';
+  static const String changePassword = 'Change Password';
+  static const String helpSupport = 'Help & Support';
+  static const String sendFeedback = 'Send Feedback';
+  static const String about = 'About';
+  static const String signOut = 'Sign Out';
+  static const String account = 'Account';
+  static const String preferences = 'Preferences';
+  static const String support = 'Support';
+  static const String workoutManagement = 'Workout Management';
+  static const String fitnessEnthusiast = 'Fitness Enthusiast';
+  static const String totalWorkouts = 'Total Workouts';
+  static const String thisWeek = 'This Week';
+  static const String streak = 'Streak';
   
   // ==================== Muscle Groups ====================
   static const String muscleChest = 'Chest';
@@ -209,89 +314,4 @@ class AppStrings {
   static const String thursday = 'Thursday';
   static const String friday = 'Friday';
   static const String saturday = 'Saturday';
-
-  // ==================== Nutrition - Meals ====================
-  static const String mealsTitle = 'Meals';
-  static const String addMeal = 'Add Meal';
-  static const String editMeal = 'Edit Meal';
-  static const String deleteMeal = 'Delete Meal';
-  static const String mealName = 'Meal Name';
-  static const String mealNameHint = 'e.g., Chicken Breast';
-  static const String noMealsYet = 'No meals yet';
-  static const String createMealsDescription = 'Create custom meals to track your nutrition';
-  static const String addFirstMeal = 'Add Your First Meal';
-  static const String aboutMeals = 'About Meals';
-  static const String aboutMealsDescription = 'Create reusable meals with macros per 100g for quick logging';
-  static const String deleteMealConfirm = 'Delete this meal? All nutrition logs using this meal will be unlinked.';
-  static const String mealDeletedSuccess = 'Meal deleted successfully';
-  static const String mealAddedSuccess = 'Meal added successfully';
-  static const String mealUpdatedSuccess = 'Meal updated successfully';
-
-  // ==================== Nutrition - Macros ====================
-  static const String protein = 'Protein';
-  static const String carbs = 'Carbs';
-  static const String fats = 'Fats';
-  static const String calories = 'Calories';
-  static const String macrosPerHundredGrams = 'Macros per 100g';
-  static const String proteinGrams = 'Protein (g)';
-  static const String carbsGrams = 'Carbs (g)';
-  static const String fatsGrams = 'Fats (g)';
-  static const String proteinHint = 'e.g., 25';
-  static const String carbsHint = 'e.g., 0';
-  static const String fatsHint = 'e.g., 5';
-
-  // ==================== Nutrition - Logging ====================
-  static const String nutritionTitle = 'Nutrition';
-  static const String logNutrition = 'Log Nutrition';
-  static const String nutritionLog = 'Nutrition Log';
-  static const String logMeal = 'Log Meal';
-  static const String logDirectMacros = 'Log Direct Macros';
-  static const String selectMeal = 'Select Meal';
-  static const String portionSize = 'Portion Size (g)';
-  static const String portionSizeHint = 'e.g., 150';
-  static const String enterMacros = 'Enter Macros';
-  static const String noNutritionLogsYet = 'No nutrition logs yet';
-  static const String startLoggingNutrition = 'Start logging meals to track your nutrition';
-  static const String nutritionLogAddedSuccess = 'Nutrition log added successfully';
-  static const String nutritionLogUpdatedSuccess = 'Nutrition log updated successfully';
-  static const String nutritionLogDeletedSuccess = 'Nutrition log deleted successfully';
-  static const String deleteNutritionLog = 'Delete Nutrition Log';
-  static const String deleteNutritionLogConfirm = 'Delete this nutrition log?';
-
-  // ==================== Nutrition - Daily Summary ====================
-  static const String dailyMacros = 'Daily Macros';
-  static const String totalProtein = 'Total Protein';
-  static const String totalCarbs = 'Total Carbs';
-  static const String totalFats = 'Total Fats';
-  static const String totalCalories = 'Total Calories';
-  static const String dailyNutritionSummary = 'Daily Nutrition Summary';
-  static const String macroBreakdown = 'Macro Breakdown';
-  static const String caloriesFromProtein = 'Calories from Protein';
-  static const String caloriesFromCarbs = 'Calories from Carbs';
-  static const String caloriesFromFats = 'Calories from Fats';
-
-  // ==================== Nutrition - Validation ====================
-  static const String mealNameRequired = 'Meal name is required';
-  static const String proteinRequired = 'Protein is required';
-  static const String carbsRequired = 'Carbs is required';
-  static const String fatsRequired = 'Fats is required';
-  static const String portionRequired = 'Portion size is required';
-  static const String invalidMacroValue = 'Enter a valid number';
-  static const String macroTooLow = 'Must be 0 or greater';
-  static const String macroTooHigh = 'Value too high';
-  static const String portionTooLow = 'Portion must be greater than 0';
-  static const String portionTooHigh = 'Portion size too large';
-
-  // ==================== Nutrition - Types ====================
-  static const String mealType = 'Meal';
-  static const String directMacrosType = 'Direct Macros';
-  static const String loggedViaMeal = 'Logged via meal';
-  static const String loggedDirectly = 'Logged directly';
-
-  // ==================== Nutrition - Library ====================
-  static const String mealLibrary = 'Meal Library';
-  static const String viewMealLibrary = 'View Meal Library';
-  static const String manageMeals = 'Manage Meals';
-  static const String noMealsAvailable = 'No meals available';
-  static const String createMealsFirst = 'Create meals in the library first';
 }
