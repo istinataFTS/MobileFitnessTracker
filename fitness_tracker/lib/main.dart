@@ -118,7 +118,6 @@ class FitnessTrackerApp extends StatelessWidget {
         BlocProvider(
           create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
         ),
-        // ⭐ NEW: Nutrition BLoCs
         BlocProvider(
           create: (_) => di.sl<MealBloc>()..add(LoadMealsEvent()),
         ),

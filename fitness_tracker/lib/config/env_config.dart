@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 
 class EnvConfig {
-  EnvConfig._();
-
+  EnvConfig._(); // Private constructor to prevent instantiation
   static const String appName = String.fromEnvironment(
     'APP_NAME',
     defaultValue: 'Fitness Tracker',
@@ -17,6 +16,8 @@ class EnvConfig {
     'USER_NAME',
     defaultValue: 'Fitness User',
   );
+
+  // ==================== ENVIRONMENT ====================
   
   static const String environment = String.fromEnvironment(
     'ENVIRONMENT',
@@ -26,6 +27,8 @@ class EnvConfig {
   static bool get isDevelopment => environment == 'development';
   static bool get isProduction => environment == 'production';
   static bool get isStaging => environment == 'staging';
+
+  // ==================== FEATURE FLAGS ====================
   
   static bool get enableDevicePreview => kDebugMode;
   
@@ -33,15 +36,20 @@ class EnvConfig {
     'ENABLE_PERFORMANCE_MONITORING',
     defaultValue: true,
   );
+
+  // ==================== DATABASE CONFIGURATION ====================
   
   static const String databaseName = String.fromEnvironment(
     'DATABASE_NAME',
     defaultValue: 'fitness_tracker.db',
   );
   
+  /// Database version for migrations
+  /// IMPORTANT: Increment this when adding new tables or columns
+  /// Version 5: Added exercise_muscle_factors and muscle_stimulus tables, intensity column
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 4,
+    defaultValue: 5,
   );
   
   static const bool seedDefaultData = bool.fromEnvironment(
@@ -63,6 +71,8 @@ class EnvConfig {
     'FORCE_RESEED',
     defaultValue: false,
   );
+
+  // ==================== API CONFIGURATION ====================
   
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -78,6 +88,8 @@ class EnvConfig {
     'API_TIMEOUT_SECONDS',
     defaultValue: 30,
   );
+
+  // ==================== LOGGING ====================
   
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
   
@@ -85,7 +97,11 @@ class EnvConfig {
     'LOG_LEVEL',
     defaultValue: 'debug',
   );
+
+  // ==================== VALIDATION ====================
   
+  /// Validate production configuration
+  /// Call this in main() to ensure production settings are correct
   static void validateProductionConfig() {
     if (isProduction) {
       assert(
@@ -99,6 +115,7 @@ class EnvConfig {
     }
   }
   
+  /// Print current configuration (development only)
   static void printConfig() {
     if (!enableDebugLogs) return;
     
