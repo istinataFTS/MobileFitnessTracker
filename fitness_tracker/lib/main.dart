@@ -20,6 +20,7 @@ import 'presentation/pages/history/bloc/history_bloc.dart';
 import 'presentation/pages/meals/bloc/meal_bloc.dart';
 import 'presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import 'domain/usecases/exercises/seed_exercises.dart';
+import 'domain/usecases/muscle_factors/seed_exercise_factors.dart';
 
 void main() async {
   PerformanceMonitor.startTimer('app_initialization');
@@ -42,50 +43,60 @@ void main() async {
       debugPrint('✅ Dependencies initialized in: ${initDuration.inMilliseconds}ms');
       
       if (EnvConfig.seedDefaultData) {
-        debugPrint('Seeding database...');
+        // ==================== SEED EXERCISES ====================
+        debugPrint('Seeding database with default exercises...');
         final seedStart = DateTime.now();
         
         final seedExercises = di.sl<SeedExercises>();
         final result = await seedExercises();
         
+        final seedDuration = DateTime.now().difference(seedStart);
+        
         result.fold(
-          (failure) => debugPrint('❌ Seeding failed: ${failure.message}'),
+          (failure) {
+            debugPrint('❌ Exercise seeding failed: ${failure.message}');
+          },
           (count) {
-            final seedDuration = DateTime.now().difference(seedStart);
-            debugPrint('✅ Seeded $count exercises in: ${seedDuration.inMilliseconds}ms');
+            debugPrint('✅ Exercise seeding completed in: ${seedDuration.inMilliseconds}ms');
+            debugPrint('   Exercises seeded: $count');
+          },
+        );
+        
+        // ==================== SEED EXERCISE MUSCLE FACTORS ====================
+        debugPrint('Seeding database with exercise muscle factors...');
+        final factorSeedStart = DateTime.now();
+        
+        final seedFactors = di.sl<SeedExerciseFactors>();
+        final factorResult = await seedFactors();
+        
+        final factorSeedDuration = DateTime.now().difference(factorSeedStart);
+        
+        factorResult.fold(
+          (failure) {
+            debugPrint('❌ Muscle factor seeding failed: ${failure.message}');
+          },
+          (count) {
+            debugPrint('✅ Muscle factor seeding completed in: ${factorSeedDuration.inMilliseconds}ms');
+            debugPrint('   Muscle factors seeded: $count');
           },
         );
       }
       
-      if (kDebugMode) {
-        await AppDiagnostics.runDiagnostics();
-      }
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ Initialization error: $e');
-      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }
   
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  PerformanceMonitor.endTimer('app_initialization');
   
-  final initDuration = PerformanceMonitor.endTimer('app_initialization');
-  if (initDuration != null) {
-    debugPrint('App initialization completed in: ${initDuration.inMilliseconds}ms');
+  if (EnvConfig.enableDebugLogs) {
+    AppDiagnostics.logSystemInfo();
   }
-  
-  PerformanceMonitor.startTimer('first_frame');
   
   runApp(
     DevicePreview(
-      enabled: kDebugMode && !kIsWeb,
+      enabled: EnvConfig.enableDevicePreview,
       builder: (context) => const FitnessTrackerApp(),
     ),
   );
@@ -96,98 +107,22 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return _buildWebApp(context);
-    }
-
-    // ⭐ UPDATED: Added MealBloc and NutritionLogBloc providers
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (_) => di.sl<TargetsBloc>()..add(LoadTargetsEvent()),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<LogSetBloc>(),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<HomeBloc>()..add(LoadHomeDataEvent()),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<HistoryBloc>()..add(LoadAllSetsEvent()),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<MealBloc>()..add(LoadMealsEvent()),
-        ),
-        BlocProvider(
-          create: (_) => di.sl<NutritionLogBloc>(),
-        ),
+        BlocProvider(create: (context) => di.sl<TargetsBloc>()..add(LoadTargets())),
+        BlocProvider(create: (context) => di.sl<LogSetBloc>()),
+        BlocProvider(create: (context) => di.sl<HomeBloc>()..add(LoadHomeData())),
+        BlocProvider(create: (context) => di.sl<ExerciseBloc>()..add(LoadExercises())),
+        BlocProvider(create: (context) => di.sl<HistoryBloc>()),
+        BlocProvider(create: (context) => di.sl<MealBloc>()..add(LoadMeals())),
+        BlocProvider(create: (context) => di.sl<NutritionLogBloc>()),
       ],
-      child: _buildMaterialApp(context),
-    );
-  }
-
-  Widget _buildMaterialApp(BuildContext context) {
-    return MaterialApp(
-      title: EnvConfig.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
-      home: const BottomNavigation(),
-      scrollBehavior: const MaterialScrollBehavior().copyWith(
-        dragDevices: {
-          PointerDeviceKind.mouse,
-          PointerDeviceKind.touch,
-          PointerDeviceKind.stylus,
-          PointerDeviceKind.unknown,
-        },
-      ),
-    );
-  }
-
-  /// Web build without database dependencies
-  Widget _buildWebApp(BuildContext context) {
-    return MaterialApp(
-      title: EnvConfig.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.web_outlined,
-                size: 64,
-                color: AppTheme.primaryOrange,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                AppStrings.appName,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Web version coming soon!',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textMedium,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Please use the mobile app for now.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textDim,
-                    ),
-              ),
-            ],
-          ),
-        ),
+      child: MaterialApp(
+        title: AppStrings.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const BottomNavigation(),
+        builder: DevicePreview.appBuilder,
       ),
     );
   }

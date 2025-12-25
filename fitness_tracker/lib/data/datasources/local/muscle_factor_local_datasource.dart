@@ -7,28 +7,31 @@ import 'database_helper.dart';
 /// Local data source interface for MuscleFactor operations
 abstract class MuscleFactorLocalDataSource {
   /// Get all muscle factors for a specific exercise
-  Future<List<MuscleFactorModel>> getFactorsByExerciseId(String exerciseId);
+  Future<List<MuscleFactorModel>> getFactorsForExercise(String exerciseId);
   
   /// Get all muscle factors for a specific muscle group
-  Future<List<MuscleFactorModel>> getFactorsByMuscleGroup(String muscleGroup);
+  Future<List<MuscleFactorModel>> getFactorsForMuscle(String muscleGroup);
+  
+  /// Get all muscle factors
+  Future<List<MuscleFactorModel>> getAllFactors();
   
   /// Get a specific muscle factor
   Future<MuscleFactorModel?> getFactorById(String id);
   
   /// Insert a single muscle factor
-  Future<void> insertFactor(MuscleFactorModel factor);
+  Future<void> insertMuscleFactor(MuscleFactorModel factor);
   
   /// Insert multiple muscle factors (for seeding)
-  Future<void> insertFactorsBatch(List<MuscleFactorModel> factors);
+  Future<void> insertMuscleFactorsBatch(List<MuscleFactorModel> factors);
   
   /// Update a muscle factor
-  Future<void> updateFactor(MuscleFactorModel factor);
+  Future<void> updateMuscleFactor(MuscleFactorModel factor);
   
   /// Delete muscle factor by ID
-  Future<void> deleteFactor(String id);
+  Future<void> deleteMuscleFactor(String id);
   
   /// Delete all factors for an exercise
-  Future<void> deleteFactorsByExerciseId(String exerciseId);
+  Future<void> deleteFactorsForExercise(String exerciseId);
   
   /// Clear all muscle factors (for reseeding)
   Future<void> clearAllFactors();
@@ -41,7 +44,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   const MuscleFactorLocalDataSourceImpl({required this.databaseHelper});
 
   @override
-  Future<List<MuscleFactorModel>> getFactorsByExerciseId(String exerciseId) async {
+  Future<List<MuscleFactorModel>> getFactorsForExercise(String exerciseId) async {
     try {
       final db = await databaseHelper.database;
       final maps = await db.query(
@@ -57,7 +60,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<List<MuscleFactorModel>> getFactorsByMuscleGroup(String muscleGroup) async {
+  Future<List<MuscleFactorModel>> getFactorsForMuscle(String muscleGroup) async {
     try {
       final db = await databaseHelper.database;
       final maps = await db.query(
@@ -69,6 +72,20 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
       return maps.map((map) => MuscleFactorModel.fromMap(map)).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get muscle factors for muscle group: $e');
+    }
+  }
+
+  @override
+  Future<List<MuscleFactorModel>> getAllFactors() async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.exerciseMuscleFactors,
+        orderBy: '${DatabaseTables.factorExerciseId}, ${DatabaseTables.factorValue} DESC',
+      );
+      return maps.map((map) => MuscleFactorModel.fromMap(map)).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get all muscle factors: $e');
     }
   }
 
@@ -91,7 +108,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<void> insertFactor(MuscleFactorModel factor) async {
+  Future<void> insertMuscleFactor(MuscleFactorModel factor) async {
     try {
       final db = await databaseHelper.database;
       await db.insert(
@@ -105,7 +122,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<void> insertFactorsBatch(List<MuscleFactorModel> factors) async {
+  Future<void> insertMuscleFactorsBatch(List<MuscleFactorModel> factors) async {
     try {
       final db = await databaseHelper.database;
       final batch = db.batch();
@@ -125,7 +142,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<void> updateFactor(MuscleFactorModel factor) async {
+  Future<void> updateMuscleFactor(MuscleFactorModel factor) async {
     try {
       final db = await databaseHelper.database;
       await db.update(
@@ -140,7 +157,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<void> deleteFactor(String id) async {
+  Future<void> deleteMuscleFactor(String id) async {
     try {
       final db = await databaseHelper.database;
       await db.delete(
@@ -154,7 +171,7 @@ class MuscleFactorLocalDataSourceImpl implements MuscleFactorLocalDataSource {
   }
 
   @override
-  Future<void> deleteFactorsByExerciseId(String exerciseId) async {
+  Future<void> deleteFactorsForExercise(String exerciseId) async {
     try {
       final db = await databaseHelper.database;
       await db.delete(

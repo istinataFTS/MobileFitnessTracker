@@ -1,6 +1,7 @@
 import '../../core/constants/database_tables.dart';
 import '../../domain/entities/muscle_factor.dart';
 
+/// Data model for MuscleFactor with database serialization
 class MuscleFactorModel extends MuscleFactor {
   const MuscleFactorModel({
     required super.id,
@@ -39,7 +40,7 @@ class MuscleFactorModel extends MuscleFactor {
     };
   }
 
-  /// Create model from JSON (for API compatibility)
+  /// Create model from JSON (for API compatibility if needed)
   factory MuscleFactorModel.fromJson(Map<String, dynamic> json) {
     return MuscleFactorModel(
       id: json['id'] as String,
@@ -49,7 +50,7 @@ class MuscleFactorModel extends MuscleFactor {
     );
   }
 
-  /// Convert model to JSON (for API compatibility)
+  /// Convert model to JSON (for API compatibility if needed)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
