@@ -48,7 +48,7 @@ import '../domain/usecases/nutrition_logs/delete_nutrition_log.dart';
 import '../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../domain/usecases/muscle_factors/seed_exercise_factors.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
-import '../presentation/pages/log_set/bloc/log_set_bloc.dart';
+import '../presentation/pages/log/bloc/workout_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../presentation/pages/history/bloc/history_bloc.dart';
@@ -76,11 +76,10 @@ Future<void> init() async {
         deleteTarget: sl(),
       ));
 
-  sl.registerFactory(() => LogSetBloc(
-        addWorkoutSet: sl(),
-        getAllTargets: sl(),
-        getWeeklySets: sl(),
-      ));
+  sl.registerFactory(() => WorkoutBloc(
+    addWorkoutSet: sl(),
+    getWeeklySets: sl(),
+       ));
 
   sl.registerFactory(() => HomeBloc(
         getAllTargets: sl(),

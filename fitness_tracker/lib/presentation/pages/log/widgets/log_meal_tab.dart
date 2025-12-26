@@ -8,7 +8,7 @@ import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../meals/bloc/meal_bloc.dart';
-import '../../nutrition/bloc/nutrition_log_bloc.dart';
+import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
 
 /// Meal logging tab - searchable meal list with grams input
 class LogMealTab extends StatefulWidget {

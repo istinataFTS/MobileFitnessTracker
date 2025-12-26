@@ -13,7 +13,7 @@ import 'core/utils/app_diagnostics.dart';
 import 'presentation/navigation/bottom_navigation.dart';
 import 'injection/injection_container.dart' as di;
 import 'presentation/pages/targets/bloc/targets_bloc.dart';
-import 'presentation/pages/log_set/bloc/log_set_bloc.dart';
+import 'presentation/pages/log/bloc/workout_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
 import 'presentation/pages/history/bloc/history_bloc.dart';
@@ -110,7 +110,7 @@ class FitnessTrackerApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (context) => di.sl<TargetsBloc>()..add(LoadTargets())),
-        BlocProvider(create: (context) => di.sl<LogSetBloc>()),
+        BlocProvider(create: (context) => di.sl<WorkoutBloc>()),
         BlocProvider(create: (context) => di.sl<HomeBloc>()..add(LoadHomeData())),
         BlocProvider(create: (context) => di.sl<ExerciseBloc>()..add(LoadExercises())),
         BlocProvider(create: (context) => di.sl<HistoryBloc>()),

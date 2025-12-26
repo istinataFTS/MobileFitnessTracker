@@ -9,7 +9,7 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
-import '../../workout/bloc/workout_bloc.dart';
+import '../bloc/workout_bloc.dart';
 
 /// Exercise logging tab - keeps existing set logging functionality
 class LogExerciseTab extends StatefulWidget {

@@ -9,7 +9,7 @@ import '../../../domain/entities/exercise.dart';
 import '../bloc/history_bloc.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../widgets/edit_set_dialog.dart';
-import '../../log_set/log_set_page.dart';
+import '../../log/log_page.dart';
 
 /// Bottom sheet displaying workout details for a selected date
 class DayDetailsBottomSheet extends StatelessWidget {
