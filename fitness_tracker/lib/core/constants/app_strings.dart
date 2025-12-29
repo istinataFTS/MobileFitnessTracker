@@ -275,4 +275,52 @@ class AppStrings {
   static const String areYouSure = 'Are you sure?';
   static const String cannotBeUndone = 'This action cannot be undone';
   static const String deleteConfirmation = 'Are you sure you want to delete this?';
+
+  // ==================== Intensity Slider ====================
+  static const String intensity = 'Intensity';
+  static const String intensityInfo = 'Intensity Information';
+  static const String intensityLevels = 'Intensity Levels';
+  static const String currentIntensity = 'Current Intensity';
+  static const String allIntensityLevels = 'All Intensity Levels';
+
+  // ==================== Period Selector ====================
+  static const String period = 'Period';
+  static const String periodToday = 'Today';
+  static const String periodWeek = 'Week';
+  static const String periodMonth = 'Month';
+  static const String periodAllTime = 'All Time';
+
+  // ==================== Body Visualization ====================
+  static const String progress = 'Progress';
+  static const String frontView = 'Front';
+  static const String backView = 'Back';
+  static const String bodyVisualization = 'Body Visualization';
+
+  // ==================== Progress Stats ====================
+  static const String sets = 'Sets';
+  static const String target = 'Target';
+  static const String muscles = 'Muscles';
+  static const String trainedMuscles = 'Trained Muscles';
+  static const String remainingTarget = 'Remaining';
+  static const String totalSets = 'Total Sets';
+
+  // ==================== Muscle Status ====================
+  static const String untrained = 'Untrained';
+  static const String lightTraining = 'Light';
+  static const String moderateTraining = 'Moderate';
+  static const String heavyTraining = 'Heavy';
+  static const String maxTraining = 'Maximum';
+
+  // ==================== Loading & Empty States ====================
+  static const String loadingVisualization = 'Loading visualization...';
+  static const String noWorkoutData = 'No workout data yet';
+  static const String noWorkoutDataDesc = 'Start logging workouts to see your progress';
+
+  // ==================== Color Legend ====================
+  static const String colorLegend = 'Color Legend';
+  static const String colorGray = 'Gray - Untrained';
+  static const String colorGreen = 'Green - Light Training';
+  static const String colorYellow = 'Yellow - Moderate Training';
+  static const String colorOrange = 'Orange - Heavy Training';
+  static const String colorRed = 'Red - Maximum Training';
 }

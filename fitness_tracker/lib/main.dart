@@ -15,12 +15,14 @@ import 'injection/injection_container.dart' as di;
 import 'presentation/pages/targets/bloc/targets_bloc.dart';
 import 'presentation/pages/log/bloc/workout_bloc.dart';
 import 'presentation/pages/home/bloc/home_bloc.dart';
+import 'presentation/pages/home/bloc/muscle_visual_bloc.dart'; // NEW: Phase 6
 import 'presentation/pages/exercises/bloc/exercise_bloc.dart';
 import 'presentation/pages/history/bloc/history_bloc.dart';
 import 'presentation/pages/meals/bloc/meal_bloc.dart';
 import 'presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import 'domain/usecases/exercises/seed_exercises.dart';
 import 'domain/usecases/muscle_factors/seed_exercise_factors.dart';
+import 'domain/entities/time_period.dart'; // NEW: For MuscleVisualBloc
 
 void main() async {
   PerformanceMonitor.startTimer('app_initialization');
@@ -43,62 +45,61 @@ void main() async {
       debugPrint('✅ Dependencies initialized in: ${initDuration.inMilliseconds}ms');
       
       if (EnvConfig.seedDefaultData) {
-        // ==================== SEED EXERCISES ====================
-        debugPrint('Seeding database with default exercises...');
+        debugPrint('Seeding database...');
         final seedStart = DateTime.now();
         
+        // Seed exercises
         final seedExercises = di.sl<SeedExercises>();
-        final result = await seedExercises();
+        final exercisesResult = await seedExercises();
         
-        final seedDuration = DateTime.now().difference(seedStart);
-        
-        result.fold(
-          (failure) {
-            debugPrint('❌ Exercise seeding failed: ${failure.message}');
+        await exercisesResult.fold(
+          (failure) async {
+            debugPrint('⚠️  Exercise seeding failed: ${failure.message}');
           },
-          (count) {
-            debugPrint('✅ Exercise seeding completed in: ${seedDuration.inMilliseconds}ms');
-            debugPrint('   Exercises seeded: $count');
-          },
-        );
-        
-        // ==================== SEED EXERCISE MUSCLE FACTORS ====================
-        debugPrint('Seeding database with exercise muscle factors...');
-        final factorSeedStart = DateTime.now();
-        
-        final seedFactors = di.sl<SeedExerciseFactors>();
-        final factorResult = await seedFactors();
-        
-        final factorSeedDuration = DateTime.now().difference(factorSeedStart);
-        
-        factorResult.fold(
-          (failure) {
-            debugPrint('❌ Muscle factor seeding failed: ${failure.message}');
-          },
-          (count) {
-            debugPrint('✅ Muscle factor seeding completed in: ${factorSeedDuration.inMilliseconds}ms');
-            debugPrint('   Muscle factors seeded: $count');
+          (exerciseCount) async {
+            final exerciseDuration = DateTime.now().difference(seedStart);
+            debugPrint('✅ Seeded $exerciseCount exercises in: ${exerciseDuration.inMilliseconds}ms');
+            
+            // ⭐ NEW: Seed muscle factors (Phase 4)
+            final factorSeedStart = DateTime.now();
+            final seedFactors = di.sl<SeedExerciseFactors>();
+            final factorsResult = await seedFactors();
+            
+            factorsResult.fold(
+              (failure) {
+                debugPrint('⚠️  Muscle factor seeding failed: ${failure.message}');
+              },
+              (factorCount) {
+                final factorDuration = DateTime.now().difference(factorSeedStart);
+                debugPrint('✅ Seeded $factorCount muscle factors in: ${factorDuration.inMilliseconds}ms');
+              },
+            );
           },
         );
+        
+        final totalSeedDuration = DateTime.now().difference(seedStart);
+        debugPrint('✅ Database seeding completed in: ${totalSeedDuration.inMilliseconds}ms');
       }
       
+      if (kDebugMode) {
+        await AppDiagnostics.runDiagnostics();
+      }
     } catch (e) {
       debugPrint('❌ Initialization error: $e');
       rethrow;
     }
   }
-  
-  PerformanceMonitor.endTimer('app_initialization');
-  
-  if (EnvConfig.enableDebugLogs) {
-    AppDiagnostics.logSystemInfo();
-  }
-  
+
+  final totalInitTime = PerformanceMonitor.stopTimer('app_initialization');
+  debugPrint('🚀 App initialization complete in: ${totalInitTime}ms');
+
   runApp(
-    DevicePreview(
-      enabled: EnvConfig.enableDevicePreview,
-      builder: (context) => const FitnessTrackerApp(),
-    ),
+    kDebugMode && !kIsWeb
+        ? DevicePreview(
+            enabled: false, // Set to true to enable DevicePreview
+            builder: (context) => const FitnessTrackerApp(),
+          )
+        : const FitnessTrackerApp(),
   );
 }
 
@@ -107,22 +108,94 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return _buildWebApp();
+    }
+
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => di.sl<TargetsBloc>()..add(LoadTargets())),
-        BlocProvider(create: (context) => di.sl<WorkoutBloc>()),
-        BlocProvider(create: (context) => di.sl<HomeBloc>()..add(LoadHomeData())),
-        BlocProvider(create: (context) => di.sl<ExerciseBloc>()..add(LoadExercises())),
-        BlocProvider(create: (context) => di.sl<HistoryBloc>()),
-        BlocProvider(create: (context) => di.sl<MealBloc>()..add(LoadMeals())),
-        BlocProvider(create: (context) => di.sl<NutritionLogBloc>()),
+        BlocProvider<TargetsBloc>(
+          create: (context) => di.sl<TargetsBloc>()..add(LoadTargetsEvent()),
+        ),
+        BlocProvider<WorkoutBloc>(
+          create: (context) => di.sl<WorkoutBloc>()..add(const LoadWeeklySetsEvent()),
+        ),
+        BlocProvider<HomeBloc>(
+          create: (context) => di.sl<HomeBloc>()..add(LoadHomeDataEvent()),
+        ),
+        // ⭐ NEW: MuscleVisualBloc (Phase 6)
+        BlocProvider<MuscleVisualBloc>(
+          create: (context) => di.sl<MuscleVisualBloc>()
+            ..add(const LoadMuscleVisualsEvent(TimePeriod.week)),
+        ),
+        BlocProvider<ExerciseBloc>(
+          create: (context) => di.sl<ExerciseBloc>()..add(LoadExercisesEvent()),
+        ),
+        BlocProvider<HistoryBloc>(
+          create: (context) => di.sl<HistoryBloc>(),
+        ),
+        BlocProvider<MealBloc>(
+          create: (context) => di.sl<MealBloc>()..add(LoadMealsEvent()),
+        ),
+        BlocProvider<NutritionLogBloc>(
+          create: (context) => di.sl<NutritionLogBloc>()
+            ..add(LoadDailyLogsEvent(DateTime.now())),
+        ),
       ],
       child: MaterialApp(
-        title: AppStrings.appName,
+        title: AppStrings.appTitle,
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
+        theme: AppTheme.darkTheme,
         home: const BottomNavigation(),
         builder: DevicePreview.appBuilder,
+        locale: DevicePreview.locale(context),
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          dragDevices: {
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.touch,
+            PointerDeviceKind.stylus,
+            PointerDeviceKind.unknown,
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebApp() {
+    return MaterialApp(
+      title: AppStrings.appTitle,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      home: const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.web,
+                size: 100,
+                color: AppTheme.primaryOrange,
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Web Version Coming Soon',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textLight,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Please use the mobile app',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppTheme.textMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

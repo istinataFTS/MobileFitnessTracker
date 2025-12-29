@@ -4,6 +4,7 @@ import '../../../core/themes/app_theme.dart';
 import 'widgets/log_exercise_tab.dart';
 import 'widgets/log_meal_tab.dart';
 import 'widgets/log_macros_tab.dart';
+import '../../widgets/intensity_slider_widget.dart';
 
 /// Redesigned Log page with three logging modes
 /// Exercise | Meal | Macros

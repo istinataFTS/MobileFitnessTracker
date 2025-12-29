@@ -1,11 +1,9 @@
-// File: lib/presentation/pages/log/bloc/workout_bloc.dart
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
+import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 
 // ==================== EVENTS ====================
 
@@ -16,24 +14,29 @@ abstract class WorkoutEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Event to add a new workout set
-class AddWorkoutSetEvent extends WorkoutEvent {
-  final WorkoutSet workoutSet;
+/// Event to log a new workout set with muscle stimulus tracking
+class LogWorkoutSetEvent extends WorkoutEvent {
+  final String exerciseId;
+  final int reps;
+  final double weight;
+  final int intensity; // NEW: Intensity level (0-5)
+  final DateTime? date;
   
-  const AddWorkoutSetEvent(this.workoutSet);
+  const LogWorkoutSetEvent({
+    required this.exerciseId,
+    required this.reps,
+    required this.weight,
+    required this.intensity,
+    this.date,
+  });
   
   @override
-  List<Object?> get props => [workoutSet];
+  List<Object?> get props => [exerciseId, reps, weight, intensity, date];
 }
 
-/// Event to load weekly sets (for validation/display)
+/// Event to load weekly sets for display
 class LoadWeeklySetsEvent extends WorkoutEvent {
   const LoadWeeklySetsEvent();
-}
-
-/// Event to refresh after a set is logged
-class RefreshWeeklySetsEvent extends WorkoutEvent {
-  const RefreshWeeklySetsEvent();
 }
 
 // ==================== STATES ====================
@@ -45,23 +48,39 @@ abstract class WorkoutState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Initial state before any operations
+/// Initial state
 class WorkoutInitial extends WorkoutState {}
 
-/// Loading state during async operations
+/// Loading state
 class WorkoutLoading extends WorkoutState {}
 
-/// Loaded state with weekly sets data
-class WorkoutLoaded extends WorkoutState {
+/// State with loaded weekly sets
+class WorkoutDataLoaded extends WorkoutState {
   final List<WorkoutSet> weeklySets;
   
-  const WorkoutLoaded(this.weeklySets);
+  const WorkoutDataLoaded({
+    required this.weeklySets,
+  });
   
   @override
   List<Object?> get props => [weeklySets];
 }
 
-/// Error state with message
+/// Success state after logging a set
+class WorkoutOperationSuccess extends WorkoutState {
+  final String message;
+  final List<String> affectedMuscles; // NEW: Muscles that received stimulus
+  
+  const WorkoutOperationSuccess({
+    required this.message,
+    this.affectedMuscles = const [],
+  });
+  
+  @override
+  List<Object?> get props => [message, affectedMuscles];
+}
+
+/// Error state
 class WorkoutError extends WorkoutState {
   final String message;
   
@@ -71,77 +90,82 @@ class WorkoutError extends WorkoutState {
   List<Object?> get props => [message];
 }
 
-/// Success state after operations (add/update/delete)
-class WorkoutOperationSuccess extends WorkoutState {
-  final String message;
-  final List<WorkoutSet> weeklySets; // Keep updated sets in state
-  
-  const WorkoutOperationSuccess({
-    required this.message,
-    required this.weeklySets,
-  });
-  
-  @override
-  List<Object?> get props => [message, weeklySets];
-}
+// ==================== BLOC ====================
 
-// ==================== BLoC ====================
-
-/// BLoC for handling workout set logging operations
+/// BLoC for managing workout set logging with muscle stimulus integration
 /// 
-/// Responsibilities:
-/// - Add new workout sets to database
-/// - Load weekly sets for progress tracking
-/// - Provide feedback on operations (success/error)
-/// 
-/// Used primarily by LogPage's exercise logging tab
+/// Handles:
+/// - Logging workout sets to database
+/// - Recording muscle stimulus for affected muscles
+/// - Loading weekly sets for progress display
+/// - Providing feedback on affected muscles
 class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
-  
-  // Cache weekly sets for quick access
-  List<WorkoutSet> _cachedWeeklySets = [];
+  final RecordWorkoutSet recordWorkoutSet; // NEW: Stimulus recording
   
   WorkoutBloc({
     required this.addWorkoutSet,
     required this.getWeeklySets,
+    required this.recordWorkoutSet,
   }) : super(WorkoutInitial()) {
-    on<AddWorkoutSetEvent>(_onAddWorkoutSet);
+    on<LogWorkoutSetEvent>(_onLogWorkoutSet);
     on<LoadWeeklySetsEvent>(_onLoadWeeklySets);
-    on<RefreshWeeklySetsEvent>(_onRefreshWeeklySets);
   }
   
-  /// Handle adding a new workout set
-  Future<void> _onAddWorkoutSet(
-    AddWorkoutSetEvent event,
+  /// Log a workout set and record muscle stimulus
+  Future<void> _onLogWorkoutSet(
+    LogWorkoutSetEvent event,
     Emitter<WorkoutState> emit,
   ) async {
     emit(WorkoutLoading());
     
-    // Add the workout set
-    final result = await addWorkoutSet(event.workoutSet);
+    // Step 1: Add workout set to database
+    final workoutSet = WorkoutSet(
+      id: '', // Will be generated by use case
+      exerciseId: event.exerciseId,
+      reps: event.reps,
+      weight: event.weight,
+      intensity: event.intensity, // NEW: Include intensity
+      date: event.date ?? DateTime.now(),
+      createdAt: DateTime.now(),
+    );
     
-    await result.fold(
+    final addSetResult = await addWorkoutSet(workoutSet);
+    
+    await addSetResult.fold(
+      // Error adding workout set
       (failure) async {
         emit(WorkoutError(failure.message));
       },
+      // Success - now record muscle stimulus
       (_) async {
-        // After successful add, reload weekly sets to get updated data
-        final setsResult = await getWeeklySets();
+        // Step 2: Record muscle stimulus for this set
+        final stimulusResult = await recordWorkoutSet(
+          exerciseId: event.exerciseId,
+          sets: 1, // Single set
+          intensity: event.intensity,
+          timestamp: event.date,
+        );
         
-        setsResult.fold(
+        stimulusResult.fold(
+          // Error recording stimulus (non-critical - workout is saved)
           (failure) {
-            // Even if reload fails, the set was added successfully
+            // Still show success since workout was saved
             emit(const WorkoutOperationSuccess(
-              message: AppStrings.setLogged,
-              weeklySets: [],
+              message: 'Set logged successfully (stimulus tracking unavailable)',
+              affectedMuscles: [],
             ));
           },
-          (sets) {
-            _cachedWeeklySets = sets;
+          // Success - show affected muscles
+          (affectedMuscles) {
+            final muscleList = affectedMuscles.isEmpty 
+                ? 'Set logged successfully'
+                : 'Set logged! Affected: ${affectedMuscles.join(', ')}';
+            
             emit(WorkoutOperationSuccess(
-              message: AppStrings.setLogged,
-              weeklySets: sets,
+              message: muscleList,
+              affectedMuscles: affectedMuscles,
             ));
           },
         );
@@ -149,41 +173,16 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
     );
   }
   
-  /// Handle loading weekly sets
+  /// Load weekly sets for display
   Future<void> _onLoadWeeklySets(
     LoadWeeklySetsEvent event,
     Emitter<WorkoutState> emit,
   ) async {
-    emit(WorkoutLoading());
+    final setsResult = await getWeeklySets();
     
-    final result = await getWeeklySets();
-    
-    result.fold(
+    setsResult.fold(
       (failure) => emit(WorkoutError(failure.message)),
-      (sets) {
-        _cachedWeeklySets = sets;
-        emit(WorkoutLoaded(sets));
-      },
+      (sets) => emit(WorkoutDataLoaded(weeklySets: sets)),
     );
   }
-  
-  /// Handle refreshing weekly sets (after external changes)
-  Future<void> _onRefreshWeeklySets(
-    RefreshWeeklySetsEvent event,
-    Emitter<WorkoutState> emit,
-  ) async {
-    // Don't show loading state for refresh (smoother UX)
-    final result = await getWeeklySets();
-    
-    result.fold(
-      (failure) => emit(WorkoutError(failure.message)),
-      (sets) {
-        _cachedWeeklySets = sets;
-        emit(WorkoutLoaded(sets));
-      },
-    );
-  }
-  
-  /// Get cached weekly sets without triggering state change
-  List<WorkoutSet> get cachedWeeklySets => _cachedWeeklySets;
 }

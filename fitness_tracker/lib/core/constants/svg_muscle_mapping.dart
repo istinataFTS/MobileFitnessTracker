@@ -36,19 +36,9 @@ class SvgMuscleMapping {
   ];
 
   // ==================== SVG PATH MAPPING ====================
-  
-  /// Map muscle groups to SVG path IDs (to be filled after SVG analysis)
-  /// 
-  /// INSTRUCTIONS:
-  /// 1. Open FrontLook.svg and BackLook.svg in a text editor
-  /// 2. Identify <path> elements for each muscle region
-  /// 3. Note the 'id' attribute or 'd' (path data) for each muscle
-  /// 4. Update this map with actual SVG path identifiers
-  /// 
-  /// Example structure:
-  /// 'front-delts': 'path-front-delts' or coordinates
+
   static const Map<String, String> svgPathIds = {
-    // Front view paths
+    // ==================== FRONT VIEW PATHS ====================
     'front-delts-front': 'TODO',
     'side-delts-front': 'TODO',
     'upper-chest-front': 'TODO',
@@ -60,7 +50,7 @@ class SvgMuscleMapping {
     'obliques-front': 'TODO',
     'quads-front': 'TODO',
     
-    // Back view paths
+    // ==================== BACK VIEW PATHS ====================
     'rear-delts-back': 'TODO',
     'side-delts-back': 'TODO',
     'upper-traps-back': 'TODO',
@@ -138,5 +128,40 @@ class SvgMuscleMapping {
   /// Check if muscle is on midline
   static bool isMidline(String muscleGroup) {
     return midlineMuscles.contains(muscleGroup);
+  }
+
+  // ==================== SVG INTEGRATION HELPERS ====================
+  
+  /// Get SVG path ID(s) for a muscle group on a specific view
+  /// Returns list of path IDs (may be empty, or multiple for bilateral muscles)
+  static List<String> getPathIdsForMuscle(String muscleGroup, bool isFrontView) {
+    final view = isFrontView ? 'front' : 'back';
+    final key = '$muscleGroup-$view';
+    
+    if (svgPathIds.containsKey(key)) {
+      final pathId = svgPathIds[key]!;
+      if (pathId != 'TODO') {
+        return [pathId];
+      }
+    }
+    
+    return []; // No path configured yet
+  }
+
+  /// Validate that all TODO placeholders have been replaced
+  /// Returns true if all SVG paths are configured
+  static bool isFullyConfigured() {
+    return !svgPathIds.values.any((id) => id == 'TODO');
+  }
+
+  /// Get list of muscles that still need SVG path configuration
+  static List<String> getUnconfiguredMuscles() {
+    final unconfigured = <String>[];
+    svgPathIds.forEach((key, value) {
+      if (value == 'TODO') {
+        unconfigured.add(key);
+      }
+    });
+    return unconfigured;
   }
 }

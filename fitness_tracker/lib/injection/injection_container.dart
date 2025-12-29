@@ -6,18 +6,21 @@ import '../data/datasources/local/exercise_local_datasource.dart';
 import '../data/datasources/local/meal_local_datasource.dart';
 import '../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../data/datasources/local/muscle_factor_local_datasource.dart';
+import '../data/datasources/local/muscle_stimulus_local_datasource.dart';
 import '../data/repositories/target_repository_impl.dart';
 import '../data/repositories/workout_set_repository_impl.dart';
 import '../data/repositories/exercise_repository_impl.dart';
 import '../data/repositories/meal_repository_impl.dart';
 import '../data/repositories/nutrition_log_repository_impl.dart';
 import '../data/repositories/muscle_factor_repository_impl.dart';
+import '../data/repositories/muscle_stimulus_repository_impl.dart';
 import '../domain/repositories/target_repository.dart';
 import '../domain/repositories/workout_set_repository.dart';
 import '../domain/repositories/exercise_repository.dart';
 import '../domain/repositories/meal_repository.dart';
 import '../domain/repositories/nutrition_log_repository.dart';
 import '../domain/repositories/muscle_factor_repository.dart';
+import '../domain/repositories/muscle_stimulus_repository.dart';
 import '../domain/usecases/targets/add_target.dart';
 import '../domain/usecases/targets/delete_target.dart';
 import '../domain/usecases/targets/get_all_targets.dart';
@@ -47,7 +50,12 @@ import '../domain/usecases/nutrition_logs/update_nutrition_log.dart';
 import '../domain/usecases/nutrition_logs/delete_nutrition_log.dart';
 import '../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../domain/usecases/muscle_factors/seed_exercise_factors.dart';
+import '../domain/usecases/muscle_stimulus/calculate_muscle_stimulus.dart';
+import '../domain/usecases/muscle_stimulus/record_workout_set.dart';
+import '../domain/usecases/muscle_stimulus/get_muscle_visual_data.dart';
+import '../domain/usecases/muscle_stimulus/apply_daily_decay.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
+import '../presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import '../presentation/pages/log/bloc/workout_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
@@ -76,14 +84,23 @@ Future<void> init() async {
         deleteTarget: sl(),
       ));
 
+  // ⭐ UPDATED: WorkoutBloc with stimulus recording (Phase 6)
   sl.registerFactory(() => WorkoutBloc(
-    addWorkoutSet: sl(),
-    getWeeklySets: sl(),
-       ));
+        addWorkoutSet: sl(),
+        getWeeklySets: sl(),
+        recordWorkoutSet: sl(), // NEW: Stimulus recording
+      ));
 
+  // ⭐ UPDATED: HomeBloc with stats calculation (Phase 6)
   sl.registerFactory(() => HomeBloc(
         getAllTargets: sl(),
         getWeeklySets: sl(),
+        getSetsByDateRange: sl(), // NEW: For muscle counting
+      ));
+
+  // ⭐ NEW: MuscleVisualBloc (Phase 6)
+  sl.registerFactory(() => MuscleVisualBloc(
+        getMuscleVisualData: sl(),
       ));
 
   sl.registerFactory(() => ExerciseBloc(
@@ -148,12 +165,6 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteExercise(sl()));
   sl.registerLazySingleton(() => SeedExercises(sl()));
 
-  // ⭐ NEW: Muscle Factors
-  sl.registerLazySingleton(() => SeedExerciseFactors(
-        muscleFactorRepository: sl(),
-        exerciseRepository: sl(),
-      ));
-
   // Meals
   sl.registerLazySingleton(() => GetAllMeals(sl()));
   sl.registerLazySingleton(() => GetMealById(sl()));
@@ -168,6 +179,23 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateNutritionLog(sl()));
   sl.registerLazySingleton(() => DeleteNutritionLog(sl()));
   sl.registerLazySingleton(() => GetDailyMacros(sl()));
+
+  sl.registerLazySingleton(() => SeedExerciseFactors(
+        muscleFactorRepository: sl(),
+        exerciseRepository: sl(),
+      ));
+
+  sl.registerLazySingleton(() => CalculateMuscleStimulus(sl()));
+  
+  sl.registerLazySingleton(() => RecordWorkoutSet(
+        muscleFactorRepository: sl(),
+        muscleStimulusRepository: sl(),
+        calculateMuscleStimulus: sl(),
+      ));
+  
+  sl.registerLazySingleton(() => GetMuscleVisualData(sl()));
+  
+  sl.registerLazySingleton(() => ApplyDailyDecay(sl()));
 
   // ==================== Repositories ====================
   // Interface to Implementation mapping
@@ -192,9 +220,12 @@ Future<void> init() async {
     () => NutritionLogRepositoryImpl(localDataSource: sl()),
   );
 
-  // ⭐ NEW: Muscle Factor Repository
   sl.registerLazySingleton<MuscleFactorRepository>(
     () => MuscleFactorRepositoryImpl(localDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<MuscleStimulusRepository>(
+    () => MuscleStimulusRepositoryImpl(localDataSource: sl()),
   );
 
   // ==================== Data Sources ====================
@@ -220,9 +251,12 @@ Future<void> init() async {
     () => NutritionLogLocalDataSourceImpl(databaseHelper: sl()),
   );
 
-  // ⭐ NEW: Muscle Factor Data Source
   sl.registerLazySingleton<MuscleFactorLocalDataSource>(
     () => MuscleFactorLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<MuscleStimulusLocalDataSource>(
+    () => MuscleStimulusLocalDataSourceImpl(databaseHelper: sl()),
   );
 
   // ==================== Core ====================
