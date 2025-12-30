@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_strings_phase7.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 
 /// Progress stats display widget for home page

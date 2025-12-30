@@ -5,13 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_groups.dart';
+import '../../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
+import '../../../widgets/intensity_slider_widget.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../bloc/workout_bloc.dart';
 
-/// Exercise logging tab - keeps existing set logging functionality
+/// Exercise logging tab for the Log page
 class LogExerciseTab extends StatefulWidget {
   const LogExerciseTab({super.key});
 
@@ -20,11 +22,13 @@ class LogExerciseTab extends StatefulWidget {
 }
 
 class _LogExerciseTabState extends State<LogExerciseTab> {
-  Exercise? _selectedExercise;
+  final _uuid = const Uuid();
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
+  
+  Exercise? _selectedExercise;
   DateTime _selectedDate = DateTime.now();
-  final _uuid = const Uuid();
+  int _selectedIntensity = MuscleStimulus.defaultIntensity; // Default to 3 (moderate)
 
   @override
   void dispose() {
@@ -38,14 +42,34 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     return BlocConsumer<WorkoutBloc, WorkoutState>(
       listener: (context, state) {
         if (state is WorkoutOperationSuccess) {
+          // Show success message with affected muscles
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    AppStrings.setLogged,
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (state.affectedMuscles.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Training: ${state.affectedMuscles.map((m) => MuscleGroups.getDisplayName(m)).join(", ")}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
               backgroundColor: AppTheme.successGreen,
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(20),
+              duration: const Duration(seconds: 2),
             ),
           );
+          
+          // Clear form after successful log
           _clearForm();
         }
 
@@ -61,97 +85,169 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         }
       },
       builder: (context, workoutState) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExerciseSelector(context),
-              const SizedBox(height: 20),
-              _buildRepsInput(),
-              const SizedBox(height: 16),
-              _buildWeightInput(),
-              const SizedBox(height: 16),
-              _buildDatePicker(context),
-              if (_selectedExercise != null) ...[
-                const SizedBox(height: 24),
-                _buildMuscleGroupInfo(),
-              ],
-              const SizedBox(height: 32),
-              _buildLogButton(workoutState),
-            ],
-          ),
+        return BlocBuilder<ExerciseBloc, ExerciseState>(
+          builder: (context, exerciseState) {
+            if (exerciseState is ExerciseLoading) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primaryOrange,
+                ),
+              );
+            }
+
+            if (exerciseState is ExerciseError) {
+              return _buildErrorState(context);
+            }
+
+            final exercises = exerciseState is ExercisesLoaded
+                ? exerciseState.exercises
+                : <Exercise>[];
+
+            if (exercises.isEmpty) {
+              return _buildEmptyExercisesState(context);
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Exercise Selector
+                  _buildExerciseSelector(exercises),
+                  const SizedBox(height: 24),
+
+                  // Reps Input
+                  _buildRepsInput(),
+                  const SizedBox(height: 20),
+
+                  // Weight Input
+                  _buildWeightInput(),
+                  const SizedBox(height: 24),
+
+                  // Intensity Slider (NEW: Phase 9)
+                  IntensitySliderWidget(
+                    intensity: _selectedIntensity,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedIntensity = value;
+                      });
+                    },
+                    enabled: true,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Date Picker
+                  _buildDatePicker(context),
+                  const SizedBox(height: 24),
+
+                  // Muscle Group Info (if exercise selected)
+                  if (_selectedExercise != null) _buildMuscleGroupInfo(),
+                  if (_selectedExercise != null) const SizedBox(height: 24),
+
+                  // Log Button
+                  _buildLogButton(workoutState),
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildExerciseSelector(BuildContext context) {
-    return BlocBuilder<ExerciseBloc, ExerciseState>(
-      builder: (context, state) {
-        final exercises = state is ExercisesLoaded ? state.exercises : <Exercise>[];
-
-        if (exercises.isEmpty) {
-          return _buildEmptyExercisesState(context);
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildErrorState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppTheme.errorRed,
+            ),
+            const SizedBox(height: 16),
             Text(
-              AppStrings.exercise,
+              AppStrings.errorLoadingExercises,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () => _showExercisePicker(context, exercises),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceDark,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryOrange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.fitness_center,
-                        color: AppTheme.primaryOrange,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _selectedExercise?.name ?? AppStrings.selectExercise,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: _selectedExercise != null
-                                  ? AppTheme.textLight
-                                  : AppTheme.textDim,
-                            ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      color: AppTheme.textDim,
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                context.read<ExerciseBloc>().add(LoadExercisesEvent());
+              },
+              child: const Text(AppStrings.retry),
             ),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExerciseSelector(List<Exercise> exercises) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.exercise,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => _showExercisePicker(context, exercises),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderDark),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _selectedExercise != null
+                        ? AppTheme.primaryOrange.withOpacity(0.1)
+                        : AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.fitness_center,
+                    color: _selectedExercise != null
+                        ? AppTheme.primaryOrange
+                        : AppTheme.textDim,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedExercise?.name ?? AppStrings.selectExercise,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: _selectedExercise != null
+                              ? AppTheme.textLight
+                              : AppTheme.textDim,
+                        ),
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textDim,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -286,7 +382,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
-                Icon(
+                const Icon(
                   Icons.arrow_drop_down,
                   color: AppTheme.textDim,
                 ),
@@ -315,7 +411,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.info_outline,
                 color: AppTheme.primaryOrange,
                 size: 20,
@@ -365,6 +461,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     final canLog = _selectedExercise != null &&
         _repsController.text.isNotEmpty &&
         _weightController.text.isNotEmpty;
+    // Intensity is always valid (defaults to 3, clamped 0-5)
 
     return SizedBox(
       width: double.infinity,
@@ -400,76 +497,112 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      isScrollControlled: true,
       builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppStrings.selectExercise,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AppStrings.selectExercise,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Exercise list
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: exercises.length,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemBuilder: (context, index) {
+                      final exercise = exercises[index];
+                      final isSelected =
+                          _selectedExercise?.id == exercise.id;
+
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppTheme.primaryOrange
+                                : AppTheme.primaryOrange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: exercises.length,
-                itemBuilder: (context, index) {
-                  final exercise = exercises[index];
-                  return ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryOrange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.fitness_center,
-                        color: AppTheme.primaryOrange,
-                        size: 20,
-                      ),
-                    ),
-                    title: Text(exercise.name),
-                    subtitle: Text(
-                      exercise.muscleGroups
-                          .take(2)
-                          .map((mg) => MuscleGroups.getDisplayName(mg))
-                          .join(', '),
-                      style: TextStyle(color: AppTheme.textMedium),
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedExercise = exercise;
-                      });
-                      Navigator.pop(context);
+                          child: Icon(
+                            Icons.fitness_center,
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.primaryOrange,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          exercise.name,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          exercise.muscleGroups
+                              .map((mg) => MuscleGroups.getDisplayName(mg))
+                              .join(', '),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: AppTheme.textMedium,
+                              ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_circle,
+                                color: AppTheme.primaryOrange,
+                              )
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedExercise = exercise;
+                          });
+                          Navigator.pop(context);
+                        },
+                      );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
@@ -505,10 +638,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     final workoutSet = WorkoutSet(
       id: _uuid.v4(),
       exerciseId: _selectedExercise!.id,
-      exerciseName: _selectedExercise!.name,
-      muscleGroups: _selectedExercise!.muscleGroups,
       reps: reps,
       weight: weight,
+      intensity: _selectedIntensity, // NEW: Include intensity
       date: _selectedDate,
       createdAt: DateTime.now(),
     );
@@ -521,6 +653,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       _selectedExercise = null;
       _repsController.clear();
       _weightController.clear();
+      _selectedIntensity = MuscleStimulus.defaultIntensity; // Reset to default
       _selectedDate = DateTime.now();
     });
   }

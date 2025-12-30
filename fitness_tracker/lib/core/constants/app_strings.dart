@@ -323,4 +323,32 @@ class AppStrings {
   static const String colorYellow = 'Yellow - Moderate Training';
   static const String colorOrange = 'Orange - Heavy Training';
   static const String colorRed = 'Red - Maximum Training';
+
+   // ==================== Period Selector ====================
+  static const String periodToday = 'Today';
+  static const String periodWeek = 'Week';
+  static const String periodMonth = 'Month';
+  static const String periodAllTime = 'All Time';
+
+  // ==================== Body Views ====================
+  static const String frontView = 'Front';
+  static const String backView = 'Back';
+
+  // ==================== Progress Stats ====================
+  static const String sets = 'Sets';
+  static const String target = 'Target';
+  static const String muscles = 'Muscles';
+  
+  // ==================== Section Headers ====================
+  static const String progress = 'Progress';
+  static const String muscleVisualization = 'Muscle Visualization';
+  
+  // ==================== Loading & Empty States ====================
+  static const String loadingVisualization = 'Loading visualization...';
+  static const String noDataYet = 'No workout data yet';
+  static const String startLogging = 'Start logging workouts to see your progress';
+  
+  // ==================== Error Messages ====================
+  static const String errorLoadingData = 'Error loading visualization data';
+  static const String tryAgain = 'Try again';
 }
