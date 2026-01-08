@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Network Security Configuration -->
+<!-- Defines security settings for network connections -->
+<network-security-config>
+    
+    <!-- Production configuration: No cleartext traffic allowed -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system certificates (Android OS) -->
+            <certificates src="system" />
+            
+            <!-- Trust user-installed certificates (for debugging) -->
+            <!-- Remove in production if not needed -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Domain-specific configurations -->
+    <!-- Add any domains your app connects to -->
+    <!-- 
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.yourapp.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+        <pin-set expiration="2025-12-31">
+            <pin digest="SHA-256">base64-encoded-pin-here=</pin>
+        </pin-set>
+    </domain-config>
+    -->
+    
+    <!-- Debug configuration (only if absolutely necessary) -->
+    <!--
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+    -->
+    
+</network-security-config>

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/themes/app_theme.dart';
 import '../pages/home/home_page.dart';
-import '../pages/log_set/log_set_page.dart';
+import '../pages/log/log_page.dart';
 import '../pages/history/history_page.dart';
 import '../pages/library/library_page.dart';
 import '../pages/targets/targets_page.dart';
@@ -21,7 +21,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const LogSetPage(),
+    const LogPage(),
     const HistoryPage(),
     const LibraryPage(), 
     const TargetsPage(),

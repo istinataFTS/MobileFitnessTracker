@@ -9,7 +9,7 @@ import '../../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../widgets/intensity_slider_widget.dart';
+import '../intensity_slider_widget.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../bloc/workout_bloc.dart';
 

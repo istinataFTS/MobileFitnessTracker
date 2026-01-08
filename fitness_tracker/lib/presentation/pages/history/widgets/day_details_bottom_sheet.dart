@@ -280,9 +280,7 @@ class DayDetailsBottomSheet extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => LogSetPage(
-                    preselectedDate: date,
-                  ),
+                  builder: (context) => const LogPage(),
                 ),
               ),
             },

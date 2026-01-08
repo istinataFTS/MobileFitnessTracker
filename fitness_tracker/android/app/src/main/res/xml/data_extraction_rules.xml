@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Data Extraction Rules (Android 12+) -->
+<!-- Controls what data can be backed up or transferred -->
+<data-extraction-rules>
+    
+    <!-- Cloud Backup Rules -->
+    <cloud-backup>
+        <!-- Disable automatic cloud backup for database -->
+        <!-- All data should remain on-device only -->
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+    </cloud-backup>
+    
+    <!-- Device Transfer Rules (Android to Android) -->
+    <device-transfer>
+        <!-- Disable device transfer for database -->
+        <!-- Users should start fresh on new devices -->
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+    </device-transfer>
+    
+</data-extraction-rules>
