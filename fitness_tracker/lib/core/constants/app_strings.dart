@@ -43,6 +43,9 @@ class AppStrings {
   static const String errorDatabase = 'Database error occurred';
   static const String successSetLogged = 'Set logged successfully';
   static const String comingSoon = 'Coming soon!';
+  static const String errorLoadingExercises = 'Error loading exercises';
+  static const String errorLoadingData = 'Error loading visualization data';
+  static const String tryAgain = 'Try again';
 
   // ==================== Navigation ====================
   static const String home = 'Home';
@@ -53,12 +56,14 @@ class AppStrings {
 
   // ==================== Exercises ====================
   static const String exercisesTitle = 'Exercises';
+  static const String exercise = 'Exercise';
   static const String addExercise = 'Add Exercise';
   static const String editExercise = 'Edit Exercise';
   static const String deleteExercise = 'Delete Exercise';
   static const String exerciseName = 'Exercise Name';
   static const String exerciseNameHint = 'e.g., Bench Press';
   static const String muscleGroup = 'Muscle Group';
+  static const String muscleGroups = 'Muscle Groups';
   static const String selectMuscleGroup = 'Select Muscle Group';
   static const String addFirstExercise = 'Add Your First Exercise';
   static const String noExercisesYet = 'No exercises yet';
@@ -121,9 +126,13 @@ class AppStrings {
   static const String weightKg = 'Weight (kg)';
   static const String reps = 'Reps';
   static const String logSet = 'Log Set';
+  static const String setLogged = 'Set logged successfully';
+  static const String logSetButton = 'Log Set';
   static const String logExerciseTab = 'Exercise';
   static const String logMealTab = 'Meal';
   static const String logMacrosTab = 'Macros';
+  static const String workoutDate = 'Workout Date';
+  static const String setWillCountToward = 'This set will count toward your weekly goals';
   
   // ==================== Meal Logging ====================
   static const String selectMeal = 'Select Meal';
@@ -152,7 +161,7 @@ class AppStrings {
   static const String noWorkoutsToday = 'No workouts today';
   static const String noWorkoutsYet = 'No workouts yet';
   static const String startLoggingSets = 'Start logging sets to see your history';
-  static const String sets = 'sets';
+  static const String sets = 'Sets';
   static const String viewAll = 'View All';
   static const String recentWorkouts = 'Recent Workouts';
 
@@ -171,10 +180,15 @@ class AppStrings {
   // ==================== Targets ====================
   static const String targetsTitle = 'Targets';
   static const String addTarget = 'Add Target';
+  static const String addFirstTarget = 'Add Your First Target';
   static const String editTarget = 'Edit Target';
   static const String deleteTarget = 'Delete Target';
+  static const String removeTarget = 'Remove Target';
+  static const String removeTargetConfirm = 'Are you sure you want to remove this target?';
   static const String targetMuscleGroup = 'Muscle Group';
   static const String targetWeeklyGoal = 'Weekly Goal';
+  static const String weeklyRepGoal = 'Weekly Sets Goal';
+  static const String setsPerWeek = 'sets/week';
   static const String targetProgress = 'Progress';
   static const String targetCompleted = 'Completed';
   static const String targetInProgress = 'In Progress';
@@ -185,6 +199,7 @@ class AppStrings {
   static const String aboutTargetsDescription = 'Set weekly goals for muscle groups and track your progress';
   static const String targetDeleteConfirm = 'Delete this target?';
   static const String setsThisWeek = 'sets this week';
+  static const String allMuscleGroupsAdded = 'All muscle groups have targets';
 
   // ==================== Profile/Settings ====================
   static const String profileTitle = 'Profile';
@@ -257,6 +272,8 @@ class AppStrings {
   static const String trySearchingAgain = 'Try searching again';
   static const String emptyLibrary = 'Your library is empty';
   static const String getStarted = 'Get Started';
+  static const String noDataYet = 'No workout data yet';
+  static const String startLogging = 'Start logging workouts to see your progress';
   
   // ==================== Validation Messages ====================
   static const String fieldRequired = 'This field is required';
@@ -295,9 +312,9 @@ class AppStrings {
   static const String frontView = 'Front';
   static const String backView = 'Back';
   static const String bodyVisualization = 'Body Visualization';
+  static const String muscleVisualization = 'Muscle Visualization';
 
   // ==================== Progress Stats ====================
-  static const String sets = 'Sets';
   static const String target = 'Target';
   static const String muscles = 'Muscles';
   static const String trainedMuscles = 'Trained Muscles';
@@ -323,32 +340,9 @@ class AppStrings {
   static const String colorYellow = 'Yellow - Moderate Training';
   static const String colorOrange = 'Orange - Heavy Training';
   static const String colorRed = 'Red - Maximum Training';
-
-   // ==================== Period Selector ====================
-  static const String periodToday = 'Today';
-  static const String periodWeek = 'Week';
-  static const String periodMonth = 'Month';
-  static const String periodAllTime = 'All Time';
-
-  // ==================== Body Views ====================
-  static const String frontView = 'Front';
-  static const String backView = 'Back';
-
-  // ==================== Progress Stats ====================
-  static const String sets = 'Sets';
-  static const String target = 'Target';
-  static const String muscles = 'Muscles';
   
-  // ==================== Section Headers ====================
-  static const String progress = 'Progress';
-  static const String muscleVisualization = 'Muscle Visualization';
-  
-  // ==================== Loading & Empty States ====================
-  static const String loadingVisualization = 'Loading visualization...';
-  static const String noDataYet = 'No workout data yet';
-  static const String startLogging = 'Start logging workouts to see your progress';
-  
-  // ==================== Error Messages ====================
-  static const String errorLoadingData = 'Error loading visualization data';
-  static const String tryAgain = 'Try again';
+  // ==================== Library ====================
+  static const String libraryTitle = 'Library';
+  static const String exercisesTab = 'Exercises';
+  static const String mealsTab = 'Meals';
 }

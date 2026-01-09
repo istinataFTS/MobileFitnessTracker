@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../config/env_config.dart';
 
 /// Constants for muscle stimulus calculation and visualization system
-/// All values are sourced from environmental configuration to avoid hardcoding
+/// All configurable values are sourced from EnvConfig to avoid hardcoding
 class MuscleStimulus {
   MuscleStimulus._(); // Private constructor to prevent instantiation
 
@@ -125,14 +125,12 @@ class MuscleStimulus {
   
   /// Intensity exponent for non-linear scaling
   /// Formula: (intensity / maxIntensity) ^ intensityExponent
-  /// From env config to avoid hardcoding
-  static double get intensityExponent => 
-      const double.fromEnvironment('INTENSITY_EXPONENT', defaultValue: 1.35);
+  /// From EnvConfig to avoid hardcoding
+  static double get intensityExponent => EnvConfig.intensityExponent;
 
   /// Weekly decay factor applied to rolling weekly load each day
-  /// From env config to avoid hardcoding
-  static double get weeklyDecayFactor => 
-      const double.fromEnvironment('WEEKLY_DECAY_FACTOR', defaultValue: 0.6);
+  /// From EnvConfig to avoid hardcoding
+  static double get weeklyDecayFactor => EnvConfig.weeklyDecayFactor;
 
   // ==================== INTENSITY LEVELS ====================
   
@@ -168,35 +166,27 @@ class MuscleStimulus {
   // ==================== VISUAL INTENSITY THRESHOLDS ====================
   
   /// Daily stimulus threshold for visual intensity calculation
-  static double get dailyThreshold => 
-      const double.fromEnvironment('DAILY_STIMULUS_THRESHOLD', defaultValue: 8.0);
+  static double get dailyThreshold => EnvConfig.dailyThreshold;
   
   /// Weekly stimulus threshold for visual intensity calculation
-  static double get weeklyThreshold => 
-      const double.fromEnvironment('WEEKLY_STIMULUS_THRESHOLD', defaultValue: 25.0);
+  static double get weeklyThreshold => EnvConfig.weeklyThreshold;
   
   /// Monthly stimulus threshold for visual intensity calculation
-  static double get monthlyThreshold => 
-      const double.fromEnvironment('MONTHLY_STIMULUS_THRESHOLD', defaultValue: 90.0);
+  static double get monthlyThreshold => EnvConfig.monthlyThreshold;
 
   // ==================== COLOR THRESHOLDS ====================
   
   /// Visual intensity threshold for green color (0.0 - 0.20)
-  static double get colorThresholdGreen => 
-      const double.fromEnvironment('COLOR_THRESHOLD_GREEN', defaultValue: 0.20);
+  static double get colorThresholdGreen => EnvConfig.colorThresholdGreen;
   
   /// Visual intensity threshold for yellow color (0.20 - 0.45)
-  static double get colorThresholdYellow => 
-      const double.fromEnvironment('COLOR_THRESHOLD_YELLOW', defaultValue: 0.45);
+  static double get colorThresholdYellow => EnvConfig.colorThresholdYellow;
   
   /// Visual intensity threshold for orange color (0.45 - 0.70)
-  static double get colorThresholdOrange => 
-      const double.fromEnvironment('COLOR_THRESHOLD_ORANGE', defaultValue: 0.70);
+  static double get colorThresholdOrange => EnvConfig.colorThresholdOrange;
   
   /// Visual intensity threshold for red color (0.70 - 1.0)
-  /// Note: Red starts at orange threshold
-  static double get colorThresholdRed => 
-      const double.fromEnvironment('COLOR_THRESHOLD_RED', defaultValue: 0.70);
+  static double get colorThresholdRed => EnvConfig.colorThresholdRed;
 
   // ==================== VALIDATION & HELPER METHODS ====================
   

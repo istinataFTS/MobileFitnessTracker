@@ -1,4 +1,3 @@
-/// Centralized input validation for forms
 class InputValidators {
   InputValidators._();
 
@@ -115,7 +114,7 @@ class InputValidators {
     return input
         .trim()
         .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces with single
-        .replaceAll(RegExp(r'[<>\"\'`;]'), ''); // Remove potentially harmful characters
+        .replaceAll(RegExp(r'[<>"`;]'), ''); // Remove potentially harmful characters
   }
 
   /// Format weight for display

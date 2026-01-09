@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_strings.dart';
-import '../../core/constants/muscle_stimulus_constants.dart';
-import '../../core/themes/app_theme.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/constants/muscle_stimulus_constants.dart';
 
 /// Intensity slider widget for workout set logging
+class IntensitySliderWidget extends StatelessWidget {
   final int intensity;
   final ValueChanged<int> onChanged;
   final bool enabled;
 
   const IntensitySliderWidget({
-    super.key,
+    Key? key,
     required this.intensity,
     required this.onChanged,
     this.enabled = true,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -149,9 +150,9 @@ class IntensityInfoDialog extends StatelessWidget {
   final int currentIntensity;
 
   const IntensityInfoDialog({
-    super.key,
+    Key? key,
     required this.currentIntensity,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

@@ -7,6 +7,11 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/macro_calculator.dart';
 import '../../../domain/entities/meal.dart';
 import '../meals/bloc/meal_bloc.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/macro_calculator.dart';
+import '../../../../domain/entities/meal.dart';
+import '../../meals/bloc/meal_bloc.dart';
 
 /// Meals management tab for the Library page
 /// Handles CRUD operations for meal library

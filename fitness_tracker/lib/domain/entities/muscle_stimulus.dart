@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:equatable/equatable.dart';
-import '../../core/constants/muscle_stimulus_constants.dart';
+import '../../core/constants/muscle_stimulus_constants.dart' as constants;
 
 class MuscleStimulus extends Equatable {
   final String id;
@@ -58,7 +58,7 @@ class MuscleStimulus extends Equatable {
     final hoursElapsed = now.difference(lastSetTime).inMilliseconds / (1000 * 60 * 60);
 
     // Get recovery rate for this muscle
-    final k = MuscleStimulus Constants.getRecoveryRate(muscleGroup);
+    final k = constants.MuscleStimulus.getRecoveryRate(muscleGroup);
 
     // Calculate remaining stimulus using exponential decay
     // Formula: S(t) = S₀ * e^(-k*t)

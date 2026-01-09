@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 
 class EnvConfig {
   EnvConfig._(); // Private constructor to prevent instantiation
+
+  // ==================== APP INFORMATION ====================
+  
   static const String appName = String.fromEnvironment(
     'APP_NAME',
     defaultValue: 'Fitness Tracker',
@@ -89,6 +92,21 @@ class EnvConfig {
     defaultValue: 30,
   );
 
+  // ==================== MUSCLE STIMULUS CONFIGURATION ====================
+  
+  /// Intensity exponent for non-linear scaling
+  /// Formula: (intensity / maxIntensity) ^ intensityExponent
+  /// Higher values = more dramatic difference between intensity levels
+  static const double intensityExponent = 1.35;
+  static const double weeklyDecayFactor = 0.6;
+  static const double dailyThreshold = 8.0;
+  static const double weeklyThreshold = 25.0;
+  static const double monthlyThreshold = 90.0;
+  static const double colorThresholdGreen = 0.20;
+  static const double colorThresholdYellow = 0.45;
+  static const double colorThresholdOrange = 0.70;
+  static const double colorThresholdRed = 0.70;
+
   // ==================== LOGGING ====================
   
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
@@ -128,6 +146,13 @@ class EnvConfig {
     debugPrint('Seed Data Version: $seedDataVersion');
     debugPrint('Force Reseed: $forceReseed');
     debugPrint('Enable Seeding Logs: $enableSeedingLogs');
+    debugPrint('');
+    debugPrint('Muscle Stimulus Configuration:');
+    debugPrint('  Intensity Exponent: $intensityExponent');
+    debugPrint('  Weekly Decay Factor: $weeklyDecayFactor');
+    debugPrint('  Daily Threshold: $dailyThreshold');
+    debugPrint('  Weekly Threshold: $weeklyThreshold');
+    debugPrint('  Monthly Threshold: $monthlyThreshold');
     debugPrint('==============================================');
   }
 }

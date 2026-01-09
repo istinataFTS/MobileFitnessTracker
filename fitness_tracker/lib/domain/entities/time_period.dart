@@ -1,141 +1,81 @@
-import 'dart:math';
-import 'package:equatable/equatable.dart';
-import '../../core/constants/muscle_stimulus_constants.dart';
+/// Time periods for muscle visualization filtering
+enum TimePeriod {
+  /// Show today's workout data
+  today,
+  
+  /// Show this week's accumulated data (rolling 7 days)
+  week,
+  
+  /// Show this month's accumulated data (rolling 30 days)
+  month,
+  
+  /// Show all-time cumulative data
+  allTime,
+}
 
-class MuscleStimulus extends Equatable {
-  final String id;
-  final String muscleGroup;
-  
-  /// Date in YYYY-MM-DD format
-  final DateTime date;
-  
-  /// Total stimulus accumulated for this muscle on this date
-  /// Calculated as sum of all set stimuli for the day
-  final double dailyStimulus;
-  
-  /// Rolling weekly load with exponential decay
-  /// Formula: previousWeeklyLoad * 0.6 + dailyStimulus
-  final double rollingWeeklyLoad;
-  
-  /// Unix timestamp (milliseconds) of the last set performed for this muscle
-  /// Used for calculating real-time recovery decay
-  final int? lastSetTimestamp;
-  
-  /// Stimulus value of the last set performed
-  /// Used as starting point for decay calculation
-  final double? lastSetStimulus;
-  
-  final DateTime createdAt;
-  final DateTime updatedAt;
-
-  const MuscleStimulus({
-    required this.id,
-    required this.muscleGroup,
-    required this.date,
-    required this.dailyStimulus,
-    required this.rollingWeeklyLoad,
-    this.lastSetTimestamp,
-    this.lastSetStimulus,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  /// Calculate remaining stimulus after recovery decay
-  /// 
-  /// Uses exponential decay formula: stimulus * e^(-k * hours)
-  /// where k is the muscle-specific recovery rate
-  /// 
-  /// Returns the current remaining stimulus based on time elapsed since last set
-  double calculateRemainingStimulus() {
-    // If no last set recorded, return 0
-    if (lastSetTimestamp == null || lastSetStimulus == null) {
-      return 0.0;
+/// Extension methods for TimePeriod
+extension TimePeriodExtension on TimePeriod {
+  /// Get display name for UI
+  String get displayName {
+    switch (this) {
+      case TimePeriod.today:
+        return 'Today';
+      case TimePeriod.week:
+        return 'Week';
+      case TimePeriod.month:
+        return 'Month';
+      case TimePeriod.allTime:
+        return 'All Time';
     }
-
-    // Calculate hours elapsed since last set
-    final lastSetTime = DateTime.fromMillisecondsSinceEpoch(lastSetTimestamp!);
+  }
+  
+  /// Get date range for this period
+  DateRange getDateRange() {
     final now = DateTime.now();
-    final hoursElapsed = now.difference(lastSetTime).inMilliseconds / (1000 * 60 * 60);
-
-    // Get recovery rate for this muscle
-    final k = MuscleStimulus Constants.getRecoveryRate(muscleGroup);
-
-    // Calculate remaining stimulus using exponential decay
-    // Formula: S(t) = S₀ * e^(-k*t)
-    final remainingStimulus = lastSetStimulus! * exp(-k * hoursElapsed);
-
-    return remainingStimulus.clamp(0.0, lastSetStimulus!);
-  }
-
-  /// Get date as string in YYYY-MM-DD format
-  String get dateString {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  /// Check if this stimulus record is from today
-  bool get isToday {
-    final now = DateTime.now();
-    return date.year == now.year && 
-           date.month == now.month && 
-           date.day == now.day;
-  }
-
-  /// Check if last set was performed today
-  bool get lastSetWasToday {
-    if (lastSetTimestamp == null) return false;
+    final today = DateTime(now.year, now.month, now.day);
     
-    final lastSetTime = DateTime.fromMillisecondsSinceEpoch(lastSetTimestamp!);
-    final now = DateTime.now();
-    
-    return lastSetTime.year == now.year && 
-           lastSetTime.month == now.month && 
-           lastSetTime.day == now.day;
+    switch (this) {
+      case TimePeriod.today:
+        return DateRange(
+          start: today,
+          end: today,
+        );
+      case TimePeriod.week:
+        return DateRange(
+          start: today.subtract(const Duration(days: 7)),
+          end: today,
+        );
+      case TimePeriod.month:
+        return DateRange(
+          start: today.subtract(const Duration(days: 30)),
+          end: today,
+        );
+      case TimePeriod.allTime:
+        // Return a very old start date for all-time
+        return DateRange(
+          start: DateTime(2020, 1, 1),
+          end: today,
+        );
+    }
   }
+}
 
-  /// Get hours since last set
-  double? get hoursSinceLastSet {
-    if (lastSetTimestamp == null) return null;
-    
-    final lastSetTime = DateTime.fromMillisecondsSinceEpoch(lastSetTimestamp!);
-    final now = DateTime.now();
-    
-    return now.difference(lastSetTime).inMilliseconds / (1000 * 60 * 60);
+/// Helper class for date ranges
+class DateRange {
+  final DateTime start;
+  final DateTime end;
+  
+  const DateRange({
+    required this.start,
+    required this.end,
+  });
+  
+  /// Check if a date falls within this range
+  bool contains(DateTime date) {
+    return date.isAfter(start.subtract(const Duration(days: 1))) &&
+           date.isBefore(end.add(const Duration(days: 1)));
   }
-
-  MuscleStimulus copyWith({
-    String? id,
-    String? muscleGroup,
-    DateTime? date,
-    double? dailyStimulus,
-    double? rollingWeeklyLoad,
-    int? lastSetTimestamp,
-    double? lastSetStimulus,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return MuscleStimulus(
-      id: id ?? this.id,
-      muscleGroup: muscleGroup ?? this.muscleGroup,
-      date: date ?? this.date,
-      dailyStimulus: dailyStimulus ?? this.dailyStimulus,
-      rollingWeeklyLoad: rollingWeeklyLoad ?? this.rollingWeeklyLoad,
-      lastSetTimestamp: lastSetTimestamp ?? this.lastSetTimestamp,
-      lastSetStimulus: lastSetStimulus ?? this.lastSetStimulus,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        id,
-        muscleGroup,
-        date,
-        dailyStimulus,
-        rollingWeeklyLoad,
-        lastSetTimestamp,
-        lastSetStimulus,
-        createdAt,
-        updatedAt,
-      ];
+  
+  /// Get number of days in this range
+  int get days => end.difference(start).inDays + 1;
 }

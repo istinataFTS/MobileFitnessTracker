@@ -5,6 +5,11 @@ import '../../../core/utils/input_validators.dart';
 import '../../../domain/entities/workout_set.dart';
 import '../../../domain/entities/exercise.dart';
 import '../bloc/history_bloc.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
+import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/entities/exercise.dart';
+import '../bloc/history_bloc.dart';
 
 /// Dialog for editing an existing workout set
 class EditSetDialog extends StatefulWidget {

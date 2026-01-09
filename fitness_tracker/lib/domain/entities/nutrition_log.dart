@@ -16,20 +16,23 @@ class NutritionLog extends Equatable {
   /// Null for direct macro logs, non-null for meal logs
   final String? mealId;
   
+  /// Name of the meal (for display purposes)
+  final String mealName;
+  
   /// Grams consumed (only applicable for meal logs)
   /// Should be null for direct macro logs
-  final double? grams;
+  final double? gramsConsumed;
   
   // Actual macronutrients logged (in grams)
-  final double carbs;
-  final double protein;
-  final double fat;
+  final double proteinGrams;
+  final double carbsGrams;
+  final double fatGrams;
   
   // Total calories
   final double calories;
   
   // Date when nutrition was consumed
-  final DateTime date;
+  final DateTime loggedAt;
   
   // Timestamp when log was created
   final DateTime createdAt;
@@ -37,12 +40,13 @@ class NutritionLog extends Equatable {
   const NutritionLog({
     required this.id,
     this.mealId,
-    this.grams,
-    required this.carbs,
-    required this.protein,
-    required this.fat,
+    required this.mealName,
+    this.gramsConsumed,
+    required this.proteinGrams,
+    required this.carbsGrams,
+    required this.fatGrams,
     required this.calories,
-    required this.date,
+    required this.loggedAt,
     required this.createdAt,
   });
 
@@ -55,7 +59,7 @@ class NutritionLog extends Equatable {
   /// Calculate expected calories from macros
   /// Formula: 4 calories per gram of carbs/protein, 9 calories per gram of fat
   double get calculatedCalories {
-    return (carbs * 4.0) + (protein * 4.0) + (fat * 9.0);
+    return (carbsGrams * 4.0) + (proteinGrams * 4.0) + (fatGrams * 9.0);
   }
 
   /// Check if stored calories match calculated calories (within 1 calorie tolerance)
@@ -67,38 +71,39 @@ class NutritionLog extends Equatable {
   /// - Must have mealId
   /// - Must have grams > 0
   bool get isValidMealLog {
-    return mealId != null && grams != null && grams! > 0;
+    return mealId != null && gramsConsumed != null && gramsConsumed! > 0;
   }
 
   /// Validate direct macro log constraints
   /// - Must NOT have mealId
-  /// - Should NOT have grams (or grams should be null)
   /// - Must have at least one macro > 0
   bool get isValidDirectMacroLog {
     return mealId == null && 
-           (carbs > 0 || protein > 0 || fat > 0);
+           (carbsGrams > 0 || proteinGrams > 0 || fatGrams > 0);
   }
 
   NutritionLog copyWith({
     String? id,
     String? mealId,
-    double? grams,
-    double? carbs,
-    double? protein,
-    double? fat,
+    String? mealName,
+    double? gramsConsumed,
+    double? proteinGrams,
+    double? carbsGrams,
+    double? fatGrams,
     double? calories,
-    DateTime? date,
+    DateTime? loggedAt,
     DateTime? createdAt,
   }) {
     return NutritionLog(
       id: id ?? this.id,
       mealId: mealId ?? this.mealId,
-      grams: grams ?? this.grams,
-      carbs: carbs ?? this.carbs,
-      protein: protein ?? this.protein,
-      fat: fat ?? this.fat,
+      mealName: mealName ?? this.mealName,
+      gramsConsumed: gramsConsumed ?? this.gramsConsumed,
+      proteinGrams: proteinGrams ?? this.proteinGrams,
+      carbsGrams: carbsGrams ?? this.carbsGrams,
+      fatGrams: fatGrams ?? this.fatGrams,
       calories: calories ?? this.calories,
-      date: date ?? this.date,
+      loggedAt: loggedAt ?? this.loggedAt,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -107,12 +112,13 @@ class NutritionLog extends Equatable {
   List<Object?> get props => [
         id,
         mealId,
-        grams,
-        carbs,
-        protein,
-        fat,
+        mealName,
+        gramsConsumed,
+        proteinGrams,
+        carbsGrams,
+        fatGrams,
         calories,
-        date,
+        loggedAt,
         createdAt,
       ];
 }

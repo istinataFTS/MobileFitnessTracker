@@ -10,6 +10,12 @@ import '../bloc/history_bloc.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../widgets/edit_set_dialog.dart';
 import '../../log/log_page.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/constants/calendar_constants.dart';
+import '../../../../core/constants/muscle_groups.dart';
+import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/entities/exercise.dart';
+import '../../exercises/bloc/exercise_bloc.dart';
 
 /// Bottom sheet displaying workout details for a selected date
 class DayDetailsBottomSheet extends StatelessWidget {

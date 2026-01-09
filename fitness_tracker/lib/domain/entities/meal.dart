@@ -1,16 +1,19 @@
 import 'package:equatable/equatable.dart';
-import '../../core/constants/app_constants.dart';
 
 /// Represents a meal with nutritional information per 100g
 /// 
 /// Stores macronutrients (carbs, protein, fat) and total calories.
 /// All macro values are per 100g serving.
+/// Also stores a default serving size for the meal.
 /// 
 /// Calories are calculated as: 4*carbs + 4*protein + 9*fat
 /// The entity validates that calories match the macro breakdown.
 class Meal extends Equatable {
   final String id;
   final String name;
+  
+  /// Default serving size for this meal (in grams)
+  final double servingSizeGrams;
   
   // Macronutrients per 100g (in grams)
   final double carbsPer100g;
@@ -25,12 +28,19 @@ class Meal extends Equatable {
   const Meal({
     required this.id,
     required this.name,
+    required this.servingSizeGrams,
     required this.carbsPer100g,
     required this.proteinPer100g,
     required this.fatPer100g,
     required this.caloriesPer100g,
     required this.createdAt,
   });
+
+  /// Calculate macros for the default serving size
+  double get proteinPerServing => (proteinPer100g * servingSizeGrams) / 100;
+  double get carbsPerServing => (carbsPer100g * servingSizeGrams) / 100;
+  double get fatsPerServing => (fatPer100g * servingSizeGrams) / 100;
+  double get caloriesPerServing => (caloriesPer100g * servingSizeGrams) / 100;
 
   /// Calculate expected calories from macros
   /// Formula: 4 calories per gram of carbs/protein, 9 calories per gram of fat
@@ -45,7 +55,7 @@ class Meal extends Equatable {
 
   /// Calculate macros and calories for a given weight in grams
   MealNutrition calculateForGrams(double grams) {
-    final multiplier = grams / AppConstants.baseServingSizeGrams;
+    final multiplier = grams / 100.0;
     return MealNutrition(
       carbs: carbsPer100g * multiplier,
       protein: proteinPer100g * multiplier,
@@ -58,6 +68,7 @@ class Meal extends Equatable {
   Meal copyWith({
     String? id,
     String? name,
+    double? servingSizeGrams,
     double? carbsPer100g,
     double? proteinPer100g,
     double? fatPer100g,
@@ -67,6 +78,7 @@ class Meal extends Equatable {
     return Meal(
       id: id ?? this.id,
       name: name ?? this.name,
+      servingSizeGrams: servingSizeGrams ?? this.servingSizeGrams,
       carbsPer100g: carbsPer100g ?? this.carbsPer100g,
       proteinPer100g: proteinPer100g ?? this.proteinPer100g,
       fatPer100g: fatPer100g ?? this.fatPer100g,
@@ -79,6 +91,7 @@ class Meal extends Equatable {
   List<Object?> get props => [
         id,
         name,
+        servingSizeGrams,
         carbsPer100g,
         proteinPer100g,
         fatPer100g,
