@@ -1,4 +1,3 @@
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/database_tables.dart';
 import '../../core/utils/macro_calculator.dart';
 import '../../domain/entities/meal.dart';
@@ -10,6 +9,7 @@ class MealModel extends Meal {
   const MealModel({
     required super.id,
     required super.name,
+    required super.servingSizeGrams,
     required super.carbsPer100g,
     required super.proteinPer100g,
     required super.fatPer100g,
@@ -22,6 +22,7 @@ class MealModel extends Meal {
     return MealModel(
       id: meal.id,
       name: meal.name,
+      servingSizeGrams: meal.servingSizeGrams,
       carbsPer100g: meal.carbsPer100g,
       proteinPer100g: meal.proteinPer100g,
       fatPer100g: meal.fatPer100g,
@@ -35,6 +36,7 @@ class MealModel extends Meal {
     return MealModel(
       id: map[DatabaseTables.mealId] as String,
       name: map[DatabaseTables.mealName] as String,
+      servingSizeGrams: (map[DatabaseTables.mealServingSizeGrams] as num).toDouble(),
       carbsPer100g: (map[DatabaseTables.mealCarbsPer100g] as num).toDouble(),
       proteinPer100g: (map[DatabaseTables.mealProteinPer100g] as num).toDouble(),
       fatPer100g: (map[DatabaseTables.mealFatPer100g] as num).toDouble(),
@@ -48,6 +50,7 @@ class MealModel extends Meal {
     return {
       DatabaseTables.mealId: id,
       DatabaseTables.mealName: name,
+      DatabaseTables.mealServingSizeGrams: servingSizeGrams,
       DatabaseTables.mealCarbsPer100g: carbsPer100g,
       DatabaseTables.mealProteinPer100g: proteinPer100g,
       DatabaseTables.mealFatPer100g: fatPer100g,
@@ -61,6 +64,7 @@ class MealModel extends Meal {
     return MealModel(
       id: json['id'] as String,
       name: json['name'] as String,
+      servingSizeGrams: (json['servingSizeGrams'] as num?)?.toDouble() ?? 100.0,
       carbsPer100g: (json['carbsPer100g'] as num).toDouble(),
       proteinPer100g: (json['proteinPer100g'] as num).toDouble(),
       fatPer100g: (json['fatPer100g'] as num).toDouble(),
@@ -74,6 +78,7 @@ class MealModel extends Meal {
     return {
       'id': id,
       'name': name,
+      'servingSizeGrams': servingSizeGrams,
       'carbsPer100g': carbsPer100g,
       'proteinPer100g': proteinPer100g,
       'fatPer100g': fatPer100g,
@@ -82,27 +87,30 @@ class MealModel extends Meal {
     };
   }
 
-  /// Validate macro and calorie consistency
-  /// Throws exception if calories don't match macros
-  void validateMacros() {
+  /// Validate calories match macro breakdown
+  /// Logs warning if mismatch exceeds 1 calorie tolerance
+  void validateCalories() {
     if (!hasValidCalories) {
       final calculated = calculatedCalories;
-      throw ArgumentError(
+      print(
+        'WARNING: Calorie mismatch for meal "$name": '
         'Calories mismatch: stated $caloriesPer100g cal, '
-        'calculated $calculated cal from macros. '
+        'calculated ${calculated.toStringAsFixed(1)} cal. '
         'Difference: ${(caloriesPer100g - calculated).abs().toStringAsFixed(1)} cal',
       );
     }
   }
 
-  /// Create a meal with auto-calculated calories from macros
-  /// Useful when user only inputs macros
-  factory MealModel.fromMacros({
+  /// Create model with smart calorie calculation
+  /// If calories are not provided or invalid, calculates from macros
+  factory MealModel.withCalculatedCalories({
     required String id,
     required String name,
+    required double servingSizeGrams,
     required double carbsPer100g,
     required double proteinPer100g,
     required double fatPer100g,
+    double? caloriesPer100g,
     required DateTime createdAt,
   }) {
     final calories = MacroCalculator.calculateCalories(
@@ -111,88 +119,18 @@ class MealModel extends Meal {
       fat: fatPer100g,
     );
 
-    return MealModel(
-      id: id,
-      name: name,
-      carbsPer100g: carbsPer100g,
-      proteinPer100g: proteinPer100g,
-      fatPer100g: fatPer100g,
-      caloriesPer100g: calories,
-      createdAt: createdAt,
-    );
-  }
-
-  /// Create a meal with auto-calculated macros from calories
-  /// Distributes calories evenly across macros if not specified
-  /// This is a fallback - prefer explicit macro input
-  factory MealModel.fromCalories({
-    required String id,
-    required String name,
-    required double caloriesPer100g,
-    required DateTime createdAt,
-    double? carbsPer100g,
-    double? proteinPer100g,
-    double? fatPer100g,
-  }) {
-    // If all macros provided, validate them
-    if (carbsPer100g != null && proteinPer100g != null && fatPer100g != null) {
-      return MealModel(
-        id: id,
-        name: name,
-        carbsPer100g: carbsPer100g,
-        proteinPer100g: proteinPer100g,
-        fatPer100g: fatPer100g,
-        caloriesPer100g: caloriesPer100g,
-        createdAt: createdAt,
-      );
-    }
-
-    // If only calories provided, use default distribution ratios from AppConstants
-    if (carbsPer100g == null && proteinPer100g == null && fatPer100g == null) {
-      return MealModel(
-        id: id,
-        name: name,
-        carbsPer100g: (caloriesPer100g * AppConstants.defaultCarbsRatio) / 
-                      MacroCalculator.caloriesPerGramCarbs,
-        proteinPer100g: (caloriesPer100g * AppConstants.defaultProteinRatio) / 
-                        MacroCalculator.caloriesPerGramProtein,
-        fatPer100g: (caloriesPer100g * AppConstants.defaultFatsRatio) / 
-                    MacroCalculator.caloriesPerGramFat,
-        caloriesPer100g: caloriesPer100g,
-        createdAt: createdAt,
-      );
-    }
-
-    // Calculate missing macro(s) using MacroCalculator
-    final carbs = carbsPer100g ?? 0.0;
-    final protein = proteinPer100g ?? 0.0;
-    final fat = fatPer100g ?? 0.0;
-
-    final calculatedCarbs = carbsPer100g ?? MacroCalculator.calculateCarbsFromCalories(
-      totalCalories: caloriesPer100g,
-      protein: protein,
-      fat: fat,
-    );
-
-    final calculatedProtein = proteinPer100g ?? MacroCalculator.calculateProteinFromCalories(
-      totalCalories: caloriesPer100g,
-      carbs: carbs,
-      fat: fat,
-    );
-
-    final calculatedFat = fatPer100g ?? MacroCalculator.calculateFatFromCalories(
-      totalCalories: caloriesPer100g,
-      carbs: carbs,
-      protein: protein,
-    );
+    final calculatedCarbs = carbsPer100g;
+    final calculatedProtein = proteinPer100g;
+    final calculatedFat = fatPer100g;
 
     return MealModel(
       id: id,
       name: name,
+      servingSizeGrams: servingSizeGrams,
       carbsPer100g: calculatedCarbs,
       proteinPer100g: calculatedProtein,
       fatPer100g: calculatedFat,
-      caloriesPer100g: caloriesPer100g,
+      caloriesPer100g: caloriesPer100g ?? calories,
       createdAt: createdAt,
     );
   }

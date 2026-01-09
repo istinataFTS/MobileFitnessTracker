@@ -1,35 +1,28 @@
 import 'package:dartz/dartz.dart';
 import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
-import '../../domain/entities/workout_set.dart';
-import '../../domain/repositories/workout_set_repository.dart';
-import '../datasources/local/workout_set_local_datasource.dart';
-import '../models/workout_set_model.dart';
+import '../../domain/entities/muscle_factor.dart';
+import '../../domain/repositories/muscle_factor_repository.dart';
+import '../datasources/local/muscle_factor_local_datasource.dart';
+import '../models/muscle_factor_model.dart';
 
-class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
-  final WorkoutSetLocalDataSource localDataSource;
+/// Repository implementation for MuscleFactor operations
+/// Implements domain layer interface using data layer datasources
+/// 
+/// MuscleFactor represents the contribution factor of an exercise to a muscle group
+/// (e.g., bench press might be 1.0 for chest, 0.6 for triceps, 0.3 for front delts)
+class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
+  final MuscleFactorLocalDataSource localDataSource;
 
-  const WorkoutSetRepositoryImpl({required this.localDataSource});
-
-  @override
-  Future<Either<Failure, List<WorkoutSet>>> getAllSets() async {
-    try {
-      final sets = await localDataSource.getAllSets();
-      return Right(sets);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
-  }
+  const MuscleFactorRepositoryImpl({required this.localDataSource});
 
   @override
-  Future<Either<Failure, List<WorkoutSet>>> getSetsByExerciseId(
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByExerciseId(
     String exerciseId,
   ) async {
     try {
-      final sets = await localDataSource.getSetsByExerciseId(exerciseId);
-      return Right(sets);
+      final factors = await localDataSource.getFactorsForExercise(exerciseId);
+      return Right(factors);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
     } catch (e) {
@@ -38,13 +31,12 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   }
 
   @override
-  Future<Either<Failure, List<WorkoutSet>>> getSetsByDateRange(
-    DateTime startDate,
-    DateTime endDate,
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByMuscleGroup(
+    String muscleGroup,
   ) async {
     try {
-      final sets = await localDataSource.getSetsByDateRange(startDate, endDate);
-      return Right(sets);
+      final factors = await localDataSource.getFactorsForMuscle(muscleGroup);
+      return Right(factors);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
     } catch (e) {
@@ -53,10 +45,22 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addSet(WorkoutSet set) async {
+  Future<Either<Failure, List<MuscleFactor>>> getAllFactors() async {
     try {
-      final model = WorkoutSetModel.fromEntity(set);
-      await localDataSource.insertSet(model);
+      final factors = await localDataSource.getAllFactors();
+      return Right(factors);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addFactor(MuscleFactor factor) async {
+    try {
+      final model = MuscleFactorModel.fromEntity(factor);
+      await localDataSource.addFactor(model);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -66,9 +70,14 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteSet(String id) async {
+  Future<Either<Failure, void>> addFactorsBatch(
+    List<MuscleFactor> factors,
+  ) async {
     try {
-      await localDataSource.deleteSet(id);
+      final models = factors
+          .map((factor) => MuscleFactorModel.fromEntity(factor))
+          .toList();
+      await localDataSource.addFactorsBatch(models);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -78,9 +87,48 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   }
 
   @override
-  Future<Either<Failure, void>> clearAllSets() async {
+  Future<Either<Failure, void>> updateFactor(MuscleFactor factor) async {
     try {
-      await localDataSource.clearAllSets();
+      final model = MuscleFactorModel.fromEntity(factor);
+      await localDataSource.updateFactor(model);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteFactor(String id) async {
+    try {
+      await localDataSource.deleteFactor(id);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteFactorsByExerciseId(
+    String exerciseId,
+  ) async {
+    try {
+      await localDataSource.deleteFactorsByExerciseId(exerciseId);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearAllFactors() async {
+    try {
+      await localDataSource.clearAllFactors();
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));

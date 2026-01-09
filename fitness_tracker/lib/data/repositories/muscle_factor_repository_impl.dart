@@ -7,16 +7,17 @@ import '../datasources/local/muscle_factor_local_datasource.dart';
 import '../models/muscle_factor_model.dart';
 
 /// Repository implementation for MuscleFactor operations
+/// Implements domain layer interface using data layer datasources
 /// 
-/// Converts between domain entities and data models
-/// Handles error conversion (exceptions → failures)
+/// MuscleFactor represents the contribution factor of an exercise to a muscle group
+/// (e.g., bench press might be 1.0 for chest, 0.6 for triceps, 0.3 for front delts)
 class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   final MuscleFactorLocalDataSource localDataSource;
 
   const MuscleFactorRepositoryImpl({required this.localDataSource});
 
   @override
-  Future<Either<Failure, List<MuscleFactor>>> getFactorsForExercise(
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByExerciseId(
     String exerciseId,
   ) async {
     try {
@@ -30,7 +31,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, List<MuscleFactor>>> getFactorsForMuscle(
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByMuscleGroup(
     String muscleGroup,
   ) async {
     try {
@@ -56,22 +57,10 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, MuscleFactor?>> getFactorById(String id) async {
-    try {
-      final factor = await localDataSource.getFactorById(id);
-      return Right(factor);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, void>> addMuscleFactor(MuscleFactor factor) async {
+  Future<Either<Failure, void>> addFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
-      await localDataSource.insertMuscleFactor(model);
+      await localDataSource.addFactor(model);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -81,12 +70,14 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addMuscleFactorsBatch(List<MuscleFactor> factors) async {
+  Future<Either<Failure, void>> addFactorsBatch(
+    List<MuscleFactor> factors,
+  ) async {
     try {
       final models = factors
           .map((factor) => MuscleFactorModel.fromEntity(factor))
           .toList();
-      await localDataSource.insertMuscleFactorsBatch(models);
+      await localDataSource.addFactorsBatch(models);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -96,10 +87,10 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) async {
+  Future<Either<Failure, void>> updateFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
-      await localDataSource.updateMuscleFactor(model);
+      await localDataSource.updateFactor(model);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -109,9 +100,9 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteMuscleFactor(String id) async {
+  Future<Either<Failure, void>> deleteFactor(String id) async {
     try {
-      await localDataSource.deleteMuscleFactor(id);
+      await localDataSource.deleteFactor(id);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
@@ -121,9 +112,11 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteFactorsForExercise(String exerciseId) async {
+  Future<Either<Failure, void>> deleteFactorsByExerciseId(
+    String exerciseId,
+  ) async {
     try {
-      await localDataSource.deleteFactorsForExercise(exerciseId);
+      await localDataSource.deleteFactorsByExerciseId(exerciseId);
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));

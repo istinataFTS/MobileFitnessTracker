@@ -9,7 +9,7 @@ class DatabaseTables {
   static const String exercises = 'exercises';
   static const String meals = 'meals';
   static const String nutritionLogs = 'nutrition_logs';
-  static const String exerciseMuscleFactor s = 'exercise_muscle_factors';
+  static const String exerciseMuscleFactors = 'exercise_muscle_factors';
   static const String muscleStimulus = 'muscle_stimulus';
 
   // ==================== TARGETS TABLE COLUMNS ====================
@@ -23,7 +23,7 @@ class DatabaseTables {
   static const String setExerciseId = 'exercise_id';
   static const String setReps = 'reps';
   static const String setWeight = 'weight';
-  static const String setIntensity = 'intensity'; // NEW: 0-5 intensity rating
+  static const String setIntensity = 'intensity'; // 0-5 intensity rating
   static const String setDate = 'date';
   static const String setCreatedAt = 'created_at';
 
@@ -36,6 +36,7 @@ class DatabaseTables {
   // ==================== MEALS TABLE COLUMNS ====================
   static const String mealId = 'id';
   static const String mealName = 'name';
+  static const String mealServingSizeGrams = 'serving_size_grams';
   static const String mealCarbsPer100g = 'carbs_per_100g';
   static const String mealProteinPer100g = 'protein_per_100g';
   static const String mealFatPer100g = 'fat_per_100g';
@@ -45,12 +46,13 @@ class DatabaseTables {
   // ==================== NUTRITION LOGS TABLE COLUMNS ====================
   static const String nutritionLogId = 'id';
   static const String nutritionLogMealId = 'meal_id'; // Nullable - null for direct macro logs
+  static const String nutritionLogMealName = 'meal_name';
   static const String nutritionLogGrams = 'grams'; // Nullable - only for meal logs
-  static const String nutritionLogCarbs = 'carbs';
-  static const String nutritionLogProtein = 'protein';
-  static const String nutritionLogFat = 'fat';
+  static const String nutritionLogProtein = 'protein_grams';
+  static const String nutritionLogCarbs = 'carbs_grams';
+  static const String nutritionLogFat = 'fat_grams';
   static const String nutritionLogCalories = 'calories';
-  static const String nutritionLogDate = 'date';
+  static const String nutritionLogDate = 'logged_at';
   static const String nutritionLogCreatedAt = 'created_at';
 
   // ==================== EXERCISE MUSCLE FACTORS TABLE COLUMNS ====================
