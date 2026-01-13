@@ -91,7 +91,8 @@ class ApplyDailyDecay {
     }
   }
 
-  /// Check if decay should be applied today
+ /// Check if decay should be applied today
+  Future<Either<Failure, bool>> shouldApplyDecayToday() async {
     try {
       final today = DateTime.now();
       final todayStart = DateTime(today.year, today.month, today.day);

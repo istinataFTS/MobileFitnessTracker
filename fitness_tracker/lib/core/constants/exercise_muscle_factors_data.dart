@@ -1,7 +1,7 @@
 import '../../domain/entities/muscle_factor.dart';
 import 'muscle_stimulus_constants.dart';
 
-class ExerciseMuscleFactor sData {
+class ExerciseMuscleFactorsData {
   ExerciseMuscleFactorsData._(); // Private constructor
 
   /// Get all exercise muscle factor mappings

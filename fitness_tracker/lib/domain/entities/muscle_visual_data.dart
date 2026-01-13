@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/muscle_stimulus_constants.dart';
 
+
 class MuscleVisualData extends Equatable {
   final String muscleGroup;
   
@@ -52,7 +53,7 @@ class MuscleVisualData extends Equatable {
         : 0.0;
 
     // Determine color based on intensity thresholds
-    final color = _getColorForIntensity(visualIntensity);
+    final color = getColorForIntensity(visualIntensity);
 
     return MuscleVisualData(
       muscleGroup: muscleGroup,
@@ -71,7 +72,7 @@ class MuscleVisualData extends Equatable {
   /// - Yellow (0.20-0.45): Moderate training
   /// - Orange (0.45-0.70): Heavy training
   /// - Red (0.70-1.0): Maximum training
-  static Color _getColorForIntensity(double intensity) {
+  static Color getColorForIntensity(double intensity) {
     if (intensity == 0.0) {
       // Gray for untrained muscles
       return Colors.grey.withOpacity(0.3);

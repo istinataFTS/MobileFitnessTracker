@@ -57,6 +57,7 @@ class AppStrings {
   static const String comingSoon = 'Coming soon!';
   static const String noData = 'No data available';
   static const String noDataYet = 'No data yet';
+  static const String errorLoadingExercises = 'Error loading exercises';
 
   // ==================== Success Messages ====================
   static const String success = 'Success';
@@ -86,6 +87,8 @@ class AppStrings {
   static const String viewHistory = 'View History';
   static const String manageTargets = 'Manage Targets';
   static const String manageTargetsDesc = 'Set and track weekly muscle group goals';
+  static const String noWorkoutData = 'No Workout Data';
+  static const String noWorkoutDataDesc = 'Start logging sets to see your muscle training visualization';
 
   // ==================== Log Page ====================
   static const String logTitle = 'Log';
@@ -119,6 +122,12 @@ class AppStrings {
   static const String exerciseName = 'Exercise Name';
   static const String noExercises = 'No exercises found';
   static const String noSets = 'No sets logged';
+
+   // ==================== Intensity System ====================
+  static const String intensityInfo = 'Intensity affects muscle recovery tracking';
+  static const String intensityLevels = 'Intensity Levels';
+  static const String currentIntensity = 'Current Intensity';
+  static const String allIntensityLevels = 'All Intensity Levels';
 
   // ==================== Library Page ====================
   static const String libraryTitle = 'Library';
@@ -299,13 +308,8 @@ class AppStrings {
   static const String backView = 'Back';
   static const String noMuscleData = 'No muscle stimulus data yet';
   static const String startWorkingOut = 'Start working out to see your progress';
-}
 
-/// Phase 7 muscle visualization specific strings
-/// Separated for organization but accessed as part of AppStrings
-class AppStringsPhase7 {
-  AppStringsPhase7._();
-  
+
   // Visualization
   static const String progress = 'Progress';
   static const String muscles = 'Muscles';
