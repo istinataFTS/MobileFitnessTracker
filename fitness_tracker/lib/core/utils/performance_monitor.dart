@@ -37,6 +37,12 @@ class PerformanceMonitor {
     return duration;
   }
   
+
+  static int stopTimer(String operation) {
+    final duration = endTimer(operation);
+    return duration?.inMilliseconds ?? 0;
+  }
+  
   /// Get average duration for an operation
   static Duration? getAverageDuration(String operation) {
     final metrics = _metrics[operation];
