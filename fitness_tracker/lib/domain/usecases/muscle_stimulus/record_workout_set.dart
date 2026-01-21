@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:uuid/uuid.dart';
 import '../../../config/env_config.dart';
-import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../entities/muscle_stimulus.dart';
 import '../../repositories/muscle_factor_repository.dart';

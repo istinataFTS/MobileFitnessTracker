@@ -249,7 +249,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     
     // Get sets with exercise details
     final detailedSetsResult = await getSetsByDateRange(
-      start: weekStartDate,
+      startDate: weekStartDate,
       end: today,
     );
     
