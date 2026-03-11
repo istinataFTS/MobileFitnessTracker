@@ -1,44 +1,51 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
-import '../../entities/muscle_factor.dart';
 import '../../entities/stimulus_calculation_rules.dart';
 import '../../repositories/muscle_factor_repository.dart';
 
-/// Use case for calculating muscle stimulus from workout sets
-/// 
-/// This use case calculates the training stimulus applied to each muscle group
-/// based on the exercise performed, number of sets, and intensity level.
+/// Use case for calculating muscle stimulus from workout sets.
 class CalculateMuscleStimulus {
   final MuscleFactorRepository muscleFactorRepository;
 
-  CalculateMuscleStimulus({required this.muscleFactorRepository});
+  const CalculateMuscleStimulus({
+    required this.muscleFactorRepository,
+  });
 
-  /// Calculate stimulus for a single set of an exercise
-  /// 
-  /// Returns a map of muscle group -> stimulus value
+  /// Returns a map of muscleGroup -> stimulus value.
   Future<Either<Failure, Map<String, double>>> calculateForSet({
     required String exerciseId,
     required int sets,
     required int intensity,
   }) async {
     try {
-      // Get muscle factors for this exercise
-      final factorsResult = await muscleFactorRepository.getFactorsByExerciseId(exerciseId);
+      if (sets < 0) {
+        return const Left(ValidationFailure('Sets cannot be negative'));
+      }
+
+      if (!StimulusCalculationRules.validateIntensity(intensity)) {
+        return const Left(
+          ValidationFailure('Intensity must be between 0 and 5'),
+        );
+      }
+
+      final factorsResult =
+          await muscleFactorRepository.getFactorsForExercise(exerciseId);
 
       return factorsResult.fold(
         (failure) => Left(failure),
         (factors) {
-          // Calculate stimulus for each affected muscle
+          if (factors.isEmpty) {
+            return const Right({});
+          }
+
           final muscleStimuli = <String, double>{};
 
           for (final factor in factors) {
-            // Calculate intensity factor: (intensity / 5) ^ 1.35
-            final intensityFactor = StimulusCalculationRules.calculateIntensityFactor(intensity);
-
-            // Calculate set stimulus: sets * intensityFactor * exerciseFactor
-            final setStimulus = StimulusCalculationRules.calculateSetStimulus(
+            final setStimulus =
+                StimulusCalculationRules.calculateSetStimulus(
               sets: sets,
-              intensity: intensity, 
+              intensity: intensity,
               exerciseFactor: factor.factor,
             );
 
@@ -53,10 +60,6 @@ class CalculateMuscleStimulus {
     }
   }
 
-  /// Calculate total stimulus for an entire workout
-  /// 
-  /// Takes a list of sets with their exercise IDs and intensities,
-  /// returns aggregated stimulus per muscle group
   Future<Either<Failure, Map<String, double>>> calculateForWorkout({
     required List<WorkoutSetInput> workoutSets,
   }) async {
@@ -66,16 +69,16 @@ class CalculateMuscleStimulus {
       for (final setInput in workoutSets) {
         final setResult = await calculateForSet(
           exerciseId: setInput.exerciseId,
-          sets: 1, // Each entry represents one set
+          sets: 1,
           intensity: setInput.intensity,
         );
 
         setResult.fold(
-          (failure) => null, // Skip failed calculations
+          (_) {},
           (muscleStimuli) {
-            // Aggregate stimuli for each muscle
             for (final entry in muscleStimuli.entries) {
-              totalStimuli[entry.key] = (totalStimuli[entry.key] ?? 0.0) + entry.value;
+              totalStimuli[entry.key] =
+                  (totalStimuli[entry.key] ?? 0.0) + entry.value;
             }
           },
         );
@@ -83,50 +86,27 @@ class CalculateMuscleStimulus {
 
       return Right(totalStimuli);
     } catch (e) {
-      return Left(UnexpectedFailure('Failed to calculate workout stimulus: $e'));
+      return Left(
+        UnexpectedFailure('Failed to calculate workout stimulus: $e'),
+      );
     }
   }
 
-  /// Wrapper around [calculateForSet] — satisfies call-sites that expect
-  /// this name (e.g. RecordWorkoutSet use case).
-  Future<Either<Failure, Map<String, double>>> calculateSetStimulus({
-    required String exerciseId,
-    required int sets,
-    required int intensity,
-  }) =>
-      calculateForSet(
-        exerciseId: exerciseId,
-        sets: sets,
-        intensity: intensity,
-      );
+  double calculateIntensityFactor(int intensity) {
+    return StimulusCalculationRules.calculateIntensityFactor(intensity);
+  }
 
-  /// Validate inputs before performing a stimulus calculation.
-  ///
-  /// Returns `true` when all values are within acceptable ranges.
-  /// - [sets] must be >= 1
-  /// - [intensity] must be between 0 and 5 inclusive
-  /// - [exerciseId] must be non-empty
   bool validateInputs({
     required String exerciseId,
     required int sets,
     required int intensity,
   }) {
     if (exerciseId.trim().isEmpty) return false;
-    if (sets < 1) return false;
-    if (intensity < 0 || intensity > 5) return false;
-    return true;
-  }
-
-  /// Helper method to calculate intensity factor.
-  ///
-  /// Convenience wrapper around [StimulusCalculationRules.calculateIntensityFactor].
-  /// Formula: (intensity / 5) ^ 1.35
-  double calculateIntensityFactor(int intensity) {
-    return StimulusCalculationRules.calculateIntensityFactor(intensity);
+    if (sets < 0) return false;
+    return StimulusCalculationRules.validateIntensity(intensity);
   }
 }
 
-/// Input data for a single workout set
 class WorkoutSetInput {
   final String exerciseId;
   final int intensity;

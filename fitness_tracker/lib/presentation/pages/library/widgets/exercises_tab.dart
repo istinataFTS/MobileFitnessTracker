@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:uuid/uuid.dart';
+
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';

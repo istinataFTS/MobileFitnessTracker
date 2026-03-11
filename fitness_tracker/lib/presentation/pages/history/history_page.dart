@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../core/themes/app_theme.dart';
 import '../../core/utils/error_handler.dart';
 import '../../core/constants/calendar_constants.dart';
+import '../../domain/entities/workout_set.dart';
 import 'bloc/history_bloc.dart';
 import 'widgets/history_calendar_widget.dart';
 import 'widgets/day_details_bottom_sheet.dart';
@@ -12,7 +14,6 @@ import 'widgets/day_details_bottom_sheet.dart';
 /// - Monthly calendar view with workout indicators
 /// - Tap date to view details in bottom sheet
 /// - Edit/delete past sets
-/// - Quick log for empty days
 /// - Swipe navigation between months
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -25,7 +26,6 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
-    // Load current month data
     context.read<HistoryBloc>().add(LoadMonthSetsEvent(DateTime.now()));
   }
 
@@ -50,10 +50,9 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             );
           }
-          
+
           if (state is HistoryOperationSuccess) {
             ErrorHandler.showSuccess(context, state.message);
-            // Automatically transition back to loaded state
             Future.delayed(const Duration(milliseconds: 300), () {
               if (mounted) {
                 context.read<HistoryBloc>().add(
@@ -86,29 +85,26 @@ class _HistoryPageState extends State<HistoryPage> {
               currentMonth = successState.currentMonth;
               monthSets = successState.monthSets;
               selectedDate = successState.selectedDate;
-              selectedDateSets = [];
+              selectedDateSets = const [];
             }
 
-            // Create date -> count map for calendar
             final dateCounts = <DateTime, int>{};
             for (final entry in monthSets.entries) {
               dateCounts[entry.key] = entry.value.length;
             }
 
             return GestureDetector(
-              // Swipe detection for month navigation
               onHorizontalDragEnd: (details) {
-                if (details.primaryVelocity! > CalendarConstants.swipeThreshold) {
-                  // Swipe right -> previous month
+                if (details.primaryVelocity! >
+                    CalendarConstants.swipeThreshold) {
                   _navigateToPreviousMonth(context, currentMonth);
-                } else if (details.primaryVelocity! < -CalendarConstants.swipeThreshold) {
-                  // Swipe left -> next month
+                } else if (details.primaryVelocity! <
+                    -CalendarConstants.swipeThreshold) {
                   _navigateToNextMonth(context, currentMonth);
                 }
               },
               child: Stack(
                 children: [
-                  // Calendar
                   SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -119,7 +115,9 @@ class _HistoryPageState extends State<HistoryPage> {
                           today: DateTime.now(),
                           dateSetsCount: dateCounts,
                           onDateSelected: (date) {
-                            context.read<HistoryBloc>().add(SelectDateEvent(date));
+                            context
+                                .read<HistoryBloc>()
+                                .add(SelectDateEvent(date));
                           },
                           onPreviousMonth: () {
                             _navigateToPreviousMonth(context, currentMonth);
@@ -134,14 +132,10 @@ class _HistoryPageState extends State<HistoryPage> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        
-                        // Instructions
                         _buildInstructions(context),
                       ],
                     ),
                   ),
-                  
-                  // Bottom sheet overlay
                   if (selectedDate != null)
                     _buildBottomSheetOverlay(
                       context,
@@ -159,7 +153,6 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Build initial state
   Widget _buildInitialState(BuildContext context) {
     return Center(
       child: Column(
@@ -182,7 +175,6 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Build instructions card
   Widget _buildInstructions(BuildContext context) {
     return Card(
       child: Padding(
@@ -241,7 +233,6 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Build bottom sheet overlay
   Widget _buildBottomSheetOverlay(
     BuildContext context,
     DateTime selectedDate,
@@ -249,7 +240,6 @@ class _HistoryPageState extends State<HistoryPage> {
   ) {
     return GestureDetector(
       onTap: () {
-        // Close bottom sheet when tapping outside
         context.read<HistoryBloc>().add(ClearDateSelectionEvent());
       },
       child: Container(
@@ -272,14 +262,12 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Navigate to previous month
   void _navigateToPreviousMonth(BuildContext context, DateTime currentMonth) {
     final previousMonth = DateTime(
       currentMonth.year,
       currentMonth.month - 1,
     );
-    
-    // Check if within allowed range
+
     if (previousMonth.isBefore(CalendarConstants.minAllowedDate)) {
       ErrorHandler.showInfo(
         context,
@@ -287,22 +275,20 @@ class _HistoryPageState extends State<HistoryPage> {
       );
       return;
     }
-    
+
     context.read<HistoryBloc>().add(NavigateToMonthEvent(previousMonth));
   }
 
-  /// Navigate to next month
   void _navigateToNextMonth(BuildContext context, DateTime currentMonth) {
     final nextMonth = DateTime(
       currentMonth.year,
       currentMonth.month + 1,
     );
-    
+
     final now = DateTime.now();
     final currentMonthDate = DateTime(now.year, now.month, 1);
     final nextMonthDate = DateTime(nextMonth.year, nextMonth.month, 1);
-    
-    // Don't allow navigating beyond current month
+
     if (nextMonthDate.isAfter(currentMonthDate)) {
       ErrorHandler.showInfo(
         context,
@@ -310,7 +296,7 @@ class _HistoryPageState extends State<HistoryPage> {
       );
       return;
     }
-    
+
     context.read<HistoryBloc>().add(NavigateToMonthEvent(nextMonth));
   }
 }

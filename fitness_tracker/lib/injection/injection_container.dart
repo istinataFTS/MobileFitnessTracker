@@ -2,10 +2,8 @@ import 'package:get_it/get_it.dart';
 import '../data/datasources/local/database_helper.dart';
 import '../data/datasources/local/target_local_datasource.dart';
 import '../data/datasources/local/workout_set_local_datasource.dart';
-import '../data/datasources/local/workout_set_local_datasource_impl.dart';
 import '../data/datasources/local/exercise_local_datasource.dart';
 import '../data/datasources/local/meal_local_datasource.dart';
-import '../data/datasources/local/meal_local_datasource_impl.dart';
 import '../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../data/datasources/local/muscle_factor_local_datasource.dart';
 import '../data/datasources/local/muscle_stimulus_local_datasource.dart';
@@ -68,7 +66,7 @@ import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 final sl = GetIt.instance;
 
 /// Initialize all dependencies following Clean Architecture principles
-/// 
+///
 /// Registration order:
 /// 1. BLoCs (Factory - new instance per request)
 /// 2. Use Cases (Lazy Singleton - single instance, created on first use)
@@ -78,7 +76,7 @@ final sl = GetIt.instance;
 Future<void> init() async {
   // ==================== BLoCs ====================
   // Factory registration creates new instance for each BlocProvider
-  
+
   sl.registerFactory(() => TargetsBloc(
         getAllTargets: sl(),
         addTarget: sl(),
@@ -86,21 +84,18 @@ Future<void> init() async {
         deleteTarget: sl(),
       ));
 
-  // ⭐ UPDATED: WorkoutBloc with stimulus recording (Phase 6)
   sl.registerFactory(() => WorkoutBloc(
         addWorkoutSet: sl(),
         getWeeklySets: sl(),
-        recordWorkoutSet: sl(), // NEW: Stimulus recording
+        recordWorkoutSet: sl(),
       ));
 
-  // ⭐ UPDATED: HomeBloc with stats calculation (Phase 6)
   sl.registerFactory(() => HomeBloc(
         getAllTargets: sl(),
         getWeeklySets: sl(),
-        getSetsByDateRange: sl(), // NEW: For muscle counting
+        getSetsByDateRange: sl(),
       ));
 
-  // ⭐ NEW: MuscleVisualBloc (Phase 6)
   sl.registerFactory(() => MuscleVisualBloc(
         getMuscleVisualData: sl(),
       ));
@@ -140,7 +135,7 @@ Future<void> init() async {
 
   // ==================== Use Cases ====================
   // Lazy Singleton registration creates single instance on first use
-  
+
   // Targets
   sl.registerLazySingleton(() => GetAllTargets(sl()));
   sl.registerLazySingleton(() => AddTarget(sl()));
@@ -182,26 +177,25 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteNutritionLog(sl()));
   sl.registerLazySingleton(() => GetDailyMacros(sl()));
 
+  // Muscle Factors
   sl.registerLazySingleton(() => SeedExerciseFactors(
         muscleFactorRepository: sl(),
         exerciseRepository: sl(),
       ));
 
-  sl.registerLazySingleton(() => CalculateMuscleStimulus(muscleFactorRepository: sl()));
-  
+  // Muscle Stimulus
+  sl.registerLazySingleton(() => CalculateMuscleStimulus(sl()));
   sl.registerLazySingleton(() => RecordWorkoutSet(
         muscleFactorRepository: sl(),
         muscleStimulusRepository: sl(),
         calculateMuscleStimulus: sl(),
       ));
-  
   sl.registerLazySingleton(() => GetMuscleVisualData(sl()));
-  
   sl.registerLazySingleton(() => ApplyDailyDecay(sl()));
 
   // ==================== Repositories ====================
   // Interface to Implementation mapping
-  
+
   sl.registerLazySingleton<TargetRepository>(
     () => TargetRepositoryImpl(localDataSource: sl()),
   );
@@ -232,7 +226,7 @@ Future<void> init() async {
 
   // ==================== Data Sources ====================
   // Local database access layer
-  
+
   sl.registerLazySingleton<TargetLocalDataSource>(
     () => TargetLocalDataSourceImpl(databaseHelper: sl()),
   );
@@ -254,7 +248,7 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<MuscleFactorLocalDataSource>(
-    () => MuscleFactorLocalDataSource(databaseHelper: sl()),
+    () => MuscleFactorLocalDataSourceImpl(databaseHelper: sl()),
   );
 
   sl.registerLazySingleton<MuscleStimulusLocalDataSource>(

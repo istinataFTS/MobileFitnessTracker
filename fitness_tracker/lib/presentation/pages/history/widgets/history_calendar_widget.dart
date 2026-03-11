@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/themes/app_theme.dart';
 import '../../../core/constants/calendar_constants.dart';
-import '../../../../core/themes/app_theme.dart';
-import '../../../../core/constants/calendar_constants.dart';
 
 /// Custom calendar widget for displaying a month with workout indicators
-/// Shows dates with workouts in a different color (Option B from requirements)
+/// Shows dates with workouts in a different color.
 class HistoryCalendarWidget extends StatelessWidget {
   final DateTime displayedMonth;
   final DateTime? selectedDate;
   final DateTime today;
   final Map<DateTime, int> dateSetsCount; // Date -> number of sets
   final Function(DateTime) onDateSelected;
-  final Function() onPreviousMonth;
-  final Function() onNextMonth;
-  final Function() onTodayTapped;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final VoidCallback onTodayTapped;
 
   const HistoryCalendarWidget({
     super.key,
@@ -49,7 +48,6 @@ class HistoryCalendarWidget extends StatelessWidget {
     );
   }
 
-  /// Build month header with navigation
   Widget _buildMonthHeader(BuildContext context) {
     final monthName = DateFormat('MMMM yyyy').format(displayedMonth);
     final isCurrentMonth = _isSameMonth(displayedMonth, today);
@@ -59,14 +57,11 @@ class HistoryCalendarWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          // Previous month button
           IconButton(
             icon: const Icon(Icons.chevron_left, size: 28),
             onPressed: _canNavigateToPrevious() ? onPreviousMonth : null,
             tooltip: 'Previous Month',
           ),
-          
-          // Month and year
           Expanded(
             child: Text(
               monthName,
@@ -76,8 +71,6 @@ class HistoryCalendarWidget extends StatelessWidget {
                   ),
             ),
           ),
-          
-          // Today button
           if (!isCurrentMonth)
             TextButton(
               onPressed: onTodayTapped,
@@ -86,8 +79,6 @@ class HistoryCalendarWidget extends StatelessWidget {
               ),
               child: const Text('Today'),
             ),
-          
-          // Next month button
           IconButton(
             icon: const Icon(Icons.chevron_right, size: 28),
             onPressed: _canNavigateToNext() ? onNextMonth : null,
@@ -98,10 +89,9 @@ class HistoryCalendarWidget extends StatelessWidget {
     );
   }
 
-  /// Build weekday headers (S M T W T F S)
   Widget _buildWeekdayHeaders(BuildContext context) {
     const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    
+
     return Container(
       height: CalendarConstants.weekdayHeaderHeight,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -123,35 +113,36 @@ class HistoryCalendarWidget extends StatelessWidget {
     );
   }
 
-  /// Build calendar grid with dates
   Widget _buildCalendarGrid(BuildContext context) {
-    final firstDayOfMonth = DateTime(displayedMonth.year, displayedMonth.month, 1);
-    final lastDayOfMonth = DateTime(displayedMonth.year, displayedMonth.month + 1, 0);
-    
-    // Get the weekday of the first day (0 = Monday, 6 = Sunday)
-    // Adjust to (0 = Sunday, 6 = Saturday)
+    final firstDayOfMonth =
+        DateTime(displayedMonth.year, displayedMonth.month, 1);
+    final lastDayOfMonth =
+        DateTime(displayedMonth.year, displayedMonth.month + 1, 0);
+
     int firstWeekday = firstDayOfMonth.weekday % 7;
-    
-    // Calculate total cells needed
     final totalDays = lastDayOfMonth.day;
-    final totalCells = (firstWeekday + totalDays);
+    final totalCells = firstWeekday + totalDays;
     final rows = (totalCells / 7).ceil();
-    
+
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8),
       child: Column(
         children: List.generate(rows, (rowIndex) {
           return Row(
             children: List.generate(7, (colIndex) {
               final cellIndex = rowIndex * 7 + colIndex;
               final dayNumber = cellIndex - firstWeekday + 1;
-              
-              // Check if this cell should show a date
+
               if (dayNumber < 1 || dayNumber > totalDays) {
                 return const Expanded(child: SizedBox());
               }
-              
-              final date = DateTime(displayedMonth.year, displayedMonth.month, dayNumber);
+
+              final date = DateTime(
+                displayedMonth.year,
+                displayedMonth.month,
+                dayNumber,
+              );
+
               return Expanded(
                 child: _buildDateCell(context, date),
               );
@@ -162,7 +153,6 @@ class HistoryCalendarWidget extends StatelessWidget {
     );
   }
 
-  /// Build individual date cell
   Widget _buildDateCell(BuildContext context, DateTime date) {
     final isToday = _isSameDay(date, today);
     final isSelected = selectedDate != null && _isSameDay(date, selectedDate!);
@@ -170,7 +160,6 @@ class HistoryCalendarWidget extends StatelessWidget {
     final hasWorkouts = setsCount > 0;
     final isFutureDate = date.isAfter(today);
 
-    // Determine background color
     Color? backgroundColor;
     if (isSelected) {
       backgroundColor = AppTheme.primaryOrange.withOpacity(0.2);
@@ -178,7 +167,6 @@ class HistoryCalendarWidget extends StatelessWidget {
       backgroundColor = AppTheme.primaryOrange.withOpacity(0.1);
     }
 
-    // Determine border color
     Color? borderColor;
     if (isToday) {
       borderColor = AppTheme.primaryOrange;
@@ -203,7 +191,6 @@ class HistoryCalendarWidget extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Date number
             Center(
               child: Text(
                 '${date.day}',
@@ -219,8 +206,6 @@ class HistoryCalendarWidget extends StatelessWidget {
                     ),
               ),
             ),
-            
-            // Workout indicator dot (if has workouts)
             if (hasWorkouts)
               Positioned(
                 bottom: 4,
@@ -230,7 +215,7 @@ class HistoryCalendarWidget extends StatelessWidget {
                   child: Container(
                     width: CalendarConstants.dateIndicatorSize,
                     height: CalendarConstants.dateIndicatorSize,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppTheme.primaryOrange,
                       shape: BoxShape.circle,
                     ),
@@ -243,25 +228,22 @@ class HistoryCalendarWidget extends StatelessWidget {
     );
   }
 
-  /// Check if can navigate to previous month
   bool _canNavigateToPrevious() {
-    final previousMonth = DateTime(displayedMonth.year, displayedMonth.month - 1);
+    final previousMonth =
+        DateTime(displayedMonth.year, displayedMonth.month - 1);
     return previousMonth.isAfter(CalendarConstants.minAllowedDate);
   }
 
-  /// Check if can navigate to next month
   bool _canNavigateToNext() {
     final nextMonth = DateTime(displayedMonth.year, displayedMonth.month + 1);
     final firstDayOfNext = DateTime(nextMonth.year, nextMonth.month, 1);
     return firstDayOfNext.isBefore(CalendarConstants.maxAllowedDate);
   }
 
-  /// Check if two dates are the same day
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  /// Check if two dates are in the same month
   bool _isSameMonth(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month;
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+
 import '../../../core/themes/app_theme.dart';
 import '../../../core/constants/calendar_constants.dart';
 import '../../../core/constants/muscle_groups.dart';
