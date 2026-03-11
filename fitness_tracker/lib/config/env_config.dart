@@ -47,12 +47,14 @@ class EnvConfig {
     defaultValue: 'fitness_tracker.db',
   );
   
-  /// Database version for migrations
-  /// IMPORTANT: Increment this when adding new tables or columns
-  /// Version 5: Added exercise_muscle_factors and muscle_stimulus tables, intensity column
+  /// Database version for migrations.
+  /// IMPORTANT: Increment this when adding new tables or columns.
+  /// Version 5: Added exercise_muscle_factors and muscle_stimulus tables, intensity column.
+  /// Version 6: Added meal_name column to nutrition_logs table.
+  /// Version 7: Added serving_size_grams column to meals table.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 5,
+    defaultValue: 7,
   );
   
   static const bool seedDefaultData = bool.fromEnvironment(

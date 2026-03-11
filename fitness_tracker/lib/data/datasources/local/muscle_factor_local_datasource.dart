@@ -1,5 +1,5 @@
-import '../../core/constants/database_tables.dart';
-import '../../core/errors/exceptions.dart';
+import '../../../core/constants/database_tables.dart';
+import '../../../core/errors/exceptions.dart';
 import '../../models/muscle_factor_model.dart';
 import 'database_helper.dart';
 

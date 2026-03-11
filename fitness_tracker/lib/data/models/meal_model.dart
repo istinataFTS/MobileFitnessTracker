@@ -7,6 +7,7 @@ class MealModel extends Meal {
   const MealModel({
     required super.id,
     required super.name,
+    required super.servingSizeGrams,
     required super.carbsPer100g,
     required super.proteinPer100g,
     required super.fatPer100g,
@@ -19,6 +20,7 @@ class MealModel extends Meal {
     return MealModel(
       id: meal.id,
       name: meal.name,
+      servingSizeGrams: meal.servingSizeGrams,
       carbsPer100g: meal.carbsPer100g,
       proteinPer100g: meal.proteinPer100g,
       fatPer100g: meal.fatPer100g,
@@ -32,6 +34,7 @@ class MealModel extends Meal {
     return MealModel(
       id: map[DatabaseTables.mealId] as String,
       name: map[DatabaseTables.mealName] as String,
+      servingSizeGrams: (map[DatabaseTables.mealServingSize] as num? ?? 100).toDouble(),
       carbsPer100g: (map[DatabaseTables.mealCarbsPer100g] as num).toDouble(),
       proteinPer100g: (map[DatabaseTables.mealProteinPer100g] as num).toDouble(),
       fatPer100g: (map[DatabaseTables.mealFatPer100g] as num).toDouble(),
@@ -45,6 +48,7 @@ class MealModel extends Meal {
     return {
       DatabaseTables.mealId: id,
       DatabaseTables.mealName: name,
+      DatabaseTables.mealServingSize: servingSizeGrams,
       DatabaseTables.mealCarbsPer100g: carbsPer100g,
       DatabaseTables.mealProteinPer100g: proteinPer100g,
       DatabaseTables.mealFatPer100g: fatPer100g,
@@ -98,10 +102,21 @@ class MealModel extends Meal {
     }
   }
 
+  /// Validate macros - called before inserting/updating to check consistency
+  void validateMacros() {
+    if (carbsPer100g < 0 || proteinPer100g < 0 || fatPer100g < 0) {
+      throw ArgumentError('Macros cannot be negative');
+    }
+    if (caloriesPer100g < 0) {
+      throw ArgumentError('Calories cannot be negative');
+    }
+  }
+
   /// Create a copy with updated fields
   MealModel copyWith({
     String? id,
     String? name,
+    double? servingSizeGrams,
     double? carbsPer100g,
     double? proteinPer100g,
     double? fatPer100g,
@@ -111,6 +126,7 @@ class MealModel extends Meal {
     return MealModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      servingSizeGrams: servingSizeGrams ?? this.servingSizeGrams,
       carbsPer100g: carbsPer100g ?? this.carbsPer100g,
       proteinPer100g: proteinPer100g ?? this.proteinPer100g,
       fatPer100g: fatPer100g ?? this.fatPer100g,
@@ -127,6 +143,7 @@ class MealModel extends Meal {
   factory MealModel.withCalculatedMacros({
     required String id,
     required String name,
+    double servingSizeGrams = 100.0,
     double? carbsPer100g,
     double? proteinPer100g,
     double? fatPer100g,
@@ -174,6 +191,7 @@ class MealModel extends Meal {
     return MealModel(
       id: id,
       name: name,
+      servingSizeGrams: servingSizeGrams,
       carbsPer100g: carbsPer100g ?? 0,
       proteinPer100g: proteinPer100g ?? 0,
       fatPer100g: fatPer100g ?? 0,

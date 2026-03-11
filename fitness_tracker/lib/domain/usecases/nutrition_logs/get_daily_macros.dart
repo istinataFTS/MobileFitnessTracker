@@ -23,9 +23,9 @@ class GetDailyMacros {
         double totalCalories = 0;
 
         for (final log in logs) {
-          totalProtein += log.protein;
-          totalCarbs += log.carbs;
-          totalFats += log.fats;
+          totalProtein += log.proteinGrams;
+          totalCarbs += log.carbsGrams;
+          totalFats += log.fatGrams;
           totalCalories += log.calories;
         }
 

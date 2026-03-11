@@ -2,8 +2,10 @@ import 'package:get_it/get_it.dart';
 import '../data/datasources/local/database_helper.dart';
 import '../data/datasources/local/target_local_datasource.dart';
 import '../data/datasources/local/workout_set_local_datasource.dart';
+import '../data/datasources/local/workout_set_local_datasource_impl.dart';
 import '../data/datasources/local/exercise_local_datasource.dart';
 import '../data/datasources/local/meal_local_datasource.dart';
+import '../data/datasources/local/meal_local_datasource_impl.dart';
 import '../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../data/datasources/local/muscle_factor_local_datasource.dart';
 import '../data/datasources/local/muscle_stimulus_local_datasource.dart';
@@ -185,7 +187,7 @@ Future<void> init() async {
         exerciseRepository: sl(),
       ));
 
-  sl.registerLazySingleton(() => CalculateMuscleStimulus(sl()));
+  sl.registerLazySingleton(() => CalculateMuscleStimulus(muscleFactorRepository: sl()));
   
   sl.registerLazySingleton(() => RecordWorkoutSet(
         muscleFactorRepository: sl(),
@@ -252,7 +254,7 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<MuscleFactorLocalDataSource>(
-    () => MuscleFactorLocalDataSourceImpl(databaseHelper: sl()),
+    () => MuscleFactorLocalDataSource(databaseHelper: sl()),
   );
 
   sl.registerLazySingleton<MuscleStimulusLocalDataSource>(

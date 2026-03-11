@@ -31,7 +31,7 @@ class PeriodSelectorWidget extends StatelessWidget {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<TimePeriod>(
           value: selectedPeriod,
-          onChanged: enabled ? onPeriodChanged : null,
+          onChanged: enabled ? (TimePeriod? v) { if (v != null) onPeriodChanged(v); } : null,
           icon: Icon(
             Icons.arrow_drop_down,
             color: enabled ? AppTheme.textLight : AppTheme.textDim,

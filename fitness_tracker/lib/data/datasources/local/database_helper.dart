@@ -82,6 +82,7 @@ class DatabaseHelper {
       CREATE TABLE ${DatabaseTables.meals} (
         ${DatabaseTables.mealId} TEXT PRIMARY KEY,
         ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
         ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
         ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
         ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
@@ -95,6 +96,7 @@ class DatabaseHelper {
       CREATE TABLE ${DatabaseTables.nutritionLogs} (
         ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
         ${DatabaseTables.nutritionLogMealId} TEXT,
+        ${DatabaseTables.nutritionLogMealName} TEXT NOT NULL DEFAULT '',
         ${DatabaseTables.nutritionLogGrams} REAL,
         ${DatabaseTables.nutritionLogCarbs} REAL NOT NULL,
         ${DatabaseTables.nutritionLogProtein} REAL NOT NULL,
@@ -110,7 +112,7 @@ class DatabaseHelper {
 
     // Exercise Muscle Factors table (NEW in v5)
     await db.execute('''
-      CREATE TABLE ${DatabaseTables.exerciseMuscleFactor s} (
+      CREATE TABLE ${DatabaseTables.exerciseMuscleFactors} (
         ${DatabaseTables.factorId} TEXT PRIMARY KEY,
         ${DatabaseTables.factorExerciseId} TEXT NOT NULL,
         ${DatabaseTables.factorMuscleGroup} TEXT NOT NULL,
@@ -122,7 +124,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // Muscle Stimulus table (NEW in v5)
+    // Muscle Stimulus table (NEW in v5) -- _onCreate
     await db.execute('''
       CREATE TABLE ${DatabaseTables.muscleStimulus} (
         ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
@@ -142,7 +144,7 @@ class DatabaseHelper {
     await _createIndexes(db);
   }
 
-  /// Handle database version upgrades
+  /// Handle database version upgrades for existing installations.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Migration from v1 to v2: Restructure workout_sets
     if (oldVersion < 2) {
@@ -194,6 +196,7 @@ class DatabaseHelper {
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.meals} (
           ${DatabaseTables.mealId} TEXT PRIMARY KEY,
           ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+          ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
           ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
           ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
           ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
@@ -207,6 +210,7 @@ class DatabaseHelper {
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.nutritionLogs} (
           ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
           ${DatabaseTables.nutritionLogMealId} TEXT,
+          ${DatabaseTables.nutritionLogMealName} TEXT NOT NULL DEFAULT '',
           ${DatabaseTables.nutritionLogGrams} REAL,
           ${DatabaseTables.nutritionLogCarbs} REAL NOT NULL,
           ${DatabaseTables.nutritionLogProtein} REAL NOT NULL,
@@ -254,7 +258,7 @@ class DatabaseHelper {
 
       // Create exercise_muscle_factors table
       await db.execute('''
-        CREATE TABLE ${DatabaseTables.exerciseMuscleFactor s} (
+        CREATE TABLE ${DatabaseTables.exerciseMuscleFactors} (
           ${DatabaseTables.factorId} TEXT PRIMARY KEY,
           ${DatabaseTables.factorExerciseId} TEXT NOT NULL,
           ${DatabaseTables.factorMuscleGroup} TEXT NOT NULL,
@@ -285,12 +289,12 @@ class DatabaseHelper {
       // Create indexes for new tables
       await db.execute('''
         CREATE INDEX idx_exercise_muscle_factors_exercise_id 
-        ON ${DatabaseTables.exerciseMuscleFactor s}(${DatabaseTables.factorExerciseId})
+        ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorExerciseId})
       ''');
 
       await db.execute('''
         CREATE INDEX idx_exercise_muscle_factors_muscle_group 
-        ON ${DatabaseTables.exerciseMuscleFactor s}(${DatabaseTables.factorMuscleGroup})
+        ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorMuscleGroup})
       ''');
 
       await db.execute('''
@@ -306,6 +310,22 @@ class DatabaseHelper {
       await db.execute('''
         CREATE INDEX idx_muscle_stimulus_muscle_date 
         ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+      ''');
+    }
+
+    // Migration from v5 to v6: Add meal_name column to nutrition_logs
+    if (oldVersion < 6) {
+      await db.execute('''
+        ALTER TABLE ${DatabaseTables.nutritionLogs}
+        ADD COLUMN ${DatabaseTables.nutritionLogMealName} TEXT NOT NULL DEFAULT ''
+      ''');
+    }
+
+    // Migration from v6 to v7: Add serving_size_grams column to meals
+    if (oldVersion < 7) {
+      await db.execute('''
+        ALTER TABLE ${DatabaseTables.meals}
+        ADD COLUMN ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0
       ''');
     }
   }
@@ -359,12 +379,12 @@ class DatabaseHelper {
     // Exercise muscle factors indexes
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_exercise_id 
-      ON ${DatabaseTables.exerciseMuscleFactor s}(${DatabaseTables.factorExerciseId})
+      ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorExerciseId})
     ''');
 
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_muscle_group 
-      ON ${DatabaseTables.exerciseMuscleFactor s}(${DatabaseTables.factorMuscleGroup})
+      ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorMuscleGroup})
     ''');
 
     // Muscle stimulus indexes

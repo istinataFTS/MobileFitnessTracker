@@ -63,7 +63,7 @@ class MuscleStimulusLocalDataSourceImpl implements MuscleStimulusLocalDataSource
   }) async {
     try {
       final db = await databaseHelper.database;
-      final dateString = MuscleStimulusModel._formatDateForDb(date);
+      final dateString = MuscleStimulusModel.formatDateForDb(date);
       
       final maps = await db.query(
         DatabaseTables.muscleStimulus,
@@ -87,8 +87,8 @@ class MuscleStimulusLocalDataSourceImpl implements MuscleStimulusLocalDataSource
   }) async {
     try {
       final db = await databaseHelper.database;
-      final startDateString = MuscleStimulusModel._formatDateForDb(startDate);
-      final endDateString = MuscleStimulusModel._formatDateForDb(endDate);
+      final startDateString = MuscleStimulusModel.formatDateForDb(startDate);
+      final endDateString = MuscleStimulusModel.formatDateForDb(endDate);
       
       final maps = await db.query(
         DatabaseTables.muscleStimulus,
@@ -115,7 +115,7 @@ class MuscleStimulusLocalDataSourceImpl implements MuscleStimulusLocalDataSource
   Future<List<MuscleStimulusModel>> getAllStimulusForDate(DateTime date) async {
     try {
       final db = await databaseHelper.database;
-      final dateString = MuscleStimulusModel._formatDateForDb(date);
+      final dateString = MuscleStimulusModel.formatDateForDb(date);
       
       final maps = await db.query(
         DatabaseTables.muscleStimulus,
@@ -237,7 +237,7 @@ class MuscleStimulusLocalDataSourceImpl implements MuscleStimulusLocalDataSource
   Future<void> deleteOlderThan(DateTime date) async {
     try {
       final db = await databaseHelper.database;
-      final dateString = MuscleStimulusModel._formatDateForDb(date);
+      final dateString = MuscleStimulusModel.formatDateForDb(date);
       
       await db.delete(
         DatabaseTables.muscleStimulus,

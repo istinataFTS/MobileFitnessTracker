@@ -23,7 +23,7 @@ class CalculateMuscleStimulus {
   }) async {
     try {
       // Get muscle factors for this exercise
-      final factorsResult = await muscleFactorRepository.getFactorsForExercise(exerciseId);
+      final factorsResult = await muscleFactorRepository.getFactorsByExerciseId(exerciseId);
 
       return factorsResult.fold(
         (failure) => Left(failure),
@@ -87,9 +87,39 @@ class CalculateMuscleStimulus {
     }
   }
 
-  /// Helper method to calculate intensity factor
-  /// 
-  /// This is a convenience wrapper around the calculation rule
+  /// Wrapper around [calculateForSet] — satisfies call-sites that expect
+  /// this name (e.g. RecordWorkoutSet use case).
+  Future<Either<Failure, Map<String, double>>> calculateSetStimulus({
+    required String exerciseId,
+    required int sets,
+    required int intensity,
+  }) =>
+      calculateForSet(
+        exerciseId: exerciseId,
+        sets: sets,
+        intensity: intensity,
+      );
+
+  /// Validate inputs before performing a stimulus calculation.
+  ///
+  /// Returns `true` when all values are within acceptable ranges.
+  /// - [sets] must be >= 1
+  /// - [intensity] must be between 0 and 5 inclusive
+  /// - [exerciseId] must be non-empty
+  bool validateInputs({
+    required String exerciseId,
+    required int sets,
+    required int intensity,
+  }) {
+    if (exerciseId.trim().isEmpty) return false;
+    if (sets < 1) return false;
+    if (intensity < 0 || intensity > 5) return false;
+    return true;
+  }
+
+  /// Helper method to calculate intensity factor.
+  ///
+  /// Convenience wrapper around [StimulusCalculationRules.calculateIntensityFactor].
   /// Formula: (intensity / 5) ^ 1.35
   double calculateIntensityFactor(int intensity) {
     return StimulusCalculationRules.calculateIntensityFactor(intensity);

@@ -219,7 +219,7 @@ class _LogMealTabState extends State<LogMealTab> {
     final calculatedCalories = MacroCalculator.calculateCalories(
       protein: meal.proteinPerServing,
       carbs: meal.carbsPerServing,
-      fats: meal.fatsPerServing,
+      fat: meal.fatsPerServing,
     );
 
     return Card(
@@ -372,7 +372,7 @@ class _LogMealTabState extends State<LogMealTab> {
     final calories = MacroCalculator.calculateCalories(
       protein: protein,
       carbs: carbs,
-      fats: fats,
+      fat: fats,
     );
 
     return Container(
@@ -511,16 +511,24 @@ class _LogMealTabState extends State<LogMealTab> {
 
     final grams = int.parse(_gramsController.text);
     final multiplier = grams / _selectedMeal!.servingSizeGrams;
+    final loggedProtein = _selectedMeal!.proteinPerServing * multiplier;
+    final loggedCarbs = _selectedMeal!.carbsPerServing * multiplier;
+    final loggedFat = _selectedMeal!.fatsPerServing * multiplier;
 
     final nutritionLog = NutritionLog(
       id: _uuid.v4(),
       mealId: _selectedMeal!.id,
       mealName: _selectedMeal!.name,
-      gramsConsumed: grams,
-      proteinGrams: _selectedMeal!.proteinPerServing * multiplier,
-      carbsGrams: _selectedMeal!.carbsPerServing * multiplier,
-      fatsGrams: _selectedMeal!.fatsPerServing * multiplier,
-      date: DateTime.now(),
+      gramsConsumed: grams.toDouble(),
+      proteinGrams: loggedProtein,
+      carbsGrams: loggedCarbs,
+      fatGrams: loggedFat,
+      calories: MacroCalculator.calculateCalories(
+        protein: loggedProtein,
+        carbs: loggedCarbs,
+        fat: loggedFat,
+      ),
+      loggedAt: DateTime.now(),
       createdAt: DateTime.now(),
     );
 

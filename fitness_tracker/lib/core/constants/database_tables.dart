@@ -36,6 +36,7 @@ class DatabaseTables {
   // ==================== MEALS TABLE COLUMNS ====================
   static const String mealId = 'id';
   static const String mealName = 'name';
+  static const String mealServingSize = 'serving_size_grams';
   static const String mealCarbsPer100g = 'carbs_per_100g';
   static const String mealProteinPer100g = 'protein_per_100g';
   static const String mealFatPer100g = 'fat_per_100g';
@@ -45,6 +46,7 @@ class DatabaseTables {
   // ==================== NUTRITION LOGS TABLE COLUMNS ====================
   static const String nutritionLogId = 'id';
   static const String nutritionLogMealId = 'meal_id'; // Nullable - null for direct macro logs
+  static const String nutritionLogMealName = 'meal_name'; // Display name (denormalised for fast read)
   static const String nutritionLogGrams = 'grams'; // Nullable - only for meal logs
   static const String nutritionLogCarbs = 'carbs';
   static const String nutritionLogProtein = 'protein';

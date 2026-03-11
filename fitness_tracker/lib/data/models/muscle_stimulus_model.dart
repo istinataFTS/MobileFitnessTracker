@@ -51,7 +51,7 @@ class MuscleStimulusModel extends MuscleStimulus {
     return {
       DatabaseTables.stimulusId: id,
       DatabaseTables.stimulusMuscleGroup: muscleGroup,
-      DatabaseTables.stimulusDate: _formatDateForDb(date),
+      DatabaseTables.stimulusDate: formatDateForDb(date),
       DatabaseTables.stimulusDailyStimulus: dailyStimulus,
       DatabaseTables.stimulusRollingWeeklyLoad: rollingWeeklyLoad,
       DatabaseTables.stimulusLastSetTimestamp: lastSetTimestamp,
@@ -61,9 +61,11 @@ class MuscleStimulusModel extends MuscleStimulus {
     };
   }
 
-  /// Format date as YYYY-MM-DD for database storage
-  /// Ensures consistent date format for querying
-  static String _formatDateForDb(DateTime date) {
+  /// Format date as YYYY-MM-DD for database storage.
+  ///
+  /// Public so that datasource classes can use it directly without
+  /// duplicating the formatting logic.
+  static String formatDateForDb(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 

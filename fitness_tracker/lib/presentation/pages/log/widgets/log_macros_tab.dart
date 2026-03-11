@@ -282,7 +282,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
     final calories = MacroCalculator.calculateCalories(
       protein: protein,
       carbs: carbs,
-      fats: fats,
+      fat: fats,
     );
 
     final hasAnyInput = protein > 0 || carbs > 0 || fats > 0;
@@ -483,8 +483,13 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
       gramsConsumed: null, // null for direct macro entry
       proteinGrams: protein,
       carbsGrams: carbs,
-      fatsGrams: fats,
-      date: DateTime.now(),
+      fatGrams: fats,
+      calories: MacroCalculator.calculateCalories(
+        protein: protein,
+        carbs: carbs,
+        fat: fats,
+      ),
+      loggedAt: DateTime.now(),
       createdAt: DateTime.now(),
     );
 

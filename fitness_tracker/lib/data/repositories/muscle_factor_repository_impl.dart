@@ -28,7 +28,9 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
     }
   }
 
-  @override
+  /// Returns all stored muscle factors.
+  /// Note: not part of the [MuscleFactorRepository] interface — available
+  /// as an internal utility method.
   Future<Either<Failure, List<MuscleFactor>>> getAllFactors() async {
     try {
       final factorMaps = await localDataSource.getAllFactors();
@@ -44,7 +46,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, List<MuscleFactor>>> getFactorsForExercise(
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByExerciseId(
     String exerciseId,
   ) async {
     try {
@@ -61,7 +63,25 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addMuscleFactor(MuscleFactor factor) async {
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsByMuscleGroup(
+    String muscleGroup,
+  ) async {
+    try {
+      final factorMaps = await localDataSource.getAllFactors();
+      final factors = factorMaps
+          .map((map) => MuscleFactorModel.fromMap(map))
+          .where((f) => f.muscleGroup == muscleGroup)
+          .toList();
+      return Right(factors);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.addFactor(model);
@@ -74,7 +94,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addMuscleFactorsBatch(
+  Future<Either<Failure, void>> addFactorsBatch(
     List<MuscleFactor> factors,
   ) async {
     try {
@@ -91,7 +111,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) async {
+  Future<Either<Failure, void>> updateFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.updateFactor(model);
@@ -104,7 +124,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteMuscleFactor(String id) async {
+  Future<Either<Failure, void>> deleteFactor(String id) async {
     try {
       await localDataSource.deleteFactor(id);
       return const Right(null);
@@ -116,11 +136,23 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteMuscleFactorsByExerciseId(
+  Future<Either<Failure, void>> deleteFactorsByExerciseId(
     String exerciseId,
   ) async {
     try {
       await localDataSource.deleteFactorsByExerciseId(exerciseId);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearAllFactors() async {
+    try {
+      await localDataSource.clearAllFactors();
       return const Right(null);
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));

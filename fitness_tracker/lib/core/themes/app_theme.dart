@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../config/env_config.dart';
 
 /// Application theme configuration
 /// Centralizes all color and style definitions to avoid hardcoding
@@ -34,6 +33,12 @@ class AppTheme {
   static const Color warning = Color(0xFFFFA726);
   static const Color error = Color(0xFFE53935);
   static const Color info = Color(0xFF29B6F6);
+
+  // Status color aliases used by Phase 7 widgets and nutrition UI
+  // These forward to the canonical names above.
+  static const Color successGreen = success;
+  static const Color warningAmber = warning;
+  static const Color errorRed = error;
   
   // Muscle Visualization Colors
   static const Color intensityNone = Color(0xFF2A2A2A);
@@ -74,7 +79,7 @@ class AppTheme {
     ),
     
     // Card Theme
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: surfaceDark,
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -284,7 +289,7 @@ class AppTheme {
     ),
     
     // Dialog Theme
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: surfaceDark,
       elevation: 8,
       shape: RoundedRectangleBorder(

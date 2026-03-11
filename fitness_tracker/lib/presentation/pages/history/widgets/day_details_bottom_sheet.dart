@@ -282,7 +282,7 @@ class DayDetailsBottomSheet extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (context) => const LogPage(),
                 ),
-              ),
+              );
             },
             icon: const Icon(Icons.add),
             label: const Text('Log Workout'),

@@ -181,7 +181,7 @@ class MealsTab extends StatelessWidget {
     final calculatedCalories = MacroCalculator.calculateCalories(
       protein: meal.proteinPerServing,
       carbs: meal.carbsPerServing,
-      fats: meal.fatsPerServing,
+      fat: meal.fatsPerServing,
     );
 
     return Card(
@@ -596,7 +596,7 @@ class _MealDialogState extends State<_MealDialog> {
     final calories = MacroCalculator.calculateCalories(
       protein: protein,
       carbs: carbs,
-      fats: fats,
+      fat: fats,
     );
 
     return Container(
@@ -694,14 +694,21 @@ class _MealDialogState extends State<_MealDialog> {
     final carbs = double.parse(_carbsController.text.trim());
     final fats = double.parse(_fatsController.text.trim());
 
+    final calculatedCalories = MacroCalculator.calculateCalories(
+      protein: protein,
+      carbs: carbs,
+      fat: fats,
+    );
+
     if (isEditing) {
       // Update existing meal
       final updatedMeal = widget.meal!.copyWith(
         name: name,
-        servingSizeGrams: servingSize,
-        proteinPerServing: protein,
-        carbsPerServing: carbs,
-        fatsPerServing: fats,
+        servingSizeGrams: servingSize.toDouble(),
+        proteinPer100g: protein,
+        carbsPer100g: carbs,
+        fatPer100g: fats,
+        caloriesPer100g: calculatedCalories,
       );
       context.read<MealBloc>().add(UpdateMealEvent(updatedMeal));
     } else {
@@ -709,10 +716,11 @@ class _MealDialogState extends State<_MealDialog> {
       final newMeal = Meal(
         id: _uuid.v4(),
         name: name,
-        servingSizeGrams: servingSize,
-        proteinPerServing: protein,
-        carbsPerServing: carbs,
-        fatsPerServing: fats,
+        servingSizeGrams: servingSize.toDouble(),
+        proteinPer100g: protein,
+        carbsPer100g: carbs,
+        fatPer100g: fats,
+        caloriesPer100g: calculatedCalories,
         createdAt: DateTime.now(),
       );
       context.read<MealBloc>().add(AddMealEvent(newMeal));

@@ -19,6 +19,9 @@ abstract class NutritionLogRepository {
   /// Useful for daily nutrition summary
   Future<Either<Failure, List<NutritionLog>>> getLogsByDate(DateTime date);
 
+  /// Alias for getLogsByDate - used by use cases
+  Future<Either<Failure, List<NutritionLog>>> getLogsForDate(DateTime date);
+
   /// Get logs within a date range (inclusive)
   /// Used for weekly/monthly summaries and history views
   Future<Either<Failure, List<NutritionLog>>> getLogsByDateRange(
