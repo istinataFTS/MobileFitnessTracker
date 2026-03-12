@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+
 import '../../../config/app_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
@@ -11,10 +12,10 @@ import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
 import 'widgets/body_view_toggle_widget.dart';
 import 'widgets/muscle_body_diagram_widget.dart';
+import 'widgets/nutrition_summary_card.dart';
 import 'widgets/period_selector_widget.dart';
 import 'widgets/progress_stats_widget.dart';
 
-/// Home page with integrated muscle visualization system
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -23,13 +24,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Local state for view toggle
   bool _isFrontView = true;
 
   @override
   void initState() {
     super.initState();
-    // Load home data on page init
     context.read<HomeBloc>().add(LoadHomeDataEvent());
   }
 
@@ -47,7 +46,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHomeContent(BuildContext context, HomeState homeState) {
-    // Handle loading state
     if (homeState is HomeLoading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -56,17 +54,14 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // Handle error state
     if (homeState is HomeError) {
       return _buildErrorState(context, homeState.message);
     }
 
-    // Handle loaded state
     if (homeState is HomeLoaded) {
       return _buildLoadedContent(context, homeState);
     }
 
-    // Initial state - show loading
     return const Center(
       child: CircularProgressIndicator(
         color: AppTheme.primaryOrange,
@@ -133,24 +128,22 @@ class _HomePageState extends State<HomePage> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Greeting section
           _buildGreetingSection(context),
           const SizedBox(height: 24),
 
-          // Muscle visualization card
+          _buildNutritionCard(context, homeState),
+          const SizedBox(height: 24),
+
           _buildMuscleVisualizationCard(context, homeState),
           const SizedBox(height: 24),
 
-          // Optional: Muscle groups breakdown
-          if (homeState.targets.isNotEmpty) ...[
+          if (homeState.trainingTargets.isNotEmpty)
             _buildMuscleGroupsSection(context, homeState),
-          ],
         ],
       ),
     );
   }
 
-  /// Build greeting section with user name and date
   Widget _buildGreetingSection(BuildContext context) {
     final now = DateTime.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
@@ -179,7 +172,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Build comprehensive muscle visualization card
+  Widget _buildNutritionCard(BuildContext context, HomeLoaded homeState) {
+    return NutritionSummaryCard(
+      nutritionStats: homeState.nutritionStats,
+    );
+  }
+
   Widget _buildMuscleVisualizationCard(
     BuildContext context,
     HomeLoaded homeState,
@@ -190,11 +188,8 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with period selector
             _buildCardHeader(context),
             const SizedBox(height: 20),
-
-            // Muscle visualization with BLoC
             BlocBuilder<MuscleVisualBloc, MuscleVisualState>(
               builder: (context, muscleState) {
                 return _buildVisualizationContent(
@@ -210,11 +205,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Build card header with title and period selector
   Widget _buildCardHeader(BuildContext context) {
     return Row(
       children: [
-        // Icon and title
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -236,7 +229,6 @@ class _HomePageState extends State<HomePage> {
                 ),
           ),
         ),
-        // Period selector
         BlocBuilder<MuscleVisualBloc, MuscleVisualState>(
           builder: (context, state) {
             final currentPeriod = state is MuscleVisualLoaded
@@ -258,23 +250,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Build visualization content based on muscle visual state
   Widget _buildVisualizationContent(
     BuildContext context,
     HomeLoaded homeState,
     MuscleVisualState muscleState,
   ) {
-    // Handle loading state
     if (muscleState is MuscleVisualLoading) {
       return _buildLoadingVisualization(context);
     }
 
-    // Handle error state
     if (muscleState is MuscleVisualError) {
       return _buildErrorVisualization(context, muscleState.message);
     }
 
-    // Handle loaded state
     if (muscleState is MuscleVisualLoaded) {
       return _buildLoadedVisualization(
         context,
@@ -283,11 +271,9 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // Initial state - show loading
     return _buildLoadingVisualization(context);
   }
 
-  /// Build loading visualization placeholder
   Widget _buildLoadingVisualization(BuildContext context) {
     return Container(
       height: 400,
@@ -310,7 +296,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Build error visualization state
   Widget _buildErrorVisualization(BuildContext context, String message) {
     return Container(
       height: 400,
@@ -354,13 +339,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Build loaded visualization with body diagram and stats
   Widget _buildLoadedVisualization(
     BuildContext context,
     HomeLoaded homeState,
     MuscleVisualLoaded muscleState,
   ) {
-    // Calculate stats for current period
     final stats = _calculatePeriodStats(
       homeState,
       muscleState,
@@ -368,7 +351,6 @@ class _HomePageState extends State<HomePage> {
 
     return Column(
       children: [
-        // Body diagram
         RepaintBoundary(
           child: MuscleBodyDiagramWidget(
             muscleData: muscleState.muscleData,
@@ -377,8 +359,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // View toggle
         BodyViewToggleWidget(
           isFrontView: _isFrontView,
           onViewChanged: (isFront) {
@@ -389,8 +369,6 @@ class _HomePageState extends State<HomePage> {
           enabled: true,
         ),
         const SizedBox(height: 20),
-
-        // Progress stats
         ProgressStatsWidget(
           totalSets: stats['totalSets'] as int,
           remainingTarget: stats['remainingTarget'] as int,
@@ -401,17 +379,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Calculate stats for the current period
-  /// 
-  /// Adapts stats display based on selected time period
   Map<String, dynamic> _calculatePeriodStats(
     HomeLoaded homeState,
     MuscleVisualLoaded muscleState,
   ) {
-    // Get trained muscle count from visual data
     final trainedMuscles = muscleState.trainedMuscleCount;
 
-    // For week period, use HomeBloc stats
     if (muscleState.currentPeriod == TimePeriod.week) {
       return {
         'totalSets': homeState.stats.totalWeeklySets,
@@ -420,21 +393,17 @@ class _HomePageState extends State<HomePage> {
       };
     }
 
-    // For other periods, show total sets but no target
-    // (targets are weekly-specific)
     return {
-      'totalSets': homeState.stats.totalWeeklySets, // TODO: Calculate for period
-      'remainingTarget': 0, // No target for non-week periods
+      'totalSets': homeState.stats.totalWeeklySets,
+      'remainingTarget': 0,
       'trainedMuscles': trainedMuscles,
     };
   }
 
-  /// Build muscle groups breakdown section
   Widget _buildMuscleGroupsSection(
     BuildContext context,
     HomeLoaded homeState,
   ) {
-    // Calculate muscle breakdown from weekly sets
     final muscleBreakdown = _calculateMuscleBreakdown(homeState.weeklySets);
 
     return Column(
@@ -447,8 +416,8 @@ class _HomePageState extends State<HomePage> {
               ),
         ),
         const SizedBox(height: 12),
-        ...homeState.targets.map((target) {
-          final currentSets = muscleBreakdown[target.muscleGroup] ?? 0;
+        ...homeState.trainingTargets.map((target) {
+          final currentSets = muscleBreakdown[target.categoryKey] ?? 0;
           final progress = currentSets / target.weeklyGoal;
           final isComplete = currentSets >= target.weeklyGoal;
 
@@ -463,7 +432,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Expanded(
                         child: Text(
-                          MuscleGroups.getDisplayName(target.muscleGroup),
+                          MuscleGroups.getDisplayName(target.categoryKey),
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
@@ -544,25 +513,18 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Calculate muscle breakdown from weekly sets
-  /// 
-  /// Maps each set to its muscle groups and counts sets per muscle
-  /// Requires ExercisesLoaded state to function properly
   Map<String, int> _calculateMuscleBreakdown(List weeklySets) {
     final Map<String, int> muscleBreakdown = {};
 
-    // Get exercise state from context
     final exerciseState = context.read<ExerciseBloc>().state;
 
-    // Only calculate if exercises are loaded
     if (exerciseState is! ExercisesLoaded) {
       return muscleBreakdown;
     }
 
-    final exercises = (exerciseState as ExercisesLoaded).exercises;
+    final exercises = exerciseState.exercises;
 
     for (final set in weeklySets) {
-      // Look up exercise to get muscle groups
       try {
         final exercise = exercises.firstWhere(
           (e) => e.id == set.exerciseId,
@@ -573,7 +535,6 @@ class _HomePageState extends State<HomePage> {
               (muscleBreakdown[muscleGroup] ?? 0) + 1;
         }
       } catch (_) {
-        // Exercise not found - skip this set
         continue;
       }
     }

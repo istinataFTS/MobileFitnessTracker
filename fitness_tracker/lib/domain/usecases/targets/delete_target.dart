@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../repositories/target_repository.dart';
 
@@ -7,7 +8,7 @@ class DeleteTarget {
 
   const DeleteTarget(this.repository);
 
-  Future<Either<Failure, void>> call(String muscleGroup) async {
-    return await repository.deleteTarget(muscleGroup);
+  Future<Either<Failure, void>> call(String targetId) async {
+    return repository.deleteTarget(targetId);
   }
 }

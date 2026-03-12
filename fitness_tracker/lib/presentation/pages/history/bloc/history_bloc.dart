@@ -1,321 +1,438 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/bloc/bloc_effects_mixin.dart';
+import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/usecases/nutrition_logs/delete_nutrition_log.dart';
+import '../../../../domain/usecases/nutrition_logs/get_logs_by_date_range.dart';
+import '../../../../domain/usecases/nutrition_logs/update_nutrition_log.dart';
+import '../../../../domain/usecases/workout_sets/delete_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../../../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
-import '../../../../domain/usecases/workout_sets/delete_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/update_workout_set.dart';
+
+enum HistoryMode {
+  workouts,
+  nutrition,
+}
 
 // ==================== Events ====================
 
 abstract class HistoryEvent extends Equatable {
   const HistoryEvent();
-  
+
   @override
   List<Object?> get props => [];
 }
 
-/// Event to load sets for a specific month (for calendar view)
 class LoadMonthSetsEvent extends HistoryEvent {
-  final DateTime month; // Any date within the target month
-  
+  final DateTime month;
+
   const LoadMonthSetsEvent(this.month);
-  
+
   @override
   List<Object?> get props => [month];
 }
 
-/// Event to select a specific date in the calendar
 class SelectDateEvent extends HistoryEvent {
   final DateTime date;
-  
+
   const SelectDateEvent(this.date);
-  
+
   @override
   List<Object?> get props => [date];
 }
 
-/// Event to clear date selection (close bottom sheet)
 class ClearDateSelectionEvent extends HistoryEvent {}
 
-/// Event to update an existing workout set
 class UpdateSetEvent extends HistoryEvent {
   final WorkoutSet set;
-  
+
   const UpdateSetEvent(this.set);
-  
+
   @override
   List<Object?> get props => [set];
 }
 
-/// Event to delete a workout set
 class DeleteSetEvent extends HistoryEvent {
   final String setId;
-  
+
   const DeleteSetEvent(this.setId);
-  
+
   @override
   List<Object?> get props => [setId];
 }
 
-/// Event to refresh current month data
+class DeleteNutritionHistoryLogEvent extends HistoryEvent {
+  final String logId;
+
+  const DeleteNutritionHistoryLogEvent(this.logId);
+
+  @override
+  List<Object?> get props => [logId];
+}
+
+class UpdateNutritionHistoryLogEvent extends HistoryEvent {
+  final NutritionLog log;
+
+  const UpdateNutritionHistoryLogEvent(this.log);
+
+  @override
+  List<Object?> get props => [log];
+}
+
 class RefreshCurrentMonthEvent extends HistoryEvent {}
 
-/// Event to navigate to different month
 class NavigateToMonthEvent extends HistoryEvent {
   final DateTime month;
-  
+
   const NavigateToMonthEvent(this.month);
-  
+
   @override
   List<Object?> get props => [month];
+}
+
+class ChangeHistoryModeEvent extends HistoryEvent {
+  final HistoryMode mode;
+
+  const ChangeHistoryModeEvent(this.mode);
+
+  @override
+  List<Object?> get props => [mode];
 }
 
 // ==================== States ====================
 
 abstract class HistoryState extends Equatable {
   const HistoryState();
-  
+
   @override
   List<Object?> get props => [];
 }
 
-/// Initial state
 class HistoryInitial extends HistoryState {}
 
-/// Loading state
 class HistoryLoading extends HistoryState {}
 
-/// Loaded state with calendar data
 class HistoryLoaded extends HistoryState {
-  final DateTime currentMonth; // Currently displayed month
-  final Map<DateTime, List<WorkoutSet>> monthSets; // All sets in current month, keyed by date
-  final DateTime? selectedDate; // Currently selected date (for bottom sheet)
-  final List<WorkoutSet> selectedDateSets; // Sets for the selected date
-  
+  final DateTime currentMonth;
+  final HistoryMode currentMode;
+  final Map<DateTime, List<WorkoutSet>> monthSets;
+  final Map<DateTime, List<NutritionLog>> monthNutritionLogs;
+  final DateTime? selectedDate;
+  final List<WorkoutSet> selectedDateSets;
+  final List<NutritionLog> selectedDateNutritionLogs;
+
   const HistoryLoaded({
     required this.currentMonth,
+    required this.currentMode,
     required this.monthSets,
+    required this.monthNutritionLogs,
     this.selectedDate,
     this.selectedDateSets = const [],
+    this.selectedDateNutritionLogs = const [],
   });
-  
-  /// Get set count for a specific date
+
   int getSetsCountForDate(DateTime date) {
     final normalizedDate = DateTime(date.year, date.month, date.day);
     return monthSets[normalizedDate]?.length ?? 0;
   }
-  
-  /// Check if date has any sets
-  bool hasWorkoutsOnDate(DateTime date) {
-    return getSetsCountForDate(date) > 0;
+
+  int getNutritionCountForDate(DateTime date) {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    return monthNutritionLogs[normalizedDate]?.length ?? 0;
   }
-  
+
   @override
   List<Object?> get props => [
         currentMonth,
+        currentMode,
         monthSets,
+        monthNutritionLogs,
         selectedDate,
         selectedDateSets,
+        selectedDateNutritionLogs,
       ];
 }
 
-/// Error state
-class HistoryError extends HistoryState {
-  final String message;
-  
-  const HistoryError(this.message);
-  
-  @override
-  List<Object?> get props => [message];
+// ==================== Effects ====================
+
+abstract class HistoryUiEffect {
+  const HistoryUiEffect();
 }
 
-/// Success state for operations (update/delete)
-class HistoryOperationSuccess extends HistoryState {
+class HistorySuccessEffect extends HistoryUiEffect {
   final String message;
-  final DateTime currentMonth;
-  final Map<DateTime, List<WorkoutSet>> monthSets;
-  final DateTime? selectedDate;
-  
-  const HistoryOperationSuccess({
-    required this.message,
-    required this.currentMonth,
-    required this.monthSets,
-    this.selectedDate,
-  });
-  
-  @override
-  List<Object?> get props => [message, currentMonth, monthSets, selectedDate];
+
+  const HistorySuccessEffect(this.message);
 }
 
 // ==================== BLoC ====================
 
-class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
+class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
+    with BlocEffectsMixin<HistoryUiEffect> {
   final GetAllWorkoutSets getAllWorkoutSets;
   final GetSetsByDateRange getSetsByDateRange;
+  final GetLogsByDateRange getNutritionLogsByDateRange;
   final DeleteWorkoutSet deleteWorkoutSet;
   final UpdateWorkoutSet updateWorkoutSet;
-  
-  // Cache for current loaded data
+  final DeleteNutritionLog deleteNutritionLog;
+  final UpdateNutritionLog updateNutritionLog;
+
   DateTime _currentMonth = DateTime.now();
+  HistoryMode _currentMode = HistoryMode.workouts;
   Map<DateTime, List<WorkoutSet>> _monthSets = {};
+  Map<DateTime, List<NutritionLog>> _monthNutritionLogs = {};
   DateTime? _selectedDate;
 
   HistoryBloc({
     required this.getAllWorkoutSets,
     required this.getSetsByDateRange,
+    required this.getNutritionLogsByDateRange,
     required this.deleteWorkoutSet,
     required this.updateWorkoutSet,
+    required this.deleteNutritionLog,
+    required this.updateNutritionLog,
   }) : super(HistoryInitial()) {
     on<LoadMonthSetsEvent>(_onLoadMonthSets);
     on<SelectDateEvent>(_onSelectDate);
     on<ClearDateSelectionEvent>(_onClearDateSelection);
     on<UpdateSetEvent>(_onUpdateSet);
     on<DeleteSetEvent>(_onDeleteSet);
+    on<DeleteNutritionHistoryLogEvent>(_onDeleteNutritionLog);
+    on<UpdateNutritionHistoryLogEvent>(_onUpdateNutritionLog);
     on<RefreshCurrentMonthEvent>(_onRefreshCurrentMonth);
     on<NavigateToMonthEvent>(_onNavigateToMonth);
+    on<ChangeHistoryModeEvent>(_onChangeHistoryMode);
   }
 
-  /// Load all sets for a specific month
   Future<void> _onLoadMonthSets(
     LoadMonthSetsEvent event,
     Emitter<HistoryState> emit,
   ) async {
     emit(HistoryLoading());
-    
-    // Normalize to first and last day of month
-    final firstDay = DateTime(event.month.year, event.month.month, 1);
-    final lastDay = DateTime(event.month.year, event.month.month + 1, 0);
-    
-    final result = await getSetsByDateRange(
-      startDate: firstDay,
-      endDate: lastDay,
-    );
-    
-    result.fold(
-      (failure) => emit(HistoryError(failure.message)),
-      (sets) {
-        // Group sets by date
-        final groupedSets = <DateTime, List<WorkoutSet>>{};
-        for (final set in sets) {
-          final dateKey = DateTime(set.date.year, set.date.month, set.date.day);
-          if (!groupedSets.containsKey(dateKey)) {
-            groupedSets[dateKey] = [];
-          }
-          groupedSets[dateKey]!.add(set);
-        }
-        
-        // Sort each day's sets by creation time
-        for (final sets in groupedSets.values) {
-          sets.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        }
-        
-        _currentMonth = firstDay;
-        _monthSets = groupedSets;
-        
-        emit(HistoryLoaded(
-          currentMonth: _currentMonth,
-          monthSets: _monthSets,
-          selectedDate: _selectedDate,
-          selectedDateSets: _selectedDate != null 
-              ? (_monthSets[_selectedDate!] ?? [])
-              : [],
-        ));
-      },
-    );
+
+    final loaded = await _loadMonthData(event.month);
+    if (loaded != null) {
+      emit(loaded);
+    }
   }
 
-  /// Select a specific date to view details
   void _onSelectDate(
     SelectDateEvent event,
     Emitter<HistoryState> emit,
   ) {
-    final normalizedDate = DateTime(event.date.year, event.date.month, event.date.day);
-    _selectedDate = normalizedDate;
-    
-    final selectedSets = _monthSets[normalizedDate] ?? [];
-    
-    emit(HistoryLoaded(
-      currentMonth: _currentMonth,
-      monthSets: _monthSets,
-      selectedDate: _selectedDate,
-      selectedDateSets: selectedSets,
-    ));
+    _selectedDate = _normalizeDate(event.date);
+    emit(_buildLoadedState());
   }
 
-  /// Clear date selection (close bottom sheet)
   void _onClearDateSelection(
     ClearDateSelectionEvent event,
     Emitter<HistoryState> emit,
   ) {
     _selectedDate = null;
-    
-    emit(HistoryLoaded(
-      currentMonth: _currentMonth,
-      monthSets: _monthSets,
-    ));
+    emit(_buildLoadedState());
   }
 
-  /// Update an existing workout set
   Future<void> _onUpdateSet(
     UpdateSetEvent event,
     Emitter<HistoryState> emit,
   ) async {
     final result = await updateWorkoutSet(event.set);
-    
-    result.fold(
-      (failure) => emit(HistoryError(failure.message)),
-      (_) {
-        // Refresh current month to show updated data
-        add(RefreshCurrentMonthEvent());
-        
-        emit(HistoryOperationSuccess(
-          message: 'Set updated successfully',
-          currentMonth: _currentMonth,
-          monthSets: _monthSets,
-          selectedDate: _selectedDate,
-        ));
+
+    await result.fold(
+      (failure) async => emit(HistoryLoading()),
+      (_) async {
+        final reloaded = await _reloadCurrentMonth();
+        if (reloaded != null) {
+          emit(reloaded);
+          emitEffect(const HistorySuccessEffect('Set updated successfully'));
+        }
       },
     );
   }
 
-  /// Delete a workout set
   Future<void> _onDeleteSet(
     DeleteSetEvent event,
     Emitter<HistoryState> emit,
   ) async {
     final result = await deleteWorkoutSet(event.setId);
-    
-    result.fold(
-      (failure) => emit(HistoryError(failure.message)),
-      (_) {
-        // Refresh current month to show updated data
-        add(RefreshCurrentMonthEvent());
-        
-        emit(HistoryOperationSuccess(
-          message: 'Set deleted successfully',
-          currentMonth: _currentMonth,
-          monthSets: _monthSets,
-          selectedDate: _selectedDate,
-        ));
+
+    await result.fold(
+      (failure) async => emit(HistoryLoading()),
+      (_) async {
+        final reloaded = await _reloadCurrentMonth();
+        if (reloaded != null) {
+          emit(reloaded);
+          emitEffect(const HistorySuccessEffect('Set deleted successfully'));
+        }
       },
     );
   }
 
-  /// Refresh current month data
+  Future<void> _onDeleteNutritionLog(
+    DeleteNutritionHistoryLogEvent event,
+    Emitter<HistoryState> emit,
+  ) async {
+    final result = await deleteNutritionLog(event.logId);
+
+    await result.fold(
+      (failure) async => emit(HistoryLoading()),
+      (_) async {
+        final reloaded = await _reloadCurrentMonth();
+        if (reloaded != null) {
+          emit(reloaded);
+          emitEffect(
+            const HistorySuccessEffect('Nutrition log deleted successfully'),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _onUpdateNutritionLog(
+    UpdateNutritionHistoryLogEvent event,
+    Emitter<HistoryState> emit,
+  ) async {
+    final result = await updateNutritionLog(event.log);
+
+    await result.fold(
+      (failure) async => emit(HistoryLoading()),
+      (_) async {
+        final reloaded = await _reloadCurrentMonth();
+        if (reloaded != null) {
+          emit(reloaded);
+          emitEffect(
+            const HistorySuccessEffect('Nutrition log updated successfully'),
+          );
+        }
+      },
+    );
+  }
+
   Future<void> _onRefreshCurrentMonth(
     RefreshCurrentMonthEvent event,
     Emitter<HistoryState> emit,
   ) async {
-    add(LoadMonthSetsEvent(_currentMonth));
+    final reloaded = await _reloadCurrentMonth();
+    if (reloaded != null) {
+      emit(reloaded);
+    }
   }
 
-  /// Navigate to a different month
   void _onNavigateToMonth(
     NavigateToMonthEvent event,
     Emitter<HistoryState> emit,
   ) {
-    _selectedDate = null; // Clear selection when changing months
+    _selectedDate = null;
     add(LoadMonthSetsEvent(event.month));
+  }
+
+  void _onChangeHistoryMode(
+    ChangeHistoryModeEvent event,
+    Emitter<HistoryState> emit,
+  ) {
+    _currentMode = event.mode;
+    emit(_buildLoadedState());
+  }
+
+  Future<HistoryLoaded?> _reloadCurrentMonth() async {
+    return _loadMonthData(_currentMonth);
+  }
+
+  Future<HistoryLoaded?> _loadMonthData(DateTime month) async {
+    final firstDay = DateTime(month.year, month.month, 1);
+    final lastDay = DateTime(month.year, month.month + 1, 0);
+
+    final setsResult = await getSetsByDateRange(
+      startDate: firstDay,
+      endDate: lastDay,
+    );
+
+    final nutritionResult = await getNutritionLogsByDateRange(
+      startDate: firstDay,
+      endDate: lastDay,
+    );
+
+    final groupedSets = setsResult.fold<Map<DateTime, List<WorkoutSet>>?>(
+      (_) => null,
+      (sets) {
+        final grouped = <DateTime, List<WorkoutSet>>{};
+        for (final set in sets) {
+          final dateKey = _normalizeDate(set.date);
+          grouped.putIfAbsent(dateKey, () => []);
+          grouped[dateKey]!.add(set);
+        }
+        for (final items in grouped.values) {
+          items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        }
+        return grouped;
+      },
+    );
+
+    if (groupedSets == null) {
+      return null;
+    }
+
+    final groupedNutrition =
+        nutritionResult.fold<Map<DateTime, List<NutritionLog>>?>(
+      (_) => null,
+      (logs) {
+        final grouped = <DateTime, List<NutritionLog>>{};
+        for (final log in logs) {
+          final dateKey = _normalizeDate(log.loggedAt);
+          grouped.putIfAbsent(dateKey, () => []);
+          grouped[dateKey]!.add(log);
+        }
+        for (final items in grouped.values) {
+          items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        }
+        return grouped;
+      },
+    );
+
+    if (groupedNutrition == null) {
+      return null;
+    }
+
+    _currentMonth = firstDay;
+    _monthSets = groupedSets;
+    _monthNutritionLogs = groupedNutrition;
+
+    if (_selectedDate != null) {
+      final normalizedSelectedDate = _normalizeDate(_selectedDate!);
+      final hasWorkouts = (_monthSets[normalizedSelectedDate] ?? []).isNotEmpty;
+      final hasNutrition =
+          (_monthNutritionLogs[normalizedSelectedDate] ?? []).isNotEmpty;
+
+      if (!hasWorkouts && !hasNutrition) {
+        _selectedDate = null;
+      }
+    }
+
+    return _buildLoadedState();
+  }
+
+  HistoryLoaded _buildLoadedState() {
+    final selectedDateSets =
+        _selectedDate != null ? (_monthSets[_selectedDate!] ?? []) : const [];
+    final selectedDateNutritionLogs = _selectedDate != null
+        ? (_monthNutritionLogs[_selectedDate!] ?? [])
+        : const [];
+
+    return HistoryLoaded(
+      currentMonth: _currentMonth,
+      currentMode: _currentMode,
+      monthSets: _monthSets,
+      monthNutritionLogs: _monthNutritionLogs,
+      selectedDate: _selectedDate,
+      selectedDateSets: selectedDateSets,
+      selectedDateNutritionLogs: selectedDateNutritionLogs,
+    );
+  }
+
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
   }
 }

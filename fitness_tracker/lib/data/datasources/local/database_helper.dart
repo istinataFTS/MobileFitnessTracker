@@ -1,40 +1,40 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../../../config/env_config.dart';
 import '../../../core/constants/database_tables.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
-import '../../../config/env_config.dart';
 
-/// Centralized database helper with migration management
-/// Singleton pattern ensures single database instance throughout app lifecycle
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
+
   factory DatabaseHelper() => _instance;
+
   DatabaseHelper._internal();
 
   static Database? _database;
 
-  /// Get database instance (creates if doesn't exist)
   Future<Database> get database async {
     if (kIsWeb) {
       throw UnsupportedError('Database is not supported on web platform');
     }
-    
+
     if (_database != null) return _database!;
+
     _database = await _initDatabase();
     return _database!;
   }
 
-  /// Initialize database with versioning and migrations
   Future<Database> _initDatabase() async {
     if (kIsWeb) {
       throw UnsupportedError('Database is not supported on web platform');
     }
-    
+
     final databasesPath = await getDatabasesPath();
     final path = join(databasesPath, EnvConfig.databaseName);
 
-    return await openDatabase(
+    return openDatabase(
       path,
       version: EnvConfig.databaseVersion,
       onCreate: _onCreate,
@@ -42,19 +42,24 @@ class DatabaseHelper {
     );
   }
 
-  /// Create all tables for new database
   Future<void> _onCreate(Database db, int version) async {
-    // Targets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
-        ${DatabaseTables.targetMuscleGroup} TEXT NOT NULL UNIQUE,
-        ${DatabaseTables.targetWeeklyGoal} INTEGER NOT NULL,
-        ${DatabaseTables.targetCreatedAt} TEXT NOT NULL
+        ${DatabaseTables.targetType} TEXT NOT NULL,
+        ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
+        ${DatabaseTables.targetValue} REAL NOT NULL,
+        ${DatabaseTables.targetUnit} TEXT NOT NULL,
+        ${DatabaseTables.targetPeriod} TEXT NOT NULL,
+        ${DatabaseTables.targetCreatedAt} TEXT NOT NULL,
+        UNIQUE(
+          ${DatabaseTables.targetType},
+          ${DatabaseTables.targetCategoryKey},
+          ${DatabaseTables.targetPeriod}
+        )
       )
     ''');
 
-    // Workout Sets table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -67,7 +72,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Exercises table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
@@ -77,7 +81,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Meals table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.meals} (
         ${DatabaseTables.mealId} TEXT PRIMARY KEY,
@@ -91,7 +94,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Nutrition Logs table
     await db.execute('''
       CREATE TABLE ${DatabaseTables.nutritionLogs} (
         ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
@@ -104,27 +106,25 @@ class DatabaseHelper {
         ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
         ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
         ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
-        FOREIGN KEY (${DatabaseTables.nutritionLogMealId}) 
+        FOREIGN KEY (${DatabaseTables.nutritionLogMealId})
           REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
           ON DELETE CASCADE
       )
     ''');
 
-    // Exercise Muscle Factors table (NEW in v5)
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exerciseMuscleFactors} (
         ${DatabaseTables.factorId} TEXT PRIMARY KEY,
         ${DatabaseTables.factorExerciseId} TEXT NOT NULL,
         ${DatabaseTables.factorMuscleGroup} TEXT NOT NULL,
         ${DatabaseTables.factorValue} REAL NOT NULL,
-        FOREIGN KEY (${DatabaseTables.factorExerciseId}) 
+        FOREIGN KEY (${DatabaseTables.factorExerciseId})
           REFERENCES ${DatabaseTables.exercises}(${DatabaseTables.exerciseId})
           ON DELETE CASCADE,
         UNIQUE(${DatabaseTables.factorExerciseId}, ${DatabaseTables.factorMuscleGroup})
       )
     ''');
 
-    // Muscle Stimulus table (NEW in v5) -- _onCreate
     await db.execute('''
       CREATE TABLE ${DatabaseTables.muscleStimulus} (
         ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
@@ -140,16 +140,13 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create all indexes
     await _createIndexes(db);
   }
 
-  /// Handle database version upgrades for existing installations.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Migration from v1 to v2: Restructure workout_sets
     if (oldVersion < 2) {
       await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
-      
+
       await db.execute('''
         CREATE TABLE ${DatabaseTables.workoutSets} (
           ${DatabaseTables.setId} TEXT PRIMARY KEY,
@@ -162,17 +159,16 @@ class DatabaseHelper {
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_workout_sets_exercise_id 
+        CREATE INDEX idx_workout_sets_exercise_id
         ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_workout_sets_date 
+        CREATE INDEX idx_workout_sets_date
         ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
       ''');
     }
 
-    // Migration from v2 to v3: Add exercises table
     if (oldVersion < 3) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.exercises} (
@@ -184,14 +180,12 @@ class DatabaseHelper {
       ''');
 
       await db.execute('''
-        CREATE INDEX IF NOT EXISTS idx_exercises_name 
+        CREATE INDEX IF NOT EXISTS idx_exercises_name
         ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
       ''');
     }
 
-    // Migration from v3 to v4: Add nutrition tracking (meals + nutrition_logs)
     if (oldVersion < 4) {
-      // Create meals table
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.meals} (
           ${DatabaseTables.mealId} TEXT PRIMARY KEY,
@@ -205,7 +199,6 @@ class DatabaseHelper {
         )
       ''');
 
-      // Create nutrition logs table
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ${DatabaseTables.nutritionLogs} (
           ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
@@ -218,59 +211,53 @@ class DatabaseHelper {
           ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
           ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
           ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
-          FOREIGN KEY (${DatabaseTables.nutritionLogMealId}) 
+          FOREIGN KEY (${DatabaseTables.nutritionLogMealId})
             REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
             ON DELETE CASCADE
         )
       ''');
 
-      // Create indexes for meals
       await db.execute('''
-        CREATE INDEX IF NOT EXISTS idx_meals_name 
+        CREATE INDEX IF NOT EXISTS idx_meals_name
         ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
       ''');
 
-      // Create indexes for nutrition logs
       await db.execute('''
-        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id 
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id
         ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogMealId})
       ''');
 
       await db.execute('''
-        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date 
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date
         ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogDate})
       ''');
 
       await db.execute('''
-        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at 
+        CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at
         ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogCreatedAt})
       ''');
     }
 
-    // Migration from v4 to v5: Add muscle stimulus system
     if (oldVersion < 5) {
-      // Add intensity column to workout_sets
       await db.execute('''
-        ALTER TABLE ${DatabaseTables.workoutSets} 
-        ADD COLUMN ${DatabaseTables.setIntensity} INTEGER NOT NULL 
+        ALTER TABLE ${DatabaseTables.workoutSets}
+        ADD COLUMN ${DatabaseTables.setIntensity} INTEGER NOT NULL
         DEFAULT ${MuscleStimulus.defaultIntensity}
       ''');
 
-      // Create exercise_muscle_factors table
       await db.execute('''
         CREATE TABLE ${DatabaseTables.exerciseMuscleFactors} (
           ${DatabaseTables.factorId} TEXT PRIMARY KEY,
           ${DatabaseTables.factorExerciseId} TEXT NOT NULL,
           ${DatabaseTables.factorMuscleGroup} TEXT NOT NULL,
           ${DatabaseTables.factorValue} REAL NOT NULL,
-          FOREIGN KEY (${DatabaseTables.factorExerciseId}) 
+          FOREIGN KEY (${DatabaseTables.factorExerciseId})
             REFERENCES ${DatabaseTables.exercises}(${DatabaseTables.exerciseId})
             ON DELETE CASCADE,
           UNIQUE(${DatabaseTables.factorExerciseId}, ${DatabaseTables.factorMuscleGroup})
         )
       ''');
 
-      // Create muscle_stimulus table
       await db.execute('''
         CREATE TABLE ${DatabaseTables.muscleStimulus} (
           ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
@@ -286,34 +273,35 @@ class DatabaseHelper {
         )
       ''');
 
-      // Create indexes for new tables
       await db.execute('''
-        CREATE INDEX idx_exercise_muscle_factors_exercise_id 
+        CREATE INDEX idx_exercise_muscle_factors_exercise_id
         ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorExerciseId})
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_exercise_muscle_factors_muscle_group 
+        CREATE INDEX idx_exercise_muscle_factors_muscle_group
         ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorMuscleGroup})
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_muscle_stimulus_muscle_group 
+        CREATE INDEX idx_muscle_stimulus_muscle_group
         ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup})
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_muscle_stimulus_date 
+        CREATE INDEX idx_muscle_stimulus_date
         ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusDate})
       ''');
 
       await db.execute('''
-        CREATE INDEX idx_muscle_stimulus_muscle_date 
-        ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+        CREATE INDEX idx_muscle_stimulus_muscle_date
+        ON ${DatabaseTables.muscleStimulus}(
+          ${DatabaseTables.stimulusMuscleGroup},
+          ${DatabaseTables.stimulusDate}
+        )
       ''');
     }
 
-    // Migration from v5 to v6: Add meal_name column to nutrition_logs
     if (oldVersion < 6) {
       await db.execute('''
         ALTER TABLE ${DatabaseTables.nutritionLogs}
@@ -321,95 +309,150 @@ class DatabaseHelper {
       ''');
     }
 
-    // Migration from v6 to v7: Add serving_size_grams column to meals
     if (oldVersion < 7) {
       await db.execute('''
         ALTER TABLE ${DatabaseTables.meals}
         ADD COLUMN ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0
       ''');
     }
+
+    if (oldVersion < 8) {
+      await _migrateTargetsToTypedGoals(db);
+    }
+
+    await _createIndexes(db);
   }
 
-  /// Create all performance indexes
-  Future<void> _createIndexes(Database db) async {
-    // Workout sets indexes
+  Future<void> _migrateTargetsToTypedGoals(Database db) async {
+    await db.execute('ALTER TABLE ${DatabaseTables.targets} RENAME TO targets_legacy');
+
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_workout_sets_exercise_id 
+      CREATE TABLE ${DatabaseTables.targets} (
+        ${DatabaseTables.targetId} TEXT PRIMARY KEY,
+        ${DatabaseTables.targetType} TEXT NOT NULL,
+        ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
+        ${DatabaseTables.targetValue} REAL NOT NULL,
+        ${DatabaseTables.targetUnit} TEXT NOT NULL,
+        ${DatabaseTables.targetPeriod} TEXT NOT NULL,
+        ${DatabaseTables.targetCreatedAt} TEXT NOT NULL,
+        UNIQUE(
+          ${DatabaseTables.targetType},
+          ${DatabaseTables.targetCategoryKey},
+          ${DatabaseTables.targetPeriod}
+        )
+      )
+    ''');
+
+    final legacyTargets = await db.query('targets_legacy');
+
+    for (final legacyTarget in legacyTargets) {
+      await db.insert(
+        DatabaseTables.targets,
+        <String, Object?>{
+          DatabaseTables.targetId: legacyTarget[DatabaseTables.targetId] as String,
+          DatabaseTables.targetType: 'muscle_sets',
+          DatabaseTables.targetCategoryKey:
+              legacyTarget[DatabaseTables.legacyTargetMuscleGroup] as String,
+          DatabaseTables.targetValue:
+              (legacyTarget[DatabaseTables.legacyTargetWeeklyGoal] as num).toDouble(),
+          DatabaseTables.targetUnit: 'sets',
+          DatabaseTables.targetPeriod: 'weekly',
+          DatabaseTables.targetCreatedAt:
+              legacyTarget[DatabaseTables.targetCreatedAt] as String,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await db.execute('DROP TABLE targets_legacy');
+  }
+
+  Future<void> _createIndexes(Database db) async {
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_type_period
+      ON ${DatabaseTables.targets}(
+        ${DatabaseTables.targetType},
+        ${DatabaseTables.targetPeriod}
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_category_key
+      ON ${DatabaseTables.targets}(${DatabaseTables.targetCategoryKey})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_exercise_id
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_workout_sets_date 
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_date
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_workout_sets_created_at 
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_created_at
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setCreatedAt})
     ''');
 
-    // Exercises indexes
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_exercises_name 
+      CREATE INDEX IF NOT EXISTS idx_exercises_name
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
     ''');
 
-    // Meals indexes
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_meals_name 
+      CREATE INDEX IF NOT EXISTS idx_meals_name
       ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
     ''');
 
-    // Nutrition logs indexes
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id 
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogMealId})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date 
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogDate})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at 
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogCreatedAt})
     ''');
 
-    // Exercise muscle factors indexes
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_exercise_id 
+      CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_exercise_id
       ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorExerciseId})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_muscle_group 
+      CREATE INDEX IF NOT EXISTS idx_exercise_muscle_factors_muscle_group
       ON ${DatabaseTables.exerciseMuscleFactors}(${DatabaseTables.factorMuscleGroup})
     ''');
 
-    // Muscle stimulus indexes
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_group 
+      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_group
       ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_date 
+      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_date
       ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusDate})
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_date 
-      ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_date
+      ON ${DatabaseTables.muscleStimulus}(
+        ${DatabaseTables.stimulusMuscleGroup},
+        ${DatabaseTables.stimulusDate}
+      )
     ''');
   }
 
-  /// Close database connection
-  /// WARNING: Should persist throughout app lifecycle for mobile
-  /// Only close for testing or app termination
   Future<void> close() async {
     if (kIsWeb) return;
-    
+
     final db = await database;
     await db.close();
     _database = null;

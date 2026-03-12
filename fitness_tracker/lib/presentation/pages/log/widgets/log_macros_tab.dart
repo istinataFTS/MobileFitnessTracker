@@ -1,14 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
 
-/// Direct macro logging tab - manual macro entry with calculated calories
 class LogMacrosTab extends StatefulWidget {
   const LogMacrosTab({super.key});
 
@@ -22,8 +24,33 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   final _fatsController = TextEditingController();
   final _uuid = const Uuid();
 
+  StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final nutritionBloc = context.read<NutritionLogBloc>();
+    _nutritionEffectsSub = nutritionBloc.effects.listen((effect) {
+      if (!mounted) return;
+
+      if (effect is NutritionLogSuccessEffect) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(effect.message),
+            backgroundColor: AppTheme.successGreen,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(20),
+          ),
+        );
+        _clearForm();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _nutritionEffectsSub?.cancel();
     _proteinController.dispose();
     _carbsController.dispose();
     _fatsController.dispose();
@@ -34,18 +61,6 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   Widget build(BuildContext context) {
     return BlocConsumer<NutritionLogBloc, NutritionLogState>(
       listener: (context, state) {
-        if (state is NutritionLogOperationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppTheme.successGreen,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(20),
-            ),
-          );
-          _clearForm();
-        }
-
         if (state is NutritionLogError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -160,7 +175,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
             suffixText: AppStrings.grams,
           ),
           onChanged: (value) {
-            setState(() {}); // Trigger calories recalculation
+            setState(() {});
           },
         ),
         const SizedBox(height: 4),
@@ -210,7 +225,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
             suffixText: AppStrings.grams,
           ),
           onChanged: (value) {
-            setState(() {}); // Trigger calories recalculation
+            setState(() {});
           },
         ),
         const SizedBox(height: 4),
@@ -260,7 +275,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
             suffixText: AppStrings.grams,
           ),
           onChanged: (value) {
-            setState(() {}); // Trigger calories recalculation
+            setState(() {});
           },
         ),
         const SizedBox(height: 4),
@@ -472,15 +487,18 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   }
 
   void _handleLogMacros() {
-    final protein = double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text);
-    final carbs = double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text);
-    final fats = double.parse(_fatsController.text.isEmpty ? '0' : _fatsController.text);
+    final protein =
+        double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text);
+    final carbs =
+        double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text);
+    final fats =
+        double.parse(_fatsController.text.isEmpty ? '0' : _fatsController.text);
 
     final nutritionLog = NutritionLog(
       id: _uuid.v4(),
-      mealId: null, // null for direct macro entry
+      mealId: null,
       mealName: 'Direct Macro Entry',
-      gramsConsumed: null, // null for direct macro entry
+      gramsConsumed: null,
       proteinGrams: protein,
       carbsGrams: carbs,
       fatGrams: fats,

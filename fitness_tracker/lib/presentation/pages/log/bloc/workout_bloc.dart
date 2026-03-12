@@ -1,11 +1,12 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/bloc_effects_mixin.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
-import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 
 abstract class WorkoutEvent extends Equatable {
   const WorkoutEvent();
@@ -60,22 +61,22 @@ class WorkoutError extends WorkoutState {
   List<Object?> get props => [message];
 }
 
-class WorkoutOperationSuccess extends WorkoutState {
-  final String message;
-  final List<WorkoutSet> weeklySets;
-  final List<String> affectedMuscles;
-
-  const WorkoutOperationSuccess({
-    required this.message,
-    required this.weeklySets,
-    this.affectedMuscles = const [],
-  });
-
-  @override
-  List<Object?> get props => [message, weeklySets, affectedMuscles];
+abstract class WorkoutUiEffect {
+  const WorkoutUiEffect();
 }
 
-class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
+class WorkoutLoggedEffect extends WorkoutUiEffect {
+  final String message;
+  final List<String> affectedMuscles;
+
+  const WorkoutLoggedEffect({
+    required this.message,
+    required this.affectedMuscles,
+  });
+}
+
+class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
+    with BlocEffectsMixin<WorkoutUiEffect> {
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
   final RecordWorkoutSet recordWorkoutSet;
@@ -121,10 +122,10 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
           (failure) => emit(WorkoutError(failure.message)),
           (sets) {
             _cachedWeeklySets = sets;
-            emit(
-              WorkoutOperationSuccess(
+            emit(WorkoutLoaded(sets));
+            emitEffect(
+              WorkoutLoggedEffect(
                 message: AppStrings.setLogged,
-                weeklySets: sets,
                 affectedMuscles: affectedMuscles,
               ),
             );

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
@@ -10,7 +13,6 @@ import '../../../../domain/entities/nutrition_log.dart';
 import '../../meals/bloc/meal_bloc.dart';
 import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
 
-/// Meal logging tab - searchable meal list with grams input
 class LogMealTab extends StatefulWidget {
   const LogMealTab({super.key});
 
@@ -25,8 +27,33 @@ class _LogMealTabState extends State<LogMealTab> {
   String _searchQuery = '';
   final _uuid = const Uuid();
 
+  StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final nutritionBloc = context.read<NutritionLogBloc>();
+    _nutritionEffectsSub = nutritionBloc.effects.listen((effect) {
+      if (!mounted) return;
+
+      if (effect is NutritionLogSuccessEffect) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(effect.message),
+            backgroundColor: AppTheme.successGreen,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(20),
+          ),
+        );
+        _clearForm();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _nutritionEffectsSub?.cancel();
     _gramsController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -36,18 +63,6 @@ class _LogMealTabState extends State<LogMealTab> {
   Widget build(BuildContext context) {
     return BlocConsumer<NutritionLogBloc, NutritionLogState>(
       listener: (context, state) {
-        if (state is NutritionLogOperationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppTheme.successGreen,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(20),
-            ),
-          );
-          _clearForm();
-        }
-
         if (state is NutritionLogError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -95,7 +110,6 @@ class _LogMealTabState extends State<LogMealTab> {
           return _buildEmptyMealsState(context);
         }
 
-        // Filter meals based on search query
         final filteredMeals = _searchQuery.isEmpty
             ? allMeals
             : allMeals
@@ -113,8 +127,6 @@ class _LogMealTabState extends State<LogMealTab> {
                   ),
             ),
             const SizedBox(height: 12),
-            
-            // Search field
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -139,8 +151,6 @@ class _LogMealTabState extends State<LogMealTab> {
               },
             ),
             const SizedBox(height: 16),
-            
-            // Meal list
             if (filteredMeals.isEmpty)
               _buildNoResultsState()
             else
@@ -350,7 +360,7 @@ class _LogMealTabState extends State<LogMealTab> {
             suffixText: AppStrings.grams,
           ),
           onChanged: (value) {
-            setState(() {}); // Trigger nutrition preview update
+            setState(() {});
           },
         ),
       ],

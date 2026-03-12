@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,7 +16,6 @@ import '../../exercises/bloc/exercise_bloc.dart';
 import '../bloc/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
 
-/// Exercise logging tab for the Log page
 class LogExerciseTab extends StatefulWidget {
   const LogExerciseTab({super.key});
 
@@ -27,12 +28,55 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
 
+  StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
+
   Exercise? _selectedExercise;
   DateTime _selectedDate = DateTime.now();
   int _selectedIntensity = MuscleStimulus.defaultIntensity;
 
   @override
+  void initState() {
+    super.initState();
+
+    final workoutBloc = context.read<WorkoutBloc>();
+    _workoutEffectsSub = workoutBloc.effects.listen((effect) {
+      if (!mounted) return;
+
+      if (effect is WorkoutLoggedEffect) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  effect.message,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (effect.affectedMuscles.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Training: ${effect.affectedMuscles.map((m) => MuscleGroups.getDisplayName(m)).join(", ")}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+            backgroundColor: AppTheme.successGreen,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(20),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        _clearForm();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _workoutEffectsSub?.cancel();
     _repsController.dispose();
     _weightController.dispose();
     super.dispose();
@@ -42,36 +86,6 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   Widget build(BuildContext context) {
     return BlocConsumer<WorkoutBloc, WorkoutState>(
       listener: (context, state) {
-        if (state is WorkoutOperationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    AppStrings.setLogged,
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  if (state.affectedMuscles.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Training: ${state.affectedMuscles.map((m) => MuscleGroups.getDisplayName(m)).join(", ")}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-              backgroundColor: AppTheme.successGreen,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(20),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-
-          _clearForm();
-        }
-
         if (state is WorkoutError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

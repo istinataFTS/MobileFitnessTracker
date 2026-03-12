@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/exercise.dart';
+import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/target.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../domain/usecases/exercises/get_all_exercises.dart';
+import '../../../../domain/usecases/nutrition_logs/get_daily_macros.dart';
+import '../../../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../../../domain/usecases/targets/get_all_targets.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../../../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
@@ -19,10 +21,8 @@ abstract class HomeEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Event to load all home page data
 class LoadHomeDataEvent extends HomeEvent {}
 
-/// Event to refresh home data (after workout logged)
 class RefreshHomeDataEvent extends HomeEvent {}
 
 // ==================== STATES ====================
@@ -34,29 +34,33 @@ abstract class HomeState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Initial state
 class HomeInitial extends HomeState {}
 
-/// Loading state
 class HomeLoading extends HomeState {}
 
-/// Loaded state with comprehensive home data
 class HomeLoaded extends HomeState {
   final List<Target> targets;
   final List<WorkoutSet> weeklySets;
   final HomeStats stats;
+  final HomeNutritionStats nutritionStats;
 
   const HomeLoaded({
     required this.targets,
     required this.weeklySets,
     required this.stats,
+    required this.nutritionStats,
   });
 
+  List<Target> get trainingTargets =>
+      targets.where((target) => target.isWeeklyMuscleTarget).toList();
+
+  List<Target> get macroTargets =>
+      targets.where((target) => target.isDailyMacroTarget).toList();
+
   @override
-  List<Object?> get props => [targets, weeklySets, stats];
+  List<Object?> get props => [targets, weeklySets, stats, nutritionStats];
 }
 
-/// Error state
 class HomeError extends HomeState {
   final String message;
 
@@ -68,7 +72,6 @@ class HomeError extends HomeState {
 
 // ==================== DATA CLASSES ====================
 
-/// Comprehensive statistics for home page display
 class HomeStats extends Equatable {
   final int totalWeeklySets;
   final int totalWeeklyTarget;
@@ -85,9 +88,7 @@ class HomeStats extends Equatable {
   });
 
   bool get hasMetTarget => totalWeeklySets >= totalWeeklyTarget;
-
   bool get hasTargets => totalWeeklyTarget > 0;
-
   bool get hasWorkouts => totalWeeklySets > 0;
 
   @override
@@ -100,6 +101,56 @@ class HomeStats extends Equatable {
       ];
 }
 
+class MacroProgress extends Equatable {
+  final String key;
+  final String label;
+  final double actual;
+  final double target;
+  final String unit;
+
+  const MacroProgress({
+    required this.key,
+    required this.label,
+    required this.actual,
+    required this.target,
+    required this.unit,
+  });
+
+  bool get hasTarget => target > 0;
+
+  double get progress =>
+      hasTarget ? (actual / target).clamp(0.0, 1.0) : 0.0;
+
+  double get remaining => hasTarget ? (target - actual).clamp(0.0, target) : 0.0;
+
+  bool get isComplete => hasTarget && actual >= target;
+
+  @override
+  List<Object?> get props => [key, label, actual, target, unit];
+}
+
+class HomeNutritionStats extends Equatable {
+  final List<NutritionLog> todaysLogs;
+  final Map<String, double> dailyMacros;
+  final List<MacroProgress> macroProgressItems;
+
+  const HomeNutritionStats({
+    required this.todaysLogs,
+    required this.dailyMacros,
+    required this.macroProgressItems,
+  });
+
+  double get totalProtein => dailyMacros['protein'] ?? 0.0;
+  double get totalCarbs => dailyMacros['carbs'] ?? 0.0;
+  double get totalFats => dailyMacros['fats'] ?? 0.0;
+  double get totalCalories => dailyMacros['calories'] ?? 0.0;
+
+  bool get hasLogs => todaysLogs.isNotEmpty;
+
+  @override
+  List<Object?> get props => [todaysLogs, dailyMacros, macroProgressItems];
+}
+
 // ==================== BLOC ====================
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
@@ -107,12 +158,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final GetWeeklySets getWeeklySets;
   final GetSetsByDateRange getSetsByDateRange;
   final GetAllExercises getAllExercises;
+  final GetLogsForDate getLogsForDate;
+  final GetDailyMacros getDailyMacros;
 
   HomeBloc({
     required this.getAllTargets,
     required this.getWeeklySets,
     required this.getSetsByDateRange,
     required this.getAllExercises,
+    required this.getLogsForDate,
+    required this.getDailyMacros,
   }) : super(HomeInitial()) {
     on<LoadHomeDataEvent>(_onLoadHomeData);
     on<RefreshHomeDataEvent>(_onRefreshHomeData);
@@ -123,62 +178,40 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     emit(HomeLoading());
-
-    final targetsResult = await getAllTargets();
-
-    await targetsResult.fold(
-      (failure) async {
-        emit(HomeError(failure.message));
-      },
-      (targets) async {
-        final setsResult = await getWeeklySets();
-
-        await setsResult.fold(
-          (failure) async {
-            emit(HomeError(failure.message));
-          },
-          (weeklySets) async {
-            final stats = await _calculateStats(
-              targets: targets,
-              weeklySets: weeklySets,
-            );
-
-            emit(
-              HomeLoaded(
-                targets: targets,
-                weeklySets: weeklySets,
-                stats: stats,
-              ),
-            );
-          },
-        );
-      },
-    );
+    await _loadAndEmitHomeState(emit);
   }
 
   Future<void> _onRefreshHomeData(
     RefreshHomeDataEvent event,
     Emitter<HomeState> emit,
   ) async {
+    await _loadAndEmitHomeState(emit, preserveCurrentStateOnFailure: true);
+  }
+
+  Future<void> _loadAndEmitHomeState(
+    Emitter<HomeState> emit, {
+    bool preserveCurrentStateOnFailure = false,
+  }) async {
     final targetsResult = await getAllTargets();
-    final setsResult = await getWeeklySets();
 
     await targetsResult.fold(
       (failure) async {
-        if (state is HomeLoaded) {
-          emit(state);
-        } else {
-          emit(HomeError(failure.message));
-        }
+        _emitErrorOrPreserve(
+          emit,
+          failure.message,
+          preserveCurrentStateOnFailure,
+        );
       },
       (targets) async {
+        final setsResult = await getWeeklySets();
+
         await setsResult.fold(
           (failure) async {
-            if (state is HomeLoaded) {
-              emit(state);
-            } else {
-              emit(HomeError(failure.message));
-            }
+            _emitErrorOrPreserve(
+              emit,
+              failure.message,
+              preserveCurrentStateOnFailure,
+            );
           },
           (weeklySets) async {
             final stats = await _calculateStats(
@@ -186,11 +219,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
               weeklySets: weeklySets,
             );
 
+            final nutritionStats = await _calculateNutritionStats(
+              targets: targets,
+            );
+
             emit(
               HomeLoaded(
                 targets: targets,
                 weeklySets: weeklySets,
                 stats: stats,
+                nutritionStats: nutritionStats,
               ),
             );
           },
@@ -199,11 +237,26 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
+  void _emitErrorOrPreserve(
+    Emitter<HomeState> emit,
+    String message,
+    bool preserveCurrentStateOnFailure,
+  ) {
+    if (preserveCurrentStateOnFailure && state is HomeLoaded) {
+      emit(state);
+      return;
+    }
+
+    emit(HomeError(message));
+  }
+
   Future<HomeStats> _calculateStats({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
   }) async {
-    final totalWeeklyTarget = targets.fold<int>(
+    final trainingTargets = targets.where((target) => target.isWeeklyMuscleTarget);
+
+    final totalWeeklyTarget = trainingTargets.fold<int>(
       0,
       (sum, target) => sum + target.weeklyGoal,
     );
@@ -225,6 +278,69 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       remainingTarget: remainingTarget,
       trainedMuscleCount: trainedMuscleCount,
       progressPercentage: progressPercentage,
+    );
+  }
+
+  Future<HomeNutritionStats> _calculateNutritionStats({
+    required List<Target> targets,
+  }) async {
+    final today = DateTime.now();
+
+    final logsResult = await getLogsForDate(today);
+    final macrosResult = await getDailyMacros(today);
+
+    final todaysLogs = logsResult.fold<List<NutritionLog>>(
+      (_) => <NutritionLog>[],
+      (logs) {
+        final sortedLogs = [...logs];
+        sortedLogs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return sortedLogs;
+      },
+    );
+
+    final dailyMacros = macrosResult.fold<Map<String, double>>(
+      (_) => {
+        'protein': 0.0,
+        'carbs': 0.0,
+        'fats': 0.0,
+        'calories': 0.0,
+      },
+      (macros) => macros,
+    );
+
+    final macroTargets = {
+      for (final target in targets.where((target) => target.isDailyMacroTarget))
+        target.categoryKey: target.targetValue,
+    };
+
+    final macroProgressItems = <MacroProgress>[
+      MacroProgress(
+        key: 'protein',
+        label: 'Protein',
+        actual: dailyMacros['protein'] ?? 0.0,
+        target: macroTargets['protein'] ?? 0.0,
+        unit: 'g',
+      ),
+      MacroProgress(
+        key: 'carbs',
+        label: 'Carbs',
+        actual: dailyMacros['carbs'] ?? 0.0,
+        target: macroTargets['carbs'] ?? 0.0,
+        unit: 'g',
+      ),
+      MacroProgress(
+        key: 'fats',
+        label: 'Fats',
+        actual: dailyMacros['fats'] ?? 0.0,
+        target: macroTargets['fats'] ?? 0.0,
+        unit: 'g',
+      ),
+    ];
+
+    return HomeNutritionStats(
+      todaysLogs: todaysLogs,
+      dailyMacros: dailyMacros,
+      macroProgressItems: macroProgressItems,
     );
   }
 

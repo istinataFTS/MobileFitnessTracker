@@ -47,6 +47,7 @@ import '../domain/usecases/meals/add_meal.dart';
 import '../domain/usecases/meals/update_meal.dart';
 import '../domain/usecases/meals/delete_meal.dart';
 import '../domain/usecases/nutrition_logs/get_logs_for_date.dart';
+import '../domain/usecases/nutrition_logs/get_logs_by_date_range.dart';
 import '../domain/usecases/nutrition_logs/add_nutrition_log.dart';
 import '../domain/usecases/nutrition_logs/update_nutrition_log.dart';
 import '../domain/usecases/nutrition_logs/delete_nutrition_log.dart';
@@ -93,6 +94,8 @@ Future<void> init() async {
       getWeeklySets: sl(),
       getSetsByDateRange: sl(),
       getAllExercises: sl(),
+      getLogsForDate: sl(),
+      getDailyMacros: sl(),
     ),
   );
 
@@ -117,8 +120,11 @@ Future<void> init() async {
     () => HistoryBloc(
       getAllWorkoutSets: sl(),
       getSetsByDateRange: sl(),
+      getNutritionLogsByDateRange: sl(),
       deleteWorkoutSet: sl(),
       updateWorkoutSet: sl(),
+      deleteNutritionLog: sl(),
+      updateNutritionLog: sl(),
     ),
   );
 
@@ -178,6 +184,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteMeal(sl()));
 
   sl.registerLazySingleton(() => GetLogsForDate(sl()));
+  sl.registerLazySingleton(() => GetLogsByDateRange(sl()));
   sl.registerLazySingleton(() => AddNutritionLog(sl()));
   sl.registerLazySingleton(() => UpdateNutritionLog(sl()));
   sl.registerLazySingleton(() => DeleteNutritionLog(sl()));

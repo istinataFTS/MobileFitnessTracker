@@ -1,15 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/calendar_constants.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
+import '../../../domain/entities/nutrition_log.dart';
 import '../../../domain/entities/workout_set.dart';
 import 'bloc/history_bloc.dart';
 import 'widgets/day_details_bottom_sheet.dart';
 import 'widgets/history_calendar_widget.dart';
+import 'widgets/nutrition_day_details_bottom_sheet.dart';
 
-/// Calendar-based history page for viewing past workouts
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -18,10 +21,29 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  StreamSubscription<HistoryUiEffect>? _historyEffectsSub;
+
   @override
   void initState() {
     super.initState();
-    context.read<HistoryBloc>().add(LoadMonthSetsEvent(DateTime.now()));
+
+    final historyBloc = context.read<HistoryBloc>();
+
+    _historyEffectsSub = historyBloc.effects.listen((effect) {
+      if (!mounted) return;
+
+      if (effect is HistorySuccessEffect) {
+        ErrorHandler.showSuccess(context, effect.message);
+      }
+    });
+
+    historyBloc.add(LoadMonthSetsEvent(DateTime.now()));
+  }
+
+  @override
+  void dispose() {
+    _historyEffectsSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -32,31 +54,7 @@ class _HistoryPageState extends State<HistoryPage> {
         elevation: 0,
       ),
       body: BlocConsumer<HistoryBloc, HistoryState>(
-        listener: (context, state) {
-          if (state is HistoryError) {
-            ErrorHandler.showError(
-              context,
-              state.message,
-              action: SnackBarAction(
-                label: 'Retry',
-                onPressed: () {
-                  context.read<HistoryBloc>().add(RefreshCurrentMonthEvent());
-                },
-              ),
-            );
-          }
-
-          if (state is HistoryOperationSuccess) {
-            ErrorHandler.showSuccess(context, state.message);
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                context
-                    .read<HistoryBloc>()
-                    .add(LoadMonthSetsEvent(state.currentMonth));
-              }
-            });
-          }
-        },
+        listener: (context, state) {},
         builder: (context, state) {
           if (state is HistoryLoading) {
             return const Center(
@@ -64,86 +62,159 @@ class _HistoryPageState extends State<HistoryPage> {
             );
           }
 
-          if (state is HistoryLoaded || state is HistoryOperationSuccess) {
-            final DateTime currentMonth;
-            final Map<DateTime, List<WorkoutSet>> monthSets;
-            final DateTime? selectedDate;
-            final List<WorkoutSet> selectedDateSets;
-
-            if (state is HistoryLoaded) {
-              currentMonth = state.currentMonth;
-              monthSets = state.monthSets;
-              selectedDate = state.selectedDate;
-              selectedDateSets = state.selectedDateSets;
-            } else {
-              final successState = state as HistoryOperationSuccess;
-              currentMonth = successState.currentMonth;
-              monthSets = successState.monthSets;
-              selectedDate = successState.selectedDate;
-              selectedDateSets = <WorkoutSet>[];
-            }
-
-            final dateCounts = <DateTime, int>{};
-            for (final entry in monthSets.entries) {
-              dateCounts[entry.key] = entry.value.length;
-            }
-
-            return GestureDetector(
-              onHorizontalDragEnd: (details) {
-                if (details.primaryVelocity != null &&
-                    details.primaryVelocity! >
-                        CalendarConstants.swipeThreshold) {
-                  _navigateToPreviousMonth(context, currentMonth);
-                } else if (details.primaryVelocity != null &&
-                    details.primaryVelocity! <
-                        -CalendarConstants.swipeThreshold) {
-                  _navigateToNextMonth(context, currentMonth);
-                }
-              },
-              child: Stack(
-                children: [
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        HistoryCalendarWidget(
-                          displayedMonth: currentMonth,
-                          selectedDate: selectedDate,
-                          today: DateTime.now(),
-                          dateSetsCount: dateCounts,
-                          onDateSelected: (date) {
-                            context.read<HistoryBloc>().add(SelectDateEvent(date));
-                          },
-                          onPreviousMonth: () {
-                            _navigateToPreviousMonth(context, currentMonth);
-                          },
-                          onNextMonth: () {
-                            _navigateToNextMonth(context, currentMonth);
-                          },
-                          onTodayTapped: () {
-                            context
-                                .read<HistoryBloc>()
-                                .add(NavigateToMonthEvent(DateTime.now()));
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        _buildInstructions(context),
-                      ],
-                    ),
-                  ),
-                  if (selectedDate != null)
-                    _buildBottomSheetOverlay(
-                      context,
-                      selectedDate,
-                      selectedDateSets,
-                    ),
-                ],
-              ),
-            );
+          if (state is HistoryLoaded) {
+            return _buildLoadedState(context, state);
           }
 
           return _buildInitialState(context);
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadedState(BuildContext context, HistoryLoaded state) {
+    final dateCounts = <DateTime, int>{};
+
+    if (state.currentMode == HistoryMode.workouts) {
+      for (final entry in state.monthSets.entries) {
+        dateCounts[entry.key] = entry.value.length;
+      }
+    } else {
+      for (final entry in state.monthNutritionLogs.entries) {
+        dateCounts[entry.key] = entry.value.length;
+      }
+    }
+
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null &&
+            details.primaryVelocity! > CalendarConstants.swipeThreshold) {
+          _navigateToPreviousMonth(context, state.currentMonth);
+        } else if (details.primaryVelocity != null &&
+            details.primaryVelocity! < -CalendarConstants.swipeThreshold) {
+          _navigateToNextMonth(context, state.currentMonth);
+        }
+      },
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildModeToggle(context, state.currentMode),
+                const SizedBox(height: 20),
+                HistoryCalendarWidget(
+                  displayedMonth: state.currentMonth,
+                  selectedDate: state.selectedDate,
+                  today: DateTime.now(),
+                  dateSetsCount: dateCounts,
+                  onDateSelected: (date) {
+                    context.read<HistoryBloc>().add(SelectDateEvent(date));
+                  },
+                  onPreviousMonth: () {
+                    _navigateToPreviousMonth(context, state.currentMonth);
+                  },
+                  onNextMonth: () {
+                    _navigateToNextMonth(context, state.currentMonth);
+                  },
+                  onTodayTapped: () {
+                    context
+                        .read<HistoryBloc>()
+                        .add(NavigateToMonthEvent(DateTime.now()));
+                  },
+                ),
+                const SizedBox(height: 24),
+                _buildInstructions(context, state.currentMode),
+              ],
+            ),
+          ),
+          if (state.selectedDate != null)
+            _buildBottomSheetOverlay(
+              context,
+              currentMode: state.currentMode,
+              selectedDate: state.selectedDate!,
+              selectedDateSets: state.selectedDateSets,
+              selectedDateNutritionLogs: state.selectedDateNutritionLogs,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeToggle(BuildContext context, HistoryMode currentMode) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.borderDark),
+      ),
+      child: Row(
+        children: [
+          _buildModeButton(
+            context,
+            label: 'Workouts',
+            icon: Icons.fitness_center,
+            isSelected: currentMode == HistoryMode.workouts,
+            onTap: () {
+              context
+                  .read<HistoryBloc>()
+                  .add(const ChangeHistoryModeEvent(HistoryMode.workouts));
+            },
+          ),
+          _buildModeButton(
+            context,
+            label: 'Nutrition',
+            icon: Icons.restaurant_menu,
+            isSelected: currentMode == HistoryMode.nutrition,
+            onTap: () {
+              context
+                  .read<HistoryBloc>()
+                  .add(const ChangeHistoryModeEvent(HistoryMode.nutrition));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryOrange : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.white : AppTheme.textDim,
+                size: 22,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textDim,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -170,7 +241,24 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildInstructions(BuildContext context) {
+  Widget _buildInstructions(BuildContext context, HistoryMode mode) {
+    final title =
+        mode == HistoryMode.workouts ? 'How to use' : 'How to use nutrition history';
+
+    final instructions = mode == HistoryMode.workouts
+        ? const [
+            '• Tap a date to view workout details',
+            '• Dates with workouts are highlighted',
+            '• Swipe left/right to change months',
+            '• Edit or delete past sets from details',
+          ]
+        : const [
+            '• Tap a date to view nutrition details',
+            '• Dates with nutrition logs are highlighted',
+            '• Swipe left/right to change months',
+            '• Edit or delete past nutrition logs from details',
+          ];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -186,7 +274,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'How to use',
+                  title,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -194,22 +282,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ],
             ),
             const SizedBox(height: 12),
-            _buildInstructionItem(
-              context,
-              '• Tap a date to view workout details',
-            ),
-            _buildInstructionItem(
-              context,
-              '• Dates with workouts are highlighted',
-            ),
-            _buildInstructionItem(
-              context,
-              '• Swipe left/right to change months',
-            ),
-            _buildInstructionItem(
-              context,
-              '• Edit or delete past sets from details',
-            ),
+            ...instructions.map((item) => _buildInstructionItem(context, item)),
           ],
         ),
       ),
@@ -229,10 +302,12 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildBottomSheetOverlay(
-    BuildContext context,
-    DateTime selectedDate,
-    List<WorkoutSet> selectedDateSets,
-  ) {
+    BuildContext context, {
+    required HistoryMode currentMode,
+    required DateTime selectedDate,
+    required List<WorkoutSet> selectedDateSets,
+    required List<NutritionLog> selectedDateNutritionLogs,
+  }) {
     return GestureDetector(
       onTap: () {
         context.read<HistoryBloc>().add(ClearDateSelectionEvent());
@@ -246,10 +321,15 @@ class _HistoryPageState extends State<HistoryPage> {
           builder: (context, scrollController) {
             return SingleChildScrollView(
               controller: scrollController,
-              child: DayDetailsBottomSheet(
-                date: selectedDate,
-                sets: selectedDateSets,
-              ),
+              child: currentMode == HistoryMode.workouts
+                  ? DayDetailsBottomSheet(
+                      date: selectedDate,
+                      sets: selectedDateSets,
+                    )
+                  : NutritionDayDetailsBottomSheet(
+                      date: selectedDate,
+                      logs: selectedDateNutritionLogs,
+                    ),
             );
           },
         ),
@@ -266,7 +346,7 @@ class _HistoryPageState extends State<HistoryPage> {
     if (previousMonth.isBefore(CalendarConstants.minAllowedDate)) {
       ErrorHandler.showInfo(
         context,
-        'Cannot view workouts from more than 5 years ago',
+        'Cannot view data from more than 5 years ago',
       );
       return;
     }

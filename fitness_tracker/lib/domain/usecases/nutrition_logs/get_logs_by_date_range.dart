@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../entities/nutrition_log.dart';
 import '../../repositories/nutrition_log_repository.dart';
@@ -12,6 +13,6 @@ class GetLogsByDateRange {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
-    return await repository.getLogsByDateRange(startDate, endDate);
+    return repository.getLogsByDateRange(startDate, endDate);
   }
 }

@@ -1,14 +1,15 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../domain/entities/target.dart';
 import '../../../../domain/usecases/targets/add_target.dart';
 import '../../../../domain/usecases/targets/delete_target.dart';
 import '../../../../domain/usecases/targets/get_all_targets.dart';
 import '../../../../domain/usecases/targets/update_target.dart';
 
-// Events
 abstract class TargetsEvent extends Equatable {
   const TargetsEvent();
+
   @override
   List<Object?> get props => [];
 }
@@ -17,28 +18,34 @@ class LoadTargetsEvent extends TargetsEvent {}
 
 class AddTargetEvent extends TargetsEvent {
   final Target target;
+
   const AddTargetEvent(this.target);
+
   @override
   List<Object?> get props => [target];
 }
 
 class UpdateTargetEvent extends TargetsEvent {
   final Target target;
+
   const UpdateTargetEvent(this.target);
+
   @override
   List<Object?> get props => [target];
 }
 
 class DeleteTargetEvent extends TargetsEvent {
-  final String muscleGroup;
-  const DeleteTargetEvent(this.muscleGroup);
+  final String targetId;
+
+  const DeleteTargetEvent(this.targetId);
+
   @override
-  List<Object?> get props => [muscleGroup];
+  List<Object?> get props => [targetId];
 }
 
-// States
 abstract class TargetsState extends Equatable {
   const TargetsState();
+
   @override
   List<Object?> get props => [];
 }
@@ -49,26 +56,37 @@ class TargetsLoading extends TargetsState {}
 
 class TargetsLoaded extends TargetsState {
   final List<Target> targets;
+
   const TargetsLoaded(this.targets);
+
+  List<Target> get trainingTargets =>
+      targets.where((target) => target.isWeeklyMuscleTarget).toList();
+
+  List<Target> get macroTargets =>
+      targets.where((target) => target.isDailyMacroTarget).toList();
+
   @override
   List<Object?> get props => [targets];
 }
 
 class TargetsError extends TargetsState {
   final String message;
+
   const TargetsError(this.message);
+
   @override
   List<Object?> get props => [message];
 }
 
 class TargetOperationSuccess extends TargetsState {
   final String message;
+
   const TargetOperationSuccess(this.message);
+
   @override
   List<Object?> get props => [message];
 }
 
-// BLoC
 class TargetsBloc extends Bloc<TargetsEvent, TargetsState> {
   final GetAllTargets getAllTargets;
   final AddTarget addTarget;
@@ -92,7 +110,9 @@ class TargetsBloc extends Bloc<TargetsEvent, TargetsState> {
     Emitter<TargetsState> emit,
   ) async {
     emit(TargetsLoading());
+
     final result = await getAllTargets();
+
     result.fold(
       (failure) => emit(TargetsError(failure.message)),
       (targets) => emit(TargetsLoaded(targets)),
@@ -104,6 +124,7 @@ class TargetsBloc extends Bloc<TargetsEvent, TargetsState> {
     Emitter<TargetsState> emit,
   ) async {
     final result = await addTarget(event.target);
+
     await result.fold(
       (failure) async => emit(TargetsError(failure.message)),
       (_) async {
@@ -118,6 +139,7 @@ class TargetsBloc extends Bloc<TargetsEvent, TargetsState> {
     Emitter<TargetsState> emit,
   ) async {
     final result = await updateTarget(event.target);
+
     await result.fold(
       (failure) async => emit(TargetsError(failure.message)),
       (_) async {
@@ -131,7 +153,8 @@ class TargetsBloc extends Bloc<TargetsEvent, TargetsState> {
     DeleteTargetEvent event,
     Emitter<TargetsState> emit,
   ) async {
-    final result = await deleteTarget(event.muscleGroup);
+    final result = await deleteTarget(event.targetId);
+
     await result.fold(
       (failure) async => emit(TargetsError(failure.message)),
       (_) async {
