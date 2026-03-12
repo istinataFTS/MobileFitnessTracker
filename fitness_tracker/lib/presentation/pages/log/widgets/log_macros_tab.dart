@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_strings.dart';
@@ -10,7 +11,6 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
-import 'log_date_widgets.dart';
 
 class LogMacrosTab extends StatefulWidget {
   final DateTime? initialDate;
@@ -41,7 +41,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   void initState() {
     super.initState();
 
-    _selectedDate = _normalizeDate(widget.initialDate ?? DateTime.now());
+    _selectedDate = widget.initialDate ?? DateTime.now();
 
     final nutritionBloc = context.read<NutritionLogBloc>();
     _nutritionEffectsSub = nutritionBloc.effects.listen((effect) {
@@ -59,9 +59,8 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
           );
         }
 
-        final loggedDate = _selectedDate;
+        widget.onLoggedSuccess?.call(_selectedDate);
         _clearForm();
-        widget.onLoggedSuccess?.call(loggedDate);
       }
     });
   }
@@ -99,8 +98,6 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LogDateContextBanner(selectedDate: _selectedDate),
-                    const SizedBox(height: 20),
                     _buildInfoCard(),
                     const SizedBox(height: 24),
                     Text(
@@ -116,11 +113,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
                     const SizedBox(height: 16),
                     _buildFatsInput(),
                     const SizedBox(height: 20),
-                    LogDatePickerCard(
-                      label: 'Nutrition date',
-                      selectedDate: _selectedDate,
-                      onTap: () => _selectDate(context),
-                    ),
+                    _buildDatePicker(context),
                     const SizedBox(height: 24),
                     _buildCaloriesPreview(),
                   ],
@@ -310,6 +303,61 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.textDim,
               ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Log Date',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => _selectDate(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderDark),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryOrange,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textDim,
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -533,23 +581,20 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
       },
     );
 
-    if (picked != null && !_isSameDay(picked, _selectedDate)) {
+    if (picked != null && picked != _selectedDate) {
       setState(() {
-        _selectedDate = _normalizeDate(picked);
+        _selectedDate = picked;
       });
     }
   }
 
   void _handleLogMacros() {
-    final protein = double.parse(
-      _proteinController.text.isEmpty ? '0' : _proteinController.text,
-    );
-    final carbs = double.parse(
-      _carbsController.text.isEmpty ? '0' : _carbsController.text,
-    );
-    final fats = double.parse(
-      _fatsController.text.isEmpty ? '0' : _fatsController.text,
-    );
+    final protein =
+        double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text);
+    final carbs =
+        double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text);
+    final fats =
+        double.parse(_fatsController.text.isEmpty ? '0' : _fatsController.text);
 
     final nutritionLog = NutritionLog(
       id: _uuid.v4(),
@@ -564,11 +609,25 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
         carbs: carbs,
         fat: fats,
       ),
-      loggedAt: _selectedDate,
+      loggedAt: _combineDateWithCurrentTime(_selectedDate),
       createdAt: DateTime.now(),
     );
 
     context.read<NutritionLogBloc>().add(AddNutritionLogEvent(nutritionLog));
+  }
+
+  DateTime _combineDateWithCurrentTime(DateTime date) {
+    final now = DateTime.now();
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      now.hour,
+      now.minute,
+      now.second,
+      now.millisecond,
+      now.microsecond,
+    );
   }
 
   void _clearForm() {
@@ -577,13 +636,5 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
       _carbsController.clear();
       _fatsController.clear();
     });
-  }
-
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }

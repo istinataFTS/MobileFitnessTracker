@@ -241,6 +241,11 @@ class _WorkoutHistorySection extends StatelessWidget {
       icon: Icons.fitness_center,
       title: 'Workout history',
       subtitle: '${sets.length} set${sets.length == 1 ? '' : 's'} logged',
+      onAddPressed: () => showHistoryWorkoutLogBottomSheet(
+        context,
+        selectedDate: date,
+      ),
+      addTooltip: 'Add workout set',
       child: sets.isEmpty
           ? _InlineEmptyHint(
               icon: Icons.fitness_center_outlined,
@@ -431,6 +436,11 @@ class _NutritionHistorySection extends StatelessWidget {
       icon: Icons.restaurant_menu,
       title: 'Nutrition history',
       subtitle: '${logs.length} entr${logs.length == 1 ? 'y' : 'ies'} logged',
+      onAddPressed: () => showHistoryNutritionTypeBottomSheet(
+        context,
+        selectedDate: date,
+      ),
+      addTooltip: 'Add nutrition entry',
       headerTrailing: logs.isEmpty
           ? null
           : Wrap(
@@ -622,6 +632,8 @@ class _HistorySectionCard extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final Widget? headerTrailing;
+  final VoidCallback? onAddPressed;
+  final String? addTooltip;
 
   const _HistorySectionCard({
     required this.icon,
@@ -629,6 +641,8 @@ class _HistorySectionCard extends StatelessWidget {
     required this.subtitle,
     required this.child,
     this.headerTrailing,
+    this.onAddPressed,
+    this.addTooltip,
   });
 
   @override
@@ -655,6 +669,13 @@ class _HistorySectionCard extends StatelessWidget {
                       ),
                 ),
               ),
+              if (onAddPressed != null)
+                IconButton(
+                  onPressed: onAddPressed,
+                  icon: const Icon(Icons.add),
+                  tooltip: addTooltip ?? 'Add',
+                  visualDensity: VisualDensity.compact,
+                ),
             ],
           ),
           const SizedBox(height: 4),

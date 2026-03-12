@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_strings.dart';
@@ -12,7 +13,6 @@ import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../meals/bloc/meal_bloc.dart';
 import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
-import 'log_date_widgets.dart';
 
 class LogMealTab extends StatefulWidget {
   final DateTime? initialDate;
@@ -44,7 +44,7 @@ class _LogMealTabState extends State<LogMealTab> {
   void initState() {
     super.initState();
 
-    _selectedDate = _normalizeDate(widget.initialDate ?? DateTime.now());
+    _selectedDate = widget.initialDate ?? DateTime.now();
 
     final nutritionBloc = context.read<NutritionLogBloc>();
     _nutritionEffectsSub = nutritionBloc.effects.listen((effect) {
@@ -62,9 +62,8 @@ class _LogMealTabState extends State<LogMealTab> {
           );
         }
 
-        final loggedDate = _selectedDate;
+        widget.onLoggedSuccess?.call(_selectedDate);
         _clearForm();
-        widget.onLoggedSuccess?.call(loggedDate);
       }
     });
   }
@@ -101,18 +100,12 @@ class _LogMealTabState extends State<LogMealTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LogDateContextBanner(selectedDate: _selectedDate),
-                    const SizedBox(height: 20),
                     _buildMealSelector(context),
                     if (_selectedMeal != null) ...[
                       const SizedBox(height: 20),
                       _buildAmountInput(),
                       const SizedBox(height: 20),
-                      LogDatePickerCard(
-                        label: 'Nutrition date',
-                        selectedDate: _selectedDate,
-                        onTap: () => _selectDate(context),
-                      ),
+                      _buildDatePicker(context),
                       const SizedBox(height: 24),
                       _buildNutritionPreview(),
                     ],
@@ -393,6 +386,61 @@ class _LogMealTabState extends State<LogMealTab> {
     );
   }
 
+  Widget _buildDatePicker(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Log Date',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => _selectDate(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderDark),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryOrange,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textDim,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildNutritionPreview() {
     if (_selectedMeal == null || _gramsController.text.isEmpty) {
       return const SizedBox.shrink();
@@ -563,9 +611,9 @@ class _LogMealTabState extends State<LogMealTab> {
       },
     );
 
-    if (picked != null && !_isSameDay(picked, _selectedDate)) {
+    if (picked != null && picked != _selectedDate) {
       setState(() {
-        _selectedDate = _normalizeDate(picked);
+        _selectedDate = picked;
       });
     }
   }
@@ -592,27 +640,30 @@ class _LogMealTabState extends State<LogMealTab> {
         carbs: loggedCarbs,
         fat: loggedFat,
       ),
-      loggedAt: _selectedDate,
+      loggedAt: _combineDateWithCurrentTime(_selectedDate),
       createdAt: DateTime.now(),
     );
 
     context.read<NutritionLogBloc>().add(AddNutritionLogEvent(nutritionLog));
   }
 
+  DateTime _combineDateWithCurrentTime(DateTime date) {
+    final now = DateTime.now();
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      now.hour,
+      now.minute,
+      now.second,
+      now.millisecond,
+      now.microsecond,
+    );
+  }
+
   void _clearForm() {
     setState(() {
-      _selectedMeal = null;
       _gramsController.clear();
-      _searchController.clear();
-      _searchQuery = '';
     });
-  }
-
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }

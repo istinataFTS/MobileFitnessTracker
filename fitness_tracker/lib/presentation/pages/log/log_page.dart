@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
@@ -12,24 +13,34 @@ import 'bloc/workout_bloc.dart';
 import 'widgets/log_exercise_tab.dart';
 import 'widgets/log_macros_tab.dart';
 import 'widgets/log_meal_tab.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 class LogPage extends StatefulWidget {
-  const LogPage({super.key});
+  final int initialIndex;
+  final DateTime? initialDate;
+
+  const LogPage({
+    super.key,
+    this.initialIndex = 0,
+    this.initialDate,
+  });
 
   @override
   State<LogPage> createState() => _LogPageState();
 }
 
 class _LogPageState extends State<LogPage> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
   StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
 
+  DateTime get _effectiveInitialDate => widget.initialDate ?? DateTime.now();
+
   @override
   void initState() {
     super.initState();
+
+    _selectedIndex = widget.initialIndex.clamp(0, 2);
 
     final workoutBloc = context.read<WorkoutBloc>();
     final nutritionLogBloc = context.read<NutritionLogBloc>();
@@ -64,11 +75,13 @@ class _LogPageState extends State<LogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text(AppStrings.logTitle),
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: canPop,
       ),
       body: Column(
         children: [
@@ -160,13 +173,13 @@ class _LogPageState extends State<LogPage> {
   Widget _buildContent() {
     switch (_selectedIndex) {
       case 0:
-        return const LogExerciseTab();
+        return LogExerciseTab(initialDate: _effectiveInitialDate);
       case 1:
-        return const LogMealTab();
+        return LogMealTab(initialDate: _effectiveInitialDate);
       case 2:
-        return const LogMacrosTab();
+        return LogMacrosTab(initialDate: _effectiveInitialDate);
       default:
-        return const LogExerciseTab();
+        return LogExerciseTab(initialDate: _effectiveInitialDate);
     }
   }
 }

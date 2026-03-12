@@ -20,11 +20,13 @@ Future<void> showHistoryWorkoutLogBottomSheet(
       initialDate: selectedDate,
       showSuccessFeedback: false,
       onLoggedSuccess: (loggedDate) {
-        Navigator.of(context).pop();
-
         final historyBloc = context.read<HistoryBloc>();
         historyBloc.add(SelectDateEvent(loggedDate));
         historyBloc.add(RefreshCurrentMonthEvent());
+
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       },
     ),
   );
@@ -98,11 +100,13 @@ Future<void> showHistoryMealLogBottomSheet(
       initialDate: selectedDate,
       showSuccessFeedback: false,
       onLoggedSuccess: (loggedDate) {
-        Navigator.of(context).pop();
-
         final historyBloc = context.read<HistoryBloc>();
         historyBloc.add(SelectDateEvent(loggedDate));
         historyBloc.add(RefreshCurrentMonthEvent());
+
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       },
     ),
   );
@@ -120,11 +124,13 @@ Future<void> showHistoryMacrosLogBottomSheet(
       initialDate: selectedDate,
       showSuccessFeedback: false,
       onLoggedSuccess: (loggedDate) {
-        Navigator.of(context).pop();
-
         final historyBloc = context.read<HistoryBloc>();
         historyBloc.add(SelectDateEvent(loggedDate));
         historyBloc.add(RefreshCurrentMonthEvent());
+
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       },
     ),
   );

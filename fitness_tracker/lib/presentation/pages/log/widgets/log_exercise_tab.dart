@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_strings.dart';
@@ -14,7 +15,6 @@ import '../../../../domain/entities/workout_set.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../bloc/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
-import 'log_date_widgets.dart';
 
 class LogExerciseTab extends StatefulWidget {
   final DateTime? initialDate;
@@ -47,7 +47,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   void initState() {
     super.initState();
 
-    _selectedDate = _normalizeDate(widget.initialDate ?? DateTime.now());
+    _selectedDate = widget.initialDate ?? DateTime.now();
 
     final workoutBloc = context.read<WorkoutBloc>();
     _workoutEffectsSub = workoutBloc.effects.listen((effect) {
@@ -82,9 +82,8 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
           );
         }
 
-        final loggedDate = _selectedDate;
+        widget.onLoggedSuccess?.call(_selectedDate);
         _clearForm();
-        widget.onLoggedSuccess?.call(loggedDate);
       }
     });
   }
@@ -140,8 +139,6 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LogDateContextBanner(selectedDate: _selectedDate),
-                  const SizedBox(height: 20),
                   _buildExerciseSelector(exercises),
                   const SizedBox(height: 24),
                   _buildRepsInput(),
@@ -157,11 +154,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                     },
                   ),
                   const SizedBox(height: 20),
-                  LogDatePickerCard(
-                    label: AppStrings.workoutDate,
-                    selectedDate: _selectedDate,
-                    onTap: () => _selectDate(context),
-                  ),
+                  _buildDatePicker(context),
                   const SizedBox(height: 20),
                   _buildMuscleGroupInfo(),
                   const SizedBox(height: 28),
@@ -343,6 +336,61 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
             hintText: '0.0',
             prefixIcon: Icon(Icons.fitness_center),
             suffixText: AppStrings.unitKg,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.workoutDate,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => _selectDate(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceDark,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderDark),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryOrange,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textDim,
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -543,9 +591,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       },
     );
 
-    if (picked != null && !_isSameDay(picked, _selectedDate)) {
+    if (picked != null && picked != _selectedDate) {
       setState(() {
-        _selectedDate = _normalizeDate(picked);
+        _selectedDate = picked;
       });
     }
   }
@@ -577,18 +625,8 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
   void _clearForm() {
     setState(() {
-      _selectedExercise = null;
       _repsController.clear();
       _weightController.clear();
-      _selectedIntensity = MuscleStimulus.defaultIntensity;
     });
-  }
-
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
