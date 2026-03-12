@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 
-import '../../../core/constants/app_strings.dart';
-import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/macro_calculator.dart';
-import '../../../domain/entities/meal.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/macro_calculator.dart';
+import '../../../../domain/entities/meal.dart';
 import '../../meals/bloc/meal_bloc.dart';
+
 /// Meals management tab for the Library page
-/// Handles CRUD operations for meal library
 class MealsTab extends StatelessWidget {
   const MealsTab({super.key});
 
@@ -15,7 +17,6 @@ class MealsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<MealBloc, MealState>(
       listener: (context, state) {
-        // Handle success feedback
         if (state is MealOperationSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -27,7 +28,6 @@ class MealsTab extends StatelessWidget {
           );
         }
 
-        // Handle errors
         if (state is MealError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -40,7 +40,6 @@ class MealsTab extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        // Show loading state
         if (state is MealLoading) {
           return const Center(
             child: CircularProgressIndicator(
@@ -49,12 +48,10 @@ class MealsTab extends StatelessWidget {
           );
         }
 
-        // Show error state with retry option
         if (state is MealError) {
           return _buildErrorState(context, state.message);
         }
 
-        // Show loaded state (empty or with meals)
         final meals = state is MealsLoaded ? state.meals : <Meal>[];
 
         return Column(
@@ -192,7 +189,6 @@ class MealsTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Meal name and actions
               Row(
                 children: [
                   Expanded(
@@ -212,8 +208,8 @@ class MealsTab extends StatelessWidget {
                         _confirmDeleteMeal(context, meal);
                       }
                     },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
                         value: 'edit',
                         child: Row(
                           children: [
@@ -223,15 +219,17 @@ class MealsTab extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
                             Icon(Icons.delete_outline,
                                 size: 20, color: AppTheme.errorRed),
                             SizedBox(width: 12),
-                            Text(AppStrings.delete,
-                                style: TextStyle(color: AppTheme.errorRed)),
+                            Text(
+                              AppStrings.delete,
+                              style: TextStyle(color: AppTheme.errorRed),
+                            ),
                           ],
                         ),
                       ),
@@ -240,8 +238,6 @@ class MealsTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              
-              // Serving size
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -260,8 +256,6 @@ class MealsTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
-              // Macros
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -327,7 +321,7 @@ class MealsTab extends StatelessWidget {
   Widget _buildAddButton(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppTheme.surfaceDark,
         border: Border(
           top: BorderSide(color: AppTheme.borderDark, width: 1),
@@ -400,11 +394,8 @@ class MealsTab extends StatelessWidget {
   }
 }
 
-// ==================== Meal Dialog ====================
-
-/// Unified dialog for adding and editing meals
 class _MealDialog extends StatefulWidget {
-  final Meal? meal; // null for add, non-null for edit
+  final Meal? meal;
 
   const _MealDialog({this.meal});
 
@@ -452,6 +443,9 @@ class _MealDialogState extends State<_MealDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isValid = _nameController.text.trim().isNotEmpty &&
+        _servingSizeController.text.trim().isNotEmpty;
+
     return Dialog(
       child: Container(
         constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
@@ -462,7 +456,28 @@ class _MealDialogState extends State<_MealDialog> {
             const Divider(height: 1),
             Flexible(child: _buildContent(context)),
             const Divider(height: 1),
-            _buildActions(context),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: isValid ? _handleSave : null,
+                      child: Text(
+                        isEditing ? AppStrings.saveChanges : AppStrings.add,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -497,7 +512,6 @@ class _MealDialogState extends State<_MealDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Meal name
           TextField(
             controller: _nameController,
             decoration: const InputDecoration(
@@ -507,10 +521,9 @@ class _MealDialogState extends State<_MealDialog> {
             ),
             textCapitalization: TextCapitalization.words,
             autofocus: !isEditing,
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 20),
-          
-          // Serving size
           TextField(
             controller: _servingSizeController,
             decoration: const InputDecoration(
@@ -520,9 +533,9 @@ class _MealDialogState extends State<_MealDialog> {
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 24),
-          
           Text(
             AppStrings.macrosPerServing,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -530,8 +543,6 @@ class _MealDialogState extends State<_MealDialog> {
                 ),
           ),
           const SizedBox(height: 12),
-          
-          // Protein
           TextField(
             controller: _proteinController,
             decoration: const InputDecoration(
@@ -543,11 +554,9 @@ class _MealDialogState extends State<_MealDialog> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
             ],
-            onChanged: (_) => setState(() {}), // Trigger calories recalc
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          
-          // Carbs
           TextField(
             controller: _carbsController,
             decoration: const InputDecoration(
@@ -559,11 +568,9 @@ class _MealDialogState extends State<_MealDialog> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
             ],
-            onChanged: (_) => setState(() {}), // Trigger calories recalc
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          
-          // Fats
           TextField(
             controller: _fatsController,
             decoration: const InputDecoration(
@@ -575,11 +582,9 @@ class _MealDialogState extends State<_MealDialog> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
             ],
-            onChanged: (_) => setState(() {}), // Trigger calories recalc
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 20),
-          
-          // Calculated calories display
           _buildCaloriesDisplay(context),
         ],
       ),
@@ -590,7 +595,7 @@ class _MealDialogState extends State<_MealDialog> {
     final protein = double.tryParse(_proteinController.text) ?? 0.0;
     final carbs = double.tryParse(_carbsController.text) ?? 0.0;
     final fats = double.tryParse(_fatsController.text) ?? 0.0;
-    
+
     final calories = MacroCalculator.calculateCalories(
       protein: protein,
       carbs: carbs,
@@ -635,10 +640,7 @@ class _MealDialogState extends State<_MealDialog> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: AppTheme.primaryOrange.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
@@ -656,69 +658,37 @@ class _MealDialogState extends State<_MealDialog> {
     );
   }
 
-  Widget _buildActions(BuildContext context) {
-    final isValid = _nameController.text.trim().isNotEmpty &&
-        _servingSizeController.text.trim().isNotEmpty &&
-        (double.tryParse(_proteinController.text) ?? 0) >= 0 &&
-        (double.tryParse(_carbsController.text) ?? 0) >= 0 &&
-        (double.tryParse(_fatsController.text) ?? 0) >= 0;
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(AppStrings.cancel),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: isValid ? _handleSave : null,
-              child: Text(isEditing ? AppStrings.saveChanges : AppStrings.add),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _handleSave() {
     final name = _nameController.text.trim();
-    final servingSize = int.parse(_servingSizeController.text.trim());
-    final protein = double.parse(_proteinController.text.trim());
-    final carbs = double.parse(_carbsController.text.trim());
-    final fats = double.parse(_fatsController.text.trim());
-
-    final calculatedCalories = MacroCalculator.calculateCalories(
+    final servingSize = double.tryParse(_servingSizeController.text) ?? 100.0;
+    final protein = double.tryParse(_proteinController.text) ?? 0.0;
+    final carbs = double.tryParse(_carbsController.text) ?? 0.0;
+    final fats = double.tryParse(_fatsController.text) ?? 0.0;
+    final calories = MacroCalculator.calculateCalories(
       protein: protein,
       carbs: carbs,
       fat: fats,
     );
 
     if (isEditing) {
-      // Update existing meal
       final updatedMeal = widget.meal!.copyWith(
         name: name,
-        servingSizeGrams: servingSize.toDouble(),
+        servingSizeGrams: servingSize,
         proteinPer100g: protein,
         carbsPer100g: carbs,
         fatPer100g: fats,
-        caloriesPer100g: calculatedCalories,
+        caloriesPer100g: calories,
       );
       context.read<MealBloc>().add(UpdateMealEvent(updatedMeal));
     } else {
-      // Create new meal
       final newMeal = Meal(
         id: _uuid.v4(),
         name: name,
-        servingSizeGrams: servingSize.toDouble(),
+        servingSizeGrams: servingSize,
         proteinPer100g: protein,
         carbsPer100g: carbs,
         fatPer100g: fats,
-        caloriesPer100g: calculatedCalories,
+        caloriesPer100g: calories,
         createdAt: DateTime.now(),
       );
       context.read<MealBloc>().add(AddMealEvent(newMeal));

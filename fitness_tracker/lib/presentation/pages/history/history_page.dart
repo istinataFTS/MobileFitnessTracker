@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../core/themes/app_theme.dart';
-import '../../core/utils/error_handler.dart';
-import '../../core/constants/calendar_constants.dart';
-import '../../domain/entities/workout_set.dart';
+import '../../../core/constants/calendar_constants.dart';
+import '../../../core/themes/app_theme.dart';
+import '../../../core/utils/error_handler.dart';
+import '../../../domain/entities/workout_set.dart';
 import 'bloc/history_bloc.dart';
-import 'widgets/history_calendar_widget.dart';
 import 'widgets/day_details_bottom_sheet.dart';
+import 'widgets/history_calendar_widget.dart';
 
 /// Calendar-based history page for viewing past workouts
-/// Features:
-/// - Monthly calendar view with workout indicators
-/// - Tap date to view details in bottom sheet
-/// - Edit/delete past sets
-/// - Swipe navigation between months
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -55,9 +50,9 @@ class _HistoryPageState extends State<HistoryPage> {
             ErrorHandler.showSuccess(context, state.message);
             Future.delayed(const Duration(milliseconds: 300), () {
               if (mounted) {
-                context.read<HistoryBloc>().add(
-                      LoadMonthSetsEvent(state.currentMonth),
-                    );
+                context
+                    .read<HistoryBloc>()
+                    .add(LoadMonthSetsEvent(state.currentMonth));
               }
             });
           }
@@ -85,7 +80,7 @@ class _HistoryPageState extends State<HistoryPage> {
               currentMonth = successState.currentMonth;
               monthSets = successState.monthSets;
               selectedDate = successState.selectedDate;
-              selectedDateSets = const [];
+              selectedDateSets = <WorkoutSet>[];
             }
 
             final dateCounts = <DateTime, int>{};
@@ -95,11 +90,13 @@ class _HistoryPageState extends State<HistoryPage> {
 
             return GestureDetector(
               onHorizontalDragEnd: (details) {
-                if (details.primaryVelocity! >
-                    CalendarConstants.swipeThreshold) {
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity! >
+                        CalendarConstants.swipeThreshold) {
                   _navigateToPreviousMonth(context, currentMonth);
-                } else if (details.primaryVelocity! <
-                    -CalendarConstants.swipeThreshold) {
+                } else if (details.primaryVelocity != null &&
+                    details.primaryVelocity! <
+                        -CalendarConstants.swipeThreshold) {
                   _navigateToNextMonth(context, currentMonth);
                 }
               },
@@ -115,9 +112,7 @@ class _HistoryPageState extends State<HistoryPage> {
                           today: DateTime.now(),
                           dateSetsCount: dateCounts,
                           onDateSelected: (date) {
-                            context
-                                .read<HistoryBloc>()
-                                .add(SelectDateEvent(date));
+                            context.read<HistoryBloc>().add(SelectDateEvent(date));
                           },
                           onPreviousMonth: () {
                             _navigateToPreviousMonth(context, currentMonth);
@@ -126,9 +121,9 @@ class _HistoryPageState extends State<HistoryPage> {
                             _navigateToNextMonth(context, currentMonth);
                           },
                           onTodayTapped: () {
-                            context.read<HistoryBloc>().add(
-                                  NavigateToMonthEvent(DateTime.now()),
-                                );
+                            context
+                                .read<HistoryBloc>()
+                                .add(NavigateToMonthEvent(DateTime.now()));
                           },
                         ),
                         const SizedBox(height: 24),
@@ -184,7 +179,7 @@ class _HistoryPageState extends State<HistoryPage> {
           children: [
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline,
                   size: 20,
                   color: AppTheme.primaryOrange,

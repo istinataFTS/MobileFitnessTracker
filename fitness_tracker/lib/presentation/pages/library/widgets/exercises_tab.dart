@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 
-import '../../../core/constants/app_strings.dart';
-import '../../../core/constants/muscle_groups.dart';
-import '../../../core/themes/app_theme.dart';
-import '../../../domain/entities/exercise.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/muscle_groups.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../domain/entities/exercise.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 
 /// Exercises management tab for the Library page
-/// Handles CRUD operations for exercise library
 class ExercisesTab extends StatelessWidget {
   const ExercisesTab({super.key});
 
@@ -16,7 +16,6 @@ class ExercisesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<ExerciseBloc, ExerciseState>(
       listener: (context, state) {
-        // Handle success feedback
         if (state is ExerciseOperationSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -28,7 +27,6 @@ class ExercisesTab extends StatelessWidget {
           );
         }
 
-        // Handle errors
         if (state is ExerciseError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -41,7 +39,6 @@ class ExercisesTab extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        // Show loading state
         if (state is ExerciseLoading) {
           return const Center(
             child: CircularProgressIndicator(
@@ -50,12 +47,10 @@ class ExercisesTab extends StatelessWidget {
           );
         }
 
-        // Show error state with retry option
         if (state is ExerciseError) {
           return _buildErrorState(context, state.message);
         }
 
-        // Show loaded state (empty or with exercises)
         final exercises = state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
         return Column(
@@ -257,8 +252,8 @@ class ExercisesTab extends StatelessWidget {
                     _confirmDeleteExercise(context, exercise);
                   }
                 },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
                     value: 'edit',
                     child: Row(
                       children: [
@@ -268,13 +263,16 @@ class ExercisesTab extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'delete',
                     child: Row(
                       children: [
                         Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
                         SizedBox(width: 12),
-                        Text(AppStrings.delete, style: TextStyle(color: AppTheme.errorRed)),
+                        Text(
+                          AppStrings.delete,
+                          style: TextStyle(color: AppTheme.errorRed),
+                        ),
                       ],
                     ),
                   ),
@@ -290,7 +288,7 @@ class ExercisesTab extends StatelessWidget {
   Widget _buildAddButton(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppTheme.surfaceDark,
         border: Border(
           top: BorderSide(color: AppTheme.borderDark, width: 1),
@@ -363,11 +361,8 @@ class ExercisesTab extends StatelessWidget {
   }
 }
 
-// ==================== Exercise Dialog ====================
-
-/// Unified dialog for adding and editing exercises
 class _ExerciseDialog extends StatefulWidget {
-  final Exercise? exercise; // null for add, non-null for edit
+  final Exercise? exercise;
 
   const _ExerciseDialog({this.exercise});
 
@@ -386,7 +381,7 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.exercise?.name ?? '');
-    _selectedMuscles = Set.from(widget.exercise?.muscleGroups ?? []);
+    _selectedMuscles = Set<String>.from(widget.exercise?.muscleGroups ?? const []);
   }
 
   @override
@@ -397,6 +392,9 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isValid =
+        _nameController.text.trim().isNotEmpty && _selectedMuscles.isNotEmpty;
+
     return Dialog(
       child: Container(
         constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
@@ -407,7 +405,28 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
             const Divider(height: 1),
             Flexible(child: _buildContent(context)),
             const Divider(height: 1),
-            _buildActions(context),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: isValid ? _handleSave : null,
+                      child: Text(
+                        isEditing ? AppStrings.saveChanges : AppStrings.add,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -437,80 +456,60 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   }
 
   Widget _buildContent(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: AppStrings.exerciseName,
-              hintText: AppStrings.exerciseNameHint,
-              prefixIcon: Icon(Icons.fitness_center),
-            ),
-            textCapitalization: TextCapitalization.words,
-            autofocus: !isEditing,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            AppStrings.muscleGroups,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+    return StatefulBuilder(
+      builder: (context, setInnerState) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: AppStrings.exerciseName,
+                  hintText: AppStrings.exerciseNameHint,
+                  prefixIcon: Icon(Icons.fitness_center),
                 ),
+                textCapitalization: TextCapitalization.words,
+                autofocus: !isEditing,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                AppStrings.muscleGroups,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: MuscleGroups.all.map((muscle) {
+                  final isSelected = _selectedMuscles.contains(muscle);
+                  return FilterChip(
+                    label: Text(MuscleGroups.getDisplayName(muscle)),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setInnerState(() {
+                        if (selected) {
+                          _selectedMuscles.add(muscle);
+                        } else {
+                          _selectedMuscles.remove(muscle);
+                        }
+                      });
+                      setState(() {});
+                    },
+                    selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
+                    checkmarkColor: AppTheme.primaryOrange,
+                    backgroundColor: AppTheme.surfaceDark,
+                  );
+                }).toList(),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: MuscleGroups.all.map((muscle) {
-              final isSelected = _selectedMuscles.contains(muscle);
-              return FilterChip(
-                label: Text(MuscleGroups.getDisplayName(muscle)),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedMuscles.add(muscle);
-                    } else {
-                      _selectedMuscles.remove(muscle);
-                    }
-                  });
-                },
-                selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
-                checkmarkColor: AppTheme.primaryOrange,
-                backgroundColor: AppTheme.surfaceDark,
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActions(BuildContext context) {
-    final isValid = _nameController.text.trim().isNotEmpty &&
-        _selectedMuscles.isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(AppStrings.cancel),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: isValid ? _handleSave : null,
-              child: Text(isEditing ? AppStrings.saveChanges : AppStrings.add),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -518,14 +517,12 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
     final name = _nameController.text.trim();
 
     if (isEditing) {
-      // Update existing exercise
       final updatedExercise = widget.exercise!.copyWith(
         name: name,
         muscleGroups: _selectedMuscles.toList(),
       );
       context.read<ExerciseBloc>().add(UpdateExerciseEvent(updatedExercise));
     } else {
-      // Create new exercise
       final newExercise = Exercise(
         id: _uuid.v4(),
         name: name,

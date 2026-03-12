@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/meal.dart';
@@ -51,7 +52,9 @@ class MealRepositoryImpl implements MealRepository {
   }
 
   @override
-  Future<Either<Failure, List<Meal>>> searchMealsByName(String searchTerm) async {
+  Future<Either<Failure, List<Meal>>> searchMealsByName(
+    String searchTerm,
+  ) async {
     try {
       final meals = await localDataSource.searchMealsByName(searchTerm);
       return Right(meals);
@@ -63,7 +66,9 @@ class MealRepositoryImpl implements MealRepository {
   }
 
   @override
-  Future<Either<Failure, List<Meal>>> getRecentMeals({int limit = 10}) async {
+  Future<Either<Failure, List<Meal>>> getRecentMeals({
+    int limit = 10,
+  }) async {
     try {
       final meals = await localDataSource.getRecentMeals(limit: limit);
       return Right(meals);
@@ -75,7 +80,9 @@ class MealRepositoryImpl implements MealRepository {
   }
 
   @override
-  Future<Either<Failure, List<Meal>>> getFrequentMeals({int limit = 10}) async {
+  Future<Either<Failure, List<Meal>>> getFrequentMeals({
+    int limit = 10,
+  }) async {
     try {
       final meals = await localDataSource.getFrequentMeals(limit: limit);
       return Right(meals);
@@ -90,14 +97,13 @@ class MealRepositoryImpl implements MealRepository {
   Future<Either<Failure, void>> addMeal(Meal meal) async {
     try {
       final model = MealModel.fromEntity(meal);
-      
-      // Validate macros before inserting
       model.validateMacros();
-      
+      model.validateAndLogCalories();
+
       await localDataSource.insertMeal(model);
       return const Right(null);
     } on ArgumentError catch (e) {
-      return Left(ValidationFailure(e.message));
+      return Left(ValidationFailure(e.message.toString()));
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
     } catch (e) {
@@ -109,14 +115,13 @@ class MealRepositoryImpl implements MealRepository {
   Future<Either<Failure, void>> updateMeal(Meal meal) async {
     try {
       final model = MealModel.fromEntity(meal);
-      
-      // Validate macros before updating
       model.validateMacros();
-      
+      model.validateAndLogCalories();
+
       await localDataSource.updateMeal(model);
       return const Right(null);
     } on ArgumentError catch (e) {
-      return Left(ValidationFailure(e.message));
+      return Left(ValidationFailure(e.message.toString()));
     } on CacheDatabaseException catch (e) {
       return Left(DatabaseFailure(e.message));
     } catch (e) {

@@ -1,120 +1,250 @@
-import '../../core/constants/database_tables.dart';
+import 'package:dartz/dartz.dart';
+
+import '../../core/errors/exceptions.dart';
+import '../../core/errors/failures.dart';
 import '../../domain/entities/nutrition_log.dart';
+import '../../domain/repositories/nutrition_log_repository.dart';
+import '../datasources/local/nutrition_log_local_datasource.dart';
+import '../models/nutrition_log_model.dart';
 
-/// Data model for NutritionLog with database serialization
-/// Extends NutritionLog entity to maintain clean architecture separation
-class NutritionLogModel extends NutritionLog {
-  const NutritionLogModel({
-    required super.id,
-    super.mealId,
-    required super.mealName,
-    super.gramsConsumed,
-    required super.proteinGrams,
-    required super.carbsGrams,
-    required super.fatGrams,
-    required super.calories,
-    required super.loggedAt,
-    required super.createdAt,
-  });
+class NutritionLogRepositoryImpl implements NutritionLogRepository {
+  final NutritionLogLocalDataSource localDataSource;
 
-  /// Create model from entity
-  factory NutritionLogModel.fromEntity(NutritionLog log) {
-    return NutritionLogModel(
-      id: log.id,
-      mealId: log.mealId,
-      mealName: log.mealName,
-      gramsConsumed: log.gramsConsumed,
-      proteinGrams: log.proteinGrams,
-      carbsGrams: log.carbsGrams,
-      fatGrams: log.fatGrams,
-      calories: log.calories,
-      loggedAt: log.loggedAt,
-      createdAt: log.createdAt,
-    );
-  }
+  const NutritionLogRepositoryImpl({required this.localDataSource});
 
-  /// Create model from database map
-  factory NutritionLogModel.fromMap(Map<String, dynamic> map) {
-    return NutritionLogModel(
-      id: map[DatabaseTables.nutritionLogId] as String,
-      mealId: map[DatabaseTables.nutritionLogMealId] as String?,
-      mealName: map[DatabaseTables.nutritionLogMealName] as String,
-      gramsConsumed: (map[DatabaseTables.nutritionLogGrams] as num?)?.toDouble(),
-      proteinGrams: (map[DatabaseTables.nutritionLogProtein] as num).toDouble(),
-      carbsGrams: (map[DatabaseTables.nutritionLogCarbs] as num).toDouble(),
-      fatGrams: (map[DatabaseTables.nutritionLogFat] as num).toDouble(),
-      calories: (map[DatabaseTables.nutritionLogCalories] as num).toDouble(),
-      loggedAt: DateTime.parse(map[DatabaseTables.nutritionLogDate] as String),
-      createdAt: DateTime.parse(map[DatabaseTables.nutritionLogCreatedAt] as String),
-    );
-  }
-
-  /// Convert model to database map
-  Map<String, dynamic> toMap() {
-    return {
-      DatabaseTables.nutritionLogId: id,
-      DatabaseTables.nutritionLogMealId: mealId,
-      DatabaseTables.nutritionLogMealName: mealName,
-      DatabaseTables.nutritionLogGrams: gramsConsumed,
-      DatabaseTables.nutritionLogProtein: proteinGrams,
-      DatabaseTables.nutritionLogCarbs: carbsGrams,
-      DatabaseTables.nutritionLogFat: fatGrams,
-      DatabaseTables.nutritionLogCalories: calories,
-      DatabaseTables.nutritionLogDate: loggedAt.toIso8601String(),
-      DatabaseTables.nutritionLogCreatedAt: createdAt.toIso8601String(),
-    };
-  }
-
-  /// Create model from JSON (for API compatibility)
-  factory NutritionLogModel.fromJson(Map<String, dynamic> json) {
-    return NutritionLogModel(
-      id: json['id'] as String,
-      mealId: json['mealId'] as String?,
-      mealName: json['mealName'] as String,
-      gramsConsumed: (json['gramsConsumed'] as num?)?.toDouble(),
-      proteinGrams: (json['proteinGrams'] as num).toDouble(),
-      carbsGrams: (json['carbsGrams'] as num).toDouble(),
-      fatGrams: (json['fatGrams'] as num).toDouble(),
-      calories: (json['calories'] as num).toDouble(),
-      loggedAt: DateTime.parse(json['loggedAt'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-    );
-  }
-
-  /// Convert model to JSON (for API compatibility)
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'mealId': mealId,
-      'mealName': mealName,
-      'gramsConsumed': gramsConsumed,
-      'proteinGrams': proteinGrams,
-      'carbsGrams': carbsGrams,
-      'fatGrams': fatGrams,
-      'calories': calories,
-      'loggedAt': loggedAt.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
-    };
-  }
-
-  /// Validate log data
-  /// Checks if the log is valid based on type (meal log vs direct macro log)
-  void validate() {
-    if (isMealLog && !isValidMealLog) {
-      throw ArgumentError(
-        'Invalid meal log: Must have mealId and grams > 0',
-      );
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getAllLogs() async {
+    try {
+      final logs = await localDataSource.getAllLogs();
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
-    if (isDirectMacroLog && !isValidDirectMacroLog) {
-      throw ArgumentError(
-        'Invalid direct macro log: Must have at least one macro > 0',
-      );
+  }
+
+  @override
+  Future<Either<Failure, NutritionLog?>> getLogById(String id) async {
+    try {
+      final log = await localDataSource.getLogById(id);
+      return Right(log);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
-    if (!hasValidCalories) {
-      print(
-        'WARNING: Calorie mismatch for log "$mealName": '
-        'stated $calories cal, calculated ${calculatedCalories.toStringAsFixed(1)} cal',
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getLogsByDate(
+    DateTime date,
+  ) async {
+    try {
+      final logs = await localDataSource.getLogsByDate(date);
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  // Keeps compatibility with existing use cases that call repository.getLogsForDate(...)
+  Future<Either<Failure, List<NutritionLog>>> getLogsForDate(
+    DateTime date,
+  ) async {
+    return getLogsByDate(date);
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getLogsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    try {
+      final logs = await localDataSource.getLogsByDateRange(startDate, endDate);
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getLogsByMealId(
+    String mealId,
+  ) async {
+    try {
+      final logs = await localDataSource.getLogsByMealId(mealId);
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getTodayLogs() async {
+    try {
+      final logs = await localDataSource.getTodayLogs();
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getWeeklyLogs() async {
+    try {
+      final logs = await localDataSource.getWeeklyLogs();
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getMealLogs() async {
+    try {
+      final logs = await localDataSource.getMealLogs();
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NutritionLog>>> getDirectMacroLogs() async {
+    try {
+      final logs = await localDataSource.getDirectMacroLogs();
+      return Right(logs);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addLog(NutritionLog log) async {
+    try {
+      final model = NutritionLogModel.fromEntity(log);
+      model.validate();
+      await localDataSource.insertLog(model);
+      return const Right(null);
+    } on ArgumentError catch (e) {
+      return Left(ValidationFailure(e.message.toString()));
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateLog(NutritionLog log) async {
+    try {
+      final model = NutritionLogModel.fromEntity(log);
+      model.validate();
+      await localDataSource.updateLog(model);
+      return const Right(null);
+    } on ArgumentError catch (e) {
+      return Left(ValidationFailure(e.message.toString()));
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteLog(String id) async {
+    try {
+      await localDataSource.deleteLog(id);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteLogsByDate(DateTime date) async {
+    try {
+      await localDataSource.deleteLogsByDate(date);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteLogsByMealId(String mealId) async {
+    try {
+      await localDataSource.deleteLogsByMealId(mealId);
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> clearAllLogs() async {
+    try {
+      await localDataSource.clearAllLogs();
+      return const Right(null);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, int>> getLogsCount() async {
+    try {
+      final logs = await localDataSource.getAllLogs();
+      return Right(logs.length);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, DailyMacros>> getDailyMacros(DateTime date) async {
+    try {
+      final result = await localDataSource.getDailyMacros(date);
+
+      final dailyMacros = DailyMacros(
+        totalCarbs: result['totalCarbs'] ?? 0.0,
+        totalProtein: result['totalProtein'] ?? 0.0,
+        totalFat: result['totalFat'] ?? 0.0,
+        totalCalories: result['totalCalories'] ?? 0.0,
+        date: date,
+        logsCount: (result['logsCount'] ?? 0.0).round(),
       );
+
+      return Right(dailyMacros);
+    } on CacheDatabaseException catch (e) {
+      return Left(DatabaseFailure(e.message));
+    } catch (e) {
+      return Left(DatabaseFailure('Unexpected error: $e'));
     }
   }
 }

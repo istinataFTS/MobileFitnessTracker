@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
-import '../../../core/themes/app_theme.dart';
-import '../../../core/constants/calendar_constants.dart';
-import '../../../core/constants/muscle_groups.dart';
-import '../../../domain/entities/workout_set.dart';
-import '../../../domain/entities/exercise.dart';
-import '../bloc/history_bloc.dart';
+import '../../../../core/constants/calendar_constants.dart';
+import '../../../../core/constants/muscle_groups.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../domain/entities/exercise.dart';
+import '../../../../domain/entities/workout_set.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
-import 'edit_set_dialog.dart';
 import '../../log/log_page.dart';
+import '../bloc/history_bloc.dart';
+import 'edit_set_dialog.dart';
 
 /// Bottom sheet displaying workout details for a selected date
 class DayDetailsBottomSheet extends StatelessWidget {
@@ -36,7 +37,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             width: 40,
@@ -46,14 +46,8 @@ class DayDetailsBottomSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
-          // Header
           _buildHeader(context, hasWorkouts),
-          
-          if (hasWorkouts)
-            const Divider(height: 1),
-          
-          // Content
+          if (hasWorkouts) const Divider(height: 1),
           Flexible(
             child: hasWorkouts
                 ? _buildWorkoutsList(context)
@@ -64,10 +58,9 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Build header with date and stats
   Widget _buildHeader(BuildContext context, bool hasWorkouts) {
     final dateStr = DateFormat('EEEE, MMM d').format(date);
-    
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -94,8 +87,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
               ],
             ),
           ),
-          
-          // Close button
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () {
@@ -107,7 +98,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Build list of workouts
   Widget _buildWorkoutsList(BuildContext context) {
     return BlocBuilder<ExerciseBloc, ExerciseState>(
       builder: (context, exerciseState) {
@@ -115,9 +105,8 @@ class DayDetailsBottomSheet extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // Create exercise map for quick lookup
         final exerciseMap = <String, Exercise>{
-          for (var ex in exerciseState.exercises) ex.id: ex,
+          for (final ex in exerciseState.exercises) ex.id: ex,
         };
 
         return ListView.separated(
@@ -128,9 +117,9 @@ class DayDetailsBottomSheet extends StatelessWidget {
           itemBuilder: (context, index) {
             final set = sets[index];
             final exercise = exerciseMap[set.exerciseId];
-            
+
             if (exercise == null) {
-              return const SizedBox(); // Skip if exercise not found
+              return const SizedBox.shrink();
             }
 
             return _buildSetCard(context, set, exercise);
@@ -140,10 +129,9 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Build individual set card
   Widget _buildSetCard(BuildContext context, WorkoutSet set, Exercise exercise) {
     final muscleGroupsList = exercise.muscleGroups
-        .map((mg) => MuscleGroups.getDisplayName(mg))
+        .map(MuscleGroups.getDisplayName)
         .join(', ');
 
     return Card(
@@ -153,7 +141,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Exercise name and actions
             Row(
               children: [
                 Expanded(
@@ -164,8 +151,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
                         ),
                   ),
                 ),
-                
-                // Edit button
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
                   onPressed: () => _showEditDialog(context, set, exercise),
@@ -174,8 +159,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
                   constraints: const BoxConstraints(),
                 ),
                 const SizedBox(width: 12),
-                
-                // Delete button
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
                   onPressed: () => _confirmDelete(context, set, exercise),
@@ -186,8 +169,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            
-            // Set details
             Row(
               children: [
                 _buildDetailChip(
@@ -204,8 +185,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            
-            // Muscle groups
             Text(
               muscleGroupsList,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -218,8 +197,8 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Build detail chip
-  Widget _buildDetailChip(BuildContext context, {
+  Widget _buildDetailChip(
+    BuildContext context, {
     required IconData icon,
     required String label,
   }) {
@@ -246,14 +225,13 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Build empty state
   Widget _buildEmptyState(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(40),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.fitness_center_outlined,
             size: 64,
             color: AppTheme.textDim,
@@ -272,11 +250,9 @@ class DayDetailsBottomSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          
-          // Log workout button
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.pop(context); // Close bottom sheet
+              Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -292,7 +268,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Show edit dialog
   void _showEditDialog(BuildContext context, WorkoutSet set, Exercise exercise) {
     showDialog(
       context: context,
@@ -306,11 +281,10 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Confirm delete
   void _confirmDelete(BuildContext context, WorkoutSet set, Exercise exercise) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.surfaceDark,
         title: const Text('Delete Set?'),
         content: Text(
@@ -318,13 +292,13 @@ class DayDetailsBottomSheet extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               context.read<HistoryBloc>().add(DeleteSetEvent(set.id));
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
             },
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.errorRed,

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/input_validators.dart';
-import '../../../domain/entities/workout_set.dart';
-import '../../../domain/entities/exercise.dart';
+import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
+import '../../../../domain/entities/exercise.dart';
+import '../../../../domain/entities/workout_set.dart';
 import '../bloc/history_bloc.dart';
 
 /// Dialog for editing an existing workout set
@@ -60,7 +60,6 @@ class _EditSetDialogState extends State<EditSetDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Text(
                 'Edit Set',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -75,8 +74,6 @@ class _EditSetDialogState extends State<EditSetDialog> {
                     ),
               ),
               const SizedBox(height: 24),
-              
-              // Reps Input
               TextFormField(
                 controller: _repsController,
                 decoration: const InputDecoration(
@@ -88,8 +85,6 @@ class _EditSetDialogState extends State<EditSetDialog> {
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              
-              // Weight Input
               TextFormField(
                 controller: _weightController,
                 decoration: const InputDecoration(
@@ -100,8 +95,6 @@ class _EditSetDialogState extends State<EditSetDialog> {
                 validator: InputValidators.validateWeight,
               ),
               const SizedBox(height: 24),
-              
-              // Action Buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -129,13 +122,11 @@ class _EditSetDialogState extends State<EditSetDialog> {
     }
 
     final updatedSet = widget.workoutSet.copyWith(
-      reps: int.parse(_repsController.text),
-      weight: double.parse(_weightController.text),
+      reps: int.parse(_repsController.text.trim()),
+      weight: double.parse(_weightController.text.trim()),
     );
 
     context.read<HistoryBloc>().add(UpdateSetEvent(updatedSet));
     Navigator.pop(context);
   }
 }
-
-

@@ -7,6 +7,7 @@ class MealModel extends Meal {
   const MealModel({
     required super.id,
     required super.name,
+    required super.servingSizeGrams,
     required super.carbsPer100g,
     required super.proteinPer100g,
     required super.fatPer100g,
@@ -19,6 +20,7 @@ class MealModel extends Meal {
     return MealModel(
       id: meal.id,
       name: meal.name,
+      servingSizeGrams: meal.servingSizeGrams,
       carbsPer100g: meal.carbsPer100g,
       proteinPer100g: meal.proteinPer100g,
       fatPer100g: meal.fatPer100g,
@@ -32,6 +34,7 @@ class MealModel extends Meal {
     return MealModel(
       id: map[DatabaseTables.mealId] as String,
       name: map[DatabaseTables.mealName] as String,
+      servingSizeGrams: (map[DatabaseTables.mealServingSize] as num).toDouble(),
       carbsPer100g: (map[DatabaseTables.mealCarbsPer100g] as num).toDouble(),
       proteinPer100g:
           (map[DatabaseTables.mealProteinPer100g] as num).toDouble(),
@@ -47,6 +50,7 @@ class MealModel extends Meal {
     return {
       DatabaseTables.mealId: id,
       DatabaseTables.mealName: name,
+      DatabaseTables.mealServingSize: servingSizeGrams,
       DatabaseTables.mealCarbsPer100g: carbsPer100g,
       DatabaseTables.mealProteinPer100g: proteinPer100g,
       DatabaseTables.mealFatPer100g: fatPer100g,
@@ -55,11 +59,12 @@ class MealModel extends Meal {
     };
   }
 
-  /// Convert to JSON for serialization (if needed for API or caching)
+  /// Convert to JSON for serialization
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
+      'servingSizeGrams': servingSizeGrams,
       'carbsPer100g': carbsPer100g,
       'proteinPer100g': proteinPer100g,
       'fatPer100g': fatPer100g,
@@ -69,7 +74,6 @@ class MealModel extends Meal {
   }
 
   /// Validate calorie accuracy
-  /// Returns true if stated calories match calculated calories within tolerance
   bool get hasValidCalories {
     final calculated = calculatedCalories;
     const tolerance = 5.0;
@@ -77,12 +81,32 @@ class MealModel extends Meal {
   }
 
   /// Calculate calories from macros using 4-4-9 rule
+  @override
   double get calculatedCalories {
     return MacroCalculator.calculateCalories(
       carbs: carbsPer100g,
       protein: proteinPer100g,
       fat: fatPer100g,
     );
+  }
+
+  /// Throws if the model contains invalid nutritional data.
+  void validateMacros() {
+    if (name.trim().isEmpty) {
+      throw ArgumentError('Meal name cannot be empty');
+    }
+
+    if (servingSizeGrams <= 0) {
+      throw ArgumentError('Serving size must be greater than 0');
+    }
+
+    if (carbsPer100g < 0 || proteinPer100g < 0 || fatPer100g < 0) {
+      throw ArgumentError('Macros cannot be negative');
+    }
+
+    if (caloriesPer100g < 0) {
+      throw ArgumentError('Calories cannot be negative');
+    }
   }
 
   /// Log calorie discrepancy warning if validation fails
@@ -95,15 +119,18 @@ class MealModel extends Meal {
         'calculated ${calculated.toStringAsFixed(1)} cal from macros',
       );
       print(
-        'Difference: ${(caloriesPer100g - calculated).abs().toStringAsFixed(1)} cal',
+        'Difference: '
+        '${(caloriesPer100g - calculated).abs().toStringAsFixed(1)} cal',
       );
     }
   }
 
   /// Create a copy with updated fields
+  @override
   MealModel copyWith({
     String? id,
     String? name,
+    double? servingSizeGrams,
     double? carbsPer100g,
     double? proteinPer100g,
     double? fatPer100g,
@@ -113,6 +140,7 @@ class MealModel extends Meal {
     return MealModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      servingSizeGrams: servingSizeGrams ?? this.servingSizeGrams,
       carbsPer100g: carbsPer100g ?? this.carbsPer100g,
       proteinPer100g: proteinPer100g ?? this.proteinPer100g,
       fatPer100g: fatPer100g ?? this.fatPer100g,
@@ -122,13 +150,10 @@ class MealModel extends Meal {
   }
 
   /// Create MealModel with auto-calculated calories from macros
-  /// If caloriesPer100g is null, calculates from macros
-  /// If carbsPer100g is null, calculates from remaining calories after protein and fat
-  /// If proteinPer100g is null, calculates from remaining calories after carbs and fat
-  /// If fatPer100g is null, calculates from remaining calories after carbs and protein
   factory MealModel.withCalculatedMacros({
     required String id,
     required String name,
+    double servingSizeGrams = 100,
     double? carbsPer100g,
     double? proteinPer100g,
     double? fatPer100g,
@@ -177,6 +202,7 @@ class MealModel extends Meal {
     return MealModel(
       id: id,
       name: name,
+      servingSizeGrams: servingSizeGrams,
       carbsPer100g: carbsPer100g ?? 0,
       proteinPer100g: proteinPer100g ?? 0,
       fatPer100g: fatPer100g ?? 0,

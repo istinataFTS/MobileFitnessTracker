@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/muscle_factor.dart';
@@ -28,9 +29,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
     }
   }
 
-  /// Returns all stored muscle factors.
-  /// Note: not part of the [MuscleFactorRepository] interface — available
-  /// as an internal utility method.
+  @override
   Future<Either<Failure, List<MuscleFactor>>> getAllFactors() async {
     try {
       final factorMaps = await localDataSource.getAllFactors();
@@ -46,7 +45,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, List<MuscleFactor>>> getFactorsByExerciseId(
+  Future<Either<Failure, List<MuscleFactor>>> getFactorsForExercise(
     String exerciseId,
   ) async {
     try {
@@ -67,10 +66,10 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
     String muscleGroup,
   ) async {
     try {
-      final factorMaps = await localDataSource.getAllFactors();
-      final factors = factorMaps
+      final allFactorMaps = await localDataSource.getAllFactors();
+      final factors = allFactorMaps
           .map((map) => MuscleFactorModel.fromMap(map))
-          .where((f) => f.muscleGroup == muscleGroup)
+          .where((factor) => factor.muscleGroup == muscleGroup)
           .toList();
       return Right(factors);
     } on CacheDatabaseException catch (e) {
@@ -81,7 +80,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addFactor(MuscleFactor factor) async {
+  Future<Either<Failure, void>> addMuscleFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.addFactor(model);
@@ -94,7 +93,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addFactorsBatch(
+  Future<Either<Failure, void>> addMuscleFactorsBatch(
     List<MuscleFactor> factors,
   ) async {
     try {
@@ -111,7 +110,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateFactor(MuscleFactor factor) async {
+  Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) async {
     try {
       final model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.updateFactor(model);
@@ -124,7 +123,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteFactor(String id) async {
+  Future<Either<Failure, void>> deleteMuscleFactor(String id) async {
     try {
       await localDataSource.deleteFactor(id);
       return const Right(null);
@@ -136,7 +135,7 @@ class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteFactorsByExerciseId(
+  Future<Either<Failure, void>> deleteMuscleFactorsByExerciseId(
     String exerciseId,
   ) async {
     try {

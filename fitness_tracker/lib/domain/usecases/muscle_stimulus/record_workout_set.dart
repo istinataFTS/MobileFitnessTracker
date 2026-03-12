@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
-import '../../entities/muscle_stimulus.dart';
+import '../../entities/muscle_stimulus.dart' as muscle_stimulus_entity;
 import '../../repositories/muscle_factor_repository.dart';
 import '../../repositories/muscle_stimulus_repository.dart';
 import 'calculate_muscle_stimulus.dart';
@@ -67,7 +67,8 @@ class RecordWorkoutSet {
               (failure) {
                 if (EnvConfig.enableDebugLogs) {
                   print(
-                    'Failed to update stimulus for $muscleGroup: ${failure.message}',
+                    'Failed to update stimulus for '
+                    '$muscleGroup: ${failure.message}',
                   );
                 }
               },
@@ -149,10 +150,9 @@ class RecordWorkoutSet {
       );
 
       final newWeeklyLoad =
-          (previousWeeklyLoad * MuscleStimulusConstants.weeklyDecayFactor) +
-              setStimulus;
+          (previousWeeklyLoad * MuscleStimulus.weeklyDecayFactor) + setStimulus;
 
-      final stimulus = MuscleStimulus(
+      final stimulus = muscle_stimulus_entity.MuscleStimulus(
         id: _uuid.v4(),
         muscleGroup: muscleGroup,
         date: date,
@@ -171,7 +171,7 @@ class RecordWorkoutSet {
   }
 
   Future<Either<Failure, void>> _updateExistingStimulusRecord({
-    required MuscleStimulus existing,
+    required muscle_stimulus_entity.MuscleStimulus existing,
     required double setStimulus,
     required int setTimestamp,
   }) async {

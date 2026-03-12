@@ -2,8 +2,10 @@ import 'package:get_it/get_it.dart';
 import '../data/datasources/local/database_helper.dart';
 import '../data/datasources/local/target_local_datasource.dart';
 import '../data/datasources/local/workout_set_local_datasource.dart';
+import '../data/datasources/local/workout_set_local_datasource_impl.dart';
 import '../data/datasources/local/exercise_local_datasource.dart';
 import '../data/datasources/local/meal_local_datasource.dart';
+import '../data/datasources/local/meal_local_datasource_impl.dart';
 import '../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../data/datasources/local/muscle_factor_local_datasource.dart';
 import '../data/datasources/local/muscle_stimulus_local_datasource.dart';
@@ -65,95 +67,101 @@ import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 final sl = GetIt.instance;
 
-/// Initialize all dependencies following Clean Architecture principles
-///
-/// Registration order:
-/// 1. BLoCs (Factory - new instance per request)
-/// 2. Use Cases (Lazy Singleton - single instance, created on first use)
-/// 3. Repositories (Lazy Singleton)
-/// 4. Data Sources (Lazy Singleton)
-/// 5. Core/External (Lazy Singleton)
 Future<void> init() async {
   // ==================== BLoCs ====================
-  // Factory registration creates new instance for each BlocProvider
 
-  sl.registerFactory(() => TargetsBloc(
-        getAllTargets: sl(),
-        addTarget: sl(),
-        updateTarget: sl(),
-        deleteTarget: sl(),
-      ));
+  sl.registerFactory(
+    () => TargetsBloc(
+      getAllTargets: sl(),
+      addTarget: sl(),
+      updateTarget: sl(),
+      deleteTarget: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => WorkoutBloc(
-        addWorkoutSet: sl(),
-        getWeeklySets: sl(),
-        recordWorkoutSet: sl(),
-      ));
+  sl.registerFactory(
+    () => WorkoutBloc(
+      addWorkoutSet: sl(),
+      getWeeklySets: sl(),
+      recordWorkoutSet: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => HomeBloc(
-        getAllTargets: sl(),
-        getWeeklySets: sl(),
-        getSetsByDateRange: sl(),
-      ));
+  sl.registerFactory(
+    () => HomeBloc(
+      getAllTargets: sl(),
+      getWeeklySets: sl(),
+      getSetsByDateRange: sl(),
+      getAllExercises: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => MuscleVisualBloc(
-        getMuscleVisualData: sl(),
-      ));
+  sl.registerFactory(
+    () => MuscleVisualBloc(
+      getMuscleVisualData: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => ExerciseBloc(
-        getAllExercises: sl(),
-        getExerciseById: sl(),
-        getExercisesForMuscle: sl(),
-        addExercise: sl(),
-        updateExercise: sl(),
-        deleteExercise: sl(),
-      ));
+  sl.registerFactory(
+    () => ExerciseBloc(
+      getAllExercises: sl(),
+      getExerciseById: sl(),
+      getExercisesForMuscle: sl(),
+      addExercise: sl(),
+      updateExercise: sl(),
+      deleteExercise: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => HistoryBloc(
-        getAllWorkoutSets: sl(),
-        getSetsByDateRange: sl(),
-        deleteWorkoutSet: sl(),
-        updateWorkoutSet: sl(),
-      ));
+  sl.registerFactory(
+    () => HistoryBloc(
+      getAllWorkoutSets: sl(),
+      getSetsByDateRange: sl(),
+      deleteWorkoutSet: sl(),
+      updateWorkoutSet: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => MealBloc(
-        getAllMeals: sl(),
-        getMealById: sl(),
-        getMealByName: sl(),
-        addMeal: sl(),
-        updateMeal: sl(),
-        deleteMeal: sl(),
-      ));
+  sl.registerFactory(
+    () => MealBloc(
+      getAllMeals: sl(),
+      getMealById: sl(),
+      getMealByName: sl(),
+      addMeal: sl(),
+      updateMeal: sl(),
+      deleteMeal: sl(),
+    ),
+  );
 
-  sl.registerFactory(() => NutritionLogBloc(
-        getLogsForDate: sl(),
-        addNutritionLog: sl(),
-        updateNutritionLog: sl(),
-        deleteNutritionLog: sl(),
-        getDailyMacros: sl(),
-      ));
+  sl.registerFactory(
+    () => NutritionLogBloc(
+      getLogsForDate: sl(),
+      addNutritionLog: sl(),
+      updateNutritionLog: sl(),
+      deleteNutritionLog: sl(),
+      getDailyMacros: sl(),
+    ),
+  );
 
   // ==================== Use Cases ====================
-  // Lazy Singleton registration creates single instance on first use
 
-  // Targets
   sl.registerLazySingleton(() => GetAllTargets(sl()));
   sl.registerLazySingleton(() => AddTarget(sl()));
   sl.registerLazySingleton(() => UpdateTarget(sl()));
   sl.registerLazySingleton(() => DeleteTarget(sl()));
 
-  // Workout Sets
   sl.registerLazySingleton(() => AddWorkoutSet(sl()));
   sl.registerLazySingleton(() => GetAllWorkoutSets(sl()));
   sl.registerLazySingleton(() => GetWeeklySets(sl()));
-  sl.registerLazySingleton(() => GetSetsByDateRange(
-        workoutSetRepository: sl(),
-        exerciseRepository: sl(),
-      ));
+  sl.registerLazySingleton(
+    () => GetSetsByDateRange(
+      workoutSetRepository: sl(),
+      exerciseRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
   sl.registerLazySingleton(() => UpdateWorkoutSet(sl()));
 
-  // Exercises
   sl.registerLazySingleton(() => GetAllExercises(sl()));
   sl.registerLazySingleton(() => GetExerciseById(sl()));
   sl.registerLazySingleton(() => GetExercisesForMuscle(sl()));
@@ -162,7 +170,6 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteExercise(sl()));
   sl.registerLazySingleton(() => SeedExercises(sl()));
 
-  // Meals
   sl.registerLazySingleton(() => GetAllMeals(sl()));
   sl.registerLazySingleton(() => GetMealById(sl()));
   sl.registerLazySingleton(() => GetMealByName(sl()));
@@ -170,31 +177,35 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateMeal(sl()));
   sl.registerLazySingleton(() => DeleteMeal(sl()));
 
-  // Nutrition Logs
   sl.registerLazySingleton(() => GetLogsForDate(sl()));
   sl.registerLazySingleton(() => AddNutritionLog(sl()));
   sl.registerLazySingleton(() => UpdateNutritionLog(sl()));
   sl.registerLazySingleton(() => DeleteNutritionLog(sl()));
   sl.registerLazySingleton(() => GetDailyMacros(sl()));
 
-  // Muscle Factors
-  sl.registerLazySingleton(() => SeedExerciseFactors(
-        muscleFactorRepository: sl(),
-        exerciseRepository: sl(),
-      ));
+  sl.registerLazySingleton(
+    () => SeedExerciseFactors(
+      muscleFactorRepository: sl(),
+      exerciseRepository: sl(),
+    ),
+  );
 
-  // Muscle Stimulus
-  sl.registerLazySingleton(() => CalculateMuscleStimulus(sl()));
-  sl.registerLazySingleton(() => RecordWorkoutSet(
-        muscleFactorRepository: sl(),
-        muscleStimulusRepository: sl(),
-        calculateMuscleStimulus: sl(),
-      ));
+  sl.registerLazySingleton(
+    () => CalculateMuscleStimulus(
+      muscleFactorRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => RecordWorkoutSet(
+      muscleFactorRepository: sl(),
+      muscleStimulusRepository: sl(),
+      calculateMuscleStimulus: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => GetMuscleVisualData(sl()));
   sl.registerLazySingleton(() => ApplyDailyDecay(sl()));
 
   // ==================== Repositories ====================
-  // Interface to Implementation mapping
 
   sl.registerLazySingleton<TargetRepository>(
     () => TargetRepositoryImpl(localDataSource: sl()),
@@ -225,7 +236,6 @@ Future<void> init() async {
   );
 
   // ==================== Data Sources ====================
-  // Local database access layer
 
   sl.registerLazySingleton<TargetLocalDataSource>(
     () => TargetLocalDataSourceImpl(databaseHelper: sl()),
@@ -248,7 +258,7 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<MuscleFactorLocalDataSource>(
-    () => MuscleFactorLocalDataSourceImpl(databaseHelper: sl()),
+    () => MuscleFactorLocalDataSource(databaseHelper: sl()),
   );
 
   sl.registerLazySingleton<MuscleStimulusLocalDataSource>(
@@ -256,9 +266,8 @@ Future<void> init() async {
   );
 
   // ==================== Core ====================
-  // Shared database helper
+
   sl.registerLazySingleton(() => DatabaseHelper());
 
-  // Initialize database (ensures tables are created)
   await sl<DatabaseHelper>().database;
 }

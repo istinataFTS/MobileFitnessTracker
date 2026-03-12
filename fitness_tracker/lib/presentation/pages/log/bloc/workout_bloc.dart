@@ -5,6 +5,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
+import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 
 abstract class WorkoutEvent extends Equatable {
   const WorkoutEvent();
@@ -38,6 +39,7 @@ abstract class WorkoutState extends Equatable {
 }
 
 class WorkoutInitial extends WorkoutState {}
+
 class WorkoutLoading extends WorkoutState {}
 
 class WorkoutLoaded extends WorkoutState {
@@ -61,25 +63,29 @@ class WorkoutError extends WorkoutState {
 class WorkoutOperationSuccess extends WorkoutState {
   final String message;
   final List<WorkoutSet> weeklySets;
+  final List<String> affectedMuscles;
 
   const WorkoutOperationSuccess({
     required this.message,
     required this.weeklySets,
+    this.affectedMuscles = const [],
   });
 
   @override
-  List<Object?> get props => [message, weeklySets];
+  List<Object?> get props => [message, weeklySets, affectedMuscles];
 }
 
 class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
+  final RecordWorkoutSet recordWorkoutSet;
 
   List<WorkoutSet> _cachedWeeklySets = [];
 
   WorkoutBloc({
     required this.addWorkoutSet,
     required this.getWeeklySets,
+    required this.recordWorkoutSet,
   }) : super(WorkoutInitial()) {
     on<AddWorkoutSetEvent>(_onAddWorkoutSet);
     on<LoadWeeklySetsEvent>(_onLoadWeeklySets);
@@ -92,24 +98,36 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState> {
   ) async {
     emit(WorkoutLoading());
 
-    final result = await addWorkoutSet(event.workoutSet);
+    final addResult = await addWorkoutSet(event.workoutSet);
 
-    await result.fold(
+    await addResult.fold(
       (failure) async => emit(WorkoutError(failure.message)),
       (_) async {
+        final affectedMusclesResult = await recordWorkoutSet(
+          exerciseId: event.workoutSet.exerciseId,
+          sets: 1,
+          intensity: event.workoutSet.intensity,
+          timestamp: event.workoutSet.date,
+        );
+
+        final affectedMuscles = affectedMusclesResult.fold(
+          (_) => <String>[],
+          (muscles) => muscles,
+        );
+
         final setsResult = await getWeeklySets();
 
         setsResult.fold(
-          (_) => emit(const WorkoutOperationSuccess(
-            message: AppStrings.setLogged,
-            weeklySets: [],
-          )),
+          (failure) => emit(WorkoutError(failure.message)),
           (sets) {
             _cachedWeeklySets = sets;
-            emit(WorkoutOperationSuccess(
-              message: AppStrings.setLogged,
-              weeklySets: sets,
-            ));
+            emit(
+              WorkoutOperationSuccess(
+                message: AppStrings.setLogged,
+                weeklySets: sets,
+                affectedMuscles: affectedMuscles,
+              ),
+            );
           },
         );
       },
