@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/svg_muscle_mapping.dart';
 import '../../../../core/themes/app_theme.dart';
@@ -41,12 +40,12 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Base body outline (SVG)
+                // Base body outline image
                 _buildBodyOutline(context),
-                
+
                 // Colored muscle overlays
                 _buildMuscleOverlays(context),
-                
+
                 // View indicator
                 _buildViewIndicator(context),
               ],
@@ -145,35 +144,39 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  /// Build body outline using SVG files
-  /// 
-  /// Renders FrontLook.svg or BackLook.svg based on current view
-  /// SVG files should be placed in assets/images/body/
+  /// Build body outline using PNG files
+  ///
+  /// Renders FrontLook.png or BackLook.png based on current view
+  /// PNG files should be placed in assets/images/body/
   Widget _buildBodyOutline(BuildContext context) {
-    final svgPath = isFrontView
-        ? 'assets/images/body/FrontLook.svg'
-        : 'assets/images/body/BackLook.svg';
+    final imagePath = isFrontView
+        ? 'assets/images/body/FrontLook.png'
+        : 'assets/images/body/BackLook.png';
 
-    return SvgPicture.asset(
-      svgPath,
+    return Image.asset(
+      imagePath,
       fit: BoxFit.contain,
-      placeholderBuilder: (context) => Container(
-        color: AppTheme.surfaceDark,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: AppTheme.primaryOrange,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: AppTheme.surfaceDark,
+          child: Center(
+            child: Text(
+              'Failed to load body image',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textMedium,
+                  ),
+              textAlign: TextAlign.center,
+            ),
           ),
-        ),
-      ),
-      // If SVG fails to load, show error state
-      colorFilter: null, // Don't apply color filter to base SVG
+        );
+      },
     );
   }
 
   /// Build colored muscle overlays
-  /// 
+  ///
   /// Renders colored shapes over muscle regions based on training data
-  /// Uses CustomPainter to draw color overlays on SVG paths
+  /// Uses CustomPainter to draw color overlays on body image
   Widget _buildMuscleOverlays(BuildContext context) {
     final visibleMuscles = isFrontView
         ? SvgMuscleMapping.frontViewMuscles
@@ -213,35 +216,26 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
 }
 
 /// Custom painter for muscle color overlays
-/// 
+///
 /// Draws colored regions for each muscle based on training intensity
-/// 
+///
 /// NOTE: This is a simplified implementation that draws colored rectangles
-/// as placeholders. To properly color SVG paths, you'll need to:
-/// 
-/// 1. Parse the SVG files to get path coordinates
-/// 2. Use the SvgMuscleMapping.svgPathIds to identify muscle regions
-/// 3. Apply colors to specific SVG paths using flutter_svg's color filters
-/// 
+/// as placeholders.
+///
 /// ADVANCED IMPLEMENTATION OPTIONS:
-/// 
-/// Option A: Modify SVG at runtime
-/// - Load SVG as string
-/// - Find path elements by ID
-/// - Inject fill="color" attributes
-/// - Render modified SVG
-/// 
-/// Option B: Layer multiple SVG renders
-/// - Render base SVG (grayscale)
-/// - For each trained muscle:
-///   - Render SVG with ColorFilter on specific paths
-///   - Use clipPath to show only that muscle
-/// 
-/// Option C: Use CustomPainter with SVG path data
-/// - Extract path data from SVG
-/// - Store as Path objects
+///
+/// Option A: Use image coordinates / masks
+/// - Create coordinate maps for muscle regions
+/// - Draw colored regions over image positions
+///
+/// Option B: Layer multiple transparent PNG overlays
+/// - Render base body PNG
+/// - Render muscle-specific transparent overlays on top
+///
+/// Option C: Use CustomPainter with manually defined paths
+/// - Store muscle region paths
 /// - Paint each path with appropriate color
-/// 
+///
 /// For now, this draws placeholder rectangles to demonstrate the concept.
 class _MuscleOverlayPainter extends CustomPainter {
   final Map<String, MuscleVisualData> muscleData;
@@ -256,36 +250,28 @@ class _MuscleOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // TODO: Replace with actual SVG path coloring
-    // This is a placeholder that demonstrates the concept
-    // See class documentation for implementation options
-    
     _drawPlaceholderMuscleRegions(canvas, size);
   }
 
   /// Placeholder muscle region visualization
-  /// 
+  ///
   /// Shows concept of colored muscle regions using simple shapes
-  /// Replace this with actual SVG path coloring once SVG files are available
   void _drawPlaceholderMuscleRegions(Canvas canvas, Size size) {
     final centerX = size.width / 2;
-    
-    // Only draw muscles visible on current view
+
     for (final muscleGroup in visibleMuscles) {
       if (!muscleData.containsKey(muscleGroup)) continue;
-      
+
       final data = muscleData[muscleGroup]!;
-      if (!data.hasTrained) continue; // Skip untrained muscles
-      
-      // Get approximate position for this muscle (placeholder logic)
+      if (!data.hasTrained) continue;
+
       final position = _getMusclePosition(muscleGroup, centerX, size.height);
       if (position == null) continue;
-      
+
       final paint = Paint()
-        ..color = data.color
+        ..color = data.color.withOpacity(0.45)
         ..style = PaintingStyle.fill;
 
-      // Draw colored region (placeholder - replace with actual SVG path)
       final rect = RRect.fromRectAndRadius(
         Rect.fromCenter(
           center: position,
@@ -299,13 +285,7 @@ class _MuscleOverlayPainter extends CustomPainter {
   }
 
   /// Get approximate position for muscle group (placeholder)
-  /// 
-  /// Returns null if muscle should not be drawn on current view
-  /// Replace with actual SVG path coordinates
   Offset? _getMusclePosition(String muscleGroup, double centerX, double height) {
-    // This is placeholder logic - replace with actual SVG coordinates
-    // based on SvgMuscleMapping.svgPathIds
-    
     if (isFrontView) {
       switch (muscleGroup) {
         case 'front-delts':
