@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/constants/calendar_constants.dart';
 import '../../../../core/themes/app_theme.dart';
 
-/// Custom calendar widget for displaying a month with workout indicators
+/// Compact calendar widget used to navigate the selected history day.
 class HistoryCalendarWidget extends StatelessWidget {
   final DateTime displayedMonth;
   final DateTime? selectedDate;
   final DateTime today;
-  final Map<DateTime, int> dateSetsCount;
+  final Map<DateTime, int> dateActivityCount;
   final ValueChanged<DateTime> onDateSelected;
   final VoidCallback onPreviousMonth;
   final VoidCallback onNextMonth;
@@ -20,19 +19,25 @@ class HistoryCalendarWidget extends StatelessWidget {
     required this.displayedMonth,
     required this.selectedDate,
     required this.today,
-    required this.dateSetsCount,
+    required this.dateActivityCount,
     required this.onDateSelected,
     required this.onPreviousMonth,
     required this.onNextMonth,
     required this.onTodayTapped,
   });
 
+  static const double _monthHeaderHeight = 52;
+  static const double _weekdayHeaderHeight = 28;
+  static const double _dayItemHeight = 36;
+  static const double _todayBorderWidth = 1.5;
+  static const double _indicatorSize = 5;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.borderDark),
       ),
       child: Column(
@@ -52,21 +57,22 @@ class HistoryCalendarWidget extends StatelessWidget {
     final isCurrentMonth = _isSameMonth(displayedMonth, today);
 
     return SizedBox(
-      height: CalendarConstants.monthNavHeight,
+      height: _monthHeaderHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.chevron_left, size: 28),
-              onPressed: _canNavigateToPrevious() ? onPreviousMonth : null,
+              icon: const Icon(Icons.chevron_left, size: 22),
+              onPressed: onPreviousMonth,
               tooltip: 'Previous Month',
+              visualDensity: VisualDensity.compact,
             ),
             Expanded(
               child: Text(
                 monthName,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
@@ -75,14 +81,19 @@ class HistoryCalendarWidget extends StatelessWidget {
               TextButton(
                 onPressed: onTodayTapped,
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text('Today'),
-              ),
+              )
+            else
+              const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.chevron_right, size: 28),
-              onPressed: _canNavigateToNext() ? onNextMonth : null,
+              icon: const Icon(Icons.chevron_right, size: 22),
+              onPressed: onNextMonth,
               tooltip: 'Next Month',
+              visualDensity: VisualDensity.compact,
             ),
           ],
         ),
@@ -94,16 +105,16 @@ class HistoryCalendarWidget extends StatelessWidget {
     const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
     return SizedBox(
-      height: CalendarConstants.weekdayHeaderHeight,
+      height: _weekdayHeaderHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           children: weekdays.map((day) {
             return Expanded(
               child: Center(
                 child: Text(
                   day,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.textDim,
                         fontWeight: FontWeight.w600,
                       ),
@@ -128,7 +139,7 @@ class HistoryCalendarWidget extends StatelessWidget {
     final rows = (totalCells / 7).ceil();
 
     return Padding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
       child: Column(
         children: List.generate(rows, (rowIndex) {
           return Row(
@@ -159,15 +170,16 @@ class HistoryCalendarWidget extends StatelessWidget {
   Widget _buildDateCell(BuildContext context, DateTime date) {
     final isToday = _isSameDay(date, today);
     final isSelected = selectedDate != null && _isSameDay(date, selectedDate!);
-    final setsCount = dateSetsCount[date] ?? 0;
-    final hasWorkouts = setsCount > 0;
-    final isFutureDate = date.isAfter(DateTime(today.year, today.month, today.day));
+    final activityCount = dateActivityCount[date] ?? 0;
+    final hasActivity = activityCount > 0;
+    final isFutureDate =
+        date.isAfter(DateTime(today.year, today.month, today.day));
 
     Color? backgroundColor;
     if (isSelected) {
       backgroundColor = AppTheme.primaryOrange.withOpacity(0.2);
-    } else if (hasWorkouts) {
-      backgroundColor = AppTheme.primaryOrange.withOpacity(0.1);
+    } else if (hasActivity) {
+      backgroundColor = AppTheme.primaryOrange.withOpacity(0.08);
     }
 
     Color? borderColor;
@@ -180,44 +192,44 @@ class HistoryCalendarWidget extends StatelessWidget {
     return GestureDetector(
       onTap: isFutureDate ? null : () => onDateSelected(date),
       child: Container(
-        height: CalendarConstants.dayItemHeight,
-        margin: const EdgeInsets.all(2),
+        height: _dayItemHeight,
+        margin: const EdgeInsets.all(1.5),
         decoration: BoxDecoration(
           color: backgroundColor,
           border: borderColor != null
               ? Border.all(
                   color: borderColor,
-                  width: isToday ? CalendarConstants.todayBorderWidth : 1,
+                  width: isToday ? _todayBorderWidth : 1,
                 )
               : null,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(7),
         ),
         child: Stack(
           children: [
             Center(
               child: Text(
                 '${date.day}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: isFutureDate
                           ? AppTheme.textDim
-                          : hasWorkouts
+                          : hasActivity
                               ? AppTheme.textLight
                               : AppTheme.textMedium,
-                      fontWeight: isToday || hasWorkouts
+                      fontWeight: isToday || hasActivity
                           ? FontWeight.w600
                           : FontWeight.w400,
                     ),
               ),
             ),
-            if (hasWorkouts)
+            if (hasActivity)
               Positioned(
-                bottom: 4,
+                bottom: 3,
                 left: 0,
                 right: 0,
                 child: Center(
                   child: Container(
-                    width: CalendarConstants.dateIndicatorSize,
-                    height: CalendarConstants.dateIndicatorSize,
+                    width: _indicatorSize,
+                    height: _indicatorSize,
                     decoration: const BoxDecoration(
                       color: AppTheme.primaryOrange,
                       shape: BoxShape.circle,
@@ -229,17 +241,6 @@ class HistoryCalendarWidget extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  bool _canNavigateToPrevious() {
-    final previousMonth = DateTime(displayedMonth.year, displayedMonth.month - 1);
-    return previousMonth.isAfter(CalendarConstants.minAllowedDate);
-  }
-
-  bool _canNavigateToNext() {
-    final nextMonth = DateTime(displayedMonth.year, displayedMonth.month + 1);
-    final firstDayOfNext = DateTime(nextMonth.year, nextMonth.month, 1);
-    return firstDayOfNext.isBefore(CalendarConstants.maxAllowedDate);
   }
 
   bool _isSameDay(DateTime a, DateTime b) {

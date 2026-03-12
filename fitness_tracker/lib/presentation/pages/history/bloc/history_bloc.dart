@@ -12,11 +12,6 @@ import '../../../../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../../../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import '../../../../domain/usecases/workout_sets/update_workout_set.dart';
 
-enum HistoryMode {
-  workouts,
-  nutrition,
-}
-
 // ==================== Events ====================
 
 abstract class HistoryEvent extends Equatable {
@@ -93,15 +88,6 @@ class NavigateToMonthEvent extends HistoryEvent {
   List<Object?> get props => [month];
 }
 
-class ChangeHistoryModeEvent extends HistoryEvent {
-  final HistoryMode mode;
-
-  const ChangeHistoryModeEvent(this.mode);
-
-  @override
-  List<Object?> get props => [mode];
-}
-
 // ==================== States ====================
 
 abstract class HistoryState extends Equatable {
@@ -117,7 +103,6 @@ class HistoryLoading extends HistoryState {}
 
 class HistoryLoaded extends HistoryState {
   final DateTime currentMonth;
-  final HistoryMode currentMode;
   final Map<DateTime, List<WorkoutSet>> monthSets;
   final Map<DateTime, List<NutritionLog>> monthNutritionLogs;
   final DateTime? selectedDate;
@@ -126,7 +111,6 @@ class HistoryLoaded extends HistoryState {
 
   const HistoryLoaded({
     required this.currentMonth,
-    required this.currentMode,
     required this.monthSets,
     required this.monthNutritionLogs,
     this.selectedDate,
@@ -134,20 +118,16 @@ class HistoryLoaded extends HistoryState {
     this.selectedDateNutritionLogs = const <NutritionLog>[],
   });
 
-  int getSetsCountForDate(DateTime date) {
+  int getActivityCountForDate(DateTime date) {
     final normalizedDate = DateTime(date.year, date.month, date.day);
-    return monthSets[normalizedDate]?.length ?? 0;
-  }
 
-  int getNutritionCountForDate(DateTime date) {
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    return monthNutritionLogs[normalizedDate]?.length ?? 0;
+    return (monthSets[normalizedDate]?.length ?? 0) +
+        (monthNutritionLogs[normalizedDate]?.length ?? 0);
   }
 
   @override
   List<Object?> get props => [
         currentMonth,
-        currentMode,
         monthSets,
         monthNutritionLogs,
         selectedDate,
@@ -190,7 +170,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
   final UpdateNutritionLog updateNutritionLog;
 
   DateTime _currentMonth = DateTime.now();
-  HistoryMode _currentMode = HistoryMode.workouts;
   Map<DateTime, List<WorkoutSet>> _monthSets = {};
   Map<DateTime, List<NutritionLog>> _monthNutritionLogs = {};
   DateTime? _selectedDate;
@@ -213,7 +192,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     on<UpdateNutritionHistoryLogEvent>(_onUpdateNutritionLog);
     on<RefreshCurrentMonthEvent>(_onRefreshCurrentMonth);
     on<NavigateToMonthEvent>(_onNavigateToMonth);
-    on<ChangeHistoryModeEvent>(_onChangeHistoryMode);
   }
 
   Future<void> _onLoadMonthSets(
@@ -310,14 +288,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     add(LoadMonthSetsEvent(event.month));
   }
 
-  void _onChangeHistoryMode(
-    ChangeHistoryModeEvent event,
-    Emitter<HistoryState> emit,
-  ) {
-    _currentMode = event.mode;
-    emit(_buildLoadedState());
-  }
-
   Future<void> _performHistoryMutation(
     Emitter<HistoryState> emit, {
     required Future<dynamic> Function() action,
@@ -405,13 +375,17 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
 
     if (_selectedDate != null) {
       final normalizedSelectedDate = _normalizeDate(_selectedDate!);
-      final hasWorkouts = (_monthSets[normalizedSelectedDate] ?? []).isNotEmpty;
-      final hasNutrition =
-          (_monthNutritionLogs[normalizedSelectedDate] ?? []).isNotEmpty;
+      final hasActivity =
+          (_monthSets[normalizedSelectedDate] ?? []).isNotEmpty ||
+              (_monthNutritionLogs[normalizedSelectedDate] ?? []).isNotEmpty;
 
-      if (!hasWorkouts && !hasNutrition) {
+      if (!hasActivity) {
         _selectedDate = null;
       }
+    }
+
+    if (_selectedDate == null && _isSameMonth(firstDay, DateTime.now())) {
+      _selectedDate = _normalizeDate(DateTime.now());
     }
 
     return _buildLoadedState();
@@ -428,7 +402,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
 
     return HistoryLoaded(
       currentMonth: _currentMonth,
-      currentMode: _currentMode,
       monthSets: _monthSets,
       monthNutritionLogs: _monthNutritionLogs,
       selectedDate: _selectedDate,
@@ -439,5 +412,9 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
 
   DateTime _normalizeDate(DateTime date) {
     return DateTime(date.year, date.month, date.day);
+  }
+
+  bool _isSameMonth(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month;
   }
 }

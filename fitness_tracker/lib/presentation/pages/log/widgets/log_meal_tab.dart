@@ -12,9 +12,19 @@ import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../meals/bloc/meal_bloc.dart';
 import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
+import 'log_date_widgets.dart';
 
 class LogMealTab extends StatefulWidget {
-  const LogMealTab({super.key});
+  final DateTime? initialDate;
+  final bool showSuccessFeedback;
+  final ValueChanged<DateTime>? onLoggedSuccess;
+
+  const LogMealTab({
+    super.key,
+    this.initialDate,
+    this.showSuccessFeedback = true,
+    this.onLoggedSuccess,
+  });
 
   @override
   State<LogMealTab> createState() => _LogMealTabState();
@@ -26,6 +36,7 @@ class _LogMealTabState extends State<LogMealTab> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   final _uuid = const Uuid();
+  late DateTime _selectedDate;
 
   StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
 
@@ -33,20 +44,27 @@ class _LogMealTabState extends State<LogMealTab> {
   void initState() {
     super.initState();
 
+    _selectedDate = _normalizeDate(widget.initialDate ?? DateTime.now());
+
     final nutritionBloc = context.read<NutritionLogBloc>();
     _nutritionEffectsSub = nutritionBloc.effects.listen((effect) {
       if (!mounted) return;
 
       if (effect is NutritionLogSuccessEffect) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(effect.message),
-            backgroundColor: AppTheme.successGreen,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(20),
-          ),
-        );
+        if (widget.showSuccessFeedback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(effect.message),
+              backgroundColor: AppTheme.successGreen,
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(20),
+            ),
+          );
+        }
+
+        final loggedDate = _selectedDate;
         _clearForm();
+        widget.onLoggedSuccess?.call(loggedDate);
       }
     });
   }
@@ -83,10 +101,18 @@ class _LogMealTabState extends State<LogMealTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    LogDateContextBanner(selectedDate: _selectedDate),
+                    const SizedBox(height: 20),
                     _buildMealSelector(context),
                     if (_selectedMeal != null) ...[
                       const SizedBox(height: 20),
                       _buildAmountInput(),
+                      const SizedBox(height: 20),
+                      LogDatePickerCard(
+                        label: 'Nutrition date',
+                        selectedDate: _selectedDate,
+                        onTap: () => _selectDate(context),
+                      ),
                       const SizedBox(height: 24),
                       _buildNutritionPreview(),
                     ],
@@ -516,6 +542,34 @@ class _LogMealTabState extends State<LogMealTab> {
     );
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppTheme.primaryOrange,
+              onPrimary: Colors.white,
+              surface: AppTheme.surfaceDark,
+              onSurface: AppTheme.textLight,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && !_isSameDay(picked, _selectedDate)) {
+      setState(() {
+        _selectedDate = _normalizeDate(picked);
+      });
+    }
+  }
+
   void _handleLogMeal() {
     if (_selectedMeal == null) return;
 
@@ -538,7 +592,7 @@ class _LogMealTabState extends State<LogMealTab> {
         carbs: loggedCarbs,
         fat: loggedFat,
       ),
-      loggedAt: DateTime.now(),
+      loggedAt: _selectedDate,
       createdAt: DateTime.now(),
     );
 
@@ -552,5 +606,13 @@ class _LogMealTabState extends State<LogMealTab> {
       _searchController.clear();
       _searchQuery = '';
     });
+  }
+
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
