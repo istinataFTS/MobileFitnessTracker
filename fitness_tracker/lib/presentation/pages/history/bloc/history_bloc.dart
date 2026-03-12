@@ -130,8 +130,8 @@ class HistoryLoaded extends HistoryState {
     required this.monthSets,
     required this.monthNutritionLogs,
     this.selectedDate,
-    this.selectedDateSets = const [],
-    this.selectedDateNutritionLogs = const [],
+    this.selectedDateSets = const <WorkoutSet>[],
+    this.selectedDateNutritionLogs = const <NutritionLog>[],
   });
 
   int getSetsCountForDate(DateTime date) {
@@ -156,6 +156,15 @@ class HistoryLoaded extends HistoryState {
       ];
 }
 
+class HistoryError extends HistoryState {
+  final String message;
+
+  const HistoryError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 // ==================== Effects ====================
 
 abstract class HistoryUiEffect {
@@ -171,7 +180,7 @@ class HistorySuccessEffect extends HistoryUiEffect {
 // ==================== BLoC ====================
 
 class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
-    with BlocEffectsMixin<HistoryUiEffect> {
+    with BlocEffectsMixin<HistoryState, HistoryUiEffect> {
   final GetAllWorkoutSets getAllWorkoutSets;
   final GetSetsByDateRange getSetsByDateRange;
   final GetLogsByDateRange getNutritionLogsByDateRange;
@@ -216,6 +225,8 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     final loaded = await _loadMonthData(event.month);
     if (loaded != null) {
       emit(loaded);
+    } else {
+      emit(const HistoryError('Failed to load history data'));
     }
   }
 
@@ -239,17 +250,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     UpdateSetEvent event,
     Emitter<HistoryState> emit,
   ) async {
-    final result = await updateWorkoutSet(event.set);
-
-    await result.fold(
-      (failure) async => emit(HistoryLoading()),
-      (_) async {
-        final reloaded = await _reloadCurrentMonth();
-        if (reloaded != null) {
-          emit(reloaded);
-          emitEffect(const HistorySuccessEffect('Set updated successfully'));
-        }
-      },
+    await _performHistoryMutation(
+      emit,
+      action: () => updateWorkoutSet(event.set),
+      successMessage: 'Set updated successfully',
     );
   }
 
@@ -257,17 +261,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     DeleteSetEvent event,
     Emitter<HistoryState> emit,
   ) async {
-    final result = await deleteWorkoutSet(event.setId);
-
-    await result.fold(
-      (failure) async => emit(HistoryLoading()),
-      (_) async {
-        final reloaded = await _reloadCurrentMonth();
-        if (reloaded != null) {
-          emit(reloaded);
-          emitEffect(const HistorySuccessEffect('Set deleted successfully'));
-        }
-      },
+    await _performHistoryMutation(
+      emit,
+      action: () => deleteWorkoutSet(event.setId),
+      successMessage: 'Set deleted successfully',
     );
   }
 
@@ -275,19 +272,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     DeleteNutritionHistoryLogEvent event,
     Emitter<HistoryState> emit,
   ) async {
-    final result = await deleteNutritionLog(event.logId);
-
-    await result.fold(
-      (failure) async => emit(HistoryLoading()),
-      (_) async {
-        final reloaded = await _reloadCurrentMonth();
-        if (reloaded != null) {
-          emit(reloaded);
-          emitEffect(
-            const HistorySuccessEffect('Nutrition log deleted successfully'),
-          );
-        }
-      },
+    await _performHistoryMutation(
+      emit,
+      action: () => deleteNutritionLog(event.logId),
+      successMessage: 'Nutrition log deleted successfully',
     );
   }
 
@@ -295,19 +283,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     UpdateNutritionHistoryLogEvent event,
     Emitter<HistoryState> emit,
   ) async {
-    final result = await updateNutritionLog(event.log);
-
-    await result.fold(
-      (failure) async => emit(HistoryLoading()),
-      (_) async {
-        final reloaded = await _reloadCurrentMonth();
-        if (reloaded != null) {
-          emit(reloaded);
-          emitEffect(
-            const HistorySuccessEffect('Nutrition log updated successfully'),
-          );
-        }
-      },
+    await _performHistoryMutation(
+      emit,
+      action: () => updateNutritionLog(event.log),
+      successMessage: 'Nutrition log updated successfully',
     );
   }
 
@@ -318,6 +297,8 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
     final reloaded = await _reloadCurrentMonth();
     if (reloaded != null) {
       emit(reloaded);
+    } else {
+      emit(const HistoryError('Failed to refresh history data'));
     }
   }
 
@@ -335,6 +316,28 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
   ) {
     _currentMode = event.mode;
     emit(_buildLoadedState());
+  }
+
+  Future<void> _performHistoryMutation(
+    Emitter<HistoryState> emit, {
+    required Future<dynamic> Function() action,
+    required String successMessage,
+  }) async {
+    final result = await action();
+
+    await result.fold(
+      (failure) async => emit(HistoryError(failure.message)),
+      (_) async {
+        final reloaded = await _reloadCurrentMonth();
+        if (reloaded == null) {
+          emit(const HistoryError('Failed to reload history data'));
+          return;
+        }
+
+        emit(reloaded);
+        emitEffect(HistorySuccessEffect(successMessage));
+      },
+    );
   }
 
   Future<HistoryLoaded?> _reloadCurrentMonth() async {
@@ -361,7 +364,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
         final grouped = <DateTime, List<WorkoutSet>>{};
         for (final set in sets) {
           final dateKey = _normalizeDate(set.date);
-          grouped.putIfAbsent(dateKey, () => []);
+          grouped.putIfAbsent(dateKey, () => <WorkoutSet>[]);
           grouped[dateKey]!.add(set);
         }
         for (final items in grouped.values) {
@@ -382,7 +385,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
         final grouped = <DateTime, List<NutritionLog>>{};
         for (final log in logs) {
           final dateKey = _normalizeDate(log.loggedAt);
-          grouped.putIfAbsent(dateKey, () => []);
+          grouped.putIfAbsent(dateKey, () => <NutritionLog>[]);
           grouped[dateKey]!.add(log);
         }
         for (final items in grouped.values) {
@@ -415,11 +418,13 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState>
   }
 
   HistoryLoaded _buildLoadedState() {
-    final selectedDateSets =
-        _selectedDate != null ? (_monthSets[_selectedDate!] ?? []) : const [];
-    final selectedDateNutritionLogs = _selectedDate != null
-        ? (_monthNutritionLogs[_selectedDate!] ?? [])
-        : const [];
+    final List<WorkoutSet> selectedDateSets = _selectedDate != null
+        ? (_monthSets[_selectedDate!] ?? <WorkoutSet>[])
+        : <WorkoutSet>[];
+
+    final List<NutritionLog> selectedDateNutritionLogs = _selectedDate != null
+        ? (_monthNutritionLogs[_selectedDate!] ?? <NutritionLog>[])
+        : <NutritionLog>[];
 
     return HistoryLoaded(
       currentMonth: _currentMonth,

@@ -120,7 +120,7 @@ class NutritionLogSuccessEffect extends NutritionLogUiEffect {
 // ==================== BLoC ====================
 
 class NutritionLogBloc extends Bloc<NutritionLogEvent, NutritionLogState>
-    with BlocEffectsMixin<NutritionLogUiEffect> {
+    with BlocEffectsMixin<NutritionLogState, NutritionLogUiEffect> {
   final GetLogsForDate getLogsForDate;
   final AddNutritionLog addNutritionLog;
   final UpdateNutritionLog updateNutritionLog;
@@ -156,18 +156,10 @@ class NutritionLogBloc extends Bloc<NutritionLogEvent, NutritionLogState>
     AddNutritionLogEvent event,
     Emitter<NutritionLogState> emit,
   ) async {
-    final result = await addNutritionLog(event.log);
-
-    await result.fold(
-      (failure) async => emit(NutritionLogError(failure.message)),
-      (_) async {
-        await _loadDay(_currentDate, emit);
-        emitEffect(
-          const NutritionLogSuccessEffect(
-            'Nutrition log added successfully',
-          ),
-        );
-      },
+    await _performNutritionMutation(
+      emit,
+      action: () => addNutritionLog(event.log),
+      successMessage: 'Nutrition log added successfully',
     );
   }
 
@@ -175,18 +167,10 @@ class NutritionLogBloc extends Bloc<NutritionLogEvent, NutritionLogState>
     UpdateNutritionLogEvent event,
     Emitter<NutritionLogState> emit,
   ) async {
-    final result = await updateNutritionLog(event.log);
-
-    await result.fold(
-      (failure) async => emit(NutritionLogError(failure.message)),
-      (_) async {
-        await _loadDay(_currentDate, emit);
-        emitEffect(
-          const NutritionLogSuccessEffect(
-            'Nutrition log updated successfully',
-          ),
-        );
-      },
+    await _performNutritionMutation(
+      emit,
+      action: () => updateNutritionLog(event.log),
+      successMessage: 'Nutrition log updated successfully',
     );
   }
 
@@ -194,18 +178,10 @@ class NutritionLogBloc extends Bloc<NutritionLogEvent, NutritionLogState>
     DeleteNutritionLogEvent event,
     Emitter<NutritionLogState> emit,
   ) async {
-    final result = await deleteNutritionLog(event.id);
-
-    await result.fold(
-      (failure) async => emit(NutritionLogError(failure.message)),
-      (_) async {
-        await _loadDay(_currentDate, emit);
-        emitEffect(
-          const NutritionLogSuccessEffect(
-            'Nutrition log deleted successfully',
-          ),
-        );
-      },
+    await _performNutritionMutation(
+      emit,
+      action: () => deleteNutritionLog(event.id),
+      successMessage: 'Nutrition log deleted successfully',
     );
   }
 
@@ -215,6 +191,22 @@ class NutritionLogBloc extends Bloc<NutritionLogEvent, NutritionLogState>
   ) async {
     _currentDate = event.date;
     await _loadDay(event.date, emit);
+  }
+
+  Future<void> _performNutritionMutation(
+    Emitter<NutritionLogState> emit, {
+    required Future<dynamic> Function() action,
+    required String successMessage,
+  }) async {
+    final result = await action();
+
+    await result.fold(
+      (failure) async => emit(NutritionLogError(failure.message)),
+      (_) async {
+        await _loadDay(_currentDate, emit);
+        emitEffect(NutritionLogSuccessEffect(successMessage));
+      },
+    );
   }
 
   Future<void> _loadDay(

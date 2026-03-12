@@ -76,7 +76,7 @@ class WorkoutLoggedEffect extends WorkoutUiEffect {
 }
 
 class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
-    with BlocEffectsMixin<WorkoutUiEffect> {
+    with BlocEffectsMixin<WorkoutState, WorkoutUiEffect> {
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
   final RecordWorkoutSet recordWorkoutSet;
@@ -116,21 +116,16 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
           (muscles) => muscles,
         );
 
-        final setsResult = await getWeeklySets();
+        await _loadWeeklySetsData(emit);
 
-        setsResult.fold(
-          (failure) => emit(WorkoutError(failure.message)),
-          (sets) {
-            _cachedWeeklySets = sets;
-            emit(WorkoutLoaded(sets));
-            emitEffect(
-              WorkoutLoggedEffect(
-                message: AppStrings.setLogged,
-                affectedMuscles: affectedMuscles,
-              ),
-            );
-          },
-        );
+        if (state is WorkoutLoaded) {
+          emitEffect(
+            WorkoutLoggedEffect(
+              message: AppStrings.setLogged,
+              affectedMuscles: affectedMuscles,
+            ),
+          );
+        }
       },
     );
   }
@@ -139,23 +134,24 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     LoadWeeklySetsEvent event,
     Emitter<WorkoutState> emit,
   ) async {
-    emit(WorkoutLoading());
-
-    final result = await getWeeklySets();
-
-    result.fold(
-      (failure) => emit(WorkoutError(failure.message)),
-      (sets) {
-        _cachedWeeklySets = sets;
-        emit(WorkoutLoaded(sets));
-      },
-    );
+    await _loadWeeklySetsData(emit, showLoading: true);
   }
 
   Future<void> _onRefreshWeeklySets(
     RefreshWeeklySetsEvent event,
     Emitter<WorkoutState> emit,
   ) async {
+    await _loadWeeklySetsData(emit);
+  }
+
+  Future<void> _loadWeeklySetsData(
+    Emitter<WorkoutState> emit, {
+    bool showLoading = false,
+  }) async {
+    if (showLoading) {
+      emit(WorkoutLoading());
+    }
+
     final result = await getWeeklySets();
 
     result.fold(

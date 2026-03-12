@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-mixin BlocEffectsMixin<Effect> on BlocBase<Object?> {
+mixin BlocEffectsMixin<State, Effect> on BlocBase<State> {
   final StreamController<Effect> _effectsController =
       StreamController<Effect>.broadcast();
 
