@@ -1,0 +1,62 @@
+import 'package:get_it/get_it.dart';
+
+import '../../data/datasources/local/muscle_factor_local_datasource.dart';
+import '../../data/datasources/local/muscle_stimulus_local_datasource.dart';
+import '../../data/repositories/muscle_factor_repository_impl.dart';
+import '../../data/repositories/muscle_stimulus_repository_impl.dart';
+import '../../domain/repositories/muscle_factor_repository.dart';
+import '../../domain/repositories/muscle_stimulus_repository.dart';
+import '../../domain/usecases/muscle_factors/seed_exercise_factors.dart';
+import '../../domain/usecases/muscle_stimulus/apply_daily_decay.dart';
+import '../../domain/usecases/muscle_stimulus/calculate_muscle_stimulus.dart';
+import '../../domain/usecases/muscle_stimulus/get_muscle_visual_data.dart';
+import '../../domain/usecases/muscle_stimulus/record_workout_set.dart';
+import '../../presentation/pages/home/bloc/muscle_visual_bloc.dart';
+
+void registerMuscleStimulusModule(GetIt sl) {
+  sl.registerFactory(
+    () => MuscleVisualBloc(
+      getMuscleVisualData: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => SeedExerciseFactors(
+      muscleFactorRepository: sl(),
+      exerciseRepository: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => CalculateMuscleStimulus(
+      muscleFactorRepository: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => RecordWorkoutSet(
+      muscleFactorRepository: sl(),
+      muscleStimulusRepository: sl(),
+      calculateMuscleStimulus: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(() => GetMuscleVisualData(sl()));
+  sl.registerLazySingleton(() => ApplyDailyDecay(sl()));
+
+  sl.registerLazySingleton<MuscleFactorRepository>(
+    () => MuscleFactorRepositoryImpl(localDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<MuscleStimulusRepository>(
+    () => MuscleStimulusRepositoryImpl(localDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<MuscleFactorLocalDataSource>(
+    () => MuscleFactorLocalDataSource(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<MuscleStimulusLocalDataSource>(
+    () => MuscleStimulusLocalDataSourceImpl(databaseHelper: sl()),
+  );
+}

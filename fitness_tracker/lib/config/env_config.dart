@@ -3,6 +3,12 @@ import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 class EnvConfig {
   EnvConfig._();
 
+  static const Set<String> _supportedEnvironments = {
+    'development',
+    'staging',
+    'production',
+  };
+
   // ==================== APP INFORMATION ====================
 
   static const String appName = String.fromEnvironment(
@@ -94,7 +100,7 @@ class EnvConfig {
     defaultValue: 30,
   );
 
-  // ==================== MUSCLE STIMULUS CONFIGURATION ====================
+  // ==================== DOMAIN CONSTANTS ====================
 
   static const double intensityExponent = 1.35;
   static const double weeklyDecayFactor = 0.6;
@@ -117,17 +123,53 @@ class EnvConfig {
 
   // ==================== VALIDATION ====================
 
-  static void validateProductionConfig() {
-    if (isProduction) {
-      assert(
-        !forceReseed,
-        'FORCE_RESEED must be false in production!',
-      );
-      assert(
-        apiKey.isNotEmpty,
-        'API_KEY must be set in production!',
+  static List<String> getRuntimeConfigIssues() {
+    final issues = <String>[];
+
+    if (!_supportedEnvironments.contains(environment)) {
+      issues.add(
+        'ENVIRONMENT must be one of: ${_supportedEnvironments.join(', ')}.',
       );
     }
+
+    if (databaseName.trim().isEmpty) {
+      issues.add('DATABASE_NAME must not be empty.');
+    }
+
+    if (databaseVersion < 1) {
+      issues.add('DATABASE_VERSION must be greater than or equal to 1.');
+    }
+
+    if (apiTimeoutSeconds <= 0) {
+      issues.add('API_TIMEOUT_SECONDS must be greater than 0.');
+    }
+
+    if (isProduction && forceReseed) {
+      issues.add('FORCE_RESEED must be false in production.');
+    }
+
+    if (isProduction && apiKey.isEmpty) {
+      issues.add('API_KEY must be set in production.');
+    }
+
+    return issues;
+  }
+
+  static void ensureValidRuntimeConfig() {
+    final issues = getRuntimeConfigIssues();
+
+    if (issues.isEmpty) {
+      return;
+    }
+
+    throw StateError(
+      'Invalid runtime configuration:\n- ${issues.join('\n- ')}',
+    );
+  }
+
+  @Deprecated('Use ensureValidRuntimeConfig() instead.')
+  static void validateProductionConfig() {
+    ensureValidRuntimeConfig();
   }
 
   static void printConfig() {
@@ -142,6 +184,8 @@ class EnvConfig {
     debugPrint('Seed Data Version: $seedDataVersion');
     debugPrint('Force Reseed: $forceReseed');
     debugPrint('Enable Seeding Logs: $enableSeedingLogs');
+    debugPrint('API Base URL: $apiBaseUrl');
+    debugPrint('API Timeout Seconds: $apiTimeoutSeconds');
     debugPrint('');
     debugPrint('Muscle Stimulus Configuration:');
     debugPrint('  Intensity Exponent: $intensityExponent');

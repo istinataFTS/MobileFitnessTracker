@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import '../../config/env_config.dart';
-import '../../data/datasources/local/database_helper.dart';
-import '../../core/constants/database_tables.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../../config/env_config.dart';
+import '../../core/constants/database_tables.dart';
+import '../../data/datasources/local/database_helper.dart';
 
 class AppDiagnostics {
   static Future<void> runDiagnostics() async {
@@ -26,17 +27,21 @@ class AppDiagnostics {
     debugPrint('  App Name: ${EnvConfig.appName}');
     debugPrint('  Version: ${EnvConfig.appVersion}');
     debugPrint('  Environment: ${EnvConfig.environment}');
-    debugPrint('  Database: ${EnvConfig.databaseName} (v${EnvConfig.databaseVersion})');
+    debugPrint(
+      '  Database: ${EnvConfig.databaseName} (v${EnvConfig.databaseVersion})',
+    );
     debugPrint('  Seeding Enabled: ${EnvConfig.seedDefaultData}');
     debugPrint('  Force Reseed: ${EnvConfig.forceReseed}');
-    
-    if (EnvConfig.isProduction && EnvConfig.forceReseed) {
-      debugPrint('  ❌ ERROR: Force reseed is enabled in production!');
-    } else if (!EnvConfig.isDevelopment && EnvConfig.enableDebugLogs) {
-      debugPrint('  ⚠️  Warning: Debug logs enabled outside development');
+
+    final issues = EnvConfig.getRuntimeConfigIssues();
+    if (issues.isEmpty) {
+      debugPrint('  ✅ Runtime configuration OK');
     } else {
-      debugPrint('  ✅ Production settings OK');
+      for (final issue in issues) {
+        debugPrint('  ⚠️ $issue');
+      }
     }
+
     debugPrint('');
   }
 
@@ -44,7 +49,7 @@ class AppDiagnostics {
     debugPrint('💾 Database Setup:');
 
     if (kIsWeb) {
-      debugPrint('  ℹ️  Web platform - database not supported');
+      debugPrint('  ℹ️ Web platform - database not supported');
       debugPrint('');
       return;
     }
@@ -67,7 +72,6 @@ class AppDiagnostics {
       }
 
       await _checkTableCounts(db);
-      
     } catch (e) {
       debugPrint('  ❌ Database error: $e');
     }
@@ -96,44 +100,29 @@ class AppDiagnostics {
       );
       debugPrint('  Indexes: ${indexes.length} found');
     } catch (e) {
-      debugPrint('  ⚠️  Could not retrieve table counts: $e');
+      debugPrint('  ⚠️ Could not retrieve table counts: $e');
     }
   }
 
   static Future<void> _checkProductionReadiness() async {
     debugPrint('🚀 Production Readiness:');
 
-    final issues = <String>[];
-
-    if (EnvConfig.environment == 'development') {
-      issues.add('Environment is set to development');
-    }
-
-    if (EnvConfig.forceReseed) {
-      issues.add('Force reseed is enabled (dangerous!)');
-    }
-
-    if (EnvConfig.apiKey.isEmpty && EnvConfig.isProduction) {
-      issues.add('API key is empty in production');
-    }
-
-    if (EnvConfig.enableDebugLogs && EnvConfig.isProduction) {
-      issues.add('Debug logs enabled in production');
-    }
+    final issues = EnvConfig.getRuntimeConfigIssues();
 
     if (issues.isEmpty) {
-      debugPrint('  ✅ No production issues found');
-    } else {
-      debugPrint('  ⚠️  Found ${issues.length} issue(s):');
-      for (final issue in issues) {
-        debugPrint('    - $issue');
-      }
+      debugPrint('  ✅ No production/runtime issues found');
+      return;
+    }
+
+    debugPrint('  ⚠️ Found ${issues.length} issue(s):');
+    for (final issue in issues) {
+      debugPrint('    - $issue');
     }
   }
 
   static Future<bool> testDataPersistence() async {
     if (kIsWeb) {
-      debugPrint('⚠️  Cannot test data persistence on web platform');
+      debugPrint('⚠️ Cannot test data persistence on web platform');
       return false;
     }
 
@@ -144,7 +133,7 @@ class AppDiagnostics {
       final db = await dbHelper.database;
 
       final testId = 'test_persistence_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       await db.insert(DatabaseTables.exercises, {
         DatabaseTables.exerciseId: testId,
         DatabaseTables.exerciseName: 'Test Exercise - Persistence',
@@ -159,21 +148,21 @@ class AppDiagnostics {
         whereArgs: [testId],
       );
 
-      if (result.isNotEmpty) {
-        debugPrint('  ✅ Test exercise persisted successfully');
-        
-        await db.delete(
-          DatabaseTables.exercises,
-          where: '${DatabaseTables.exerciseId} = ?',
-          whereArgs: [testId],
-        );
-        debugPrint('  ✅ Cleaned up test data');
-        
-        return true;
-      } else {
+      if (result.isEmpty) {
         debugPrint('  ❌ Test exercise not found after insert');
         return false;
       }
+
+      debugPrint('  ✅ Test exercise persisted successfully');
+
+      await db.delete(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: [testId],
+      );
+      debugPrint('  ✅ Cleaned up test data');
+
+      return true;
     } catch (e) {
       debugPrint('  ❌ Persistence test failed: $e');
       return false;
@@ -182,21 +171,22 @@ class AppDiagnostics {
 
   static void checkHardcodedValues() {
     debugPrint('\n🔎 Checking for Hardcoded Values:');
-    
+
     final checks = [
       'Database name: Using EnvConfig.databaseName',
       'App version: Using EnvConfig.appVersion',
       'API endpoints: Using EnvConfig.apiBaseUrl',
       'User name: Using EnvConfig.userName',
       'Seeding: Using EnvConfig.seedDefaultData',
+      'Web-only strings: Using AppStrings constants',
     ];
 
     debugPrint('  Manual verification checklist:');
     for (final check in checks) {
       debugPrint('    ✓ $check');
     }
-    
-    debugPrint('  ℹ️  Verify no hardcoded strings in:');
+
+    debugPrint('  ℹ️ Verify no hardcoded strings in:');
     debugPrint('    - Database configurations');
     debugPrint('    - API endpoints');
     debugPrint('    - User-facing strings (use app_strings.dart)');
@@ -204,19 +194,19 @@ class AppDiagnostics {
 
   static void checkAppStoreCompliance() {
     debugPrint('\n🏪 App Store Compliance:');
-    
+
     debugPrint('  iOS Requirements:');
     debugPrint('    - Info.plist configured');
     debugPrint('    - Privacy descriptions added');
     debugPrint('    - iCloud backup disabled for database');
     debugPrint('    - No external data transmission');
-    
+
     debugPrint('\n  Android Requirements:');
     debugPrint('    - AndroidManifest.xml permissions minimal');
     debugPrint('    - Target SDK 34+ (Android 14)');
     debugPrint('    - Storage permissions only for database');
     debugPrint('    - No internet permissions needed');
-    
+
     debugPrint('\n  Data Privacy:');
     debugPrint('    ✅ All data stored locally');
     debugPrint('    ✅ No analytics tracking');
