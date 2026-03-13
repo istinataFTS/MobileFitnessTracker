@@ -10,7 +10,7 @@ import 'package:fitness_tracker/domain/usecases/workout_sets/delete_workout_set.
 import 'package:fitness_tracker/domain/usecases/workout_sets/get_all_workout_sets.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/update_workout_set.dart';
-import 'package:fitness_tracker/presentation/pages/history/bloc/history_bloc.dart';
+import 'package:fitness_tracker/features/history/history.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -38,9 +38,9 @@ void main() {
   late MockUpdateNutritionLog mockUpdateNutritionLog;
   late HistoryBloc bloc;
 
-  final january = DateTime(2024, 1, 1);
-  final firstActivityDate = DateTime(2024, 1, 15);
-  final secondActivityDate = DateTime(2024, 1, 18);
+  final DateTime january = DateTime(2024, 1, 1);
+  final DateTime firstActivityDate = DateTime(2024, 1, 15);
+  final DateTime secondActivityDate = DateTime(2024, 1, 18);
 
   WorkoutSet buildWorkoutSet({
     required String id,
@@ -103,8 +103,8 @@ void main() {
   });
 
   void stubMonthLoadSuccess({
-    List<WorkoutSet> sets = const [],
-    List<NutritionLog> logs = const [],
+    List<WorkoutSet> sets = const <WorkoutSet>[],
+    List<NutritionLog> logs = const <NutritionLog>[],
   }) {
     when(
       () => mockGetSetsByDateRange(
@@ -126,7 +126,7 @@ void main() {
       'emits loading then loaded with grouped month activity',
       build: () {
         stubMonthLoadSuccess(
-          sets: [
+          sets: <WorkoutSet>[
             buildWorkoutSet(
               id: 'set-1',
               date: firstActivityDate,
@@ -138,7 +138,7 @@ void main() {
               createdAt: firstActivityDate.add(const Duration(hours: 1)),
             ),
           ],
-          logs: [
+          logs: <NutritionLog>[
             buildNutritionLog(
               id: 'log-1',
               loggedAt: secondActivityDate,
@@ -149,7 +149,7 @@ void main() {
         return bloc;
       },
       act: (bloc) => bloc.add(LoadMonthSetsEvent(january)),
-      expect: () => [
+      expect: () => <Matcher>[
         isA<HistoryLoading>(),
         isA<HistoryLoaded>()
             .having((state) => state.currentMonth, 'currentMonth', january)
@@ -193,9 +193,13 @@ void main() {
         return bloc;
       },
       act: (bloc) => bloc.add(LoadMonthSetsEvent(january)),
-      expect: () => [
+      expect: () => <Matcher>[
         isA<HistoryLoading>(),
-        const HistoryError('Failed to load history data'),
+        isA<HistoryError>().having(
+          (state) => state.message,
+          'message',
+          'Failed to load history data',
+        ),
       ],
     );
 
@@ -203,14 +207,14 @@ void main() {
       'selects a date from loaded month data',
       build: () {
         stubMonthLoadSuccess(
-          sets: [
+          sets: <WorkoutSet>[
             buildWorkoutSet(
               id: 'set-1',
               date: firstActivityDate,
               createdAt: firstActivityDate.add(const Duration(hours: 2)),
             ),
           ],
-          logs: [
+          logs: <NutritionLog>[
             buildNutritionLog(
               id: 'log-1',
               loggedAt: firstActivityDate,
@@ -225,7 +229,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         bloc.add(SelectDateEvent(firstActivityDate));
       },
-      expect: () => [
+      expect: () => <Matcher>[
         isA<HistoryLoading>(),
         isA<HistoryLoaded>(),
         isA<HistoryLoaded>()
@@ -251,7 +255,7 @@ void main() {
       'clears the selected date',
       build: () {
         stubMonthLoadSuccess(
-          sets: [
+          sets: <WorkoutSet>[
             buildWorkoutSet(
               id: 'set-1',
               date: firstActivityDate,
@@ -266,9 +270,9 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         bloc.add(SelectDateEvent(firstActivityDate));
         await Future<void>.delayed(Duration.zero);
-        bloc.add(ClearDateSelectionEvent());
+        bloc.add(const ClearDateSelectionEvent());
       },
-      expect: () => [
+      expect: () => <Matcher>[
         isA<HistoryLoading>(),
         isA<HistoryLoaded>(),
         isA<HistoryLoaded>()
@@ -296,7 +300,7 @@ void main() {
       'refreshes the currently loaded month',
       build: () {
         stubMonthLoadSuccess(
-          sets: [
+          sets: <WorkoutSet>[
             buildWorkoutSet(
               id: 'set-1',
               date: firstActivityDate,
@@ -309,9 +313,9 @@ void main() {
       act: (bloc) async {
         bloc.add(LoadMonthSetsEvent(january));
         await Future<void>.delayed(Duration.zero);
-        bloc.add(RefreshCurrentMonthEvent());
+        bloc.add(const RefreshCurrentMonthEvent());
       },
-      expect: () => [
+      expect: () => <Matcher>[
         isA<HistoryLoading>(),
         isA<HistoryLoaded>(),
         isA<HistoryLoaded>()

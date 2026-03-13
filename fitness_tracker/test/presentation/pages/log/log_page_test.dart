@@ -1,6 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/app/app.dart';
-import 'package:fitness_tracker/presentation/pages/history/bloc/history_bloc.dart';
+import 'package:fitness_tracker/features/history/history.dart';
 import 'package:fitness_tracker/presentation/pages/home/bloc/home_bloc.dart';
 import 'package:fitness_tracker/presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/presentation/pages/log/bloc/workout_bloc.dart';
@@ -77,7 +77,7 @@ void main() {
     when(() => workoutBloc.state).thenReturn(WorkoutInitial());
     when(() => nutritionLogBloc.state).thenReturn(NutritionLogInitial());
     when(() => homeBloc.state).thenReturn(HomeInitial());
-    when(() => historyBloc.state).thenReturn(HistoryInitial());
+    when(() => historyBloc.state).thenReturn(const HistoryInitial());
     when(() => muscleVisualBloc.state).thenReturn(MuscleVisualInitial());
 
     when(() => workoutBloc.add(any())).thenReturn(null);
@@ -109,7 +109,7 @@ void main() {
     whenListen(
       historyBloc,
       const Stream<HistoryState>.empty(),
-      initialState: HistoryInitial(),
+      initialState: const HistoryInitial(),
     );
     whenListen(
       muscleVisualBloc,
@@ -121,7 +121,7 @@ void main() {
   Widget buildSubject() {
     return AppShell(
       home: MultiBlocProvider(
-        providers: [
+        providers: <BlocProvider<dynamic>>[
           BlocProvider<WorkoutBloc>.value(value: workoutBloc),
           BlocProvider<NutritionLogBloc>.value(value: nutritionLogBloc),
           BlocProvider<HomeBloc>.value(value: homeBloc),
@@ -164,7 +164,7 @@ void main() {
         (_) => Stream<WorkoutUiEffect>.value(
           const WorkoutLoggedEffect(
             message: 'Set logged',
-            affectedMuscles: ['chest'],
+            affectedMuscles: <String>['chest'],
           ),
         ),
       );
@@ -174,7 +174,7 @@ void main() {
       await tester.pump();
 
       verify(() => homeBloc.add(RefreshHomeDataEvent())).called(1);
-      verify(() => historyBloc.add(RefreshCurrentMonthEvent())).called(1);
+      verify(() => historyBloc.add(const RefreshCurrentMonthEvent())).called(1);
       verify(() => workoutBloc.add(const RefreshWeeklySetsEvent())).called(1);
       verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
     });

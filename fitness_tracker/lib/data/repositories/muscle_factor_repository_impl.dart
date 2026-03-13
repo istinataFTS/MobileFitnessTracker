@@ -1,162 +1,108 @@
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/muscle_factor.dart';
 import '../../domain/repositories/muscle_factor_repository.dart';
 import '../datasources/local/muscle_factor_local_datasource.dart';
 import '../models/muscle_factor_model.dart';
 
-/// Implementation of MuscleFactorRepository
+/// Implementation of [MuscleFactorRepository].
+///
+/// Keeps failure mapping centralized and avoids parsing raw DB rows here.
 class MuscleFactorRepositoryImpl implements MuscleFactorRepository {
   final MuscleFactorLocalDataSource localDataSource;
 
-  MuscleFactorRepositoryImpl({required this.localDataSource});
+  const MuscleFactorRepositoryImpl({
+    required this.localDataSource,
+  });
 
   @override
-  Future<Either<Failure, MuscleFactor?>> getFactorById(String id) async {
-    try {
-      final factorMap = await localDataSource.getFactorById(id);
-      if (factorMap == null) {
-        return const Right(null);
-      }
-      final factor = MuscleFactorModel.fromMap(factorMap);
-      return Right(factor);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, MuscleFactor?>> getFactorById(String id) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getFactorById(id);
+    });
   }
 
   @override
-  Future<Either<Failure, List<MuscleFactor>>> getAllFactors() async {
-    try {
-      final factorMaps = await localDataSource.getAllFactors();
-      final factors = factorMaps
-          .map((map) => MuscleFactorModel.fromMap(map))
-          .toList();
-      return Right(factors);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, List<MuscleFactor>>> getAllFactors() {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getAllFactors();
+    });
   }
 
   @override
   Future<Either<Failure, List<MuscleFactor>>> getFactorsForExercise(
     String exerciseId,
-  ) async {
-    try {
-      final factorMaps = await localDataSource.getFactorsForExercise(exerciseId);
-      final factors = factorMaps
-          .map((map) => MuscleFactorModel.fromMap(map))
-          .toList();
-      return Right(factors);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getFactorsForExercise(exerciseId);
+    });
   }
 
   @override
   Future<Either<Failure, List<MuscleFactor>>> getFactorsByMuscleGroup(
     String muscleGroup,
-  ) async {
-    try {
-      final allFactorMaps = await localDataSource.getAllFactors();
-      final factors = allFactorMaps
-          .map((map) => MuscleFactorModel.fromMap(map))
-          .where((factor) => factor.muscleGroup == muscleGroup)
-          .toList();
-      return Right(factors);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      final List<MuscleFactorModel> allFactors =
+          await localDataSource.getAllFactors();
+
+      return allFactors
+          .where((MuscleFactor factor) => factor.muscleGroup == muscleGroup)
+          .toList(growable: false);
+    });
   }
 
   @override
-  Future<Either<Failure, void>> addMuscleFactor(MuscleFactor factor) async {
-    try {
-      final model = MuscleFactorModel.fromEntity(factor);
+  Future<Either<Failure, void>> addMuscleFactor(MuscleFactor factor) {
+    return RepositoryGuard.run(() async {
+      final MuscleFactorModel model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.addFactor(model);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
   Future<Either<Failure, void>> addMuscleFactorsBatch(
     List<MuscleFactor> factors,
-  ) async {
-    try {
-      final models = factors
-          .map((factor) => MuscleFactorModel.fromEntity(factor))
-          .toList();
+  ) {
+    return RepositoryGuard.run(() async {
+      final List<MuscleFactorModel> models = factors
+          .map(MuscleFactorModel.fromEntity)
+          .toList(growable: false);
+
       await localDataSource.addFactorsBatch(models);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) async {
-    try {
-      final model = MuscleFactorModel.fromEntity(factor);
+  Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) {
+    return RepositoryGuard.run(() async {
+      final MuscleFactorModel model = MuscleFactorModel.fromEntity(factor);
       await localDataSource.updateFactor(model);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> deleteMuscleFactor(String id) async {
-    try {
+  Future<Either<Failure, void>> deleteMuscleFactor(String id) {
+    return RepositoryGuard.run(() async {
       await localDataSource.deleteFactor(id);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
   Future<Either<Failure, void>> deleteMuscleFactorsByExerciseId(
     String exerciseId,
-  ) async {
-    try {
+  ) {
+    return RepositoryGuard.run(() async {
       await localDataSource.deleteFactorsByExerciseId(exerciseId);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> clearAllFactors() async {
-    try {
+  Future<Either<Failure, void>> clearAllFactors() {
+    return RepositoryGuard.run(() async {
       await localDataSource.clearAllFactors();
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 }

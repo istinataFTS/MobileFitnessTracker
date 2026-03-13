@@ -1,6 +1,6 @@
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/presentation/pages/history/utils/history_activity_aggregator.dart';
+import 'package:fitness_tracker/features/history/presentation/helpers/history_activity_aggregator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

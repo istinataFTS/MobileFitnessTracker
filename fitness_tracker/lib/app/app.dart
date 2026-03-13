@@ -8,10 +8,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../config/env_config.dart';
 import '../core/constants/app_strings.dart';
 import '../core/themes/app_theme.dart';
+import '../features/history/history.dart';
 import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
-import '../presentation/pages/history/bloc/history_bloc.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import '../presentation/pages/log/bloc/workout_bloc.dart';
@@ -48,7 +48,7 @@ class FitnessTrackerApp extends StatelessWidget {
     }
 
     return MultiBlocProvider(
-      providers: [
+      providers: <BlocProvider<dynamic>>[
         BlocProvider<TargetsBloc>(
           create: (_) => di.sl<TargetsBloc>(),
         ),
@@ -89,7 +89,7 @@ class FitnessTrackerApp extends StatelessWidget {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children: <Widget>[
             Icon(
               Icons.web,
               size: 100,

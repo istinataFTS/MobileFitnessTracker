@@ -1,84 +1,43 @@
-import 'package:flutter_test/flutter_test.dart';
-
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/exceptions.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/errors/repository_guard.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('RepositoryGuard', () {
     test('returns Right when action succeeds', () async {
-      final result = await RepositoryGuard.run(() async {
+      final Either<Failure, int> result = await RepositoryGuard.run(() async {
         return 42;
       });
 
-      expect(result.isRight(), isTrue);
-      expect(result.getOrElse(() => -1), 42);
-    });
-
-    test('maps ValidationException to ValidationFailure', () async {
-      final result = await RepositoryGuard.run<int>(() async {
-        throw const ValidationException('Validation failed');
-      });
-
-      expect(result.isLeft(), isTrue);
-
-      result.fold(
-        (failure) {
-          expect(failure, isA<ValidationFailure>());
-          expect(failure.message, 'Validation failed');
-        },
-        (_) => fail('Expected a failure result'),
-      );
+      expect(result, const Right(42));
     });
 
     test('maps CacheDatabaseException to DatabaseFailure', () async {
-      final result = await RepositoryGuard.run<void>(() async {
-        throw const CacheDatabaseException('DB unavailable');
+      final Either<Failure, int> result = await RepositoryGuard.run(() async {
+        throw const CacheDatabaseException('db error');
       });
 
-      expect(result.isLeft(), isTrue);
-
-      result.fold(
-        (failure) {
-          expect(failure, isA<DatabaseFailure>());
-          expect(failure.message, 'DB unavailable');
-        },
-        (_) => fail('Expected a failure result'),
-      );
+      expect(result, const Left(DatabaseFailure('db error')));
     });
 
-    test('maps CacheException to CacheFailure', () async {
-      final result = await RepositoryGuard.run<String>(() async {
-        throw const CacheException('Cache lookup failed');
+    test('maps ValidationException to ValidationFailure', () async {
+      final Either<Failure, int> result = await RepositoryGuard.run(() async {
+        throw const ValidationException('invalid');
       });
 
-      expect(result.isLeft(), isTrue);
-
-      result.fold(
-        (failure) {
-          expect(failure, isA<CacheFailure>());
-          expect(failure.message, 'Cache lookup failed');
-        },
-        (_) => fail('Expected a failure result'),
-      );
+      expect(result, const Left(ValidationFailure('invalid')));
     });
 
-    test('maps unknown exceptions to UnexpectedFailure', () async {
-      final result = await RepositoryGuard.run<void>(() async {
-        throw StateError('Unexpected repository issue');
+    test('maps unexpected errors to UnexpectedFailure', () async {
+      final Either<Failure, int> result = await RepositoryGuard.run(() async {
+        throw StateError('broken');
       });
 
-      expect(result.isLeft(), isTrue);
-
-      result.fold(
-        (failure) {
-          expect(failure, isA<UnexpectedFailure>());
-          expect(
-            failure.message,
-            'Unexpected error: Bad state: Unexpected repository issue',
-          );
-        },
-        (_) => fail('Expected a failure result'),
+      expect(
+        result,
+        const Left(UnexpectedFailure('Unexpected error: Bad state: broken')),
       );
     });
   });

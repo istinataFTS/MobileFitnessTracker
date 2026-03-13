@@ -10,7 +10,7 @@ class RepositoryGuard {
     Future<T> Function() action,
   ) async {
     try {
-      final result = await action();
+      final T result = await action();
       return Right(result);
     } catch (error) {
       return Left(RepositoryErrorMapper.map(error));

@@ -3,57 +3,73 @@ import '../../../core/errors/exceptions.dart';
 import '../../models/muscle_factor_model.dart';
 import 'database_helper.dart';
 
-/// Local data source for muscle factor operations
+/// Local data source for muscle factor operations.
+///
+/// Owns database row parsing and returns storage models instead of raw maps.
 class MuscleFactorLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  MuscleFactorLocalDataSource({required this.databaseHelper});
+  const MuscleFactorLocalDataSource({
+    required this.databaseHelper,
+  });
 
-  /// Get a muscle factor by ID
-  Future<Map<String, dynamic>?> getFactorById(String id) async {
+  /// Get a muscle factor by ID.
+  Future<MuscleFactorModel?> getFactorById(String id) async {
     try {
       final db = await databaseHelper.database;
-      final results = await db.query(
+      final List<Map<String, dynamic>> results = await db.query(
         DatabaseTables.exerciseMuscleFactors,
         where: '${DatabaseTables.factorId} = ?',
         whereArgs: [id],
         limit: 1,
       );
-      
-      if (results.isEmpty) return null;
-      return results.first;
+
+      if (results.isEmpty) {
+        return null;
+      }
+
+      return MuscleFactorModel.fromMap(results.first);
     } catch (e) {
       throw CacheDatabaseException('Failed to get factor by ID: $e');
     }
   }
 
-  /// Get all muscle factors
-  Future<List<Map<String, dynamic>>> getAllFactors() async {
+  /// Get all muscle factors.
+  Future<List<MuscleFactorModel>> getAllFactors() async {
     try {
       final db = await databaseHelper.database;
-      return await db.query(DatabaseTables.exerciseMuscleFactors);
+      final List<Map<String, dynamic>> results =
+          await db.query(DatabaseTables.exerciseMuscleFactors);
+
+      return results
+          .map(MuscleFactorModel.fromMap)
+          .toList(growable: false);
     } catch (e) {
       throw CacheDatabaseException('Failed to get all factors: $e');
     }
   }
 
-  /// Get all muscle factors for a specific exercise
-  Future<List<Map<String, dynamic>>> getFactorsForExercise(
+  /// Get all muscle factors for a specific exercise.
+  Future<List<MuscleFactorModel>> getFactorsForExercise(
     String exerciseId,
   ) async {
     try {
       final db = await databaseHelper.database;
-      return await db.query(
+      final List<Map<String, dynamic>> results = await db.query(
         DatabaseTables.exerciseMuscleFactors,
         where: '${DatabaseTables.factorExerciseId} = ?',
         whereArgs: [exerciseId],
       );
+
+      return results
+          .map(MuscleFactorModel.fromMap)
+          .toList(growable: false);
     } catch (e) {
       throw CacheDatabaseException('Failed to get factors for exercise: $e');
     }
   }
 
-  /// Add a single muscle factor
+  /// Add a single muscle factor.
   Future<void> addFactor(MuscleFactorModel factor) async {
     try {
       final db = await databaseHelper.database;
@@ -66,26 +82,26 @@ class MuscleFactorLocalDataSource {
     }
   }
 
-  /// Add multiple muscle factors in a batch
+  /// Add multiple muscle factors in a batch.
   Future<void> addFactorsBatch(List<MuscleFactorModel> factors) async {
     try {
       final db = await databaseHelper.database;
       final batch = db.batch();
-      
-      for (final factor in factors) {
+
+      for (final MuscleFactorModel factor in factors) {
         batch.insert(
           DatabaseTables.exerciseMuscleFactors,
           factor.toMap(),
         );
       }
-      
+
       await batch.commit(noResult: true);
     } catch (e) {
       throw CacheDatabaseException('Failed to add factors batch: $e');
     }
   }
 
-  /// Update an existing muscle factor
+  /// Update an existing muscle factor.
   Future<void> updateFactor(MuscleFactorModel factor) async {
     try {
       final db = await databaseHelper.database;
@@ -100,7 +116,7 @@ class MuscleFactorLocalDataSource {
     }
   }
 
-  /// Delete a muscle factor by ID
+  /// Delete a muscle factor by ID.
   Future<void> deleteFactor(String id) async {
     try {
       final db = await databaseHelper.database;
@@ -114,7 +130,7 @@ class MuscleFactorLocalDataSource {
     }
   }
 
-  /// Delete all muscle factors for a specific exercise
+  /// Delete all muscle factors for a specific exercise.
   Future<void> deleteFactorsByExerciseId(String exerciseId) async {
     try {
       final db = await databaseHelper.database;
@@ -124,11 +140,13 @@ class MuscleFactorLocalDataSource {
         whereArgs: [exerciseId],
       );
     } catch (e) {
-      throw CacheDatabaseException('Failed to delete factors for exercise: $e');
+      throw CacheDatabaseException(
+        'Failed to delete factors for exercise: $e',
+      );
     }
   }
 
-  /// Clear all muscle factors
+  /// Clear all muscle factors.
   Future<void> clearAllFactors() async {
     try {
       final db = await databaseHelper.database;

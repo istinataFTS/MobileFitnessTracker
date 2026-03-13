@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
-import '../history/bloc/history_bloc.dart';
+import '../../../features/history/history.dart';
 import '../home/bloc/home_bloc.dart';
 import '../home/bloc/muscle_visual_bloc.dart';
 import '../nutrition_log/bloc/nutrition_log_bloc.dart';
@@ -42,26 +42,30 @@ class _LogPageState extends State<LogPage> {
 
     _selectedIndex = widget.initialIndex.clamp(0, 2);
 
-    final workoutBloc = context.read<WorkoutBloc>();
-    final nutritionLogBloc = context.read<NutritionLogBloc>();
+    final WorkoutBloc workoutBloc = context.read<WorkoutBloc>();
+    final NutritionLogBloc nutritionLogBloc = context.read<NutritionLogBloc>();
 
     _workoutEffectsSub = workoutBloc.effects.listen((effect) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (effect is WorkoutLoggedEffect) {
         context.read<HomeBloc>().add(RefreshHomeDataEvent());
-        context.read<HistoryBloc>().add(RefreshCurrentMonthEvent());
+        context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
         context.read<WorkoutBloc>().add(const RefreshWeeklySetsEvent());
         context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
       }
     });
 
     _nutritionEffectsSub = nutritionLogBloc.effects.listen((effect) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (effect is NutritionLogSuccessEffect) {
         context.read<HomeBloc>().add(RefreshHomeDataEvent());
-        context.read<HistoryBloc>().add(RefreshCurrentMonthEvent());
+        context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
       }
     });
   }
@@ -75,7 +79,7 @@ class _LogPageState extends State<LogPage> {
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
+    final bool canPop = Navigator.of(context).canPop();
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
@@ -84,7 +88,7 @@ class _LogPageState extends State<LogPage> {
         automaticallyImplyLeading: canPop,
       ),
       body: Column(
-        children: [
+        children: <Widget>[
           _buildSegmentedControl(),
           Expanded(
             child: _buildContent(),
@@ -104,7 +108,7 @@ class _LogPageState extends State<LogPage> {
         border: Border.all(color: AppTheme.borderDark),
       ),
       child: Row(
-        children: [
+        children: <Widget>[
           _buildSegmentButton(
             index: 0,
             label: AppStrings.logExerciseTab,
@@ -130,7 +134,7 @@ class _LogPageState extends State<LogPage> {
     required String label,
     required IconData icon,
   }) {
-    final isSelected = _selectedIndex == index;
+    final bool isSelected = _selectedIndex == index;
 
     return Expanded(
       child: GestureDetector(
@@ -148,7 +152,7 @@ class _LogPageState extends State<LogPage> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: <Widget>[
               Icon(
                 icon,
                 color: isSelected ? Colors.white : AppTheme.textDim,

@@ -1,6 +1,6 @@
 import 'package:get_it/get_it.dart';
 
-import '../../presentation/pages/history/bloc/history_bloc.dart';
+import '../../features/history/history.dart';
 
 void registerHistoryModule(GetIt sl) {
   sl.registerFactory(

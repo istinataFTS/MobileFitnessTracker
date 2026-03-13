@@ -1,36 +1,32 @@
 import 'package:dartz/dartz.dart';
-import '../../core/errors/exceptions.dart';
+
 import '../../core/errors/failures.dart';
+import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/muscle_stimulus.dart';
 import '../../domain/repositories/muscle_stimulus_repository.dart';
 import '../datasources/local/muscle_stimulus_local_datasource.dart';
 import '../models/muscle_stimulus_model.dart';
 
-/// Repository implementation for MuscleStimulus operations
-/// 
-/// Converts between domain entities and data models
-/// Handles error conversion (exceptions → failures)
+/// Repository implementation for MuscleStimulus operations.
+/// Uses [RepositoryGuard] to keep failure mapping consistent across methods.
 class MuscleStimulusRepositoryImpl implements MuscleStimulusRepository {
   final MuscleStimulusLocalDataSource localDataSource;
 
-  const MuscleStimulusRepositoryImpl({required this.localDataSource});
+  const MuscleStimulusRepositoryImpl({
+    required this.localDataSource,
+  });
 
   @override
   Future<Either<Failure, MuscleStimulus?>> getStimulusByMuscleAndDate({
     required String muscleGroup,
     required DateTime date,
-  }) async {
-    try {
-      final stimulus = await localDataSource.getStimulusByMuscleAndDate(
+  }) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getStimulusByMuscleAndDate(
         muscleGroup: muscleGroup,
         date: date,
       );
-      return Right(stimulus);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
@@ -38,60 +34,41 @@ class MuscleStimulusRepositoryImpl implements MuscleStimulusRepository {
     required String muscleGroup,
     required DateTime startDate,
     required DateTime endDate,
-  }) async {
-    try {
-      final stimulusList = await localDataSource.getStimulusByDateRange(
+  }) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getStimulusByDateRange(
         muscleGroup: muscleGroup,
         startDate: startDate,
         endDate: endDate,
       );
-      return Right(stimulusList);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
   Future<Either<Failure, MuscleStimulus?>> getTodayStimulus(
     String muscleGroup,
-  ) async {
-    try {
-      final stimulus = await localDataSource.getTodayStimulus(muscleGroup);
-      return Right(stimulus);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getTodayStimulus(muscleGroup);
+    });
   }
 
   @override
   Future<Either<Failure, List<MuscleStimulus>>> getAllStimulusForDate(
     DateTime date,
-  ) async {
-    try {
-      final stimulusList = await localDataSource.getAllStimulusForDate(date);
-      return Right(stimulusList);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getAllStimulusForDate(date);
+    });
   }
 
   @override
-  Future<Either<Failure, void>> upsertStimulus(MuscleStimulus stimulus) async {
-    try {
-      final model = MuscleStimulusModel.fromEntity(stimulus);
+  Future<Either<Failure, void>> upsertStimulus(MuscleStimulus stimulus) {
+    return RepositoryGuard.run(() async {
+      final MuscleStimulusModel model =
+          MuscleStimulusModel.fromEntity(stimulus);
       await localDataSource.upsertStimulus(model);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
@@ -101,8 +78,8 @@ class MuscleStimulusRepositoryImpl implements MuscleStimulusRepository {
     required double rollingWeeklyLoad,
     int? lastSetTimestamp,
     double? lastSetStimulus,
-  }) async {
-    try {
+  }) {
+    return RepositoryGuard.run(() async {
       await localDataSource.updateStimulusValues(
         id: id,
         dailyStimulus: dailyStimulus,
@@ -110,61 +87,36 @@ class MuscleStimulusRepositoryImpl implements MuscleStimulusRepository {
         lastSetTimestamp: lastSetTimestamp,
         lastSetStimulus: lastSetStimulus,
       );
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> applyDailyDecayToAll() async {
-    try {
+  Future<Either<Failure, void>> applyDailyDecayToAll() {
+    return RepositoryGuard.run(() async {
       await localDataSource.applyDailyDecayToAll();
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
   Future<Either<Failure, double>> getMaxStimulusForMuscle(
     String muscleGroup,
-  ) async {
-    try {
-      final maxStimulus = await localDataSource.getMaxStimulusForMuscle(muscleGroup);
-      return Right(maxStimulus);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getMaxStimulusForMuscle(muscleGroup);
+    });
   }
 
   @override
-  Future<Either<Failure, void>> deleteOlderThan(DateTime date) async {
-    try {
+  Future<Either<Failure, void>> deleteOlderThan(DateTime date) {
+    return RepositoryGuard.run(() async {
       await localDataSource.deleteOlderThan(date);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> clearAllStimulus() async {
-    try {
+  Future<Either<Failure, void>> clearAllStimulus() {
+    return RepositoryGuard.run(() async {
       await localDataSource.clearAllStimulus();
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 }

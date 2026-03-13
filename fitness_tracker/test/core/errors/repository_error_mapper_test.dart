@@ -1,56 +1,50 @@
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:fitness_tracker/core/errors/exceptions.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/errors/repository_error_mapper.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('RepositoryErrorMapper', () {
     test('maps ValidationException to ValidationFailure', () {
-      final failure = RepositoryErrorMapper.map(
-        const ValidationException('Invalid meal macros'),
+      final Failure result = RepositoryErrorMapper.map(
+        const ValidationException('Invalid input'),
       );
 
-      expect(failure, isA<ValidationFailure>());
-      expect(failure.message, 'Invalid meal macros');
+      expect(result, const ValidationFailure('Invalid input'));
     });
 
     test('maps CacheDatabaseException to DatabaseFailure', () {
-      final failure = RepositoryErrorMapper.map(
-        const CacheDatabaseException('Database write failed'),
+      final Failure result = RepositoryErrorMapper.map(
+        const CacheDatabaseException('DB failed'),
       );
 
-      expect(failure, isA<DatabaseFailure>());
-      expect(failure.message, 'Database write failed');
+      expect(result, const DatabaseFailure('DB failed'));
     });
 
     test('maps CacheException to CacheFailure', () {
-      final failure = RepositoryErrorMapper.map(
-        const CacheException('Cache miss'),
+      final Failure result = RepositoryErrorMapper.map(
+        const CacheException('Cache failed'),
       );
 
-      expect(failure, isA<CacheFailure>());
-      expect(failure.message, 'Cache miss');
+      expect(result, const CacheFailure('Cache failed'));
     });
 
     test('maps ArgumentError to ValidationFailure', () {
-      final failure = RepositoryErrorMapper.map(
-        ArgumentError('Invalid workout set input'),
+      final Failure result = RepositoryErrorMapper.map(
+        ArgumentError('Bad argument'),
       );
 
-      expect(failure, isA<ValidationFailure>());
-      expect(failure.message, contains('Invalid workout set input'));
+      expect(result, const ValidationFailure('Bad argument'));
     });
 
     test('maps unknown errors to UnexpectedFailure', () {
-      final failure = RepositoryErrorMapper.map(
-        StateError('Something unexpected happened'),
+      final Failure result = RepositoryErrorMapper.map(
+        StateError('boom'),
       );
 
-      expect(failure, isA<UnexpectedFailure>());
       expect(
-        failure.message,
-        'Unexpected error: Bad state: Something unexpected happened',
+        result,
+        const UnexpectedFailure('Unexpected error: Bad state: boom'),
       );
     });
   });
