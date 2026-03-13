@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/constants/svg_muscle_mapping.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/muscle_visual_data.dart';
+import '../helpers/body_visualization_mapper.dart';
+import '../models/body_region_visual_data.dart';
+import '../models/body_view.dart';
 
-/// Muscle body diagram widget with colored muscle regions
 class MuscleBodyDiagramWidget extends StatelessWidget {
   final Map<String, MuscleVisualData> muscleData;
   final bool isFrontView;
@@ -23,9 +25,15 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
       return _buildLoadingState(context);
     }
 
-    if (muscleData.isEmpty) {
+    if (!BodyVisualizationMapper.hasAnyTraining(muscleData)) {
       return _buildEmptyState(context);
     }
+
+    final bodyView = isFrontView ? BodyView.front : BodyView.back;
+    final regions = BodyVisualizationMapper.mapRegions(
+      muscleData: muscleData,
+      view: bodyView,
+    );
 
     return RepaintBoundary(
       child: Container(
@@ -34,19 +42,16 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
           maxWidth: 300,
         ),
         child: AspectRatio(
-          aspectRatio: 3 / 5, // Typical human body proportions
+          aspectRatio: 3 / 5,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Base body outline image
                 _buildBodyOutline(context),
-
-                // Colored muscle overlays
-                _buildMuscleOverlays(context),
-
-                // View indicator
+                CustomPaint(
+                  painter: _BodyRegionOverlayPainter(regions: regions),
+                ),
                 _buildViewIndicator(context),
               ],
             ),
@@ -56,7 +61,6 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  /// Build loading state indicator
   Widget _buildLoadingState(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(
@@ -75,7 +79,7 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircularProgressIndicator(
+                const CircularProgressIndicator(
                   color: AppTheme.primaryOrange,
                 ),
                 const SizedBox(height: 16),
@@ -93,7 +97,6 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  /// Build empty state (no workout data)
   Widget _buildEmptyState(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(
@@ -144,10 +147,6 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  /// Build body outline using PNG files
-  ///
-  /// Renders FrontLook.png or BackLook.png based on current view
-  /// PNG files should be placed in assets/images/body/
   Widget _buildBodyOutline(BuildContext context) {
     final imagePath = isFrontView
         ? 'assets/images/body/FrontLook.png'
@@ -173,25 +172,6 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  /// Build colored muscle overlays
-  ///
-  /// Renders colored shapes over muscle regions based on training data
-  /// Uses CustomPainter to draw color overlays on body image
-  Widget _buildMuscleOverlays(BuildContext context) {
-    final visibleMuscles = isFrontView
-        ? SvgMuscleMapping.frontViewMuscles
-        : SvgMuscleMapping.backViewMuscles;
-
-    return CustomPaint(
-      painter: _MuscleOverlayPainter(
-        muscleData: muscleData,
-        visibleMuscles: visibleMuscles,
-        isFrontView: isFrontView,
-      ),
-    );
-  }
-
-  /// Build view indicator badge
   Widget _buildViewIndicator(BuildContext context) {
     return Positioned(
       top: 12,
@@ -215,113 +195,48 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
   }
 }
 
-/// Custom painter for muscle color overlays
-///
-/// Draws colored regions for each muscle based on training intensity
-///
-/// NOTE: This is a simplified implementation that draws colored rectangles
-/// as placeholders.
-///
-/// ADVANCED IMPLEMENTATION OPTIONS:
-///
-/// Option A: Use image coordinates / masks
-/// - Create coordinate maps for muscle regions
-/// - Draw colored regions over image positions
-///
-/// Option B: Layer multiple transparent PNG overlays
-/// - Render base body PNG
-/// - Render muscle-specific transparent overlays on top
-///
-/// Option C: Use CustomPainter with manually defined paths
-/// - Store muscle region paths
-/// - Paint each path with appropriate color
-///
-/// For now, this draws placeholder rectangles to demonstrate the concept.
-class _MuscleOverlayPainter extends CustomPainter {
-  final Map<String, MuscleVisualData> muscleData;
-  final List<String> visibleMuscles;
-  final bool isFrontView;
+class _BodyRegionOverlayPainter extends CustomPainter {
+  final List<BodyRegionVisualData> regions;
 
-  _MuscleOverlayPainter({
-    required this.muscleData,
-    required this.visibleMuscles,
-    required this.isFrontView,
+  _BodyRegionOverlayPainter({
+    required this.regions,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    _drawPlaceholderMuscleRegions(canvas, size);
-  }
+    for (final region in regions) {
+      if (!region.hasTrained) {
+        continue;
+      }
 
-  /// Placeholder muscle region visualization
-  ///
-  /// Shows concept of colored muscle regions using simple shapes
-  void _drawPlaceholderMuscleRegions(Canvas canvas, Size size) {
-    final centerX = size.width / 2;
+      final rect = Rect.fromLTWH(
+        region.normalizedRect.left * size.width,
+        region.normalizedRect.top * size.height,
+        region.normalizedRect.width * size.width,
+        region.normalizedRect.height * size.height,
+      );
 
-    for (final muscleGroup in visibleMuscles) {
-      if (!muscleData.containsKey(muscleGroup)) continue;
-
-      final data = muscleData[muscleGroup]!;
-      if (!data.hasTrained) continue;
-
-      final position = _getMusclePosition(muscleGroup, centerX, size.height);
-      if (position == null) continue;
-
-      final paint = Paint()
-        ..color = data.color.withOpacity(0.45)
+      final fillPaint = Paint()
+        ..color = region.color.withOpacity(0.45)
         ..style = PaintingStyle.fill;
 
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: position,
-          width: size.width * 0.15,
-          height: size.height * 0.1,
-        ),
+      final borderPaint = Paint()
+        ..color = region.color.withOpacity(0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      final rrect = RRect.fromRectAndRadius(
+        rect,
         const Radius.circular(8),
       );
-      canvas.drawRRect(rect, paint);
-    }
-  }
 
-  /// Get approximate position for muscle group (placeholder)
-  Offset? _getMusclePosition(String muscleGroup, double centerX, double height) {
-    if (isFrontView) {
-      switch (muscleGroup) {
-        case 'front-delts':
-          return Offset(centerX, height * 0.25);
-        case 'mid-chest':
-          return Offset(centerX, height * 0.3);
-        case 'biceps':
-          return Offset(centerX, height * 0.35);
-        case 'abs':
-          return Offset(centerX, height * 0.45);
-        case 'quads':
-          return Offset(centerX, height * 0.65);
-        default:
-          return null;
-      }
-    } else {
-      switch (muscleGroup) {
-        case 'upper-traps':
-          return Offset(centerX, height * 0.2);
-        case 'lats':
-          return Offset(centerX, height * 0.35);
-        case 'lower-back':
-          return Offset(centerX, height * 0.45);
-        case 'glutes':
-          return Offset(centerX, height * 0.55);
-        case 'hamstrings':
-          return Offset(centerX, height * 0.65);
-        default:
-          return null;
-      }
+      canvas.drawRRect(rrect, fillPaint);
+      canvas.drawRRect(rrect, borderPaint);
     }
   }
 
   @override
-  bool shouldRepaint(_MuscleOverlayPainter oldDelegate) {
-    return oldDelegate.muscleData != muscleData ||
-        oldDelegate.isFrontView != isFrontView;
+  bool shouldRepaint(_BodyRegionOverlayPainter oldDelegate) {
+    return oldDelegate.regions != regions;
   }
 }
