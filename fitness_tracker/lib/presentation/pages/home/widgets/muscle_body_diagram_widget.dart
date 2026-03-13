@@ -49,9 +49,7 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 _buildBodyOutline(context),
-                CustomPaint(
-                  painter: _BodyRegionOverlayPainter(regions: regions),
-                ),
+                _buildRegionOverlays(regions),
                 _buildViewIndicator(context),
               ],
             ),
@@ -172,6 +170,21 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildRegionOverlays(List<BodyRegionVisualData> regions) {
+    final trainedRegions = regions.where((region) => region.hasTrained).toList();
+
+    return IgnorePointer(
+      ignoring: true,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          for (final region in trainedRegions)
+            _TintedOverlayRegion(region: region),
+        ],
+      ),
+    );
+  }
+
   Widget _buildViewIndicator(BuildContext context) {
     return Positioned(
       top: 12,
@@ -195,48 +208,38 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
   }
 }
 
-class _BodyRegionOverlayPainter extends CustomPainter {
-  final List<BodyRegionVisualData> regions;
+class _TintedOverlayRegion extends StatelessWidget {
+  final BodyRegionVisualData region;
 
-  _BodyRegionOverlayPainter({
-    required this.regions,
+  const _TintedOverlayRegion({
+    required this.region,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    for (final region in regions) {
-      if (!region.hasTrained) {
-        continue;
-      }
-
-      final rect = Rect.fromLTWH(
-        region.normalizedRect.left * size.width,
-        region.normalizedRect.top * size.height,
-        region.normalizedRect.width * size.width,
-        region.normalizedRect.height * size.height,
-      );
-
-      final fillPaint = Paint()
-        ..color = region.color.withOpacity(0.45)
-        ..style = PaintingStyle.fill;
-
-      final borderPaint = Paint()
-        ..color = region.color.withOpacity(0.7)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0;
-
-      final rrect = RRect.fromRectAndRadius(
-        rect,
-        const Radius.circular(8),
-      );
-
-      canvas.drawRRect(rrect, fillPaint);
-      canvas.drawRRect(rrect, borderPaint);
-    }
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: _overlayOpacityFor(region.visualIntensity),
+      child: ColorFiltered(
+        colorFilter: ColorFilter.mode(
+          region.color,
+          BlendMode.srcIn,
+        ),
+        child: Image.asset(
+          region.overlayAssetPath,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
   }
 
-  @override
-  bool shouldRepaint(_BodyRegionOverlayPainter oldDelegate) {
-    return oldDelegate.regions != regions;
+  double _overlayOpacityFor(double intensity) {
+    if (intensity <= 0) return 0.0;
+    if (intensity < 0.20) return 0.45;
+    if (intensity < 0.45) return 0.60;
+    if (intensity < 0.70) return 0.72;
+    return 0.85;
   }
 }

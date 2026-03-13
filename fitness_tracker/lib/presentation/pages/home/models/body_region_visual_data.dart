@@ -9,7 +9,7 @@ class BodyRegionVisualData extends Equatable {
   final String muscleGroup;
   final String displayName;
   final BodyView view;
-  final Rect normalizedRect;
+  final String overlayAssetPath;
   final double visualIntensity;
   final Color color;
   final bool hasTrained;
@@ -19,7 +19,7 @@ class BodyRegionVisualData extends Equatable {
     required this.muscleGroup,
     required this.displayName,
     required this.view,
-    required this.normalizedRect,
+    required this.overlayAssetPath,
     required this.visualIntensity,
     required this.color,
     required this.hasTrained,
@@ -31,7 +31,7 @@ class BodyRegionVisualData extends Equatable {
         muscleGroup,
         displayName,
         view,
-        normalizedRect,
+        overlayAssetPath,
         visualIntensity,
         color,
         hasTrained,

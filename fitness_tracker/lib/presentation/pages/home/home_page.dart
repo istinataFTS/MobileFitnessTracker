@@ -10,8 +10,8 @@ import '../../../domain/entities/time_period.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
-import 'widgets/body_view_toggle_widget.dart';
-import 'widgets/muscle_body_diagram_widget.dart';
+import 'helpers/muscle_training_summary_mapper.dart';
+import 'widgets/muscle_training_summary_widget.dart';
 import 'widgets/nutrition_summary_card.dart';
 import 'widgets/period_selector_widget.dart';
 import 'widgets/progress_stats_widget.dart';
@@ -24,8 +24,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool _isFrontView = true;
-
   @override
   void initState() {
     super.initState();
@@ -130,13 +128,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           _buildGreetingSection(context),
           const SizedBox(height: 24),
-
           _buildNutritionCard(context, homeState),
           const SizedBox(height: 24),
-
           _buildMuscleVisualizationCard(context, homeState),
           const SizedBox(height: 24),
-
           if (homeState.trainingTargets.isNotEmpty)
             _buildMuscleGroupsSection(context, homeState),
         ],
@@ -276,7 +271,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildLoadingVisualization(BuildContext context) {
     return Container(
-      height: 400,
+      height: 320,
       alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -298,7 +293,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildErrorVisualization(BuildContext context, String message) {
     return Container(
-      height: 400,
+      height: 320,
       alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -344,29 +339,18 @@ class _HomePageState extends State<HomePage> {
     HomeLoaded homeState,
     MuscleVisualLoaded muscleState,
   ) {
-    final stats = _calculatePeriodStats(
-      homeState,
-      muscleState,
+    final stats = _calculatePeriodStats(homeState, muscleState);
+    final summaryViewData = MuscleTrainingSummaryMapper.map(
+      muscleState.muscleData,
+      maxItems: 6,
     );
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RepaintBoundary(
-          child: MuscleBodyDiagramWidget(
-            muscleData: muscleState.muscleData,
-            isFrontView: _isFrontView,
-            isLoading: false,
-          ),
-        ),
-        const SizedBox(height: 16),
-        BodyViewToggleWidget(
-          isFrontView: _isFrontView,
-          onViewChanged: (isFront) {
-            setState(() {
-              _isFrontView = isFront;
-            });
-          },
-          enabled: true,
+        MuscleTrainingSummaryWidget(
+          viewData: summaryViewData,
+          isLoading: false,
         ),
         const SizedBox(height: 20),
         ProgressStatsWidget(
