@@ -1,167 +1,109 @@
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/meal.dart';
 import '../../domain/repositories/meal_repository.dart';
 import '../datasources/local/meal_local_datasource.dart';
 import '../models/meal_model.dart';
 
-/// Repository implementation for Meal operations
-/// Implements domain layer interface using data layer datasources
-/// Converts exceptions to failures for clean error handling
+/// Repository implementation for Meal operations.
+/// Converts datasource/model exceptions into domain failures.
 class MealRepositoryImpl implements MealRepository {
   final MealLocalDataSource localDataSource;
 
-  const MealRepositoryImpl({required this.localDataSource});
+  const MealRepositoryImpl({
+    required this.localDataSource,
+  });
 
   @override
-  Future<Either<Failure, List<Meal>>> getAllMeals() async {
-    try {
-      final meals = await localDataSource.getAllMeals();
-      return Right(meals);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, List<Meal>>> getAllMeals() {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getAllMeals();
+    });
   }
 
   @override
-  Future<Either<Failure, Meal?>> getMealById(String id) async {
-    try {
-      final meal = await localDataSource.getMealById(id);
-      return Right(meal);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, Meal?>> getMealById(String id) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getMealById(id);
+    });
   }
 
   @override
-  Future<Either<Failure, Meal?>> getMealByName(String name) async {
-    try {
-      final meal = await localDataSource.getMealByName(name);
-      return Right(meal);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, Meal?>> getMealByName(String name) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getMealByName(name);
+    });
   }
 
   @override
   Future<Either<Failure, List<Meal>>> searchMealsByName(
     String searchTerm,
-  ) async {
-    try {
-      final meals = await localDataSource.searchMealsByName(searchTerm);
-      return Right(meals);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.searchMealsByName(searchTerm);
+    });
   }
 
   @override
   Future<Either<Failure, List<Meal>>> getRecentMeals({
     int limit = 10,
-  }) async {
-    try {
-      final meals = await localDataSource.getRecentMeals(limit: limit);
-      return Right(meals);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  }) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getRecentMeals(limit: limit);
+    });
   }
 
   @override
   Future<Either<Failure, List<Meal>>> getFrequentMeals({
     int limit = 10,
-  }) async {
-    try {
-      final meals = await localDataSource.getFrequentMeals(limit: limit);
-      return Right(meals);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  }) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getFrequentMeals(limit: limit);
+    });
   }
 
   @override
-  Future<Either<Failure, void>> addMeal(Meal meal) async {
-    try {
+  Future<Either<Failure, void>> addMeal(Meal meal) {
+    return RepositoryGuard.run(() async {
       final model = MealModel.fromEntity(meal);
       model.validateMacros();
       model.validateAndLogCalories();
 
       await localDataSource.insertMeal(model);
-      return const Right(null);
-    } on ArgumentError catch (e) {
-      return Left(ValidationFailure(e.message.toString()));
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> updateMeal(Meal meal) async {
-    try {
+  Future<Either<Failure, void>> updateMeal(Meal meal) {
+    return RepositoryGuard.run(() async {
       final model = MealModel.fromEntity(meal);
       model.validateMacros();
       model.validateAndLogCalories();
 
       await localDataSource.updateMeal(model);
-      return const Right(null);
-    } on ArgumentError catch (e) {
-      return Left(ValidationFailure(e.message.toString()));
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> deleteMeal(String id) async {
-    try {
+  Future<Either<Failure, void>> deleteMeal(String id) {
+    return RepositoryGuard.run(() async {
       await localDataSource.deleteMeal(id);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> clearAllMeals() async {
-    try {
+  Future<Either<Failure, void>> clearAllMeals() {
+    return RepositoryGuard.run(() async {
       await localDataSource.clearAllMeals();
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, int>> getMealsCount() async {
-    try {
-      final count = await localDataSource.getMealsCount();
-      return Right(count);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, int>> getMealsCount() {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getMealsCount();
+    });
   }
 }

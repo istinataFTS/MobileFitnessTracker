@@ -40,9 +40,9 @@ class AppStrings {
 
   // ==================== Web Platform Messages ====================
   static const String webMobileOnlyTitle = 'Mobile Only App';
-  static const String webMobileOnlyDescription = 
+  static const String webMobileOnlyDescription =
       'This fitness tracker is designed for mobile devices.';
-  static const String webMobileOnlyInstruction = 
+  static const String webMobileOnlyInstruction =
       'Please install the app on your Android or iOS device.';
 
   // ==================== Error Messages ====================
@@ -86,9 +86,11 @@ class AppStrings {
   static const String logWorkout = 'Log Workout';
   static const String viewHistory = 'View History';
   static const String manageTargets = 'Manage Targets';
-  static const String manageTargetsDesc = 'Set and track weekly muscle group goals';
+  static const String manageTargetsDesc =
+      'Set and track weekly muscle group goals';
   static const String noWorkoutData = 'No Workout Data';
-  static const String noWorkoutDataDesc = 'Start logging sets to see your muscle training visualization';
+  static const String noWorkoutDataDesc =
+      'Start logging sets to see your muscle training visualization';
 
   // ==================== Log Page ====================
   static const String logTitle = 'Log';
@@ -106,7 +108,8 @@ class AppStrings {
   // ==================== Workout ====================
   static const String setLogged = 'Set logged!';
   static const String noExercisesAvailable = 'No exercises available';
-  static const String createExercisesFirst = 'Go to Library to create exercises first';
+  static const String createExercisesFirst =
+      'Go to Library to create exercises first';
   static const String workoutDate = 'Workout Date';
   static const String setWillCountToward = 'This set will count toward:';
   static const String logSetButton = 'Log Set';
@@ -131,8 +134,9 @@ class AppStrings {
   static const String noExercises = 'No exercises found';
   static const String noSets = 'No sets logged';
 
-   // ==================== Intensity System ====================
-  static const String intensityInfo = 'Intensity affects muscle recovery tracking';
+  // ==================== Intensity System ====================
+  static const String intensityInfo =
+      'Intensity affects muscle recovery tracking';
   static const String intensityLevels = 'Intensity Levels';
   static const String currentIntensity = 'Current Intensity';
   static const String allIntensityLevels = 'All Intensity Levels';
@@ -145,11 +149,13 @@ class AppStrings {
   static const String aboutExercises = 'About Exercises';
   static const String addFirstExercise = 'Add Your First Exercise';
   static const String exerciseNameHint = 'e.g. Bench Press';
-  static const String deleteExerciseConfirm = 'Are you sure you want to delete this exercise?';
+  static const String deleteExerciseConfirm =
+      'Are you sure you want to delete this exercise?';
   static const String editExercise = 'Edit Exercise';
   static const String deleteExercise = 'Delete Exercise';
   static const String noExercisesYet = 'No exercises yet';
-  static const String createExercisesDescription = 'Create exercises to track your workouts';
+  static const String createExercisesDescription =
+      'Create exercises to track your workouts';
   static const String emptyLibrary = 'Your library is empty';
 
   // ==================== Nutrition ====================
@@ -179,7 +185,8 @@ class AppStrings {
   static const String selectMeal = 'Select Meal';
   static const String searchMeals = 'Search meals...';
   static const String noMealsInLibrary = 'No meals in your library';
-  static const String createMealsInLibrary = 'Create meals in the Library tab first';
+  static const String createMealsInLibrary =
+      'Create meals in the Library tab first';
   static const String per100g = 'per 100g';
   static const String amountGrams = 'Amount (grams)';
   static const String amountGramsHint = 'Enter grams consumed';
@@ -191,9 +198,11 @@ class AppStrings {
   static const String autocalculated = 'Auto-calculated';
   static const String logMacrosButton = 'Log Macros';
   static const String noMealsYet = 'No meals yet';
-  static const String createMealsDescription = 'Create meals to track your nutrition';
+  static const String createMealsDescription =
+      'Create meals to track your nutrition';
   static const String addFirstMeal = 'Add Your First Meal';
-  static const String deleteMealConfirm = 'Are you sure you want to delete this meal?';
+  static const String deleteMealConfirm =
+      'Are you sure you want to delete this meal?';
   static const String mealNameHint = 'e.g. Chicken Breast';
   static const String servingSizeHint = 'e.g. 100';
   static const String macrosPerServing = 'Macros per Serving';
@@ -209,7 +218,8 @@ class AppStrings {
   static const String editTarget = 'Edit Target';
   static const String deleteTarget = 'Delete Target';
   static const String removeTarget = 'Remove Target';
-  static const String removeTargetConfirm = 'Are you sure you want to remove this target?';
+  static const String removeTargetConfirm =
+      'Are you sure you want to remove this target?';
   static const String muscleGroup = 'Muscle Group';
   static const String targetMuscleGroup = 'Muscle Group';
   static const String targetWeeklyGoal = 'Weekly Goal';
@@ -220,10 +230,13 @@ class AppStrings {
   static const String targetInProgress = 'In Progress';
   static const String noTargets = 'No targets set';
   static const String noTargetsYet = 'No targets yet';
-  static const String noTargetsDescription = 'Set weekly goals for muscle groups to track your progress';
-  static const String createTargetsDescription = 'Set weekly goals for each muscle group';
+  static const String noTargetsDescription =
+      'Set weekly goals for muscle groups to track your progress';
+  static const String createTargetsDescription =
+      'Set weekly goals for each muscle group';
   static const String aboutTargets = 'About Targets';
-  static const String aboutTargetsDescription = 'Set weekly goals for muscle groups and track your progress';
+  static const String aboutTargetsDescription =
+      'Set weekly goals for muscle groups and track your progress';
   static const String targetDeleteConfirm = 'Delete this target?';
   static const String targetReached = 'Target Reached!';
   static const String setsThisWeek = 'sets this week';
@@ -243,7 +256,8 @@ class AppStrings {
   static const String noHistory = 'No workout history';
   static const String noWorkoutsToday = 'No workouts today';
   static const String noWorkoutsYet = 'No workouts yet';
-  static const String startLoggingSets = 'Start logging sets to see your history';
+  static const String startLoggingSets =
+      'Start logging sets to see your history';
   static const String selectDate = 'Select Date';
   static const String viewAll = 'View All';
   static const String recentWorkouts = 'Recent Workouts';
@@ -315,7 +329,8 @@ class AppStrings {
   static const String noResultsFound = 'No results found';
   static const String trySearchingAgain = 'Try searching again';
   static const String getStarted = 'Get Started';
-  static const String startLogging = 'Start logging workouts to see your progress';
+  static const String startLogging =
+      'Start logging workouts to see your progress';
 
   // ==================== Validation Messages ====================
   static const String fieldRequired = 'This field is required';
@@ -343,36 +358,43 @@ class AppStrings {
   static const String backView = 'Back';
   static const String noMuscleData = 'No muscle stimulus data yet';
   static const String startWorkingOut = 'Start working out to see your progress';
+
+  // ==================== Muscle Summary ====================
+  static const String loadingMuscleSummary = 'Loading muscle summary...';
+  static const String noMuscleActivityYet = 'No muscle activity yet';
+  static const String noMuscleActivityDescription =
+      'Complete some training and your top muscle groups will appear here.';
+  static const String trained = 'Trained';
+  static const String topFocus = 'Top focus';
+  static const String averageIntensity = 'Avg intensity';
+  static const String intensityNone = 'None';
+  static const String intensityLight = 'Light';
+  static const String intensityModerate = 'Moderate';
+  static const String intensityHeavy = 'Heavy';
+  static const String intensityHigh = 'High';
+  static const String intensityMaximum = 'Maximum';
+  static const String musclesSuffix = 'muscles';
+  static const String stimulusLabel = 'Stimulus';
 }
 
-/// Compatibility alias so Phase 7 widgets (body_view_toggle_widget, period_selector_widget,
-/// progress_stats_widget) continue to compile without modification.
-///
-/// All entries forward to the canonical [AppStrings] constant.
-/// Long-term: migrate call-sites to use [AppStrings] directly and delete this class.
 class AppStringsPhase7 {
   AppStringsPhase7._();
 
-  // Body view labels
   static const String frontView = AppStrings.frontView;
   static const String backView = AppStrings.backView;
 
-  // Time period labels
   static const String periodToday = AppStrings.periodToday;
   static const String periodWeek = AppStrings.periodWeek;
   static const String periodMonth = AppStrings.periodMonth;
   static const String periodAllTime = AppStrings.periodAllTime;
 
-  // Stats labels
   static const String sets = AppStrings.sets;
   static const String target = AppStrings.target;
   static const String muscles = AppStrings.muscles;
   static const String progress = AppStrings.progress;
 
-  // Visualization state labels
   static const String loadingVisualization = AppStrings.loadingVisualization;
   static const String errorLoadingData = AppStrings.errorLoadingData;
 
-  // Actions
   static const String tryAgain = AppStrings.tryAgain;
 }

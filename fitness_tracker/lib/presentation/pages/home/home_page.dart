@@ -10,6 +10,7 @@ import '../../../domain/entities/time_period.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
+import 'helpers/home_progress_mapper.dart';
 import 'helpers/muscle_training_summary_mapper.dart';
 import 'widgets/muscle_training_summary_widget.dart';
 import 'widgets/nutrition_summary_card.dart';
@@ -339,7 +340,11 @@ class _HomePageState extends State<HomePage> {
     HomeLoaded homeState,
     MuscleVisualLoaded muscleState,
   ) {
-    final stats = _calculatePeriodStats(homeState, muscleState);
+    final progressStats = HomeProgressMapper.buildProgressStats(
+      homeState: homeState,
+      muscleState: muscleState,
+    );
+
     final summaryViewData = MuscleTrainingSummaryMapper.map(
       muscleState.muscleData,
       maxItems: 6,
@@ -354,41 +359,23 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 20),
         ProgressStatsWidget(
-          totalSets: stats['totalSets'] as int,
-          remainingTarget: stats['remainingTarget'] as int,
-          trainedMuscles: stats['trainedMuscles'] as int,
-          hasTarget: homeState.stats.hasTargets,
+          totalSets: progressStats.totalSets,
+          remainingTarget: progressStats.remainingTarget,
+          trainedMuscles: progressStats.trainedMuscles,
+          hasTarget: progressStats.hasTarget,
         ),
       ],
     );
-  }
-
-  Map<String, dynamic> _calculatePeriodStats(
-    HomeLoaded homeState,
-    MuscleVisualLoaded muscleState,
-  ) {
-    final trainedMuscles = muscleState.trainedMuscleCount;
-
-    if (muscleState.currentPeriod == TimePeriod.week) {
-      return {
-        'totalSets': homeState.stats.totalWeeklySets,
-        'remainingTarget': homeState.stats.remainingTarget,
-        'trainedMuscles': trainedMuscles,
-      };
-    }
-
-    return {
-      'totalSets': homeState.stats.totalWeeklySets,
-      'remainingTarget': 0,
-      'trainedMuscles': trainedMuscles,
-    };
   }
 
   Widget _buildMuscleGroupsSection(
     BuildContext context,
     HomeLoaded homeState,
   ) {
-    final muscleBreakdown = _calculateMuscleBreakdown(homeState.weeklySets);
+    final muscleBreakdown = HomeProgressMapper.buildMuscleBreakdown(
+      weeklySets: homeState.weeklySets,
+      exerciseState: context.read<ExerciseBloc>().state,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,34 +482,5 @@ class _HomePageState extends State<HomePage> {
         }),
       ],
     );
-  }
-
-  Map<String, int> _calculateMuscleBreakdown(List weeklySets) {
-    final Map<String, int> muscleBreakdown = {};
-
-    final exerciseState = context.read<ExerciseBloc>().state;
-
-    if (exerciseState is! ExercisesLoaded) {
-      return muscleBreakdown;
-    }
-
-    final exercises = exerciseState.exercises;
-
-    for (final set in weeklySets) {
-      try {
-        final exercise = exercises.firstWhere(
-          (e) => e.id == set.exerciseId,
-        );
-
-        for (final muscleGroup in exercise.muscleGroups) {
-          muscleBreakdown[muscleGroup] =
-              (muscleBreakdown[muscleGroup] ?? 0) + 1;
-        }
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return muscleBreakdown;
   }
 }

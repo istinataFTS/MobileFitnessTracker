@@ -1,7 +1,7 @@
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/target.dart';
 import '../../domain/repositories/target_repository.dart';
 import '../datasources/local/target_local_datasource.dart';
@@ -15,27 +15,17 @@ class TargetRepositoryImpl implements TargetRepository {
   });
 
   @override
-  Future<Either<Failure, List<Target>>> getAllTargets() async {
-    try {
-      final targets = await localDataSource.getAllTargets();
-      return Right(targets);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, List<Target>>> getAllTargets() {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getAllTargets();
+    });
   }
 
   @override
-  Future<Either<Failure, Target?>> getTargetById(String id) async {
-    try {
-      final target = await localDataSource.getTargetById(id);
-      return Right(target);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+  Future<Either<Failure, Target?>> getTargetById(String id) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getTargetById(id);
+    });
   }
 
   @override
@@ -43,68 +33,43 @@ class TargetRepositoryImpl implements TargetRepository {
     TargetType type,
     String categoryKey,
     TargetPeriod period,
-  ) async {
-    try {
-      final target = await localDataSource.getTargetByTypeAndCategory(
+  ) {
+    return RepositoryGuard.run(() async {
+      return localDataSource.getTargetByTypeAndCategory(
         type,
         categoryKey,
         period,
       );
-      return Right(target);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> addTarget(Target target) async {
-    try {
+  Future<Either<Failure, void>> addTarget(Target target) {
+    return RepositoryGuard.run(() async {
       final model = TargetModel.fromEntity(target);
       await localDataSource.insertTarget(model);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> updateTarget(Target target) async {
-    try {
+  Future<Either<Failure, void>> updateTarget(Target target) {
+    return RepositoryGuard.run(() async {
       final model = TargetModel.fromEntity(target);
       await localDataSource.updateTarget(model);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> deleteTarget(String targetId) async {
-    try {
+  Future<Either<Failure, void>> deleteTarget(String targetId) {
+    return RepositoryGuard.run(() async {
       await localDataSource.deleteTarget(targetId);
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 
   @override
-  Future<Either<Failure, void>> clearAllTargets() async {
-    try {
+  Future<Either<Failure, void>> clearAllTargets() {
+    return RepositoryGuard.run(() async {
       await localDataSource.clearAllTargets();
-      return const Right(null);
-    } on CacheDatabaseException catch (e) {
-      return Left(DatabaseFailure(e.message));
-    } catch (e) {
-      return Left(DatabaseFailure('Unexpected error: $e'));
-    }
+    });
   }
 }

@@ -13,7 +13,7 @@ void main() {
   }
 
   group('MuscleTrainingSummaryWidget', () {
-    testWidgets('shows empty state when there is no trained muscle data',
+    testWidgets('shows empty state when no trained muscle data exists',
         (tester) async {
       await tester.pumpWidget(
         buildTestableWidget(
@@ -33,30 +33,36 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
-    testWidgets('shows top muscles sorted by total stimulus descending',
+    testWidgets('shows trained muscles sorted by total stimulus descending',
         (tester) async {
+      final back = const MuscleVisualData(
+        muscleGroup: 'lats',
+        totalStimulus: 20.0,
+        visualIntensity: 0.85,
+        color: Colors.red,
+        hasTrained: true,
+      );
+
+      final chest = const MuscleVisualData(
+        muscleGroup: 'mid-chest',
+        totalStimulus: 12.0,
+        visualIntensity: 0.55,
+        color: Colors.orange,
+        hasTrained: true,
+      );
+
+      final biceps = const MuscleVisualData(
+        muscleGroup: 'biceps',
+        totalStimulus: 7.0,
+        visualIntensity: 0.18,
+        color: Colors.green,
+        hasTrained: true,
+      );
+
       final muscleData = <String, MuscleVisualData>{
-        'chest': const MuscleVisualData(
-          muscleGroup: 'chest',
-          totalStimulus: 12.0,
-          visualIntensity: 0.45,
-          color: Colors.orange,
-          hasTrained: true,
-        ),
-        'back': const MuscleVisualData(
-          muscleGroup: 'back',
-          totalStimulus: 20.0,
-          visualIntensity: 0.75,
-          color: Colors.red,
-          hasTrained: true,
-        ),
-        'biceps': const MuscleVisualData(
-          muscleGroup: 'biceps',
-          totalStimulus: 7.0,
-          visualIntensity: 0.18,
-          color: Colors.green,
-          hasTrained: true,
-        ),
+        back.muscleGroup: back,
+        chest.muscleGroup: chest,
+        biceps.muscleGroup: biceps,
       };
 
       await tester.pumpWidget(
@@ -73,59 +79,71 @@ void main() {
       expect(find.text('Top focus'), findsOneWidget);
       expect(find.text('Avg intensity'), findsOneWidget);
 
-      expect(find.text('back'), findsOneWidget);
-      expect(find.text('chest'), findsOneWidget);
-      expect(find.text('biceps'), findsOneWidget);
+      final backFinder = find.text(back.displayName);
+      final chestFinder = find.text(chest.displayName);
+      final bicepsFinder = find.text(biceps.displayName);
 
-      final backFinder = find.text('back');
-      final chestFinder = find.text('chest');
-      final bicepsFinder = find.text('biceps');
+      expect(backFinder, findsOneWidget);
+      expect(chestFinder, findsOneWidget);
+      expect(bicepsFinder, findsOneWidget);
 
-      expect(tester.getTopLeft(backFinder).dy, lessThan(tester.getTopLeft(chestFinder).dy));
-      expect(tester.getTopLeft(chestFinder).dy, lessThan(tester.getTopLeft(bicepsFinder).dy));
+      expect(
+        tester.getTopLeft(backFinder).dy,
+        lessThan(tester.getTopLeft(chestFinder).dy),
+      );
+      expect(
+        tester.getTopLeft(chestFinder).dy,
+        lessThan(tester.getTopLeft(bicepsFinder).dy),
+      );
 
       expect(find.text('Stimulus: 20.0'), findsOneWidget);
       expect(find.text('Stimulus: 12.0'), findsOneWidget);
       expect(find.text('Stimulus: 7.0'), findsOneWidget);
     });
 
-    testWidgets('shows intensity badges for trained muscles',
+    testWidgets('shows correct intensity badges for trained muscles',
         (tester) async {
-      final muscleData = <String, MuscleVisualData>{
-        'quads': const MuscleVisualData(
-          muscleGroup: 'quads',
-          totalStimulus: 5.0,
-          visualIntensity: 0.10,
-          color: Colors.green,
-          hasTrained: true,
-        ),
-        'hamstrings': const MuscleVisualData(
-          muscleGroup: 'hamstrings',
-          totalStimulus: 10.0,
-          visualIntensity: 0.30,
-          color: Colors.yellow,
-          hasTrained: true,
-        ),
-        'glutes': const MuscleVisualData(
-          muscleGroup: 'glutes',
-          totalStimulus: 14.0,
-          visualIntensity: 0.55,
-          color: Colors.orange,
-          hasTrained: true,
-        ),
-        'calves': const MuscleVisualData(
-          muscleGroup: 'calves',
-          totalStimulus: 18.0,
-          visualIntensity: 0.85,
-          color: Colors.red,
-          hasTrained: true,
-        ),
-      };
+      final light = const MuscleVisualData(
+        muscleGroup: 'biceps',
+        totalStimulus: 5.0,
+        visualIntensity: 0.10,
+        color: Colors.green,
+        hasTrained: true,
+      );
+
+      final moderate = const MuscleVisualData(
+        muscleGroup: 'quads',
+        totalStimulus: 10.0,
+        visualIntensity: 0.30,
+        color: Colors.yellow,
+        hasTrained: true,
+      );
+
+      final heavy = const MuscleVisualData(
+        muscleGroup: 'mid-chest',
+        totalStimulus: 14.0,
+        visualIntensity: 0.55,
+        color: Colors.orange,
+        hasTrained: true,
+      );
+
+      final maximum = const MuscleVisualData(
+        muscleGroup: 'lats',
+        totalStimulus: 18.0,
+        visualIntensity: 0.85,
+        color: Colors.red,
+        hasTrained: true,
+      );
 
       await tester.pumpWidget(
         buildTestableWidget(
           MuscleTrainingSummaryWidget(
-            muscleData: muscleData,
+            muscleData: {
+              light.muscleGroup: light,
+              moderate.muscleGroup: moderate,
+              heavy.muscleGroup: heavy,
+              maximum.muscleGroup: maximum,
+            },
             maxItems: 4,
           ),
         ),
@@ -139,44 +157,48 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNWidgets(4));
     });
 
-    testWidgets('respects maxItems and hides lower-ranked muscles',
+    testWidgets('respects maxItems and hides lower ranked muscles',
         (tester) async {
-      final muscleData = <String, MuscleVisualData>{
-        'a': const MuscleVisualData(
-          muscleGroup: 'a',
-          totalStimulus: 30.0,
-          visualIntensity: 0.90,
-          color: Colors.red,
-          hasTrained: true,
-        ),
-        'b': const MuscleVisualData(
-          muscleGroup: 'b',
-          totalStimulus: 20.0,
-          visualIntensity: 0.60,
-          color: Colors.orange,
-          hasTrained: true,
-        ),
-        'c': const MuscleVisualData(
-          muscleGroup: 'c',
-          totalStimulus: 10.0,
-          visualIntensity: 0.30,
-          color: Colors.yellow,
-          hasTrained: true,
-        ),
-      };
+      final first = const MuscleVisualData(
+        muscleGroup: 'lats',
+        totalStimulus: 30.0,
+        visualIntensity: 0.90,
+        color: Colors.red,
+        hasTrained: true,
+      );
+
+      final second = const MuscleVisualData(
+        muscleGroup: 'mid-chest',
+        totalStimulus: 20.0,
+        visualIntensity: 0.60,
+        color: Colors.orange,
+        hasTrained: true,
+      );
+
+      final third = const MuscleVisualData(
+        muscleGroup: 'biceps',
+        totalStimulus: 10.0,
+        visualIntensity: 0.30,
+        color: Colors.yellow,
+        hasTrained: true,
+      );
 
       await tester.pumpWidget(
         buildTestableWidget(
           MuscleTrainingSummaryWidget(
-            muscleData: muscleData,
+            muscleData: {
+              first.muscleGroup: first,
+              second.muscleGroup: second,
+              third.muscleGroup: third,
+            },
             maxItems: 2,
           ),
         ),
       );
 
-      expect(find.text('a'), findsOneWidget);
-      expect(find.text('b'), findsOneWidget);
-      expect(find.text('c'), findsNothing);
+      expect(find.text(first.displayName), findsOneWidget);
+      expect(find.text(second.displayName), findsOneWidget);
+      expect(find.text(third.displayName), findsNothing);
     });
   });
 }

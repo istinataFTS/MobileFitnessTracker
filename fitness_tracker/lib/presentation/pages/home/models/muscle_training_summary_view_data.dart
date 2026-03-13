@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
+
 class MuscleTrainingSummaryItem extends Equatable {
   final String displayName;
   final double stimulus;
@@ -45,7 +47,7 @@ class MuscleTrainingSummaryViewData extends Equatable {
     return const MuscleTrainingSummaryViewData(
       trainedCount: 0,
       topFocusLabel: '',
-      averageIntensityLabel: 'None',
+      averageIntensityLabel: AppStrings.intensityNone,
       averageIntensityColor: Colors.grey,
       items: [],
     );

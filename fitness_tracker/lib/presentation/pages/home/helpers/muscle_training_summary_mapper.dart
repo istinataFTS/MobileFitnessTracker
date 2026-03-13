@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/muscle_visual_data.dart';
 import '../models/muscle_training_summary_view_data.dart';
 
@@ -48,10 +49,10 @@ class MuscleTrainingSummaryMapper {
   }
 
   static String _formatAverageIntensity(double value) {
-    if (value < 0.20) return 'Light';
-    if (value < 0.45) return 'Moderate';
-    if (value < 0.70) return 'Heavy';
-    return 'High';
+    if (value < 0.20) return AppStrings.intensityLight;
+    if (value < 0.45) return AppStrings.intensityModerate;
+    if (value < 0.70) return AppStrings.intensityHeavy;
+    return AppStrings.intensityHigh;
   }
 
   static Color _colorForAverageIntensity(double value) {

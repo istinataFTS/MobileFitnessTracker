@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../models/muscle_training_summary_view_data.dart';
 
@@ -50,7 +51,7 @@ class MuscleTrainingSummaryWidget extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Loading muscle summary...',
+            AppStrings.loadingMuscleSummary,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textDim,
                 ),
@@ -78,14 +79,14 @@ class MuscleTrainingSummaryWidget extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'No muscle activity yet',
+            AppStrings.noMuscleActivityYet,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Complete some training and your top muscle groups will appear here.',
+            AppStrings.noMuscleActivityDescription,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textMedium,
@@ -111,8 +112,8 @@ class _SummaryHighlightsRow extends StatelessWidget {
         Expanded(
           child: _HighlightCard(
             icon: Icons.auto_awesome,
-            label: 'Trained',
-            value: '${viewData.trainedCount} muscles',
+            label: AppStrings.trained,
+            value: '${viewData.trainedCount} ${AppStrings.musclesSuffix}',
             accentColor: AppTheme.primaryOrange,
           ),
         ),
@@ -120,7 +121,7 @@ class _SummaryHighlightsRow extends StatelessWidget {
         Expanded(
           child: _HighlightCard(
             icon: Icons.emoji_events_outlined,
-            label: 'Top focus',
+            label: AppStrings.topFocus,
             value: viewData.topFocusLabel,
             accentColor: AppTheme.successGreen,
           ),
@@ -129,7 +130,7 @@ class _SummaryHighlightsRow extends StatelessWidget {
         Expanded(
           child: _HighlightCard(
             icon: Icons.tune,
-            label: 'Avg intensity',
+            label: AppStrings.averageIntensity,
             value: viewData.averageIntensityLabel,
             accentColor: viewData.averageIntensityColor,
           ),
@@ -253,7 +254,7 @@ class _MuscleSummaryTile extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Stimulus: ${muscle.stimulus.toStringAsFixed(1)}',
+            '${AppStrings.stimulusLabel}: ${muscle.stimulus.toStringAsFixed(1)}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppTheme.textMedium,
                 ),
