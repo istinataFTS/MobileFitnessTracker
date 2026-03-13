@@ -11,6 +11,7 @@ import '../../../../domain/usecases/workout_sets/delete_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../../../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import '../../../../domain/usecases/workout_sets/update_workout_set.dart';
+import '../helpers/history_activity_aggregator.dart';
 
 // ==================== Events ====================
 
@@ -119,10 +120,11 @@ class HistoryLoaded extends HistoryState {
   });
 
   int getActivityCountForDate(DateTime date) {
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-
-    return (monthSets[normalizedDate]?.length ?? 0) +
-        (monthNutritionLogs[normalizedDate]?.length ?? 0);
+    return HistoryActivityAggregator.getActivityCountForDate(
+      monthSets: monthSets,
+      monthNutritionLogs: monthNutritionLogs,
+      date: date,
+    );
   }
 
   @override

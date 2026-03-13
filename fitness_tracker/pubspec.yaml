@@ -24,16 +24,14 @@ dependencies:
 
   # Date/Time Utilities
   intl: ^0.20.2
-  
+
   # Dependency Injection
   get_it: ^7.6.4
-  
-  # Utils (not using json_serializable, manual serialization instead)
-  
+
   # UI Components
   cupertino_icons: ^1.0.6
   device_preview: ^1.1.0
-  
+
   # Utils
   uuid: ^4.5.1
 
@@ -41,10 +39,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  bloc_test: ^9.1.7
+  mocktail: ^1.0.4
+
   # Code Generation
   build_runner: ^2.4.7
   json_serializable: ^6.8.0
-  
+
   # Linting
   flutter_lints: ^3.0.0
 

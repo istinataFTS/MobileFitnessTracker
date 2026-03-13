@@ -7,6 +7,7 @@ import '../../../core/constants/calendar_constants.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
 import 'bloc/history_bloc.dart';
+import 'helpers/history_activity_aggregator.dart';
 import 'widgets/history_calendar_widget.dart';
 import 'widgets/history_day_content.dart';
 
@@ -113,23 +114,10 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildLoadedState(BuildContext context, HistoryLoaded state) {
-    final activityCounts = <DateTime, int>{};
-
-    for (final entry in state.monthSets.entries) {
-      activityCounts.update(
-        entry.key,
-        (current) => current + entry.value.length,
-        ifAbsent: () => entry.value.length,
-      );
-    }
-
-    for (final entry in state.monthNutritionLogs.entries) {
-      activityCounts.update(
-        entry.key,
-        (current) => current + entry.value.length,
-        ifAbsent: () => entry.value.length,
-      );
-    }
+    final activityCounts = HistoryActivityAggregator.buildActivityCounts(
+      monthSets: state.monthSets,
+      monthNutritionLogs: state.monthNutritionLogs,
+    );
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {

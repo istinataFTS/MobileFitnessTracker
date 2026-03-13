@@ -42,7 +42,9 @@ class FitnessTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
-      return _buildWebApp();
+      return AppShell(
+        home: _buildWebHome(),
+      );
     }
 
     return MultiBlocProvider(
@@ -72,78 +74,95 @@ class FitnessTrackerApp extends StatelessWidget {
           create: (_) => di.sl<NutritionLogBloc>(),
         ),
       ],
-      child: MaterialApp(
-        title: AppStrings.appTitle,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const AppStartupListener(
-          child: BottomNavigation(),
-        ),
+      child: AppShell(
         builder: DevicePreview.appBuilder,
         locale: DevicePreview.locale(context),
-        scrollBehavior: const MaterialScrollBehavior().copyWith(
-          dragDevices: const {
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.touch,
-            PointerDeviceKind.stylus,
-            PointerDeviceKind.unknown,
-          },
+        home: const AppStartupListener(
+          child: BottomNavigation(),
         ),
       ),
     );
   }
 
-  Widget _buildWebApp() {
+  Widget _buildWebHome() {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.web,
+              size: 100,
+              color: AppTheme.primaryOrange,
+            ),
+            SizedBox(height: 20),
+            Text(
+              AppStrings.webMobileOnlyTitle,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textLight,
+              ),
+            ),
+            SizedBox(height: 10),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                AppStrings.webMobileOnlyDescription,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppTheme.textMedium,
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                AppStrings.webMobileOnlyInstruction,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textDim,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AppShell extends StatelessWidget {
+  final Widget home;
+  final TransitionBuilder? builder;
+  final Locale? locale;
+
+  const AppShell({
+    super.key,
+    required this.home,
+    this.builder,
+    this.locale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: AppStrings.appTitle,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.web,
-                size: 100,
-                color: AppTheme.primaryOrange,
-              ),
-              SizedBox(height: 20),
-              Text(
-                AppStrings.webMobileOnlyTitle,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textLight,
-                ),
-              ),
-              SizedBox(height: 10),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  AppStrings.webMobileOnlyDescription,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppTheme.textMedium,
-                  ),
-                ),
-              ),
-              SizedBox(height: 8),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  AppStrings.webMobileOnlyInstruction,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textDim,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      locale: locale,
+      builder: builder,
+      home: home,
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: const {
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.touch,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.unknown,
+        },
       ),
     );
   }
