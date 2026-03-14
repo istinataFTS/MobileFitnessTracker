@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../entities/exercise.dart';
 import '../../repositories/exercise_repository.dart';
@@ -8,7 +9,7 @@ class GetExercisesForMuscle {
 
   const GetExercisesForMuscle(this.repository);
 
-  Future<Either<Failure, List<Exercise>>> call(String muscleGroup) async {
-    return await repository.getExercisesForMuscle(muscleGroup);
+  Future<Either<Failure, List<Exercise>>> call(String muscleGroup) {
+    return repository.getExercisesForMuscle(muscleGroup);
   }
 }

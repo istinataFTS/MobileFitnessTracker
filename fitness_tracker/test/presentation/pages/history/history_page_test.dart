@@ -181,7 +181,9 @@ void main() {
       await tester.pump();
 
       verify(
-        () => historyBloc.add(const SelectDateEvent(DateTime(2024, 1, 15))),
+        () => historyBloc.add(
+          SelectDateEvent(DateTime(2024, 1, 15)),
+        ),
       ).called(1);
     });
 
@@ -201,7 +203,7 @@ void main() {
 
       verify(
         () => historyBloc.add(
-          const NavigateToMonthEvent(DateTime(2023, 12, 1)),
+          NavigateToMonthEvent(DateTime(2023, 12, 1)),
         ),
       ).called(1);
     });

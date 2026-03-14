@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../entities/exercise.dart';
 import '../../repositories/exercise_repository.dart';
@@ -8,7 +9,7 @@ class UpdateExercise {
 
   const UpdateExercise(this.repository);
 
-  Future<Either<Failure, void>> call(Exercise exercise) async {
-    return await repository.updateExercise(exercise);
+  Future<Either<Failure, void>> call(Exercise exercise) {
+    return repository.updateExercise(exercise);
   }
 }

@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 /// Widget rendering optimization utilities
 class WidgetRenderOptimizer {
   WidgetRenderOptimizer._();
 
-  /// Wrap a widget with RepaintBoundary for isolation
-  /// 
+  /// Wrap a widget with RepaintBoundary for isolation.
+  ///
   /// Use when:
-  /// - Widget has complex painting
-  /// - Widget updates frequently but content is static
-  /// - Widget is expensive to repaint
-  /// 
-  /// Example: Body diagrams, charts, heavy SVGs
+  /// - widget has complex painting
+  /// - widget updates frequently but content is static
+  /// - widget is expensive to repaint
   static Widget isolateRepaints(Widget child) {
     return RepaintBoundary(child: child);
   }
 
-  /// Optimize list item builder with RepaintBoundary
-  /// 
-  /// Automatically wraps each list item to prevent cascade repaints
+  /// Optimize list item builder with RepaintBoundary.
   static Widget Function(BuildContext, int) optimizeListBuilder(
     Widget Function(BuildContext, int) builder,
   ) {
@@ -30,9 +25,7 @@ class WidgetRenderOptimizer {
     };
   }
 
-  /// Create a const widget wrapper when possible
-  /// 
-  /// Helps Flutter skip rebuilds for unchanged widgets
+  /// Create a keyed wrapper for subtree stability.
   static Widget constWrapper({
     required Widget child,
     Key? key,
@@ -43,7 +36,10 @@ class WidgetRenderOptimizer {
     );
   }
 
-  /// Optimize image rendering with caching hints
+  /// Optimize image rendering.
+  ///
+  /// When width/height are provided and memory caching is enabled, the image
+  /// provider is resized before painting to reduce memory usage.
   static Widget optimizeImage({
     required ImageProvider image,
     double? width,
@@ -51,30 +47,33 @@ class WidgetRenderOptimizer {
     BoxFit? fit,
     bool enableMemoryCache = true,
   }) {
+    final ImageProvider optimizedProvider = enableMemoryCache
+        ? ResizeImage.resizeIfNeeded(
+            width?.toInt(),
+            height?.toInt(),
+            image,
+          )
+        : image;
+
     return Image(
-      image: image,
+      image: optimizedProvider,
       width: width,
       height: height,
       fit: fit,
-      gaplessPlayback: true, // Smooth image transitions
-      filterQuality: FilterQuality.medium, // Balance quality/performance
-      cacheWidth: width?.toInt(),
-      cacheHeight: height?.toInt(),
+      gaplessPlayback: true,
+      filterQuality: FilterQuality.medium,
     );
   }
 
-  /// Lazy builder for expensive widgets
-  /// 
-  /// Only builds widget when it's about to be visible
+  /// Lazy builder for expensive widgets.
   static Widget lazyBuilder({
     required WidgetBuilder builder,
-    double threshold = 250.0, // Pixels before viewport
+    double threshold = 250.0,
   }) {
     return Builder(
       builder: (context) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            // Could be enhanced with IntersectionObserver-like logic
             return builder(context);
           },
         );
@@ -82,7 +81,7 @@ class WidgetRenderOptimizer {
     );
   }
 
-  /// Optimize text rendering with selective rebuilds
+  /// Optimize text rendering with selective rebuilds.
   static Widget optimizeText(
     String text, {
     TextStyle? style,
@@ -94,14 +93,11 @@ class WidgetRenderOptimizer {
       style: style,
       maxLines: maxLines,
       overflow: overflow,
-      // Use const when possible
       softWrap: true,
     );
   }
 
-  /// Create an optimized AnimatedWidget wrapper
-  /// 
-  /// Reduces rebuild scope during animations
+  /// Create an optimized AnimatedWidget wrapper.
   static Widget optimizeAnimation({
     required AnimationController controller,
     required Widget Function(BuildContext, Animation<double>) builder,
@@ -112,14 +108,12 @@ class WidgetRenderOptimizer {
     );
   }
 
-  /// Optimize StatefulWidget performance
-  /// 
-  /// Returns whether widget should rebuild based on state changes
+  /// Returns whether widget should rebuild based on state changes.
   static bool shouldRebuild<T>(T oldValue, T newValue) {
     return oldValue != newValue;
   }
 
-  /// Measure widget build time (debug only)
+  /// Measure widget build time in debug mode.
   static Widget measureBuildTime({
     required String widgetName,
     required Widget child,
@@ -127,27 +121,22 @@ class WidgetRenderOptimizer {
     return Builder(
       builder: (context) {
         final stopwatch = Stopwatch()..start();
-        
-        // Build happens here
         final result = child;
-        
         stopwatch.stop();
-        
+
         if (stopwatch.elapsedMilliseconds > 16) {
-          // Slow build (>16ms = dropped frame at 60fps)
           debugPrint(
-            '⚠️ Slow build: $widgetName took ${stopwatch.elapsedMilliseconds}ms',
+            'Slow build: $widgetName took '
+            '${stopwatch.elapsedMilliseconds}ms',
           );
         }
-        
+
         return result;
       },
     );
   }
 
-  /// Optimize focus node management
-  /// 
-  /// Reuses focus nodes to prevent unnecessary rebuilds
+  /// Optimize focus node management.
   static FocusNode createOptimizedFocusNode({
     String? debugLabel,
     bool skipTraversal = false,
@@ -158,9 +147,7 @@ class WidgetRenderOptimizer {
     );
   }
 
-  /// Memoization helper for expensive computations
-  /// 
-  /// Caches result based on input key
+  /// Memoization helper for expensive computations.
   static T memoize<T>({
     required String key,
     required T Function() compute,
@@ -169,57 +156,50 @@ class WidgetRenderOptimizer {
     if (cache.containsKey(key)) {
       return cache[key]!;
     }
-    
+
     final result = compute();
     cache[key] = result;
     return result;
   }
 }
 
-/// Performance hints for Flutter rendering engine
+/// Performance hints for Flutter rendering engine.
 class RenderingHints {
   RenderingHints._();
 
-  /// Hint that widget is static and won't change
-  static const staticWidget = SizedBox.shrink();
-
-  /// Hint that list has fixed extent items (for ListView)
-  static const fixedExtentDelegate = FixedExtentScrollPhysics();
-
-  /// Hint that scrollable content is short
-  static const shortContentPhysics = ClampingScrollPhysics();
-
-  /// Optimized scroll physics for long lists
-  static const longListPhysics = AlwaysScrollableScrollPhysics();
+  static const Widget staticWidget = SizedBox.shrink();
+  static const ScrollPhysics fixedExtentDelegate = FixedExtentScrollPhysics();
+  static const ScrollPhysics shortContentPhysics = ClampingScrollPhysics();
+  static const ScrollPhysics longListPhysics = AlwaysScrollableScrollPhysics();
 }
 
-/// Widget rebuild prevention utilities
+/// Widget rebuild prevention utilities.
 class RebuildPrevention {
   RebuildPrevention._();
 
-  /// Wrap with AutomaticKeepAlive to prevent disposal in lists
+  /// Wrap with keep-alive to prevent disposal in lazily built lists.
   static Widget keepAlive({
     required Widget child,
     bool wantKeepAlive = true,
   }) {
-    return AutomaticKeepAliveClientMixin(
+    return _KeepAliveWrapper(
       wantKeepAlive: wantKeepAlive,
       child: child,
     );
   }
 
-  /// Use ValueKey to preserve widget state across rebuilds
+  /// Use ValueKey to preserve widget state across rebuilds.
   static ValueKey<T> stableKey<T>(T value) {
     return ValueKey<T>(value);
   }
 
-  /// Use GlobalKey when widget state must persist
+  /// Use GlobalKey when widget state must persist.
   static GlobalKey createPersistentKey() {
     return GlobalKey();
   }
 }
 
-/// Mixin to track widget rebuild count (debug only)
+/// Mixin to track widget rebuild count in debug builds.
 mixin RebuildTracker on StatefulWidget {
   static final Map<Type, int> _rebuildCounts = {};
 
@@ -232,16 +212,17 @@ mixin RebuildTracker on StatefulWidget {
 
     if (_rebuildCounts[runtimeType]! > 10) {
       debugPrint(
-        '⚠️ Excessive rebuilds: $runtimeType rebuilt ${_rebuildCounts[runtimeType]} times',
+        'Excessive rebuilds: $runtimeType rebuilt '
+        '${_rebuildCounts[runtimeType]} times',
       );
     }
   }
 
   static void printStats() {
-    debugPrint('📊 Widget Rebuild Statistics:');
-    _rebuildCounts.forEach((type, count) {
-      debugPrint('  $type: $count rebuilds');
-    });
+    debugPrint('Widget Rebuild Statistics:');
+    for (final entry in _rebuildCounts.entries) {
+      debugPrint('  ${entry.key}: ${entry.value} rebuilds');
+    }
   }
 
   static void resetStats() {
@@ -249,31 +230,27 @@ mixin RebuildTracker on StatefulWidget {
   }
 }
 
-/// AutomaticKeepAlive mixin implementation
-class AutomaticKeepAliveClientMixin extends StatefulWidget {
-  final bool wantKeepAlive;
-  final Widget child;
-
-  const AutomaticKeepAliveClientMixin({
-    super.key,
+class _KeepAliveWrapper extends StatefulWidget {
+  const _KeepAliveWrapper({
     required this.wantKeepAlive,
     required this.child,
   });
 
+  final bool wantKeepAlive;
+  final Widget child;
+
   @override
-  State<AutomaticKeepAliveClientMixin> createState() =>
-      _AutomaticKeepAliveClientMixinState();
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
 }
 
-class _AutomaticKeepAliveClientMixinState
-    extends State<AutomaticKeepAliveClientMixin>
-    with AutomaticKeepAliveClientMixin {
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper>
+    with AutomaticKeepAliveClientMixin<_KeepAliveWrapper> {
   @override
   bool get wantKeepAlive => widget.wantKeepAlive;
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
     return widget.child;
   }
 }

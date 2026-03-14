@@ -18,14 +18,14 @@ void main() {
   late ExerciseRepositoryImpl repository;
   late MockExerciseLocalDataSource localDataSource;
 
-  const testExercise = Exercise(
+  final testExercise = Exercise(
     id: 'exercise-1',
     name: 'Bench Press',
     muscleGroups: ['mid-chest', 'front-delts', 'triceps'],
     createdAt: DateTime(2025, 1, 1),
   );
 
-  const testExerciseModel = ExerciseModel(
+  final testExerciseModel = ExerciseModel(
     id: 'exercise-1',
     name: 'Bench Press',
     muscleGroups: ['mid-chest', 'front-delts', 'triceps'],
@@ -50,7 +50,7 @@ void main() {
 
       final result = await repository.getAllExercises();
 
-      expect(result, const Right([testExerciseModel]));
+      expect(result, Right([testExerciseModel]));
       verify(() => localDataSource.getAllExercises()).called(1);
       verifyNoMoreInteractions(localDataSource);
     });
@@ -85,7 +85,7 @@ void main() {
       expect(result, const Right(null));
       verify(
         () => localDataSource.insertExercise(
-          const ExerciseModel(
+          ExerciseModel(
             id: 'exercise-1',
             name: 'Bench Press',
             muscleGroups: ['mid-chest', 'front-delts', 'triceps'],

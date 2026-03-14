@@ -1,7 +1,9 @@
-import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
-import 'package:fitness_tracker/presentation/pages/home/widgets/muscle_training_summary_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:fitness_tracker/core/constants/app_strings.dart';
+import 'package:fitness_tracker/presentation/pages/home/models/muscle_training_summary_view_data.dart';
+import 'package:fitness_tracker/presentation/pages/home/widgets/muscle_training_summary_widget.dart';
 
 void main() {
   Widget buildTestableWidget(Widget child) {
@@ -13,82 +15,76 @@ void main() {
   }
 
   group('MuscleTrainingSummaryWidget', () {
-    testWidgets('shows empty state when no trained muscle data exists',
+    testWidgets('shows empty state when there is no summary data',
         (tester) async {
       await tester.pumpWidget(
         buildTestableWidget(
-          const MuscleTrainingSummaryWidget(
-            muscleData: {},
+          MuscleTrainingSummaryWidget(
+            viewData: MuscleTrainingSummaryViewData.empty(),
           ),
         ),
       );
 
-      expect(find.text('No muscle activity yet'), findsOneWidget);
+      expect(find.text(AppStrings.noMuscleActivityYet), findsOneWidget);
       expect(
-        find.text(
-          'Complete some training and your top muscle groups will appear here.',
-        ),
+        find.text(AppStrings.noMuscleActivityDescription),
         findsOneWidget,
       );
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
-    testWidgets('shows trained muscles sorted by total stimulus descending',
-        (tester) async {
-      final back = const MuscleVisualData(
-        muscleGroup: 'lats',
-        totalStimulus: 20.0,
-        visualIntensity: 0.85,
-        color: Colors.red,
-        hasTrained: true,
+    testWidgets('shows ranked muscles in display order', (tester) async {
+      final viewData = MuscleTrainingSummaryViewData(
+        trainedCount: 3,
+        topFocusLabel: 'Lats',
+        averageIntensityLabel: AppStrings.intensityHeavy,
+        averageIntensityColor: Colors.orange,
+        items: const [
+          MuscleTrainingSummaryItem(
+            displayName: 'Lats',
+            stimulus: 20.0,
+            visualIntensity: 0.85,
+            color: Colors.red,
+            intensityLabel: AppStrings.intensityMaximum,
+          ),
+          MuscleTrainingSummaryItem(
+            displayName: 'Mid Chest',
+            stimulus: 12.0,
+            visualIntensity: 0.55,
+            color: Colors.orange,
+            intensityLabel: AppStrings.intensityHeavy,
+          ),
+          MuscleTrainingSummaryItem(
+            displayName: 'Biceps',
+            stimulus: 7.0,
+            visualIntensity: 0.18,
+            color: Colors.green,
+            intensityLabel: AppStrings.intensityLight,
+          ),
+        ],
       );
-
-      final chest = const MuscleVisualData(
-        muscleGroup: 'mid-chest',
-        totalStimulus: 12.0,
-        visualIntensity: 0.55,
-        color: Colors.orange,
-        hasTrained: true,
-      );
-
-      final biceps = const MuscleVisualData(
-        muscleGroup: 'biceps',
-        totalStimulus: 7.0,
-        visualIntensity: 0.18,
-        color: Colors.green,
-        hasTrained: true,
-      );
-
-      final muscleData = <String, MuscleVisualData>{
-        back.muscleGroup: back,
-        chest.muscleGroup: chest,
-        biceps.muscleGroup: biceps,
-      };
 
       await tester.pumpWidget(
         buildTestableWidget(
-          MuscleTrainingSummaryWidget(
-            muscleData: muscleData,
-            maxItems: 3,
-          ),
+          MuscleTrainingSummaryWidget(viewData: viewData),
         ),
       );
 
-      expect(find.text('Trained'), findsOneWidget);
-      expect(find.text('3 muscles'), findsOneWidget);
-      expect(find.text('Top focus'), findsOneWidget);
-      expect(find.text('Avg intensity'), findsOneWidget);
+      expect(find.text(AppStrings.trained), findsOneWidget);
+      expect(find.text('3 ${AppStrings.musclesSuffix}'), findsOneWidget);
+      expect(find.text(AppStrings.topFocus), findsOneWidget);
+      expect(find.text(AppStrings.averageIntensity), findsOneWidget);
 
-      final backFinder = find.text(back.displayName);
-      final chestFinder = find.text(chest.displayName);
-      final bicepsFinder = find.text(biceps.displayName);
+      final latsFinder = find.text('Lats');
+      final chestFinder = find.text('Mid Chest');
+      final bicepsFinder = find.text('Biceps');
 
-      expect(backFinder, findsOneWidget);
+      expect(latsFinder, findsOneWidget);
       expect(chestFinder, findsOneWidget);
       expect(bicepsFinder, findsOneWidget);
 
       expect(
-        tester.getTopLeft(backFinder).dy,
+        tester.getTopLeft(latsFinder).dy,
         lessThan(tester.getTopLeft(chestFinder).dy),
       );
       expect(
@@ -96,109 +92,61 @@ void main() {
         lessThan(tester.getTopLeft(bicepsFinder).dy),
       );
 
-      expect(find.text('Stimulus: 20.0'), findsOneWidget);
-      expect(find.text('Stimulus: 12.0'), findsOneWidget);
-      expect(find.text('Stimulus: 7.0'), findsOneWidget);
+      expect(find.text('${AppStrings.stimulusLabel}: 20.0'), findsOneWidget);
+      expect(find.text('${AppStrings.stimulusLabel}: 12.0'), findsOneWidget);
+      expect(find.text('${AppStrings.stimulusLabel}: 7.0'), findsOneWidget);
     });
 
-    testWidgets('shows correct intensity badges for trained muscles',
-        (tester) async {
-      final light = const MuscleVisualData(
-        muscleGroup: 'biceps',
-        totalStimulus: 5.0,
-        visualIntensity: 0.10,
-        color: Colors.green,
-        hasTrained: true,
-      );
-
-      final moderate = const MuscleVisualData(
-        muscleGroup: 'quads',
-        totalStimulus: 10.0,
-        visualIntensity: 0.30,
-        color: Colors.yellow,
-        hasTrained: true,
-      );
-
-      final heavy = const MuscleVisualData(
-        muscleGroup: 'mid-chest',
-        totalStimulus: 14.0,
-        visualIntensity: 0.55,
-        color: Colors.orange,
-        hasTrained: true,
-      );
-
-      final maximum = const MuscleVisualData(
-        muscleGroup: 'lats',
-        totalStimulus: 18.0,
-        visualIntensity: 0.85,
-        color: Colors.red,
-        hasTrained: true,
+    testWidgets('shows correct intensity badges', (tester) async {
+      final viewData = MuscleTrainingSummaryViewData(
+        trainedCount: 4,
+        topFocusLabel: 'Calves',
+        averageIntensityLabel: AppStrings.intensityHeavy,
+        averageIntensityColor: Colors.orange,
+        items: const [
+          MuscleTrainingSummaryItem(
+            displayName: 'Biceps',
+            stimulus: 5.0,
+            visualIntensity: 0.10,
+            color: Colors.green,
+            intensityLabel: AppStrings.intensityLight,
+          ),
+          MuscleTrainingSummaryItem(
+            displayName: 'Quads',
+            stimulus: 10.0,
+            visualIntensity: 0.30,
+            color: Colors.yellow,
+            intensityLabel: AppStrings.intensityModerate,
+          ),
+          MuscleTrainingSummaryItem(
+            displayName: 'Mid Chest',
+            stimulus: 14.0,
+            visualIntensity: 0.55,
+            color: Colors.orange,
+            intensityLabel: AppStrings.intensityHeavy,
+          ),
+          MuscleTrainingSummaryItem(
+            displayName: 'Calves',
+            stimulus: 18.0,
+            visualIntensity: 0.85,
+            color: Colors.red,
+            intensityLabel: AppStrings.intensityMaximum,
+          ),
+        ],
       );
 
       await tester.pumpWidget(
         buildTestableWidget(
-          MuscleTrainingSummaryWidget(
-            muscleData: {
-              light.muscleGroup: light,
-              moderate.muscleGroup: moderate,
-              heavy.muscleGroup: heavy,
-              maximum.muscleGroup: maximum,
-            },
-            maxItems: 4,
-          ),
+          MuscleTrainingSummaryWidget(viewData: viewData),
         ),
       );
 
-      expect(find.text('Light'), findsOneWidget);
-      expect(find.text('Moderate'), findsOneWidget);
-      expect(find.text('Heavy'), findsOneWidget);
-      expect(find.text('Maximum'), findsOneWidget);
+      expect(find.text(AppStrings.intensityLight), findsOneWidget);
+      expect(find.text(AppStrings.intensityModerate), findsOneWidget);
+      expect(find.text(AppStrings.intensityHeavy), findsAtLeastNWidgets(2));
+      expect(find.text(AppStrings.intensityMaximum), findsOneWidget);
 
       expect(find.byType(LinearProgressIndicator), findsNWidgets(4));
-    });
-
-    testWidgets('respects maxItems and hides lower ranked muscles',
-        (tester) async {
-      final first = const MuscleVisualData(
-        muscleGroup: 'lats',
-        totalStimulus: 30.0,
-        visualIntensity: 0.90,
-        color: Colors.red,
-        hasTrained: true,
-      );
-
-      final second = const MuscleVisualData(
-        muscleGroup: 'mid-chest',
-        totalStimulus: 20.0,
-        visualIntensity: 0.60,
-        color: Colors.orange,
-        hasTrained: true,
-      );
-
-      final third = const MuscleVisualData(
-        muscleGroup: 'biceps',
-        totalStimulus: 10.0,
-        visualIntensity: 0.30,
-        color: Colors.yellow,
-        hasTrained: true,
-      );
-
-      await tester.pumpWidget(
-        buildTestableWidget(
-          MuscleTrainingSummaryWidget(
-            muscleData: {
-              first.muscleGroup: first,
-              second.muscleGroup: second,
-              third.muscleGroup: third,
-            },
-            maxItems: 2,
-          ),
-        ),
-      );
-
-      expect(find.text(first.displayName), findsOneWidget);
-      expect(find.text(second.displayName), findsOneWidget);
-      expect(find.text(third.displayName), findsNothing);
     });
   });
 }

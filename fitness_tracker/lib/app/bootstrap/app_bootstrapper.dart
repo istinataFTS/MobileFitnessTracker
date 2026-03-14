@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../config/env_config.dart';
 import '../../core/utils/app_lifecycle_manager.dart';
@@ -10,6 +10,8 @@ import 'app_data_seeder.dart';
 import 'app_debug_diagnostics_runner.dart';
 
 class AppBootstrapper {
+  static const String _startupTimerName = 'app_initialization';
+
   const AppBootstrapper();
 
   Future<void> bootstrap() async {
@@ -33,8 +35,6 @@ class AppBootstrapper {
       debugPrint('🚀 App initialization complete in: ${totalInitTime}ms');
     }
   }
-
-  static const String _startupTimerName = 'app_initialization';
 
   void _logRuntimeConfig() {
     if (kDebugMode) {

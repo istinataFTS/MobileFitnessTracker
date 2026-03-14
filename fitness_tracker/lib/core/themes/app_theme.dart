@@ -10,24 +10,24 @@ class AppTheme {
   static const Color primaryOrange = Color(0xFFFF6B35);
   static const Color primaryOrangeDark = Color(0xFFE55A2B);
   static const Color primaryOrangeLight = Color(0xFFFF8C5A);
-  
+
   // Background Colors
   static const Color backgroundDark = Color(0xFF0A0A0A);
   static const Color surfaceDark = Color(0xFF1A1A1A);
   static const Color surfaceMedium = Color(0xFF2A2A2A);
   static const Color surfaceLight = Color(0xFF3A3A3A);
-  
+
   // Text Colors
   static const Color textLight = Color(0xFFFFFFFF);
   static const Color textMedium = Color(0xFFBBBBBB);
   static const Color textDim = Color(0xFF888888);
   static const Color textDisabled = Color(0xFF555555);
-  
+
   // Border Colors
   static const Color borderDark = Color(0xFF2A2A2A);
   static const Color borderMedium = Color(0xFF3A3A3A);
   static const Color borderLight = Color(0xFF4A4A4A);
-  
+
   // Status Colors
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFFA726);
@@ -39,20 +39,20 @@ class AppTheme {
   static const Color successGreen = success;
   static const Color warningAmber = warning;
   static const Color errorRed = error;
-  
+
   // Muscle Visualization Colors
   static const Color intensityNone = Color(0xFF2A2A2A);
   static const Color intensityLow = Color(0xFF4A5F4A);
   static const Color intensityMedium = Color(0xFF7A9F7A);
   static const Color intensityHigh = Color(0xFFAADFAA);
   static const Color intensityVeryHigh = Color(0xFFDAFFDA);
-  
+
   // ==================== DARK THEME ====================
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     scaffoldBackgroundColor: backgroundDark,
     primaryColor: primaryOrange,
-    
+
     // Color Scheme
     colorScheme: const ColorScheme.dark(
       primary: primaryOrange,
@@ -64,7 +64,7 @@ class AppTheme {
       onSurface: textLight,
       onError: textLight,
     ),
-    
+
     // AppBar Theme
     appBarTheme: const AppBarTheme(
       backgroundColor: backgroundDark,
@@ -77,7 +77,7 @@ class AppTheme {
       ),
       iconTheme: IconThemeData(color: textLight),
     ),
-    
+
     // Card Theme
     cardTheme: CardThemeData(
       color: surfaceDark,
@@ -87,7 +87,7 @@ class AppTheme {
         side: const BorderSide(color: borderDark, width: 1),
       ),
     ),
-    
+
     // Text Theme
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
@@ -146,7 +146,7 @@ class AppTheme {
         fontSize: 10,
       ),
     ),
-    
+
     // Input Decoration Theme
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -170,7 +170,7 @@ class AppTheme {
       labelStyle: const TextStyle(color: textMedium),
       hintStyle: const TextStyle(color: textDim),
     ),
-    
+
     // Button Themes
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -187,7 +187,7 @@ class AppTheme {
         ),
       ),
     ),
-    
+
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: primaryOrange,
@@ -198,7 +198,7 @@ class AppTheme {
         ),
       ),
     ),
-    
+
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: primaryOrange,
@@ -213,26 +213,26 @@ class AppTheme {
         ),
       ),
     ),
-    
+
     // Icon Theme
     iconTheme: const IconThemeData(
       color: textLight,
       size: 24,
     ),
-    
+
     // Divider Theme
     dividerTheme: const DividerThemeData(
       color: borderDark,
       thickness: 1,
       space: 1,
     ),
-    
+
     // Slider Theme
     sliderTheme: SliderThemeData(
       activeTrackColor: primaryOrange,
       inactiveTrackColor: borderMedium,
       thumbColor: primaryOrange,
-      overlayColor: primaryOrange.withOpacity(0.2),
+      overlayColor: primaryOrange.withValues(alpha: 0.2),
       valueIndicatorColor: primaryOrange,
       valueIndicatorTextStyle: const TextStyle(
         color: textLight,
@@ -240,7 +240,7 @@ class AppTheme {
         fontWeight: FontWeight.bold,
       ),
     ),
-    
+
     // Switch Theme
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -251,12 +251,12 @@ class AppTheme {
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return primaryOrange.withOpacity(0.5);
+          return primaryOrange.withValues(alpha: 0.5);
         }
         return borderMedium;
       }),
     ),
-    
+
     // Checkbox Theme
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
@@ -268,7 +268,7 @@ class AppTheme {
       checkColor: const WidgetStatePropertyAll(textLight),
       side: const BorderSide(color: borderMedium, width: 2),
     ),
-    
+
     // Radio Theme
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
@@ -278,7 +278,7 @@ class AppTheme {
         return borderMedium;
       }),
     ),
-    
+
     // Bottom Navigation Bar Theme
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: surfaceDark,
@@ -287,7 +287,7 @@ class AppTheme {
       type: BottomNavigationBarType.fixed,
       elevation: 8,
     ),
-    
+
     // Dialog Theme
     dialogTheme: DialogThemeData(
       backgroundColor: surfaceDark,
@@ -305,7 +305,7 @@ class AppTheme {
         fontSize: 16,
       ),
     ),
-    
+
     // Snackbar Theme
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: surfaceMedium,
@@ -314,20 +314,20 @@ class AppTheme {
       elevation: 4,
     ),
   );
-  
+
   // ==================== CUSTOM GRADIENTS ====================
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryOrange, primaryOrangeDark],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient surfaceGradient = LinearGradient(
     colors: [surfaceDark, surfaceMedium],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
-  
+
   // ==================== CUSTOM SHADOWS ====================
   static const List<BoxShadow> cardShadow = [
     BoxShadow(
@@ -336,7 +336,7 @@ class AppTheme {
       offset: Offset(0, 2),
     ),
   ];
-  
+
   static const List<BoxShadow> elevatedShadow = [
     BoxShadow(
       color: Color(0x60000000),

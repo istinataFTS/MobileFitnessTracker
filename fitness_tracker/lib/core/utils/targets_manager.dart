@@ -1,16 +1,18 @@
 import 'package:flutter/foundation.dart';
-import '../../domain/entities/target.dart';
-import '../constants/muscle_groups.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/entities/target.dart';
+import '../constants/muscle_groups.dart';
 
 class TargetsManager extends ChangeNotifier {
-  static final TargetsManager _instance = TargetsManager._internal();
   factory TargetsManager() => _instance;
+
   TargetsManager._internal();
 
+  static final TargetsManager _instance = TargetsManager._internal();
+
   final List<Target> _targets = [];
-  final _uuid = const Uuid();
+  final Uuid _uuid = const Uuid();
 
   List<Target> get targets => List.unmodifiable(_targets);
 

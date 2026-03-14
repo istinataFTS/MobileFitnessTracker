@@ -16,21 +16,21 @@ class MealRepositoryImpl implements MealRepository {
 
   @override
   Future<Either<Failure, List<Meal>>> getAllMeals() {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getAllMeals(),
     );
   }
 
   @override
   Future<Either<Failure, Meal?>> getMealById(String id) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getMealById(id),
     );
   }
 
   @override
   Future<Either<Failure, Meal?>> getMealByName(String name) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getMealByName(name),
     );
   }
@@ -39,7 +39,7 @@ class MealRepositoryImpl implements MealRepository {
   Future<Either<Failure, List<Meal>>> searchMealsByName(
     String searchTerm,
   ) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.searchMealsByName(searchTerm),
     );
   }
@@ -48,7 +48,7 @@ class MealRepositoryImpl implements MealRepository {
   Future<Either<Failure, List<Meal>>> getRecentMeals({
     int limit = 10,
   }) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getRecentMeals(limit: limit),
     );
   }
@@ -57,14 +57,14 @@ class MealRepositoryImpl implements MealRepository {
   Future<Either<Failure, List<Meal>>> getFrequentMeals({
     int limit = 10,
   }) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getFrequentMeals(limit: limit),
     );
   }
 
   @override
   Future<Either<Failure, void>> addMeal(Meal meal) {
-    return guardRepositoryCall(() async {
+    return RepositoryGuard.run(() async {
       final MealModel model = MealModel.fromEntity(meal);
       model.validateMacros();
       model.validateAndLogCalories();
@@ -75,7 +75,7 @@ class MealRepositoryImpl implements MealRepository {
 
   @override
   Future<Either<Failure, void>> updateMeal(Meal meal) {
-    return guardRepositoryCall(() async {
+    return RepositoryGuard.run(() async {
       final MealModel model = MealModel.fromEntity(meal);
       model.validateMacros();
       model.validateAndLogCalories();
@@ -86,21 +86,21 @@ class MealRepositoryImpl implements MealRepository {
 
   @override
   Future<Either<Failure, void>> deleteMeal(String id) {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.deleteMeal(id),
     );
   }
 
   @override
   Future<Either<Failure, void>> clearAllMeals() {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.clearAllMeals(),
     );
   }
 
   @override
   Future<Either<Failure, int>> getMealsCount() {
-    return guardRepositoryCall(
+    return RepositoryGuard.run(
       () => localDataSource.getMealsCount(),
     );
   }

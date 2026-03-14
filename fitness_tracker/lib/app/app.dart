@@ -39,51 +39,6 @@ class AppHost extends StatelessWidget {
 class FitnessTrackerApp extends StatelessWidget {
   const FitnessTrackerApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return AppShell(
-        home: _buildWebHome(),
-      );
-    }
-
-    return MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<TargetsBloc>(
-          create: (_) => di.sl<TargetsBloc>(),
-        ),
-        BlocProvider<WorkoutBloc>(
-          create: (_) => di.sl<WorkoutBloc>(),
-        ),
-        BlocProvider<HomeBloc>(
-          create: (_) => di.sl<HomeBloc>(),
-        ),
-        BlocProvider<MuscleVisualBloc>(
-          create: (_) => di.sl<MuscleVisualBloc>(),
-        ),
-        BlocProvider<ExerciseBloc>(
-          create: (_) => di.sl<ExerciseBloc>(),
-        ),
-        BlocProvider<HistoryBloc>(
-          create: (_) => di.sl<HistoryBloc>(),
-        ),
-        BlocProvider<MealBloc>(
-          create: (_) => di.sl<MealBloc>(),
-        ),
-        BlocProvider<NutritionLogBloc>(
-          create: (_) => di.sl<NutritionLogBloc>(),
-        ),
-      ],
-      child: AppShell(
-        builder: DevicePreview.appBuilder,
-        locale: DevicePreview.locale(context),
-        home: const AppStartupListener(
-          child: BottomNavigation(),
-        ),
-      ),
-    );
-  }
-
   Widget _buildWebHome() {
     return const Scaffold(
       body: Center(
@@ -133,19 +88,64 @@ class FitnessTrackerApp extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return AppShell(
+        home: _buildWebHome(),
+      );
+    }
+
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<TargetsBloc>(
+          create: (_) => di.sl<TargetsBloc>(),
+        ),
+        BlocProvider<WorkoutBloc>(
+          create: (_) => di.sl<WorkoutBloc>(),
+        ),
+        BlocProvider<HomeBloc>(
+          create: (_) => di.sl<HomeBloc>(),
+        ),
+        BlocProvider<MuscleVisualBloc>(
+          create: (_) => di.sl<MuscleVisualBloc>(),
+        ),
+        BlocProvider<ExerciseBloc>(
+          create: (_) => di.sl<ExerciseBloc>(),
+        ),
+        BlocProvider<HistoryBloc>(
+          create: (_) => di.sl<HistoryBloc>(),
+        ),
+        BlocProvider<MealBloc>(
+          create: (_) => di.sl<MealBloc>(),
+        ),
+        BlocProvider<NutritionLogBloc>(
+          create: (_) => di.sl<NutritionLogBloc>(),
+        ),
+      ],
+      child: AppShell(
+        builder: DevicePreview.appBuilder,
+        locale: DevicePreview.locale(context),
+        home: const AppStartupListener(
+          child: BottomNavigation(),
+        ),
+      ),
+    );
+  }
 }
 
 class AppShell extends StatelessWidget {
-  final Widget home;
-  final TransitionBuilder? builder;
-  final Locale? locale;
-
   const AppShell({
-    super.key,
     required this.home,
+    super.key,
     this.builder,
     this.locale,
   });
+
+  final Widget home;
+  final TransitionBuilder? builder;
+  final Locale? locale;
 
   @override
   Widget build(BuildContext context) {

@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../entities/exercise.dart';
 import '../../repositories/exercise_repository.dart';
@@ -8,7 +9,7 @@ class GetExerciseById {
 
   const GetExerciseById(this.repository);
 
-  Future<Either<Failure, Exercise?>> call(String id) async {
-    return await repository.getExerciseById(id);
+  Future<Either<Failure, Exercise?>> call(String id) {
+    return repository.getExerciseById(id);
   }
 }

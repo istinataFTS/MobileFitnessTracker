@@ -181,7 +181,7 @@ class TargetsPage extends StatelessWidget {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: AppTheme.primaryOrange.withOpacity(0.1),
+                color: AppTheme.primaryOrange.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -222,7 +222,7 @@ class TargetsPage extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppTheme.primaryOrange.withOpacity(0.1),
+            color: AppTheme.primaryOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -308,7 +308,7 @@ class TargetsPage extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppTheme.primaryOrange.withOpacity(0.1),
+            color: AppTheme.primaryOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(
@@ -378,7 +378,7 @@ class TargetsPage extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppTheme.primaryOrange.withOpacity(0.1),
+            color: AppTheme.primaryOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -520,8 +520,8 @@ class TargetsPage extends StatelessWidget {
       builder: (_) => BlocProvider.value(
         value: context.read<TargetsBloc>(),
         child: _TrainingTargetDialog(
-          existingTarget: target,
           availableMuscles: const [],
+          existingTarget: target,
         ),
       ),
     );
@@ -558,7 +558,9 @@ class TargetsPage extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Goal'),
-        content: Text('Are you sure you want to remove this goal?\n\n$displayName'),
+        content: Text(
+          'Are you sure you want to remove this goal?\n\n$displayName',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -626,13 +628,13 @@ class TargetsPage extends StatelessWidget {
 }
 
 class _TrainingTargetDialog extends StatefulWidget {
-  final List<String> availableMuscles;
-  final Target? existingTarget;
-
   const _TrainingTargetDialog({
     required this.availableMuscles,
     this.existingTarget,
   });
+
+  final List<String> availableMuscles;
+  final Target? existingTarget;
 
   @override
   State<_TrainingTargetDialog> createState() => _TrainingTargetDialogState();
@@ -718,7 +720,7 @@ class _TrainingTargetDialogState extends State<_TrainingTargetDialog> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryOrange.withOpacity(0.1),
+                  color: AppTheme.primaryOrange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -768,11 +770,11 @@ class _TrainingTargetDialogState extends State<_TrainingTargetDialog> {
 }
 
 class _MacroTargetDialog extends StatefulWidget {
-  final Target? existingTarget;
-
   const _MacroTargetDialog({
     this.existingTarget,
   });
+
+  final Target? existingTarget;
 
   @override
   State<_MacroTargetDialog> createState() => _MacroTargetDialogState();

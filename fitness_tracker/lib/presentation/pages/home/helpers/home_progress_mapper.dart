@@ -50,7 +50,7 @@ class HomeProgressMapper {
         );
 
         for (final muscleGroup in exercise.muscleGroups) {
-          if (!MuscleGroups.isValidMuscleGroup(muscleGroup)) {
+          if (!MuscleGroups.isValid(muscleGroup)) {
             continue;
           }
 

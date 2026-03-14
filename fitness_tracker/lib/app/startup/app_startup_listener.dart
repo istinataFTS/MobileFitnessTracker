@@ -11,12 +11,12 @@ import '../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../../presentation/pages/targets/bloc/targets_bloc.dart';
 
 class AppStartupListener extends StatefulWidget {
-  final Widget child;
-
   const AppStartupListener({
-    super.key,
     required this.child,
+    super.key,
   });
+
+  final Widget child;
 
   @override
   State<AppStartupListener> createState() => _AppStartupListenerState();

@@ -1,298 +1,298 @@
 import '../../domain/entities/exercise.dart';
 
 class DefaultExercisesData {
-  DefaultExercisesData._(); // Private constructor
+  DefaultExercisesData._();
 
   /// Get all default exercises for seeding
   /// Returns a new list each time to prevent mutation
   static List<ExerciseData> getDefaultExercises() {
     return [
       // ==================== CHEST EXERCISES ====================
-      ExerciseData(
+      const ExerciseData(
         name: 'Bench Press',
         muscleGroups: ['chest', 'triceps', 'shoulder'],
         category: 'chest',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Incline Bench Press',
         muscleGroups: ['chest', 'shoulder', 'triceps'],
         category: 'chest',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Decline Bench Press',
         muscleGroups: ['chest', 'triceps'],
         category: 'chest',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Dumbbell Flyes',
         muscleGroups: ['chest'],
         category: 'chest',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Push-ups',
         muscleGroups: ['chest', 'triceps', 'shoulder'],
         category: 'chest',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Cable Crossover',
         muscleGroups: ['chest'],
         category: 'chest',
       ),
 
       // ==================== BACK EXERCISES ====================
-      ExerciseData(
+      const ExerciseData(
         name: 'Pull-ups',
         muscleGroups: ['lats', 'biceps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Chin-ups',
         muscleGroups: ['lats', 'biceps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Barbell Row',
         muscleGroups: ['lats', 'lower back', 'biceps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Dumbbell Row',
         muscleGroups: ['lats', 'lower back', 'biceps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Deadlift',
         muscleGroups: ['lower back', 'glutes', 'hamstring', 'traps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Lat Pulldown',
         muscleGroups: ['lats', 'biceps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'T-Bar Row',
         muscleGroups: ['lats', 'lower back'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Seated Cable Row',
         muscleGroups: ['lats', 'lower back'],
         category: 'back',
       ),
 
       // ==================== SHOULDER EXERCISES ====================
-      ExerciseData(
+      const ExerciseData(
         name: 'Overhead Press',
         muscleGroups: ['shoulder', 'triceps'],
         category: 'shoulders',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Arnold Press',
         muscleGroups: ['shoulder'],
         category: 'shoulders',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Lateral Raises',
         muscleGroups: ['shoulder'],
         category: 'shoulders',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Front Raises',
         muscleGroups: ['shoulder'],
         category: 'shoulders',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Rear Delt Flyes',
         muscleGroups: ['shoulder'],
         category: 'shoulders',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Face Pulls',
         muscleGroups: ['shoulder', 'traps'],
         category: 'shoulders',
       ),
 
       // ==================== ARM EXERCISES ====================
-      
+
       // Biceps
-      ExerciseData(
+      const ExerciseData(
         name: 'Barbell Curl',
         muscleGroups: ['biceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Dumbbell Curl',
         muscleGroups: ['biceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Hammer Curl',
         muscleGroups: ['biceps', 'forearms'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Preacher Curl',
         muscleGroups: ['biceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Concentration Curl',
         muscleGroups: ['biceps'],
         category: 'arms',
       ),
-      
+
       // Triceps
-      ExerciseData(
+      const ExerciseData(
         name: 'Tricep Dips',
         muscleGroups: ['triceps', 'chest'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Tricep Pushdown',
         muscleGroups: ['triceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Overhead Tricep Extension',
         muscleGroups: ['triceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Skull Crushers',
         muscleGroups: ['triceps'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Close-Grip Bench Press',
         muscleGroups: ['triceps', 'chest'],
         category: 'arms',
       ),
-      
+
       // Forearms
-      ExerciseData(
+      const ExerciseData(
         name: 'Wrist Curl',
         muscleGroups: ['forearms'],
         category: 'arms',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Reverse Wrist Curl',
         muscleGroups: ['forearms'],
         category: 'arms',
       ),
 
       // ==================== LEG EXERCISES ====================
-      
+
       // Quads/Glutes
-      ExerciseData(
+      const ExerciseData(
         name: 'Squat',
         muscleGroups: ['quads', 'glutes', 'hamstring'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Front Squat',
         muscleGroups: ['quads', 'glutes'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Leg Press',
         muscleGroups: ['quads', 'glutes'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Lunges',
         muscleGroups: ['quads', 'glutes'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Bulgarian Split Squat',
         muscleGroups: ['quads', 'glutes'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Leg Extension',
         muscleGroups: ['quads'],
         category: 'legs',
       ),
-      
+
       // Hamstrings
-      ExerciseData(
+      const ExerciseData(
         name: 'Leg Curl',
         muscleGroups: ['hamstring'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Romanian Deadlift',
         muscleGroups: ['hamstring', 'glutes', 'lower back'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Nordic Curls',
         muscleGroups: ['hamstring'],
         category: 'legs',
       ),
-      
+
       // Calves
-      ExerciseData(
+      const ExerciseData(
         name: 'Calf Raises',
         muscleGroups: ['calves'],
         category: 'legs',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Seated Calf Raises',
         muscleGroups: ['calves'],
         category: 'legs',
       ),
 
       // ==================== CORE EXERCISES ====================
-      ExerciseData(
+      const ExerciseData(
         name: 'Crunches',
         muscleGroups: ['abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Sit-ups',
         muscleGroups: ['abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Planks',
         muscleGroups: ['abs', 'obliques'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Side Planks',
         muscleGroups: ['obliques', 'abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Russian Twists',
         muscleGroups: ['obliques', 'abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Hanging Leg Raises',
         muscleGroups: ['abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Ab Wheel Rollout',
         muscleGroups: ['abs'],
         category: 'core',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Cable Crunches',
         muscleGroups: ['abs'],
         category: 'core',
       ),
-      
+
       // ==================== TRAPS EXERCISES ====================
-      ExerciseData(
+      const ExerciseData(
         name: 'Shrugs',
         muscleGroups: ['traps'],
         category: 'back',
       ),
-      ExerciseData(
+      const ExerciseData(
         name: 'Upright Row',
         muscleGroups: ['traps', 'shoulder'],
         category: 'back',
@@ -307,14 +307,14 @@ class DefaultExercisesData {
   static Map<String, List<ExerciseData>> getExercisesByCategory() {
     final exercises = getDefaultExercises();
     final Map<String, List<ExerciseData>> grouped = {};
-    
+
     for (final exercise in exercises) {
       if (!grouped.containsKey(exercise.category)) {
         grouped[exercise.category] = [];
       }
       grouped[exercise.category]!.add(exercise);
     }
-    
+
     return grouped;
   }
 }
@@ -322,15 +322,15 @@ class DefaultExercisesData {
 /// Data class for exercise seed data
 /// Lighter than Exercise entity, used only for seeding
 class ExerciseData {
-  final String name;
-  final List<String> muscleGroups;
-  final String category; // For organizational purposes
-
   const ExerciseData({
     required this.name,
     required this.muscleGroups,
     required this.category,
   });
+
+  final String name;
+  final List<String> muscleGroups;
+  final String category; // For organizational purposes
 
   /// Convert to Exercise entity for database insertion
   Exercise toEntity(String id, DateTime createdAt) {

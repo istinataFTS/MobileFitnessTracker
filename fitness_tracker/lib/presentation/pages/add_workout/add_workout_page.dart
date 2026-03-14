@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 
@@ -11,7 +12,9 @@ class AddWorkoutPage extends StatefulWidget {
 }
 
 class _AddWorkoutPageState extends State<AddWorkoutPage> {
-  final _formKey = GlobalKey<FormState>();
+  static const int _defaultWeeklySetsGoal = 12;
+
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now();
   final Map<String, int> _muscleSets = {};
 
@@ -95,9 +98,7 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
 
   Widget _buildMuscleGroupInputs() {
     return Column(
-      children: MuscleGroups.all.map((muscle) {
-        return _buildMuscleGroupInput(muscle);
-      }).toList(),
+      children: MuscleGroups.all.map(_buildMuscleGroupInput).toList(),
     );
   }
 
@@ -121,7 +122,7 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Goal: ${MuscleGroups.getDefaultGoal(muscleGroup)} sets/week',
+                    'Goal: $_defaultWeeklySetsGoal sets/week',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -191,7 +192,8 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
         child: Icon(
           icon,
           size: 20,
-          color: onPressed != null ? AppTheme.primaryOrange : AppTheme.textLight,
+          color:
+              onPressed != null ? AppTheme.primaryOrange : AppTheme.textLight,
         ),
       ),
     );
@@ -206,7 +208,7 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
         color: AppTheme.surfaceDark,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -264,6 +266,7 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
         );
       },
     );
+
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
@@ -273,9 +276,8 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
 
   void _saveWorkout() {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement save workout logic with BLoC
       final totalSets = _muscleSets.values.fold(0, (sum, sets) => sum + sets);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Workout saved! Total: $totalSets sets'),
@@ -284,7 +286,6 @@ class _AddWorkoutPageState extends State<AddWorkoutPage> {
         ),
       );
 
-      // Clear form
       setState(() {
         _muscleSets.clear();
       });

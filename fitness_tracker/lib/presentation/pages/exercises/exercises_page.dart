@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/exercise.dart';
 import 'bloc/exercise_bloc.dart';
-
 
 class ExercisesPage extends StatelessWidget {
   const ExercisesPage({super.key});
@@ -17,7 +17,7 @@ class ExercisesPage extends StatelessWidget {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text(AppStrings.exercisesTitle),
-        automaticallyImplyLeading: false, // No back button - it's a main tab
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -28,7 +28,6 @@ class ExercisesPage extends StatelessWidget {
       ),
       body: BlocConsumer<ExerciseBloc, ExerciseState>(
         listener: (context, state) {
-          // Handle success feedback
           if (state is ExerciseOperationSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -39,8 +38,7 @@ class ExercisesPage extends StatelessWidget {
               ),
             );
           }
-          
-          // Handle errors
+
           if (state is ExerciseError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -53,7 +51,6 @@ class ExercisesPage extends StatelessWidget {
           }
         },
         builder: (context, state) {
-          // Show loading state
           if (state is ExerciseLoading) {
             return const Center(
               child: CircularProgressIndicator(
@@ -62,13 +59,12 @@ class ExercisesPage extends StatelessWidget {
             );
           }
 
-          // Show error state with retry option
           if (state is ExerciseError) {
             return _buildErrorState(context, state.message);
           }
 
-          // Show loaded state (empty or with exercises)
-          final exercises = state is ExercisesLoaded ? state.exercises : <Exercise>[];
+          final exercises =
+              state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
           return Column(
             children: [
@@ -285,9 +281,16 @@ class ExercisesPage extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: AppTheme.errorRed,
+                        ),
                         SizedBox(width: 12),
-                        Text(AppStrings.delete, style: TextStyle(color: AppTheme.errorRed)),
+                        Text(
+                          AppStrings.delete,
+                          style: TextStyle(color: AppTheme.errorRed),
+                        ),
                       ],
                     ),
                   ),
@@ -305,7 +308,7 @@ class ExercisesPage extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
-        border: Border(
+        border: const Border(
           top: BorderSide(color: AppTheme.borderDark, width: 1),
         ),
       ),
@@ -364,7 +367,6 @@ class ExercisesPage extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              // Dispatch delete event to bloc
               context.read<ExerciseBloc>().add(DeleteExerciseEvent(exercise.id));
               Navigator.pop(dialogContext);
             },
@@ -381,7 +383,7 @@ class ExercisesPage extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(AppStrings.aboutExercises),
-        content: const Text(AppStrings.aboutExercisesDescription),
+        content: const Text(AppStrings.createExercisesDescription),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -393,12 +395,8 @@ class ExercisesPage extends StatelessWidget {
   }
 }
 
-// ==================== Exercise Dialog ====================
-
-/// Unified dialog for adding and editing exercises
-/// Now uses ExerciseBloc instead of ExercisesManager
 class _ExerciseDialog extends StatefulWidget {
-  final Exercise? exercise; // null for add, non-null for edit
+  final Exercise? exercise;
 
   const _ExerciseDialog({this.exercise});
 
@@ -409,7 +407,7 @@ class _ExerciseDialog extends StatefulWidget {
 class _ExerciseDialogState extends State<_ExerciseDialog> {
   late final TextEditingController _nameController;
   late final Set<String> _selectedMuscles;
-  final _uuid = const Uuid(); // UUID generator for new exercises
+  final _uuid = const Uuid();
 
   bool get isEditing => widget.exercise != null;
 
@@ -520,8 +518,8 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   }
 
   Widget _buildActions(BuildContext context) {
-    final isValid = _nameController.text.trim().isNotEmpty &&
-        _selectedMuscles.isNotEmpty;
+    final isValid =
+        _nameController.text.trim().isNotEmpty && _selectedMuscles.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -549,16 +547,14 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
     final name = _nameController.text.trim();
 
     if (isEditing) {
-      // Update existing exercise
       final updatedExercise = widget.exercise!.copyWith(
         name: name,
         muscleGroups: _selectedMuscles.toList(),
       );
       context.read<ExerciseBloc>().add(UpdateExerciseEvent(updatedExercise));
     } else {
-      // Create new exercise with UUID
       final newExercise = Exercise(
-        id: _uuid.v4(), // Generate unique ID
+        id: _uuid.v4(),
         name: name,
         muscleGroups: _selectedMuscles.toList(),
         createdAt: DateTime.now(),
