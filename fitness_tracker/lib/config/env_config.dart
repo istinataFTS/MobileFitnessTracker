@@ -55,9 +55,10 @@ class EnvConfig {
   /// Version 11: Added remote-ready sync metadata columns to targets.
   /// Version 12: Added remote-ready sync metadata columns to exercises.
   /// Version 13: Added remote-ready sync metadata columns to meals and nutrition logs.
+  /// Version 14: Added app metadata storage for session and migration state.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 13,
+    defaultValue: 14,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

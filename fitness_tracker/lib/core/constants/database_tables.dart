@@ -9,6 +9,7 @@ class DatabaseTables {
   static const String exerciseMuscleFactors = 'exercise_muscle_factors';
   static const String muscleStimulus = 'muscle_stimulus';
   static const String pendingSyncDeletes = 'pending_sync_deletes';
+  static const String appMetadata = 'app_metadata';
 
   static const String targetId = 'id';
   static const String targetType = 'type';
@@ -102,4 +103,8 @@ class DatabaseTables {
   static const String pendingDeleteCreatedAt = 'created_at';
   static const String pendingDeleteLastAttemptAt = 'last_attempt_at';
   static const String pendingDeleteErrorMessage = 'error_message';
+
+  static const String metadataKey = 'key';
+  static const String metadataValue = 'value';
+  static const String metadataUpdatedAt = 'updated_at';
 }

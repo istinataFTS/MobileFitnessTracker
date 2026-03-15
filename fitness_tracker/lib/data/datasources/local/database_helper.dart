@@ -105,7 +105,12 @@ class DatabaseHelper {
         ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
         ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
         ${DatabaseTables.mealCaloriesPer100g} REAL NOT NULL,
-        ${DatabaseTables.mealCreatedAt} TEXT NOT NULL
+        ${DatabaseTables.mealCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.mealUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.mealServerId} TEXT,
+        ${DatabaseTables.mealSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.mealLastSyncedAt} TEXT,
+        ${DatabaseTables.mealLastSyncError} TEXT
       )
     ''');
 
@@ -121,6 +126,11 @@ class DatabaseHelper {
         ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
         ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
         ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogServerId} TEXT,
+        ${DatabaseTables.nutritionLogSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.nutritionLogLastSyncedAt} TEXT,
+        ${DatabaseTables.nutritionLogLastSyncError} TEXT,
         FOREIGN KEY (${DatabaseTables.nutritionLogMealId})
           REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
           ON DELETE CASCADE
@@ -164,6 +174,14 @@ class DatabaseHelper {
         ${DatabaseTables.pendingDeleteCreatedAt} TEXT NOT NULL,
         ${DatabaseTables.pendingDeleteLastAttemptAt} TEXT,
         ${DatabaseTables.pendingDeleteErrorMessage} TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.appMetadata} (
+        ${DatabaseTables.metadataKey} TEXT PRIMARY KEY,
+        ${DatabaseTables.metadataValue} TEXT,
+        ${DatabaseTables.metadataUpdatedAt} TEXT NOT NULL
       )
     ''');
 
@@ -363,6 +381,14 @@ class DatabaseHelper {
       await _migrateExercisesForRemoteReadiness(db);
     }
 
+    if (oldVersion < 13) {
+      await _migrateMealsAndNutritionLogsForRemoteReadiness(db);
+    }
+
+    if (oldVersion < 14) {
+      await _createAppMetadataTable(db);
+    }
+
     await _createIndexes(db);
   }
 
@@ -527,6 +553,82 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _migrateMealsAndNutritionLogsForRemoteReadiness(
+    Database db,
+  ) async {
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.meals}
+      ADD COLUMN ${DatabaseTables.mealUpdatedAt} TEXT
+    ''');
+
+    await db.execute('''
+      UPDATE ${DatabaseTables.meals}
+      SET ${DatabaseTables.mealUpdatedAt} = ${DatabaseTables.mealCreatedAt}
+      WHERE ${DatabaseTables.mealUpdatedAt} IS NULL
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.meals}
+      ADD COLUMN ${DatabaseTables.mealServerId} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.meals}
+      ADD COLUMN ${DatabaseTables.mealSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.meals}
+      ADD COLUMN ${DatabaseTables.mealLastSyncedAt} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.meals}
+      ADD COLUMN ${DatabaseTables.mealLastSyncError} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.nutritionLogs}
+      ADD COLUMN ${DatabaseTables.nutritionLogUpdatedAt} TEXT
+    ''');
+
+    await db.execute('''
+      UPDATE ${DatabaseTables.nutritionLogs}
+      SET ${DatabaseTables.nutritionLogUpdatedAt} = ${DatabaseTables.nutritionLogCreatedAt}
+      WHERE ${DatabaseTables.nutritionLogUpdatedAt} IS NULL
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.nutritionLogs}
+      ADD COLUMN ${DatabaseTables.nutritionLogServerId} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.nutritionLogs}
+      ADD COLUMN ${DatabaseTables.nutritionLogSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.nutritionLogs}
+      ADD COLUMN ${DatabaseTables.nutritionLogLastSyncedAt} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.nutritionLogs}
+      ADD COLUMN ${DatabaseTables.nutritionLogLastSyncError} TEXT
+    ''');
+  }
+
+  Future<void> _createAppMetadataTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ${DatabaseTables.appMetadata} (
+        ${DatabaseTables.metadataKey} TEXT PRIMARY KEY,
+        ${DatabaseTables.metadataValue} TEXT,
+        ${DatabaseTables.metadataUpdatedAt} TEXT NOT NULL
+      )
+    ''');
+  }
+
   Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
@@ -612,6 +714,21 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meals_updated_at
+      ON ${DatabaseTables.meals}(${DatabaseTables.mealUpdatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meals_sync_status
+      ON ${DatabaseTables.meals}(${DatabaseTables.mealSyncStatus})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meals_server_id
+      ON ${DatabaseTables.meals}(${DatabaseTables.mealServerId})
+    ''');
+
+    await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_nutrition_logs_meal_id
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogMealId})
     ''');
@@ -624,6 +741,21 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_nutrition_logs_created_at
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogCreatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_updated_at
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogUpdatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_sync_status
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogSyncStatus})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_server_id
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogServerId})
     ''');
 
     await db.execute('''
@@ -667,6 +799,11 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_pending_sync_deletes_local_entity_id
       ON ${DatabaseTables.pendingSyncDeletes}(${DatabaseTables.pendingDeleteLocalEntityId})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_app_metadata_updated_at
+      ON ${DatabaseTables.appMetadata}(${DatabaseTables.metadataUpdatedAt})
     ''');
   }
 
