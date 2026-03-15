@@ -68,7 +68,12 @@ class DatabaseHelper {
         ${DatabaseTables.setWeight} REAL NOT NULL,
         ${DatabaseTables.setIntensity} INTEGER NOT NULL DEFAULT ${MuscleStimulus.defaultIntensity},
         ${DatabaseTables.setDate} TEXT NOT NULL,
-        ${DatabaseTables.setCreatedAt} TEXT NOT NULL
+        ${DatabaseTables.setCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.setUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.setServerId} TEXT,
+        ${DatabaseTables.setSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.setLastSyncedAt} TEXT,
+        ${DatabaseTables.setLastSyncError} TEXT
       )
     ''');
 
@@ -320,6 +325,10 @@ class DatabaseHelper {
       await _migrateTargetsToTypedGoals(db);
     }
 
+    if (oldVersion < 9) {
+      await _migrateWorkoutSetsForRemoteReadiness(db);
+    }
+
     await _createIndexes(db);
   }
 
@@ -367,6 +376,39 @@ class DatabaseHelper {
     await db.execute('DROP TABLE targets_legacy');
   }
 
+  Future<void> _migrateWorkoutSetsForRemoteReadiness(Database db) async {
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.workoutSets}
+      ADD COLUMN ${DatabaseTables.setUpdatedAt} TEXT
+    ''');
+
+    await db.execute('''
+      UPDATE ${DatabaseTables.workoutSets}
+      SET ${DatabaseTables.setUpdatedAt} = ${DatabaseTables.setCreatedAt}
+      WHERE ${DatabaseTables.setUpdatedAt} IS NULL
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.workoutSets}
+      ADD COLUMN ${DatabaseTables.setServerId} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.workoutSets}
+      ADD COLUMN ${DatabaseTables.setSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.workoutSets}
+      ADD COLUMN ${DatabaseTables.setLastSyncedAt} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.workoutSets}
+      ADD COLUMN ${DatabaseTables.setLastSyncError} TEXT
+    ''');
+  }
+
   Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
@@ -394,6 +436,21 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_workout_sets_created_at
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setCreatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_updated_at
+      ON ${DatabaseTables.workoutSets}(${DatabaseTables.setUpdatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_sync_status
+      ON ${DatabaseTables.workoutSets}(${DatabaseTables.setSyncStatus})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_server_id
+      ON ${DatabaseTables.workoutSets}(${DatabaseTables.setServerId})
     ''');
 
     await db.execute('''

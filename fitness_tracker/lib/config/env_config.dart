@@ -9,8 +9,6 @@ class EnvConfig {
     'production',
   };
 
-  // ==================== APP INFORMATION ====================
-
   static const String appName = String.fromEnvironment(
     'APP_NAME',
     defaultValue: 'Fitness Tracker',
@@ -26,8 +24,6 @@ class EnvConfig {
     defaultValue: 'Fitness User',
   );
 
-  // ==================== ENVIRONMENT ====================
-
   static const String environment = String.fromEnvironment(
     'ENVIRONMENT',
     defaultValue: 'development',
@@ -37,16 +33,12 @@ class EnvConfig {
   static bool get isProduction => environment == 'production';
   static bool get isStaging => environment == 'staging';
 
-  // ==================== FEATURE FLAGS ====================
-
   static bool get enableDevicePreview => kDebugMode;
 
   static const bool enablePerformanceMonitoring = bool.fromEnvironment(
     'ENABLE_PERFORMANCE_MONITORING',
     defaultValue: true,
   );
-
-  // ==================== DATABASE CONFIGURATION ====================
 
   static const String databaseName = String.fromEnvironment(
     'DATABASE_NAME',
@@ -58,9 +50,10 @@ class EnvConfig {
   /// Version 6: Added meal_name column to nutrition_logs table.
   /// Version 7: Added serving_size_grams column to meals table.
   /// Version 8: Reworked targets into typed goals (training + macro targets).
+  /// Version 9: Added remote-ready sync metadata columns to workout_sets.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 8,
+    defaultValue: 9,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(
@@ -83,8 +76,6 @@ class EnvConfig {
     defaultValue: false,
   );
 
-  // ==================== API CONFIGURATION ====================
-
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://api.yourapp.com',
@@ -100,8 +91,6 @@ class EnvConfig {
     defaultValue: 30,
   );
 
-  // ==================== DOMAIN CONSTANTS ====================
-
   static const double intensityExponent = 1.35;
   static const double weeklyDecayFactor = 0.6;
   static const double dailyThreshold = 8.0;
@@ -112,16 +101,12 @@ class EnvConfig {
   static const double colorThresholdOrange = 0.70;
   static const double colorThresholdRed = 0.70;
 
-  // ==================== LOGGING ====================
-
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
 
   static const String logLevel = String.fromEnvironment(
     'LOG_LEVEL',
     defaultValue: 'debug',
   );
-
-  // ==================== VALIDATION ====================
 
   static List<String> getRuntimeConfigIssues() {
     final issues = <String>[];

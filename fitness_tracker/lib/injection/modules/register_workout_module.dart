@@ -2,6 +2,8 @@ import 'package:get_it/get_it.dart';
 
 import '../../data/datasources/local/workout_set_local_datasource.dart';
 import '../../data/datasources/local/workout_set_local_datasource_impl.dart';
+import '../../data/datasources/remote/noop_workout_set_remote_datasource.dart';
+import '../../data/datasources/remote/workout_set_remote_datasource.dart';
 import '../../data/repositories/workout_set_repository_impl.dart';
 import '../../domain/repositories/workout_set_repository.dart';
 import '../../domain/usecases/workout_sets/add_workout_set.dart';
@@ -34,10 +36,17 @@ void registerWorkoutModule(GetIt sl) {
   sl.registerLazySingleton(() => UpdateWorkoutSet(sl()));
 
   sl.registerLazySingleton<WorkoutSetRepository>(
-    () => WorkoutSetRepositoryImpl(localDataSource: sl()),
+    () => WorkoutSetRepositoryImpl(
+      localDataSource: sl(),
+      remoteDataSource: sl(),
+    ),
   );
 
   sl.registerLazySingleton<WorkoutSetLocalDataSource>(
     () => WorkoutSetLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<WorkoutSetRemoteDataSource>(
+    NoopWorkoutSetRemoteDataSource.new,
   );
 }

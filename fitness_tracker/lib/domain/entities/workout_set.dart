@@ -1,28 +1,32 @@
 import 'package:equatable/equatable.dart';
-import '../../core/constants/muscle_stimulus_constants.dart';
 
-/// Represents a single set performed in a workout
-/// Links to an Exercise entity via exerciseId
+import '../../core/constants/muscle_stimulus_constants.dart';
+import 'entity_sync_metadata.dart';
+
 class WorkoutSet extends Equatable {
   final String id;
-  final String exerciseId; // Reference to Exercise entity
+  final String exerciseId;
   final int reps;
   final double weight;
-  final int intensity; // 0-5 intensity rating (NEW: Phase 9)
+  final int intensity;
   final DateTime date;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final EntitySyncMetadata syncMetadata;
 
   const WorkoutSet({
     required this.id,
     required this.exerciseId,
     required this.reps,
     required this.weight,
-    this.intensity = MuscleStimulus.defaultIntensity, // Default to 3 (moderate)
+    this.intensity = MuscleStimulus.defaultIntensity,
     required this.date,
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
+  })  : updatedAt = updatedAt ?? createdAt,
+        syncMetadata = syncMetadata ?? const EntitySyncMetadata();
 
-  /// Create a copy with optional field updates
   WorkoutSet copyWith({
     String? id,
     String? exerciseId,
@@ -31,6 +35,8 @@ class WorkoutSet extends Equatable {
     int? intensity,
     DateTime? date,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
   }) {
     return WorkoutSet(
       id: id ?? this.id,
@@ -40,14 +46,15 @@ class WorkoutSet extends Equatable {
       intensity: intensity ?? this.intensity,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncMetadata: syncMetadata ?? this.syncMetadata,
     );
   }
 
-  /// Get validated intensity (clamped to 0-5 range)
   int get validatedIntensity => MuscleStimulus.clampIntensity(intensity);
 
-  /// Get intensity label for display
-  String get intensityLabel => MuscleStimulus.getIntensityLabel(validatedIntensity);
+  String get intensityLabel =>
+      MuscleStimulus.getIntensityLabel(validatedIntensity);
 
   @override
   List<Object?> get props => [
@@ -58,5 +65,7 @@ class WorkoutSet extends Equatable {
         intensity,
         date,
         createdAt,
+        updatedAt,
+        syncMetadata,
       ];
 }
