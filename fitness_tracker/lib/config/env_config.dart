@@ -54,9 +54,10 @@ class EnvConfig {
   /// Version 10: Added pending delete sync queue for durable remote deletions.
   /// Version 11: Added remote-ready sync metadata columns to targets.
   /// Version 12: Added remote-ready sync metadata columns to exercises.
+  /// Version 13: Added remote-ready sync metadata columns to meals and nutrition logs.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 12,
+    defaultValue: 13,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

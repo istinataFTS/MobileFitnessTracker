@@ -1,8 +1,8 @@
 import '../../core/constants/database_tables.dart';
+import '../../core/enums/sync_status.dart';
+import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/nutrition_log.dart';
 
-/// Data model for NutritionLog with database serialization
-/// Extends NutritionLog entity to maintain clean architecture separation
 class NutritionLogModel extends NutritionLog {
   const NutritionLogModel({
     required super.id,
@@ -15,9 +15,10 @@ class NutritionLogModel extends NutritionLog {
     required super.calories,
     required super.loggedAt,
     required super.createdAt,
+    super.updatedAt,
+    super.syncMetadata,
   });
 
-  /// Create model from entity
   factory NutritionLogModel.fromEntity(NutritionLog log) {
     return NutritionLogModel(
       id: log.id,
@@ -30,26 +31,45 @@ class NutritionLogModel extends NutritionLog {
       calories: log.calories,
       loggedAt: log.loggedAt,
       createdAt: log.createdAt,
+      updatedAt: log.updatedAt,
+      syncMetadata: log.syncMetadata,
     );
   }
 
-  /// Create model from database map
   factory NutritionLogModel.fromMap(Map<String, dynamic> map) {
+    final createdAt =
+        DateTime.parse(map[DatabaseTables.nutritionLogCreatedAt] as String);
+    final updatedAtRaw = map[DatabaseTables.nutritionLogUpdatedAt] as String?;
+
     return NutritionLogModel(
       id: map[DatabaseTables.nutritionLogId] as String,
       mealId: map[DatabaseTables.nutritionLogMealId] as String?,
       mealName: map[DatabaseTables.nutritionLogMealName] as String,
-      gramsConsumed: (map[DatabaseTables.nutritionLogGrams] as num?)?.toDouble(),
-      proteinGrams: (map[DatabaseTables.nutritionLogProtein] as num).toDouble(),
+      gramsConsumed:
+          (map[DatabaseTables.nutritionLogGrams] as num?)?.toDouble(),
+      proteinGrams:
+          (map[DatabaseTables.nutritionLogProtein] as num).toDouble(),
       carbsGrams: (map[DatabaseTables.nutritionLogCarbs] as num).toDouble(),
       fatGrams: (map[DatabaseTables.nutritionLogFat] as num).toDouble(),
       calories: (map[DatabaseTables.nutritionLogCalories] as num).toDouble(),
       loggedAt: DateTime.parse(map[DatabaseTables.nutritionLogDate] as String),
-      createdAt: DateTime.parse(map[DatabaseTables.nutritionLogCreatedAt] as String),
+      createdAt: createdAt,
+      updatedAt:
+          updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
+      syncMetadata: EntitySyncMetadata(
+        serverId: map[DatabaseTables.nutritionLogServerId] as String?,
+        status: _syncStatusFromStorage(
+          map[DatabaseTables.nutritionLogSyncStatus] as String?,
+        ),
+        lastSyncedAt: _parseNullableDateTime(
+          map[DatabaseTables.nutritionLogLastSyncedAt] as String?,
+        ),
+        lastSyncError:
+            map[DatabaseTables.nutritionLogLastSyncError] as String?,
+      ),
     );
   }
 
-  /// Convert model to database map
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.nutritionLogId: id,
@@ -62,26 +82,15 @@ class NutritionLogModel extends NutritionLog {
       DatabaseTables.nutritionLogCalories: calories,
       DatabaseTables.nutritionLogDate: loggedAt.toIso8601String(),
       DatabaseTables.nutritionLogCreatedAt: createdAt.toIso8601String(),
+      DatabaseTables.nutritionLogUpdatedAt: updatedAt.toIso8601String(),
+      DatabaseTables.nutritionLogServerId: syncMetadata.serverId,
+      DatabaseTables.nutritionLogSyncStatus: syncMetadata.status.name,
+      DatabaseTables.nutritionLogLastSyncedAt:
+          syncMetadata.lastSyncedAt?.toIso8601String(),
+      DatabaseTables.nutritionLogLastSyncError: syncMetadata.lastSyncError,
     };
   }
 
-  /// Create model from JSON (for API compatibility)
-  factory NutritionLogModel.fromJson(Map<String, dynamic> json) {
-    return NutritionLogModel(
-      id: json['id'] as String,
-      mealId: json['mealId'] as String?,
-      mealName: json['mealName'] as String,
-      gramsConsumed: (json['gramsConsumed'] as num?)?.toDouble(),
-      proteinGrams: (json['proteinGrams'] as num).toDouble(),
-      carbsGrams: (json['carbsGrams'] as num).toDouble(),
-      fatGrams: (json['fatGrams'] as num).toDouble(),
-      calories: (json['calories'] as num).toDouble(),
-      loggedAt: DateTime.parse(json['loggedAt'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-    );
-  }
-
-  /// Convert model to JSON (for API compatibility)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -94,11 +103,14 @@ class NutritionLogModel extends NutritionLog {
       'calories': calories,
       'loggedAt': loggedAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'serverId': syncMetadata.serverId,
+      'syncStatus': syncMetadata.status.name,
+      'lastSyncedAt': syncMetadata.lastSyncedAt?.toIso8601String(),
+      'lastSyncError': syncMetadata.lastSyncError,
     };
   }
 
-  /// Validate log data
-  /// Checks if the log is valid based on type (meal log vs direct macro log)
   void validate() {
     if (isMealLog && !isValidMealLog) {
       throw ArgumentError(
@@ -113,8 +125,24 @@ class NutritionLogModel extends NutritionLog {
     if (!hasValidCalories) {
       print(
         'WARNING: Calorie mismatch for log "$mealName": '
-        'stated $calories cal, calculated ${calculatedCalories.toStringAsFixed(1)} cal',
+        'stated $calories cal, calculated '
+        '${calculatedCalories.toStringAsFixed(1)} cal',
       );
     }
+  }
+
+  static DateTime? _parseNullableDateTime(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    return DateTime.parse(value);
+  }
+
+  static SyncStatus _syncStatusFromStorage(String? value) {
+    return SyncStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => SyncStatus.localOnly,
+    );
   }
 }

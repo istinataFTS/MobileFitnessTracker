@@ -57,6 +57,11 @@ class DatabaseTables {
   static const String mealFatPer100g = 'fat_per_100g';
   static const String mealCaloriesPer100g = 'calories_per_100g';
   static const String mealCreatedAt = 'created_at';
+  static const String mealUpdatedAt = 'updated_at';
+  static const String mealServerId = 'server_id';
+  static const String mealSyncStatus = 'sync_status';
+  static const String mealLastSyncedAt = 'last_synced_at';
+  static const String mealLastSyncError = 'last_sync_error';
 
   static const String nutritionLogId = 'id';
   static const String nutritionLogMealId = 'meal_id';
@@ -68,6 +73,11 @@ class DatabaseTables {
   static const String nutritionLogCalories = 'calories';
   static const String nutritionLogDate = 'date';
   static const String nutritionLogCreatedAt = 'created_at';
+  static const String nutritionLogUpdatedAt = 'updated_at';
+  static const String nutritionLogServerId = 'server_id';
+  static const String nutritionLogSyncStatus = 'sync_status';
+  static const String nutritionLogLastSyncedAt = 'last_synced_at';
+  static const String nutritionLogLastSyncError = 'last_sync_error';
 
   static const String factorId = 'id';
   static const String factorExerciseId = 'exercise_id';

@@ -1,29 +1,18 @@
 import 'package:equatable/equatable.dart';
 
-/// Represents a meal with nutritional information per 100g
-/// 
-/// Stores macronutrients (carbs, protein, fat) and total calories.
-/// All macro values are per 100g serving.
-/// Also stores a default serving size for the meal.
-/// 
-/// Calories are calculated as: 4*carbs + 4*protein + 9*fat
-/// The entity validates that calories match the macro breakdown.
+import 'entity_sync_metadata.dart';
+
 class Meal extends Equatable {
   final String id;
   final String name;
-  
-  /// Default serving size for this meal (in grams)
   final double servingSizeGrams;
-  
-  // Macronutrients per 100g (in grams)
   final double carbsPer100g;
   final double proteinPer100g;
   final double fatPer100g;
-  
-  // Total calories per 100g
   final double caloriesPer100g;
-  
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final EntitySyncMetadata syncMetadata;
 
   const Meal({
     required this.id,
@@ -34,26 +23,26 @@ class Meal extends Equatable {
     required this.fatPer100g,
     required this.caloriesPer100g,
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
+  })  : updatedAt = updatedAt ?? createdAt,
+        syncMetadata = syncMetadata ?? const EntitySyncMetadata();
 
-  /// Calculate macros for the default serving size
   double get proteinPerServing => (proteinPer100g * servingSizeGrams) / 100;
   double get carbsPerServing => (carbsPer100g * servingSizeGrams) / 100;
   double get fatsPerServing => (fatPer100g * servingSizeGrams) / 100;
   double get caloriesPerServing => (caloriesPer100g * servingSizeGrams) / 100;
 
-  /// Calculate expected calories from macros
-  /// Formula: 4 calories per gram of carbs/protein, 9 calories per gram of fat
   double get calculatedCalories {
-    return (carbsPer100g * 4.0) + (proteinPer100g * 4.0) + (fatPer100g * 9.0);
+    return (carbsPer100g * 4.0) +
+        (proteinPer100g * 4.0) +
+        (fatPer100g * 9.0);
   }
 
-  /// Check if stored calories match calculated calories (within 1 calorie tolerance)
   bool get hasValidCalories {
     return (caloriesPer100g - calculatedCalories).abs() <= 1.0;
   }
 
-  /// Calculate macros and calories for a given weight in grams
   MealNutrition calculateForGrams(double grams) {
     final multiplier = grams / 100.0;
     return MealNutrition(
@@ -74,6 +63,8 @@ class Meal extends Equatable {
     double? fatPer100g,
     double? caloriesPer100g,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
   }) {
     return Meal(
       id: id ?? this.id,
@@ -84,6 +75,8 @@ class Meal extends Equatable {
       fatPer100g: fatPer100g ?? this.fatPer100g,
       caloriesPer100g: caloriesPer100g ?? this.caloriesPer100g,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncMetadata: syncMetadata ?? this.syncMetadata,
     );
   }
 
@@ -97,10 +90,11 @@ class Meal extends Equatable {
         fatPer100g,
         caloriesPer100g,
         createdAt,
+        updatedAt,
+        syncMetadata,
       ];
 }
 
-/// Helper class for calculated nutrition values
 class MealNutrition {
   final double carbs;
   final double protein;

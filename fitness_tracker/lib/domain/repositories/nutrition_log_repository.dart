@@ -1,86 +1,78 @@
 import 'package:dartz/dartz.dart';
+
+import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../entities/nutrition_log.dart';
 
-/// Repository interface for NutritionLog operations
-/// 
-/// Handles both meal-based logs and direct macro logs through
-/// a unified interface. Follows Clean Architecture principles.
 abstract class NutritionLogRepository {
-  /// Get all nutrition logs from storage
-  /// Typically sorted by date (most recent first)
-  Future<Either<Failure, List<NutritionLog>>> getAllLogs();
+  Future<Either<Failure, List<NutritionLog>>> getAllLogs({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get a specific log by ID
-  /// Returns null wrapped in Right if log doesn't exist
-  Future<Either<Failure, NutritionLog?>> getLogById(String id);
+  Future<Either<Failure, NutritionLog?>> getLogById(
+    String id, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get all logs for a specific date
-  /// Useful for daily nutrition summary
-  Future<Either<Failure, List<NutritionLog>>> getLogsByDate(DateTime date);
+  Future<Either<Failure, List<NutritionLog>>> getLogsByDate(
+    DateTime date, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Alias for getLogsByDate - used by use cases
-  Future<Either<Failure, List<NutritionLog>>> getLogsForDate(DateTime date);
+  Future<Either<Failure, List<NutritionLog>>> getLogsForDate(
+    DateTime date, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get logs within a date range (inclusive)
-  /// Used for weekly/monthly summaries and history views
   Future<Either<Failure, List<NutritionLog>>> getLogsByDateRange(
     DateTime startDate,
-    DateTime endDate,
-  );
+    DateTime endDate, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get all logs for a specific meal ID
-  /// Useful for analytics: "When did I last eat this meal?"
-  Future<Either<Failure, List<NutritionLog>>> getLogsByMealId(String mealId);
+  Future<Either<Failure, List<NutritionLog>>> getLogsByMealId(
+    String mealId, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get today's logs
-  /// Convenience method for daily tracking
-  Future<Either<Failure, List<NutritionLog>>> getTodayLogs();
+  Future<Either<Failure, List<NutritionLog>>> getTodayLogs({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get logs for current week
-  /// Convenience method for weekly summaries
-  Future<Either<Failure, List<NutritionLog>>> getWeeklyLogs();
+  Future<Either<Failure, List<NutritionLog>>> getWeeklyLogs({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get only meal-based logs (excludes direct macro logs)
-  /// Useful for meal frequency analysis
-  Future<Either<Failure, List<NutritionLog>>> getMealLogs();
+  Future<Either<Failure, List<NutritionLog>>> getMealLogs({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Get only direct macro logs (excludes meal-based logs)
-  /// Useful for tracking manual entries
-  Future<Either<Failure, List<NutritionLog>>> getDirectMacroLogs();
+  Future<Either<Failure, List<NutritionLog>>> getDirectMacroLogs({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
-  /// Add a new nutrition log
   Future<Either<Failure, void>> addLog(NutritionLog log);
 
-  /// Update an existing nutrition log
-  /// Returns error if log doesn't exist
   Future<Either<Failure, void>> updateLog(NutritionLog log);
 
-  /// Delete a log by ID
   Future<Either<Failure, void>> deleteLog(String id);
 
-  /// Delete all logs for a specific date
-  /// Useful for "clear today's entries" functionality
   Future<Either<Failure, void>> deleteLogsByDate(DateTime date);
 
-  /// Delete all logs for a specific meal ID
-  /// Used when a meal is deleted (cascade deletion)
   Future<Either<Failure, void>> deleteLogsByMealId(String mealId);
 
-  /// Clear all nutrition logs
-  /// WARNING: Use with caution - typically for testing or reset functionality
   Future<Either<Failure, void>> clearAllLogs();
 
-  /// Get total count of logs
-  /// Useful for analytics or UI display
   Future<Either<Failure, int>> getLogsCount();
 
-  /// Get daily macro totals for a specific date
-  /// Returns aggregated carbs, protein, fat, and calories
-  Future<Either<Failure, DailyMacros>> getDailyMacros(DateTime date);
+  Future<Either<Failure, DailyMacros>> getDailyMacros(
+    DateTime date, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
+
+  Future<Either<Failure, void>> syncPendingLogs();
 }
 
-/// Helper class for aggregated daily macros
 class DailyMacros {
   final double totalCarbs;
   final double totalProtein;
@@ -98,10 +90,8 @@ class DailyMacros {
     required this.logsCount,
   });
 
-  /// Check if any nutrition was logged
   bool get hasLogs => logsCount > 0;
 
-  /// Calculate calories from macros (for validation)
   double get calculatedCalories {
     return (totalCarbs * 4.0) + (totalProtein * 4.0) + (totalFat * 9.0);
   }

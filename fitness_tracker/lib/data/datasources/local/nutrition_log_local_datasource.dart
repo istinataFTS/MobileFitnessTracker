@@ -1,10 +1,10 @@
 import 'package:sqflite/sqflite.dart';
+
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../models/nutrition_log_model.dart';
 import 'database_helper.dart';
 
-/// Local data source interface for NutritionLog operations
 abstract class NutritionLogLocalDataSource {
   Future<List<NutritionLogModel>> getAllLogs();
   Future<NutritionLogModel?> getLogById(String id);
@@ -18,8 +18,17 @@ abstract class NutritionLogLocalDataSource {
   Future<List<NutritionLogModel>> getWeeklyLogs();
   Future<List<NutritionLogModel>> getMealLogs();
   Future<List<NutritionLogModel>> getDirectMacroLogs();
+  Future<List<NutritionLogModel>> getPendingSyncLogs();
   Future<void> insertLog(NutritionLogModel log);
   Future<void> updateLog(NutritionLogModel log);
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  });
+  Future<void> markAsPendingUpload(String localId, {String? errorMessage});
+  Future<void> markAsPendingUpdate(String localId, {String? errorMessage});
+  Future<void> replaceAllLogs(List<NutritionLogModel> logs);
   Future<void> deleteLog(String id);
   Future<void> deleteLogsByDate(DateTime date);
   Future<void> deleteLogsByMealId(String mealId);
@@ -27,11 +36,12 @@ abstract class NutritionLogLocalDataSource {
   Future<Map<String, double>> getDailyMacros(DateTime date);
 }
 
-/// SQLite implementation of NutritionLog local data source
 class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  const NutritionLogLocalDataSourceImpl({required this.databaseHelper});
+  const NutritionLogLocalDataSourceImpl({
+    required this.databaseHelper,
+  });
 
   @override
   Future<List<NutritionLogModel>> getAllLogs() async {
@@ -41,7 +51,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         DatabaseTables.nutritionLogs,
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get nutrition logs: $e');
     }
@@ -69,22 +79,21 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   Future<List<NutritionLogModel>> getLogsByDate(DateTime date) async {
     try {
       final db = await databaseHelper.database;
-      
-      // Normalize date to start of day for comparison
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
+        where:
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
         whereArgs: [
           startOfDay.toIso8601String(),
           endOfDay.toIso8601String(),
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get logs by date: $e');
     }
@@ -97,22 +106,21 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   ) async {
     try {
       final db = await databaseHelper.database;
-      
-      // Normalize dates
       final start = DateTime(startDate.year, startDate.month, startDate.day);
       final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
 
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
+        where:
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
         whereArgs: [
           start.toIso8601String(),
           end.toIso8601String(),
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get logs by date range: $e');
     }
@@ -128,7 +136,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         whereArgs: [mealId],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get logs by meal: $e');
     }
@@ -137,7 +145,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   @override
   Future<List<NutritionLogModel>> getTodayLogs() async {
     try {
-      return await getLogsByDate(DateTime.now());
+      return getLogsByDate(DateTime.now());
     } catch (e) {
       throw CacheDatabaseException('Failed to get today logs: $e');
     }
@@ -150,8 +158,8 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
       final startDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
       final endDate = DateTime.now();
-      
-      return await getLogsByDateRange(startDate, endDate);
+
+      return getLogsByDateRange(startDate, endDate);
     } catch (e) {
       throw CacheDatabaseException('Failed to get weekly logs: $e');
     }
@@ -166,7 +174,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         where: '${DatabaseTables.nutritionLogMealId} IS NOT NULL',
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get meal logs: $e');
     }
@@ -181,9 +189,26 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         where: '${DatabaseTables.nutritionLogMealId} IS NULL',
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
-      return maps.map((map) => NutritionLogModel.fromMap(map)).toList();
+      return maps.map(NutritionLogModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get direct macro logs: $e');
+    }
+  }
+
+  @override
+  Future<List<NutritionLogModel>> getPendingSyncLogs() async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.nutritionLogs,
+        where:
+            '${DatabaseTables.nutritionLogSyncStatus} = ? OR ${DatabaseTables.nutritionLogSyncStatus} = ?',
+        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        orderBy: '${DatabaseTables.nutritionLogUpdatedAt} ASC',
+      );
+      return maps.map(NutritionLogModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get pending sync logs: $e');
     }
   }
 
@@ -217,6 +242,99 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   }
 
   @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.nutritionLogs,
+        <String, Object?>{
+          DatabaseTables.nutritionLogServerId: serverId,
+          DatabaseTables.nutritionLogSyncStatus: 'synced',
+          DatabaseTables.nutritionLogLastSyncedAt: syncedAt.toIso8601String(),
+          DatabaseTables.nutritionLogLastSyncError: null,
+        },
+        where: '${DatabaseTables.nutritionLogId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark nutrition log as synced: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.nutritionLogs,
+        <String, Object?>{
+          DatabaseTables.nutritionLogSyncStatus: 'pendingUpload',
+          DatabaseTables.nutritionLogLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.nutritionLogId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark nutrition log as pending upload: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.nutritionLogs,
+        <String, Object?>{
+          DatabaseTables.nutritionLogSyncStatus: 'pendingUpdate',
+          DatabaseTables.nutritionLogLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.nutritionLogId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark nutrition log as pending update: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> replaceAllLogs(List<NutritionLogModel> logs) async {
+    try {
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(DatabaseTables.nutritionLogs);
+
+        final batch = txn.batch();
+        for (final log in logs) {
+          batch.insert(
+            DatabaseTables.nutritionLogs,
+            log.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to replace all nutrition logs: $e');
+    }
+  }
+
+  @override
   Future<void> deleteLog(String id) async {
     try {
       final db = await databaseHelper.database;
@@ -234,14 +352,13 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   Future<void> deleteLogsByDate(DateTime date) async {
     try {
       final db = await databaseHelper.database;
-      
-      // Normalize date to start and end of day
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
       await db.delete(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
+        where:
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
         whereArgs: [
           startOfDay.toIso8601String(),
           endOfDay.toIso8601String(),
@@ -280,20 +397,18 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   Future<Map<String, double>> getDailyMacros(DateTime date) async {
     try {
       final db = await databaseHelper.database;
-      
-      // Normalize date to start and end of day
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
       final result = await db.rawQuery('''
-        SELECT 
+        SELECT
           COALESCE(SUM(${DatabaseTables.nutritionLogCarbs}), 0) as totalCarbs,
           COALESCE(SUM(${DatabaseTables.nutritionLogProtein}), 0) as totalProtein,
           COALESCE(SUM(${DatabaseTables.nutritionLogFat}), 0) as totalFat,
           COALESCE(SUM(${DatabaseTables.nutritionLogCalories}), 0) as totalCalories,
           COUNT(*) as logsCount
         FROM ${DatabaseTables.nutritionLogs}
-        WHERE ${DatabaseTables.nutritionLogDate} >= ? 
+        WHERE ${DatabaseTables.nutritionLogDate} >= ?
           AND ${DatabaseTables.nutritionLogDate} <= ?
       ''', [
         startOfDay.toIso8601String(),

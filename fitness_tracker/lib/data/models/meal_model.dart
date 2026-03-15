@@ -1,8 +1,9 @@
 import '../../core/constants/database_tables.dart';
+import '../../core/enums/sync_status.dart';
 import '../../core/utils/macro_calculator.dart';
+import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/meal.dart';
 
-/// Data model for Meal entity with database serialization
 class MealModel extends Meal {
   const MealModel({
     required super.id,
@@ -13,9 +14,10 @@ class MealModel extends Meal {
     required super.fatPer100g,
     required super.caloriesPer100g,
     required super.createdAt,
+    super.updatedAt,
+    super.syncMetadata,
   });
 
-  /// Create MealModel from Meal entity
   factory MealModel.fromEntity(Meal meal) {
     return MealModel(
       id: meal.id,
@@ -26,11 +28,15 @@ class MealModel extends Meal {
       fatPer100g: meal.fatPer100g,
       caloriesPer100g: meal.caloriesPer100g,
       createdAt: meal.createdAt,
+      updatedAt: meal.updatedAt,
+      syncMetadata: meal.syncMetadata,
     );
   }
 
-  /// Create MealModel from database map
   factory MealModel.fromMap(Map<String, dynamic> map) {
+    final createdAt = DateTime.parse(map[DatabaseTables.mealCreatedAt] as String);
+    final updatedAtRaw = map[DatabaseTables.mealUpdatedAt] as String?;
+
     return MealModel(
       id: map[DatabaseTables.mealId] as String,
       name: map[DatabaseTables.mealName] as String,
@@ -41,11 +47,22 @@ class MealModel extends Meal {
       fatPer100g: (map[DatabaseTables.mealFatPer100g] as num).toDouble(),
       caloriesPer100g:
           (map[DatabaseTables.mealCaloriesPer100g] as num).toDouble(),
-      createdAt: DateTime.parse(map[DatabaseTables.mealCreatedAt] as String),
+      createdAt: createdAt,
+      updatedAt:
+          updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
+      syncMetadata: EntitySyncMetadata(
+        serverId: map[DatabaseTables.mealServerId] as String?,
+        status: _syncStatusFromStorage(
+          map[DatabaseTables.mealSyncStatus] as String?,
+        ),
+        lastSyncedAt: _parseNullableDateTime(
+          map[DatabaseTables.mealLastSyncedAt] as String?,
+        ),
+        lastSyncError: map[DatabaseTables.mealLastSyncError] as String?,
+      ),
     );
   }
 
-  /// Convert MealModel to database map
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.mealId: id,
@@ -56,10 +73,15 @@ class MealModel extends Meal {
       DatabaseTables.mealFatPer100g: fatPer100g,
       DatabaseTables.mealCaloriesPer100g: caloriesPer100g,
       DatabaseTables.mealCreatedAt: createdAt.toIso8601String(),
+      DatabaseTables.mealUpdatedAt: updatedAt.toIso8601String(),
+      DatabaseTables.mealServerId: syncMetadata.serverId,
+      DatabaseTables.mealSyncStatus: syncMetadata.status.name,
+      DatabaseTables.mealLastSyncedAt:
+          syncMetadata.lastSyncedAt?.toIso8601String(),
+      DatabaseTables.mealLastSyncError: syncMetadata.lastSyncError,
     };
   }
 
-  /// Convert to JSON for serialization
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -70,17 +92,20 @@ class MealModel extends Meal {
       'fatPer100g': fatPer100g,
       'caloriesPer100g': caloriesPer100g,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'serverId': syncMetadata.serverId,
+      'syncStatus': syncMetadata.status.name,
+      'lastSyncedAt': syncMetadata.lastSyncedAt?.toIso8601String(),
+      'lastSyncError': syncMetadata.lastSyncError,
     };
   }
 
-  /// Validate calorie accuracy
   bool get hasValidCalories {
     final calculated = calculatedCalories;
     const tolerance = 5.0;
     return (caloriesPer100g - calculated).abs() <= tolerance;
   }
 
-  /// Calculate calories from macros using 4-4-9 rule
   @override
   double get calculatedCalories {
     return MacroCalculator.calculateCalories(
@@ -90,7 +115,6 @@ class MealModel extends Meal {
     );
   }
 
-  /// Throws if the model contains invalid nutritional data.
   void validateMacros() {
     if (name.trim().isEmpty) {
       throw ArgumentError('Meal name cannot be empty');
@@ -109,7 +133,6 @@ class MealModel extends Meal {
     }
   }
 
-  /// Log calorie discrepancy warning if validation fails
   void validateAndLogCalories() {
     if (!hasValidCalories) {
       final calculated = calculatedCalories;
@@ -125,7 +148,6 @@ class MealModel extends Meal {
     }
   }
 
-  /// Create a copy with updated fields
   @override
   MealModel copyWith({
     String? id,
@@ -136,6 +158,8 @@ class MealModel extends Meal {
     double? fatPer100g,
     double? caloriesPer100g,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
   }) {
     return MealModel(
       id: id ?? this.id,
@@ -146,10 +170,11 @@ class MealModel extends Meal {
       fatPer100g: fatPer100g ?? this.fatPer100g,
       caloriesPer100g: caloriesPer100g ?? this.caloriesPer100g,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncMetadata: syncMetadata ?? this.syncMetadata,
     );
   }
 
-  /// Create MealModel with auto-calculated calories from macros
   factory MealModel.withCalculatedMacros({
     required String id,
     required String name,
@@ -159,6 +184,8 @@ class MealModel extends Meal {
     double? fatPer100g,
     double? caloriesPer100g,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
   }) {
     if (caloriesPer100g != null) {
       if (carbsPer100g == null &&
@@ -199,6 +226,8 @@ class MealModel extends Meal {
           fat: fatPer100g ?? 0,
         );
 
+    final effectiveCreatedAt = createdAt ?? DateTime.now();
+
     return MealModel(
       id: id,
       name: name,
@@ -207,7 +236,24 @@ class MealModel extends Meal {
       proteinPer100g: proteinPer100g ?? 0,
       fatPer100g: fatPer100g ?? 0,
       caloriesPer100g: finalCalories,
-      createdAt: createdAt ?? DateTime.now(),
+      createdAt: effectiveCreatedAt,
+      updatedAt: updatedAt ?? effectiveCreatedAt,
+      syncMetadata: syncMetadata,
+    );
+  }
+
+  static DateTime? _parseNullableDateTime(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    return DateTime.parse(value);
+  }
+
+  static SyncStatus _syncStatusFromStorage(String? value) {
+    return SyncStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => SyncStatus.localOnly,
     );
   }
 }
