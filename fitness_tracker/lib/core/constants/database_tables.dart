@@ -17,6 +17,11 @@ class DatabaseTables {
   static const String targetUnit = 'unit';
   static const String targetPeriod = 'period';
   static const String targetCreatedAt = 'created_at';
+  static const String targetUpdatedAt = 'updated_at';
+  static const String targetServerId = 'server_id';
+  static const String targetSyncStatus = 'sync_status';
+  static const String targetLastSyncedAt = 'last_synced_at';
+  static const String targetLastSyncError = 'last_sync_error';
 
   static const String legacyTargetMuscleGroup = 'muscle_group';
   static const String legacyTargetWeeklyGoal = 'weekly_goal';
@@ -38,6 +43,11 @@ class DatabaseTables {
   static const String exerciseName = 'name';
   static const String exerciseMuscleGroups = 'muscle_groups';
   static const String exerciseCreatedAt = 'created_at';
+  static const String exerciseUpdatedAt = 'updated_at';
+  static const String exerciseServerId = 'server_id';
+  static const String exerciseSyncStatus = 'sync_status';
+  static const String exerciseLastSyncedAt = 'last_synced_at';
+  static const String exerciseLastSyncError = 'last_sync_error';
 
   static const String mealId = 'id';
   static const String mealName = 'name';

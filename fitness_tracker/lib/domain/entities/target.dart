@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'entity_sync_metadata.dart';
+
 enum TargetType {
   muscleSets,
   macro,
@@ -24,6 +26,8 @@ class Target extends Equatable {
   final String unit;
   final TargetPeriod period;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final EntitySyncMetadata syncMetadata;
 
   const Target({
     required this.id,
@@ -33,7 +37,10 @@ class Target extends Equatable {
     required this.unit,
     required this.period,
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
+  })  : updatedAt = updatedAt ?? createdAt,
+        syncMetadata = syncMetadata ?? const EntitySyncMetadata();
 
   bool get isMuscleTarget => type == TargetType.muscleSets;
   bool get isMacroTarget => type == TargetType.macro;
@@ -58,6 +65,8 @@ class Target extends Equatable {
     String? unit,
     TargetPeriod? period,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    EntitySyncMetadata? syncMetadata,
   }) {
     return Target(
       id: id ?? this.id,
@@ -67,6 +76,8 @@ class Target extends Equatable {
       unit: unit ?? this.unit,
       period: period ?? this.period,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncMetadata: syncMetadata ?? this.syncMetadata,
     );
   }
 
@@ -79,5 +90,7 @@ class Target extends Equatable {
         unit,
         period,
         createdAt,
+        updatedAt,
+        syncMetadata,
       ];
 }

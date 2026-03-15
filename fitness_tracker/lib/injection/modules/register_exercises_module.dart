@@ -1,7 +1,12 @@
 import 'package:get_it/get_it.dart';
 
 import '../../data/datasources/local/exercise_local_datasource.dart';
+import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
+import '../../data/datasources/remote/exercise_remote_datasource.dart';
+import '../../data/datasources/remote/noop_exercise_remote_datasource.dart';
 import '../../data/repositories/exercise_repository_impl.dart';
+import '../../data/sync/exercise_sync_coordinator.dart';
+import '../../data/sync/exercise_sync_coordinator_impl.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/usecases/exercises/add_exercise.dart';
 import '../../domain/usecases/exercises/delete_exercise.dart';
@@ -33,10 +38,26 @@ void registerExercisesModule(GetIt sl) {
   sl.registerLazySingleton(() => SeedExercises(sl()));
 
   sl.registerLazySingleton<ExerciseRepository>(
-    () => ExerciseRepositoryImpl(localDataSource: sl()),
+    () => ExerciseRepositoryImpl(
+      localDataSource: sl(),
+      remoteDataSource: sl(),
+      syncCoordinator: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton<ExerciseSyncCoordinator>(
+    () => ExerciseSyncCoordinatorImpl(
+      localDataSource: sl(),
+      remoteDataSource: sl(),
+      pendingSyncDeleteLocalDataSource: sl(),
+    ),
   );
 
   sl.registerLazySingleton<ExerciseLocalDataSource>(
     () => ExerciseLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<ExerciseRemoteDataSource>(
+    NoopExerciseRemoteDataSource.new,
   );
 }

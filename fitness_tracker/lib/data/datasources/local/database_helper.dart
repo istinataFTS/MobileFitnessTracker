@@ -52,6 +52,11 @@ class DatabaseHelper {
         ${DatabaseTables.targetUnit} TEXT NOT NULL,
         ${DatabaseTables.targetPeriod} TEXT NOT NULL,
         ${DatabaseTables.targetCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.targetUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.targetServerId} TEXT,
+        ${DatabaseTables.targetSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.targetLastSyncedAt} TEXT,
+        ${DatabaseTables.targetLastSyncError} TEXT,
         UNIQUE(
           ${DatabaseTables.targetType},
           ${DatabaseTables.targetCategoryKey},
@@ -82,7 +87,12 @@ class DatabaseHelper {
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
         ${DatabaseTables.exerciseName} TEXT NOT NULL UNIQUE,
         ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
-        ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL
+        ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.exerciseUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.exerciseServerId} TEXT,
+        ${DatabaseTables.exerciseSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.exerciseLastSyncedAt} TEXT,
+        ${DatabaseTables.exerciseLastSyncError} TEXT
       )
     ''');
 
@@ -345,6 +355,14 @@ class DatabaseHelper {
       await _createPendingSyncDeletesTable(db);
     }
 
+    if (oldVersion < 11) {
+      await _migrateTargetsForRemoteReadiness(db);
+    }
+
+    if (oldVersion < 12) {
+      await _migrateExercisesForRemoteReadiness(db);
+    }
+
     await _createIndexes(db);
   }
 
@@ -443,6 +461,72 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _migrateTargetsForRemoteReadiness(Database db) async {
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.targets}
+      ADD COLUMN ${DatabaseTables.targetUpdatedAt} TEXT
+    ''');
+
+    await db.execute('''
+      UPDATE ${DatabaseTables.targets}
+      SET ${DatabaseTables.targetUpdatedAt} = ${DatabaseTables.targetCreatedAt}
+      WHERE ${DatabaseTables.targetUpdatedAt} IS NULL
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.targets}
+      ADD COLUMN ${DatabaseTables.targetServerId} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.targets}
+      ADD COLUMN ${DatabaseTables.targetSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.targets}
+      ADD COLUMN ${DatabaseTables.targetLastSyncedAt} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.targets}
+      ADD COLUMN ${DatabaseTables.targetLastSyncError} TEXT
+    ''');
+  }
+
+  Future<void> _migrateExercisesForRemoteReadiness(Database db) async {
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.exercises}
+      ADD COLUMN ${DatabaseTables.exerciseUpdatedAt} TEXT
+    ''');
+
+    await db.execute('''
+      UPDATE ${DatabaseTables.exercises}
+      SET ${DatabaseTables.exerciseUpdatedAt} = ${DatabaseTables.exerciseCreatedAt}
+      WHERE ${DatabaseTables.exerciseUpdatedAt} IS NULL
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.exercises}
+      ADD COLUMN ${DatabaseTables.exerciseServerId} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.exercises}
+      ADD COLUMN ${DatabaseTables.exerciseSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.exercises}
+      ADD COLUMN ${DatabaseTables.exerciseLastSyncedAt} TEXT
+    ''');
+
+    await db.execute('''
+      ALTER TABLE ${DatabaseTables.exercises}
+      ADD COLUMN ${DatabaseTables.exerciseLastSyncError} TEXT
+    ''');
+  }
+
   Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
@@ -455,6 +539,21 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_category_key
       ON ${DatabaseTables.targets}(${DatabaseTables.targetCategoryKey})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_updated_at
+      ON ${DatabaseTables.targets}(${DatabaseTables.targetUpdatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_sync_status
+      ON ${DatabaseTables.targets}(${DatabaseTables.targetSyncStatus})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_server_id
+      ON ${DatabaseTables.targets}(${DatabaseTables.targetServerId})
     ''');
 
     await db.execute('''
@@ -490,6 +589,21 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_exercises_name
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_exercises_updated_at
+      ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseUpdatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_exercises_sync_status
+      ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseSyncStatus})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_exercises_server_id
+      ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseServerId})
     ''');
 
     await db.execute('''

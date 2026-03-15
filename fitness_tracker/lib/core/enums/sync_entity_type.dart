@@ -1,8 +1,8 @@
 enum SyncEntityType {
   workoutSet,
+  target,
   exercise,
   meal,
   nutritionLog,
-  target,
   muscleStimulus,
 }

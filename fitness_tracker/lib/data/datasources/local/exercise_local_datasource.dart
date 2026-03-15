@@ -1,26 +1,36 @@
 import 'package:sqflite/sqflite.dart';
+
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../models/exercise_model.dart';
 import 'database_helper.dart';
 
-/// Local data source interface for Exercise operations
 abstract class ExerciseLocalDataSource {
   Future<List<ExerciseModel>> getAllExercises();
   Future<ExerciseModel?> getExerciseById(String id);
   Future<ExerciseModel?> getExerciseByName(String name);
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup);
+  Future<List<ExerciseModel>> getPendingSyncExercises();
   Future<void> insertExercise(ExerciseModel exercise);
   Future<void> updateExercise(ExerciseModel exercise);
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  });
+  Future<void> markAsPendingUpload(String localId, {String? errorMessage});
+  Future<void> markAsPendingUpdate(String localId, {String? errorMessage});
+  Future<void> replaceAllExercises(List<ExerciseModel> exercises);
   Future<void> deleteExercise(String id);
   Future<void> clearAllExercises();
 }
 
-/// SQLite implementation of Exercise local data source
 class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  const ExerciseLocalDataSourceImpl({required this.databaseHelper});
+  const ExerciseLocalDataSourceImpl({
+    required this.databaseHelper,
+  });
 
   @override
   Future<List<ExerciseModel>> getAllExercises() async {
@@ -30,7 +40,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         DatabaseTables.exercises,
         orderBy: '${DatabaseTables.exerciseName} ASC',
       );
-      return maps.map((map) => ExerciseModel.fromMap(map)).toList();
+      return maps.map(ExerciseModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercises: $e');
     }
@@ -47,7 +57,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         limit: 1,
       );
 
-      if (maps.isEmpty) return null;
+      if (maps.isEmpty) {
+        return null;
+      }
+
       return ExerciseModel.fromMap(maps.first);
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercise: $e');
@@ -65,7 +78,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         limit: 1,
       );
 
-      if (maps.isEmpty) return null;
+      if (maps.isEmpty) {
+        return null;
+      }
+
       return ExerciseModel.fromMap(maps.first);
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercise by name: $e');
@@ -76,17 +92,33 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup) async {
     try {
       final db = await databaseHelper.database;
-      // SQLite doesn't have native JSON querying, so we use LIKE with wildcards
-      // This searches for the muscle group within the JSON array
       final maps = await db.query(
         DatabaseTables.exercises,
         where: '${DatabaseTables.exerciseMuscleGroups} LIKE ?',
         whereArgs: ['%"$muscleGroup"%'],
         orderBy: '${DatabaseTables.exerciseName} ASC',
       );
-      return maps.map((map) => ExerciseModel.fromMap(map)).toList();
+      return maps.map(ExerciseModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercises for muscle: $e');
+    }
+  }
+
+  @override
+  Future<List<ExerciseModel>> getPendingSyncExercises() async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.exercises,
+        where:
+            '${DatabaseTables.exerciseSyncStatus} = ? OR ${DatabaseTables.exerciseSyncStatus} = ?',
+        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        orderBy: '${DatabaseTables.exerciseUpdatedAt} ASC',
+      );
+
+      return maps.map(ExerciseModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get pending sync exercises: $e');
     }
   }
 
@@ -116,6 +148,99 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to update exercise: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.exercises,
+        <String, Object?>{
+          DatabaseTables.exerciseServerId: serverId,
+          DatabaseTables.exerciseSyncStatus: 'synced',
+          DatabaseTables.exerciseLastSyncedAt: syncedAt.toIso8601String(),
+          DatabaseTables.exerciseLastSyncError: null,
+        },
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark exercise as synced: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.exercises,
+        <String, Object?>{
+          DatabaseTables.exerciseSyncStatus: 'pendingUpload',
+          DatabaseTables.exerciseLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark exercise as pending upload: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.exercises,
+        <String, Object?>{
+          DatabaseTables.exerciseSyncStatus: 'pendingUpdate',
+          DatabaseTables.exerciseLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark exercise as pending update: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> replaceAllExercises(List<ExerciseModel> exercises) async {
+    try {
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(DatabaseTables.exercises);
+
+        final batch = txn.batch();
+        for (final exercise in exercises) {
+          batch.insert(
+            DatabaseTables.exercises,
+            exercise.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to replace all exercises: $e');
     }
   }
 

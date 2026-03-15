@@ -1,86 +1,133 @@
 import 'dart:convert';
+
 import '../../core/constants/database_tables.dart';
+import '../../core/enums/sync_status.dart';
+import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/exercise.dart';
 
-/// Data model for Exercise with database serialization
-/// Extends Exercise entity to maintain clean architecture separation
 class ExerciseModel extends Exercise {
   const ExerciseModel({
     required super.id,
     required super.name,
     required super.muscleGroups,
     required super.createdAt,
+    super.updatedAt,
+    super.syncMetadata,
   });
 
-  /// Create model from entity
   factory ExerciseModel.fromEntity(Exercise exercise) {
     return ExerciseModel(
       id: exercise.id,
       name: exercise.name,
       muscleGroups: exercise.muscleGroups,
       createdAt: exercise.createdAt,
+      updatedAt: exercise.updatedAt,
+      syncMetadata: exercise.syncMetadata,
     );
   }
 
-  /// Create model from database map
-  /// Decodes muscle_groups from JSON string
   factory ExerciseModel.fromMap(Map<String, dynamic> map) {
+    final createdAt = DateTime.parse(
+      map[DatabaseTables.exerciseCreatedAt] as String,
+    );
+    final updatedAtRaw = map[DatabaseTables.exerciseUpdatedAt] as String?;
+
     return ExerciseModel(
       id: map[DatabaseTables.exerciseId] as String,
       name: map[DatabaseTables.exerciseName] as String,
       muscleGroups: _decodeMuscleGroups(
         map[DatabaseTables.exerciseMuscleGroups] as String,
       ),
-      createdAt: DateTime.parse(
-        map[DatabaseTables.exerciseCreatedAt] as String,
+      createdAt: createdAt,
+      updatedAt:
+          updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
+      syncMetadata: EntitySyncMetadata(
+        serverId: map[DatabaseTables.exerciseServerId] as String?,
+        status: _syncStatusFromStorage(
+          map[DatabaseTables.exerciseSyncStatus] as String?,
+        ),
+        lastSyncedAt: _parseNullableDateTime(
+          map[DatabaseTables.exerciseLastSyncedAt] as String?,
+        ),
+        lastSyncError: map[DatabaseTables.exerciseLastSyncError] as String?,
       ),
     );
   }
 
-  /// Convert model to database map
-  /// Encodes muscle_groups to JSON string for storage
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.exerciseId: id,
       DatabaseTables.exerciseName: name,
       DatabaseTables.exerciseMuscleGroups: _encodeMuscleGroups(muscleGroups),
       DatabaseTables.exerciseCreatedAt: createdAt.toIso8601String(),
+      DatabaseTables.exerciseUpdatedAt: updatedAt.toIso8601String(),
+      DatabaseTables.exerciseServerId: syncMetadata.serverId,
+      DatabaseTables.exerciseSyncStatus: syncMetadata.status.name,
+      DatabaseTables.exerciseLastSyncedAt:
+          syncMetadata.lastSyncedAt?.toIso8601String(),
+      DatabaseTables.exerciseLastSyncError: syncMetadata.lastSyncError,
     };
   }
 
-  /// Create model from JSON (API compatibility)
   factory ExerciseModel.fromJson(Map<String, dynamic> json) {
+    final createdAt = DateTime.parse(json['createdAt'] as String);
+    final updatedAtRaw = json['updatedAt'] as String?;
+
     return ExerciseModel(
       id: json['id'] as String,
       name: json['name'] as String,
       muscleGroups: (json['muscleGroups'] as List).cast<String>(),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: createdAt,
+      updatedAt:
+          updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
+      syncMetadata: EntitySyncMetadata(
+        serverId: json['serverId'] as String?,
+        status: _syncStatusFromStorage(json['syncStatus'] as String?),
+        lastSyncedAt: _parseNullableDateTime(json['lastSyncedAt'] as String?),
+        lastSyncError: json['lastSyncError'] as String?,
+      ),
     );
   }
 
-  /// Convert model to JSON (API compatibility)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'muscleGroups': muscleGroups,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'serverId': syncMetadata.serverId,
+      'syncStatus': syncMetadata.status.name,
+      'lastSyncedAt': syncMetadata.lastSyncedAt?.toIso8601String(),
+      'lastSyncError': syncMetadata.lastSyncError,
     };
   }
 
-  /// Encode muscle groups list to JSON string for database storage
   static String _encodeMuscleGroups(List<String> muscleGroups) {
     return jsonEncode(muscleGroups);
   }
 
-  /// Decode JSON string from database to muscle groups list
   static List<String> _decodeMuscleGroups(String json) {
     try {
       final decoded = jsonDecode(json) as List;
       return decoded.map((e) => e.toString()).toList();
-    } catch (e) {
-      // Return empty list if decoding fails (defensive programming)
-      return [];
+    } catch (_) {
+      return const <String>[];
     }
+  }
+
+  static DateTime? _parseNullableDateTime(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    return DateTime.parse(value);
+  }
+
+  static SyncStatus _syncStatusFromStorage(String? value) {
+    return SyncStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => SyncStatus.localOnly,
+    );
   }
 }

@@ -1,19 +1,36 @@
 import 'package:dartz/dartz.dart';
+
+import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../entities/exercise.dart';
 
-
 abstract class ExerciseRepository {
-  /// Get all exercises from storage
-  Future<Either<Failure, List<Exercise>>> getAllExercises();
-  Future<Either<Failure, Exercise?>> getExerciseById(String id);
-  Future<Either<Failure, Exercise?>> getExerciseByName(String name);
+  Future<Either<Failure, List<Exercise>>> getAllExercises({
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
+
+  Future<Either<Failure, Exercise?>> getExerciseById(
+    String id, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
+
+  Future<Either<Failure, Exercise?>> getExerciseByName(
+    String name, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
+
   Future<Either<Failure, List<Exercise>>> getExercisesForMuscle(
-    String muscleGroup,
-  );
+    String muscleGroup, {
+    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
+  });
 
   Future<Either<Failure, void>> addExercise(Exercise exercise);
+
   Future<Either<Failure, void>> updateExercise(Exercise exercise);
+
   Future<Either<Failure, void>> deleteExercise(String id);
+
   Future<Either<Failure, void>> clearAllExercises();
+
+  Future<Either<Failure, void>> syncPendingExercises();
 }

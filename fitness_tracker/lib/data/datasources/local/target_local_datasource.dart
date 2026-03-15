@@ -14,8 +14,17 @@ abstract class TargetLocalDataSource {
     String categoryKey,
     TargetPeriod period,
   );
+  Future<List<TargetModel>> getPendingSyncTargets();
   Future<void> insertTarget(TargetModel target);
   Future<void> updateTarget(TargetModel target);
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  });
+  Future<void> markAsPendingUpload(String localId, {String? errorMessage});
+  Future<void> markAsPendingUpdate(String localId, {String? errorMessage});
+  Future<void> replaceAllTargets(List<TargetModel> targets);
   Future<void> deleteTarget(String id);
   Future<void> clearAllTargets();
 }
@@ -94,6 +103,24 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   }
 
   @override
+  Future<List<TargetModel>> getPendingSyncTargets() async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.targets,
+        where:
+            '${DatabaseTables.targetSyncStatus} = ? OR ${DatabaseTables.targetSyncStatus} = ?',
+        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        orderBy: '${DatabaseTables.targetUpdatedAt} ASC',
+      );
+
+      return maps.map(TargetModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get pending sync targets: $e');
+    }
+  }
+
+  @override
   Future<void> insertTarget(TargetModel target) async {
     try {
       final db = await databaseHelper.database;
@@ -119,6 +146,99 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to update target: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.targets,
+        <String, Object?>{
+          DatabaseTables.targetServerId: serverId,
+          DatabaseTables.targetSyncStatus: 'synced',
+          DatabaseTables.targetLastSyncedAt: syncedAt.toIso8601String(),
+          DatabaseTables.targetLastSyncError: null,
+        },
+        where: '${DatabaseTables.targetId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark target as synced: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.targets,
+        <String, Object?>{
+          DatabaseTables.targetSyncStatus: 'pendingUpload',
+          DatabaseTables.targetLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.targetId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark target as pending upload: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.targets,
+        <String, Object?>{
+          DatabaseTables.targetSyncStatus: 'pendingUpdate',
+          DatabaseTables.targetLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.targetId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark target as pending update: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> replaceAllTargets(List<TargetModel> targets) async {
+    try {
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(DatabaseTables.targets);
+
+        final batch = txn.batch();
+        for (final target in targets) {
+          batch.insert(
+            DatabaseTables.targets,
+            target.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to replace all targets: $e');
     }
   }
 

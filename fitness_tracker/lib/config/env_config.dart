@@ -52,9 +52,11 @@ class EnvConfig {
   /// Version 8: Reworked targets into typed goals (training + macro targets).
   /// Version 9: Added remote-ready sync metadata columns to workout_sets.
   /// Version 10: Added pending delete sync queue for durable remote deletions.
+  /// Version 11: Added remote-ready sync metadata columns to targets.
+  /// Version 12: Added remote-ready sync metadata columns to exercises.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 10,
+    defaultValue: 12,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(
