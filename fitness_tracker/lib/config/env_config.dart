@@ -51,9 +51,10 @@ class EnvConfig {
   /// Version 7: Added serving_size_grams column to meals table.
   /// Version 8: Reworked targets into typed goals (training + macro targets).
   /// Version 9: Added remote-ready sync metadata columns to workout_sets.
+  /// Version 10: Added pending delete sync queue for durable remote deletions.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 9,
+    defaultValue: 10,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

@@ -145,6 +145,18 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.pendingSyncDeletes} (
+        ${DatabaseTables.pendingDeleteId} TEXT PRIMARY KEY,
+        ${DatabaseTables.pendingDeleteEntityType} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteLocalEntityId} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteServerEntityId} TEXT,
+        ${DatabaseTables.pendingDeleteCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteLastAttemptAt} TEXT,
+        ${DatabaseTables.pendingDeleteErrorMessage} TEXT
+      )
+    ''');
+
     await _createIndexes(db);
   }
 
@@ -329,11 +341,17 @@ class DatabaseHelper {
       await _migrateWorkoutSetsForRemoteReadiness(db);
     }
 
+    if (oldVersion < 10) {
+      await _createPendingSyncDeletesTable(db);
+    }
+
     await _createIndexes(db);
   }
 
   Future<void> _migrateTargetsToTypedGoals(Database db) async {
-    await db.execute('ALTER TABLE ${DatabaseTables.targets} RENAME TO targets_legacy');
+    await db.execute(
+      'ALTER TABLE ${DatabaseTables.targets} RENAME TO targets_legacy',
+    );
 
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
@@ -358,12 +376,14 @@ class DatabaseHelper {
       await db.insert(
         DatabaseTables.targets,
         <String, Object?>{
-          DatabaseTables.targetId: legacyTarget[DatabaseTables.targetId] as String,
+          DatabaseTables.targetId:
+              legacyTarget[DatabaseTables.targetId] as String,
           DatabaseTables.targetType: 'muscle_sets',
           DatabaseTables.targetCategoryKey:
               legacyTarget[DatabaseTables.legacyTargetMuscleGroup] as String,
           DatabaseTables.targetValue:
-              (legacyTarget[DatabaseTables.legacyTargetWeeklyGoal] as num).toDouble(),
+              (legacyTarget[DatabaseTables.legacyTargetWeeklyGoal] as num)
+                  .toDouble(),
           DatabaseTables.targetUnit: 'sets',
           DatabaseTables.targetPeriod: 'weekly',
           DatabaseTables.targetCreatedAt:
@@ -406,6 +426,20 @@ class DatabaseHelper {
     await db.execute('''
       ALTER TABLE ${DatabaseTables.workoutSets}
       ADD COLUMN ${DatabaseTables.setLastSyncError} TEXT
+    ''');
+  }
+
+  Future<void> _createPendingSyncDeletesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ${DatabaseTables.pendingSyncDeletes} (
+        ${DatabaseTables.pendingDeleteId} TEXT PRIMARY KEY,
+        ${DatabaseTables.pendingDeleteEntityType} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteLocalEntityId} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteServerEntityId} TEXT,
+        ${DatabaseTables.pendingDeleteCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.pendingDeleteLastAttemptAt} TEXT,
+        ${DatabaseTables.pendingDeleteErrorMessage} TEXT
+      )
     ''');
   }
 
@@ -504,6 +538,21 @@ class DatabaseHelper {
         ${DatabaseTables.stimulusMuscleGroup},
         ${DatabaseTables.stimulusDate}
       )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_pending_sync_deletes_entity_type
+      ON ${DatabaseTables.pendingSyncDeletes}(${DatabaseTables.pendingDeleteEntityType})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_pending_sync_deletes_created_at
+      ON ${DatabaseTables.pendingSyncDeletes}(${DatabaseTables.pendingDeleteCreatedAt})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_pending_sync_deletes_local_entity_id
+      ON ${DatabaseTables.pendingSyncDeletes}(${DatabaseTables.pendingDeleteLocalEntityId})
     ''');
   }
 

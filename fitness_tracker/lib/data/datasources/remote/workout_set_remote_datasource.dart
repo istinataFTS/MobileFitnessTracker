@@ -9,5 +9,8 @@ abstract class WorkoutSetRemoteDataSource {
 
   Future<WorkoutSet> upsertSet(WorkoutSet set);
 
-  Future<void> deleteSet(String id);
+  Future<void> deleteSet({
+    required String localId,
+    String? serverId,
+  });
 }

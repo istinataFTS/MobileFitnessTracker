@@ -23,5 +23,8 @@ class NoopWorkoutSetRemoteDataSource implements WorkoutSetRemoteDataSource {
   }
 
   @override
-  Future<void> deleteSet(String id) async {}
+  Future<void> deleteSet({
+    required String localId,
+    String? serverId,
+  }) async {}
 }

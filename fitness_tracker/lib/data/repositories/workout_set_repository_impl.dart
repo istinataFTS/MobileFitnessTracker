@@ -1,22 +1,23 @@
 import 'package:dartz/dartz.dart';
 
 import '../../core/enums/data_source_preference.dart';
-import '../../core/enums/sync_status.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
-import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/workout_set.dart';
 import '../../domain/repositories/workout_set_repository.dart';
 import '../datasources/local/workout_set_local_datasource.dart';
 import '../datasources/remote/workout_set_remote_datasource.dart';
+import '../sync/workout_set_sync_coordinator.dart';
 
 class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   final WorkoutSetLocalDataSource localDataSource;
   final WorkoutSetRemoteDataSource remoteDataSource;
+  final WorkoutSetSyncCoordinator syncCoordinator;
 
   const WorkoutSetRepositoryImpl({
     required this.localDataSource,
     required this.remoteDataSource,
+    required this.syncCoordinator,
   });
 
   @override
@@ -117,101 +118,21 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   @override
   Future<Either<Failure, void>> addSet(WorkoutSet set) {
     return RepositoryGuard.run(() async {
-      final now = DateTime.now();
-
-      final localSet = set.copyWith(
-        updatedAt: now,
-        syncMetadata: set.syncMetadata.copyWith(
-          status: remoteDataSource.isConfigured
-              ? SyncStatus.pendingUpload
-              : SyncStatus.localOnly,
-          clearLastSyncError: true,
-        ),
-      );
-
-      await localDataSource.addSet(localSet);
-
-      if (!remoteDataSource.isConfigured) {
-        return;
-      }
-
-      try {
-        final remoteSet = await remoteDataSource.upsertSet(localSet);
-        await localDataSource.markAsSynced(
-          localId: localSet.id,
-          serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-          syncedAt: DateTime.now(),
-        );
-      } catch (error) {
-        await localDataSource.markAsPendingUpload(
-          localSet.id,
-          errorMessage: error.toString(),
-        );
-      }
+      await syncCoordinator.persistAddedSet(set);
     });
   }
 
   @override
   Future<Either<Failure, void>> updateSet(WorkoutSet set) {
     return RepositoryGuard.run(() async {
-      final existingLocal = await localDataSource.getSetById(set.id);
-      final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
-
-      final localSet = set.copyWith(
-        updatedAt: DateTime.now(),
-        syncMetadata: EntitySyncMetadata(
-          serverId: existingLocal?.syncMetadata.serverId ?? set.syncMetadata.serverId,
-          status: remoteDataSource.isConfigured
-              ? (wasPreviouslySynced
-                  ? SyncStatus.pendingUpdate
-                  : SyncStatus.pendingUpload)
-              : SyncStatus.localOnly,
-          lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
-        ),
-      );
-
-      await localDataSource.updateSet(localSet);
-
-      if (!remoteDataSource.isConfigured) {
-        return;
-      }
-
-      try {
-        final remoteSet = await remoteDataSource.upsertSet(localSet);
-        await localDataSource.markAsSynced(
-          localId: localSet.id,
-          serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-          syncedAt: DateTime.now(),
-        );
-      } catch (error) {
-        if (wasPreviouslySynced) {
-          await localDataSource.markAsPendingUpdate(
-            localSet.id,
-            errorMessage: error.toString(),
-          );
-        } else {
-          await localDataSource.markAsPendingUpload(
-            localSet.id,
-            errorMessage: error.toString(),
-          );
-        }
-      }
+      await syncCoordinator.persistUpdatedSet(set);
     });
   }
 
   @override
   Future<Either<Failure, void>> deleteSet(String id) {
     return RepositoryGuard.run(() async {
-      await localDataSource.deleteSet(id);
-
-      if (remoteDataSource.isConfigured) {
-        try {
-          await remoteDataSource.deleteSet(id);
-        } catch (_) {
-          // Intentionally ignored for now.
-          // A later slice should introduce delete tombstones for reliable remote sync.
-        }
-      }
+      await syncCoordinator.persistDeletedSet(id);
     });
   }
 
@@ -225,20 +146,7 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   @override
   Future<Either<Failure, void>> syncPendingSets() {
     return RepositoryGuard.run(() async {
-      if (!remoteDataSource.isConfigured) {
-        return;
-      }
-
-      final pendingSets = await localDataSource.getPendingSyncSets();
-
-      for (final set in pendingSets) {
-        final remoteSet = await remoteDataSource.upsertSet(set);
-        await localDataSource.markAsSynced(
-          localId: set.id,
-          serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-          syncedAt: DateTime.now(),
-        );
-      }
+      await syncCoordinator.syncPendingChanges();
     });
   }
 

@@ -1,10 +1,14 @@
 import 'package:get_it/get_it.dart';
 
+import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
+import '../../data/datasources/local/pending_sync_delete_local_datasource_impl.dart';
 import '../../data/datasources/local/workout_set_local_datasource.dart';
 import '../../data/datasources/local/workout_set_local_datasource_impl.dart';
 import '../../data/datasources/remote/noop_workout_set_remote_datasource.dart';
 import '../../data/datasources/remote/workout_set_remote_datasource.dart';
 import '../../data/repositories/workout_set_repository_impl.dart';
+import '../../data/sync/workout_set_sync_coordinator.dart';
+import '../../data/sync/workout_set_sync_coordinator_impl.dart';
 import '../../domain/repositories/workout_set_repository.dart';
 import '../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../domain/usecases/workout_sets/delete_workout_set.dart';
@@ -39,11 +43,24 @@ void registerWorkoutModule(GetIt sl) {
     () => WorkoutSetRepositoryImpl(
       localDataSource: sl(),
       remoteDataSource: sl(),
+      syncCoordinator: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton<WorkoutSetSyncCoordinator>(
+    () => WorkoutSetSyncCoordinatorImpl(
+      localDataSource: sl(),
+      remoteDataSource: sl(),
+      pendingSyncDeleteLocalDataSource: sl(),
     ),
   );
 
   sl.registerLazySingleton<WorkoutSetLocalDataSource>(
     () => WorkoutSetLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
+  sl.registerLazySingleton<PendingSyncDeleteLocalDataSource>(
+    () => PendingSyncDeleteLocalDataSourceImpl(databaseHelper: sl()),
   );
 
   sl.registerLazySingleton<WorkoutSetRemoteDataSource>(
