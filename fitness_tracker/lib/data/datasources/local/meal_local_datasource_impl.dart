@@ -1,105 +1,34 @@
 import 'package:sqflite/sqflite.dart';
+
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../models/meal_model.dart';
-import '../../../domain/entities/meal.dart';
 import 'database_helper.dart';
 import 'meal_local_datasource.dart';
 
-/// Implementation of MealLocalDataSource using SQLite
 class MealLocalDataSourceImpl implements MealLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  MealLocalDataSourceImpl({required this.databaseHelper});
+  const MealLocalDataSourceImpl({
+    required this.databaseHelper,
+  });
 
   @override
-  Future<List<Meal>> getAllMeals() async {
+  Future<List<MealModel>> getAllMeals() async {
     try {
       final db = await databaseHelper.database;
-      final maps = await db.query(DatabaseTables.meals);
-      return maps.map((map) => MealModel.fromMap(map)).toList();
+      final maps = await db.query(
+        DatabaseTables.meals,
+        orderBy: '${DatabaseTables.mealName} ASC',
+      );
+      return maps.map(MealModel.fromMap).toList();
     } catch (e) {
       throw CacheDatabaseException('Failed to get all meals: $e');
     }
   }
 
   @override
-  Future<Meal?> getMealByName(String name) async {
-    try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.meals,
-        where: 'LOWER(${DatabaseTables.mealName}) = LOWER(?)',
-        whereArgs: [name],
-        limit: 1,
-      );
-      if (maps.isEmpty) return null;
-      return MealModel.fromMap(maps.first);
-    } catch (e) {
-      throw CacheDatabaseException('Failed to get meal by name: $e');
-    }
-  }
-
-  @override
-  Future<List<Meal>> searchMealsByName(String searchTerm) async {
-    try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.meals,
-        where: 'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?)',
-        whereArgs: ['%$searchTerm%'],
-        orderBy: DatabaseTables.mealName,
-      );
-      return maps.map((map) => MealModel.fromMap(map)).toList();
-    } catch (e) {
-      throw CacheDatabaseException('Failed to search meals: $e');
-    }
-  }
-
-  @override
-  Future<List<Meal>> getRecentMeals({int limit = 10}) async {
-    try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.meals,
-        orderBy: '${DatabaseTables.mealCreatedAt} DESC',
-        limit: limit,
-      );
-      return maps.map((map) => MealModel.fromMap(map)).toList();
-    } catch (e) {
-      throw CacheDatabaseException('Failed to get recent meals: $e');
-    }
-  }
-
-  @override
-  Future<List<Meal>> getFrequentMeals({int limit = 10}) async {
-    // Falls back to recent meals — no usage-count tracking in current schema
-    return getRecentMeals(limit: limit);
-  }
-
-  @override
-  Future<void> insertMeal(covariant MealModel meal) async {
-    try {
-      final db = await databaseHelper.database;
-      await db.insert(DatabaseTables.meals, meal.toMap());
-    } catch (e) {
-      throw CacheDatabaseException('Failed to insert meal: $e');
-    }
-  }
-
-  @override
-  Future<int> getMealsCount() async {
-    try {
-      final db = await databaseHelper.database;
-      final result = await db.rawQuery('SELECT COUNT(*) FROM ${DatabaseTables.meals}');
-      return Sqflite.firstIntValue(result) ?? 0;
-    } catch (e) {
-      throw CacheDatabaseException('Failed to get meals count: $e');
-    }
-  }
-
-  @override
-  Future<Meal?> getMealById(String id) async {
+  Future<MealModel?> getMealById(String id) async {
     try {
       final db = await databaseHelper.database;
       final maps = await db.query(
@@ -108,7 +37,11 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
         whereArgs: [id],
         limit: 1,
       );
-      if (maps.isEmpty) return null;
+
+      if (maps.isEmpty) {
+        return null;
+      }
+
       return MealModel.fromMap(maps.first);
     } catch (e) {
       throw CacheDatabaseException('Failed to get meal by ID: $e');
@@ -116,29 +49,194 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   @override
-  Future<void> addMeal(Meal meal) async {
+  Future<MealModel?> getMealByName(String name) async {
     try {
       final db = await databaseHelper.database;
-      final model = MealModel.fromEntity(meal);
-      await db.insert(DatabaseTables.meals, model.toMap());
+      final maps = await db.query(
+        DatabaseTables.meals,
+        where: 'LOWER(${DatabaseTables.mealName}) = LOWER(?)',
+        whereArgs: [name],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        return null;
+      }
+
+      return MealModel.fromMap(maps.first);
     } catch (e) {
-      throw CacheDatabaseException('Failed to add meal: $e');
+      throw CacheDatabaseException('Failed to get meal by name: $e');
     }
   }
 
   @override
-  Future<void> updateMeal(Meal meal) async {
+  Future<List<MealModel>> searchMealsByName(String searchTerm) async {
     try {
       final db = await databaseHelper.database;
-      final model = MealModel.fromEntity(meal);
+      final maps = await db.query(
+        DatabaseTables.meals,
+        where: 'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?)',
+        whereArgs: ['%$searchTerm%'],
+        orderBy: DatabaseTables.mealName,
+      );
+      return maps.map(MealModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to search meals: $e');
+    }
+  }
+
+  @override
+  Future<List<MealModel>> getRecentMeals({int limit = 10}) async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.meals,
+        orderBy: '${DatabaseTables.mealCreatedAt} DESC',
+        limit: limit,
+      );
+      return maps.map(MealModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get recent meals: $e');
+    }
+  }
+
+  @override
+  Future<List<MealModel>> getFrequentMeals({int limit = 10}) async {
+    return getRecentMeals(limit: limit);
+  }
+
+  @override
+  Future<List<MealModel>> getPendingSyncMeals() async {
+    try {
+      final db = await databaseHelper.database;
+      final maps = await db.query(
+        DatabaseTables.meals,
+        where:
+            '${DatabaseTables.mealSyncStatus} = ? OR ${DatabaseTables.mealSyncStatus} = ?',
+        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        orderBy: '${DatabaseTables.mealUpdatedAt} ASC',
+      );
+      return maps.map(MealModel.fromMap).toList();
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get pending sync meals: $e');
+    }
+  }
+
+  @override
+  Future<void> insertMeal(MealModel meal) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.insert(
+        DatabaseTables.meals,
+        meal.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to insert meal: $e');
+    }
+  }
+
+  @override
+  Future<void> updateMeal(MealModel meal) async {
+    try {
+      final db = await databaseHelper.database;
       await db.update(
         DatabaseTables.meals,
-        model.toMap(),
+        meal.toMap(),
         where: '${DatabaseTables.mealId} = ?',
-        whereArgs: [model.id],
+        whereArgs: [meal.id],
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to update meal: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.meals,
+        <String, Object?>{
+          DatabaseTables.mealServerId: serverId,
+          DatabaseTables.mealSyncStatus: 'synced',
+          DatabaseTables.mealLastSyncedAt: syncedAt.toIso8601String(),
+          DatabaseTables.mealLastSyncError: null,
+        },
+        where: '${DatabaseTables.mealId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark meal as synced: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.meals,
+        <String, Object?>{
+          DatabaseTables.mealSyncStatus: 'pendingUpload',
+          DatabaseTables.mealLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.mealId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark meal as pending upload: $e');
+    }
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.meals,
+        <String, Object?>{
+          DatabaseTables.mealSyncStatus: 'pendingUpdate',
+          DatabaseTables.mealLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.mealId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark meal as pending update: $e');
+    }
+  }
+
+  @override
+  Future<void> replaceAllMeals(List<MealModel> meals) async {
+    try {
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(DatabaseTables.meals);
+
+        final batch = txn.batch();
+        for (final meal in meals) {
+          batch.insert(
+            DatabaseTables.meals,
+            meal.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to replace all meals: $e');
     }
   }
 
@@ -163,6 +261,19 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       await db.delete(DatabaseTables.meals);
     } catch (e) {
       throw CacheDatabaseException('Failed to clear all meals: $e');
+    }
+  }
+
+  @override
+  Future<int> getMealsCount() async {
+    try {
+      final db = await databaseHelper.database;
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) FROM ${DatabaseTables.meals}',
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      throw CacheDatabaseException('Failed to get meals count: $e');
     }
   }
 }
