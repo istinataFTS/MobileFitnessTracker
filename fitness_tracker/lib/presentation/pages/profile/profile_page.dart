@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../../../config/env_config.dart';
+import '../../../core/constants/app_info.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../config/app_config.dart';
-import '../targets/targets_page.dart';
 import '../settings/settings_page.dart';
+import '../targets/targets_page.dart';
 
 /// Simplified Profile page - stats and settings access only
 class ProfilePage extends StatelessWidget {
@@ -15,7 +17,7 @@ class ProfilePage extends StatelessWidget {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text(AppStrings.profileTitle),
-        automaticallyImplyLeading: false, // No back button - it's a main tab
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -127,7 +129,7 @@ class ProfilePage extends StatelessWidget {
                   context,
                   icon: Icons.info_outline,
                   title: AppStrings.about,
-                  subtitle: '${AppStrings.version} ${EnvConfig.appVersion}',
+                  subtitle: AppInfo.versionLabel,
                   onTap: () => _showAboutDialog(context),
                 ),
               ],
@@ -375,15 +377,15 @@ class ProfilePage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(EnvConfig.appName),
+        title: Text(AppInfo.name),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${AppStrings.version}: ${EnvConfig.appVersion}'),
+            Text(AppInfo.versionLabel),
             const SizedBox(height: 8),
             Text(
-              'A personal fitness tracking app to monitor weekly muscle group training goals.',
+              AppInfo.aboutDescription,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

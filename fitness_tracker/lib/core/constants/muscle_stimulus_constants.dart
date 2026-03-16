@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart';
-import '../../config/env_config.dart';
 
-/// Constants for muscle stimulus calculation and visualization system
-/// All configurable values are sourced from EnvConfig to avoid hardcoding
+/// Constants for muscle stimulus calculation and visualization system.
+/// These are domain rules, not deployment/runtime configuration.
 class MuscleStimulus {
-  MuscleStimulus._(); // Private constructor to prevent instantiation
+  MuscleStimulus._();
 
   // ==================== MUSCLE GROUPS ====================
   /// Complete list of 20 muscle groups for detailed tracking
@@ -79,78 +78,75 @@ class MuscleStimulus {
   };
 
   // ==================== RECOVERY RATES (k values) ====================
-  /// Recovery decay rates for each muscle group (per hour)
-  /// These determine how quickly stimulus decays based on muscle fiber composition
-  /// Higher k = faster recovery (more fast-twitch), Lower k = slower recovery (more slow-twitch)
+  /// Recovery decay rates for each muscle group (per hour).
+  /// Higher k = faster recovery. Lower k = slower recovery.
   static const Map<String, double> recoveryRates = {
-    // Shoulders (moderate-fast recovery)
+    // Shoulders
     frontDelts: 0.030,
     sideDelts: 0.030,
     rearDelts: 0.030,
-    
-    // Traps (moderate recovery)
+
+    // Traps
     upperTraps: 0.028,
     middleTraps: 0.028,
     lowerTraps: 0.028,
-    
-    // Chest (moderate recovery)
+
+    // Chest
     upperChest: 0.027,
     midChest: 0.027,
     lowerChest: 0.027,
-    
-    // Back (slower recovery, large muscles)
+
+    // Back
     lats: 0.024,
     lowerBack: 0.023,
-    
-    // Arms (faster recovery, smaller muscles)
+
+    // Arms
     biceps: 0.032,
     triceps: 0.032,
-    forearms: 0.035, // Very fast recovery
-    
-    // Core (very slow recovery, postural muscles)
+    forearms: 0.035,
+
+    // Core
     abs: 0.020,
     obliques: 0.020,
-    
-    // Legs (slowest recovery, largest muscles)
+
+    // Legs
     glutes: 0.022,
     quads: 0.021,
     hamstrings: 0.022,
-    calves: 0.033, // Faster recovery despite being legs
+    calves: 0.033,
   };
 
   /// Default recovery rate for unknown muscles
   static const double defaultRecoveryRate = 0.025;
 
   // ==================== CALCULATION CONSTANTS ====================
-  
-  /// Intensity exponent for non-linear scaling
-  /// Formula: (intensity / maxIntensity) ^ intensityExponent
-  /// From EnvConfig to avoid hardcoding
-  static double get intensityExponent => EnvConfig.intensityExponent;
 
-  /// Weekly decay factor applied to rolling weekly load each day
-  /// From EnvConfig to avoid hardcoding
-  static double get weeklyDecayFactor => EnvConfig.weeklyDecayFactor;
+  /// Formula: (intensity / maxIntensity) ^ intensityExponent
+  static const double intensityExponent = 1.35;
+
+  /// Weekly rolling load decay factor applied each day
+  static const double weeklyDecayFactor = 0.6;
 
   // ==================== INTENSITY LEVELS ====================
-  
-  /// Minimum intensity value
+
   static const int minIntensity = 0;
-  
-  /// Maximum intensity value
   static const int maxIntensity = 5;
-  
-  /// Default intensity when not specified
   static const int defaultIntensity = 3;
 
   /// Intensity level descriptions (full version for dialogs)
   static const Map<int, String> intensityDescriptions = {
-    0: 'No effort - Warm-up sets, technique practice, or mobility work. Minimal muscle activation.',
-    1: 'Very Light - Easy sets with high reps remaining. Low muscle engagement, recovery work.',
-    2: 'Light - Moderate effort with several reps in reserve. Building volume without strain.',
-    3: 'Moderate - Working sets with 2-3 reps in reserve (RIR). Solid muscle activation.',
-    4: 'Hard - Challenging sets with 1-2 RIR. High muscle activation, approaching failure.',
-    5: 'Maximum - All-out effort, 0 RIR or actual failure. Maximum muscle stimulus.',
+    0:
+        'No effort - Warm-up sets, technique practice, or mobility work. Minimal muscle activation.',
+    1:
+        'Very Light - Easy sets with high reps remaining. Low muscle engagement, recovery work.',
+    2:
+        'Light - Moderate effort with several reps in reserve. Building volume without strain.',
+    3:
+        'Moderate - Working sets with 2-3 reps in reserve (RIR). Solid muscle activation.',
+    4:
+        'Hard - Challenging sets with 1-2 RIR. High muscle activation, approaching failure.',
+    5:
+        'Maximum - All-out effort, 0 RIR or actual failure. Maximum muscle stimulus.',
   };
 
   /// Intensity level short labels (for UI sliders)
@@ -164,79 +160,57 @@ class MuscleStimulus {
   };
 
   // ==================== VISUAL INTENSITY THRESHOLDS ====================
-  
-  /// Daily stimulus threshold for visual intensity calculation
-  static double get dailyThreshold => EnvConfig.dailyThreshold;
-  
-  /// Weekly stimulus threshold for visual intensity calculation
-  static double get weeklyThreshold => EnvConfig.weeklyThreshold;
-  
-  /// Monthly stimulus threshold for visual intensity calculation
-  static double get monthlyThreshold => EnvConfig.monthlyThreshold;
+
+  static const double dailyThreshold = 8.0;
+  static const double weeklyThreshold = 25.0;
+  static const double monthlyThreshold = 90.0;
 
   // ==================== COLOR THRESHOLDS ====================
-  
-  /// Visual intensity threshold for green color (0.0 - 0.20)
-  static double get colorThresholdGreen => EnvConfig.colorThresholdGreen;
-  
-  /// Visual intensity threshold for yellow color (0.20 - 0.45)
-  static double get colorThresholdYellow => EnvConfig.colorThresholdYellow;
-  
-  /// Visual intensity threshold for orange color (0.45 - 0.70)
-  static double get colorThresholdOrange => EnvConfig.colorThresholdOrange;
-  
-  /// Visual intensity threshold for red color (0.70 - 1.0)
-  static double get colorThresholdRed => EnvConfig.colorThresholdRed;
+
+  static const double colorThresholdGreen = 0.20;
+  static const double colorThresholdYellow = 0.45;
+  static const double colorThresholdOrange = 0.70;
+  static const double colorThresholdRed = 0.70;
 
   // ==================== VALIDATION & HELPER METHODS ====================
-  
-  /// Validate if a muscle group name is valid
+
   static bool isValidMuscleGroup(String muscleGroup) {
     return allMuscleGroups.contains(muscleGroup.toLowerCase());
   }
 
-  /// Get display name for a muscle group
   static String getDisplayName(String muscleGroup) {
     return displayNames[muscleGroup.toLowerCase()] ?? muscleGroup;
   }
 
-  /// Get recovery rate for a muscle group (returns default if not found)
   static double getRecoveryRate(String muscleGroup) {
     return recoveryRates[muscleGroup.toLowerCase()] ?? defaultRecoveryRate;
   }
 
-  /// Get intensity description
   static String getIntensityDescription(int intensity) {
-    // Clamp intensity to valid range
     final clampedIntensity = intensity.clamp(minIntensity, maxIntensity);
-    return intensityDescriptions[clampedIntensity] ?? 
-           intensityDescriptions[defaultIntensity]!;
+    return intensityDescriptions[clampedIntensity] ??
+        intensityDescriptions[defaultIntensity]!;
   }
 
-  /// Get intensity label
   static String getIntensityLabel(int intensity) {
-    // Clamp intensity to valid range
     final clampedIntensity = intensity.clamp(minIntensity, maxIntensity);
-    return intensityLabels[clampedIntensity] ?? 
-           intensityLabels[defaultIntensity]!;
+    return intensityLabels[clampedIntensity] ??
+        intensityLabels[defaultIntensity]!;
   }
 
-  /// Validate intensity value
   static bool isValidIntensity(int intensity) {
     return intensity >= minIntensity && intensity <= maxIntensity;
   }
 
-  /// Clamp intensity to valid range
   static int clampIntensity(int intensity) {
     return intensity.clamp(minIntensity, maxIntensity);
   }
 
   // ==================== DEBUG & LOGGING ====================
-  
-  /// Print configuration (development only)
+
   static void printConfiguration() {
-    if (!EnvConfig.enableDebugLogs) return;
-    
+    if (!kDebugMode) return;
+
     debugPrint('========== Muscle Stimulus Configuration ==========');
     debugPrint('Total Muscle Groups: ${allMuscleGroups.length}');
     debugPrint('Intensity Exponent: $intensityExponent');

@@ -96,16 +96,6 @@ class EnvConfig {
     defaultValue: 30,
   );
 
-  static const double intensityExponent = 1.35;
-  static const double weeklyDecayFactor = 0.6;
-  static const double dailyThreshold = 8.0;
-  static const double weeklyThreshold = 25.0;
-  static const double monthlyThreshold = 90.0;
-  static const double colorThresholdGreen = 0.20;
-  static const double colorThresholdYellow = 0.45;
-  static const double colorThresholdOrange = 0.70;
-  static const double colorThresholdRed = 0.70;
-
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
 
   static const String logLevel = String.fromEnvironment(
@@ -176,13 +166,7 @@ class EnvConfig {
     debugPrint('Enable Seeding Logs: $enableSeedingLogs');
     debugPrint('API Base URL: $apiBaseUrl');
     debugPrint('API Timeout Seconds: $apiTimeoutSeconds');
-    debugPrint('');
-    debugPrint('Muscle Stimulus Configuration:');
-    debugPrint('  Intensity Exponent: $intensityExponent');
-    debugPrint('  Weekly Decay Factor: $weeklyDecayFactor');
-    debugPrint('  Daily Threshold: $dailyThreshold');
-    debugPrint('  Weekly Threshold: $weeklyThreshold');
-    debugPrint('  Monthly Threshold: $monthlyThreshold');
+    debugPrint('Log Level: $logLevel');
     debugPrint('==============================================');
   }
 }
