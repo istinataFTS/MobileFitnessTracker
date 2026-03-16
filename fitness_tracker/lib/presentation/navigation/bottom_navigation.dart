@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../core/constants/app_strings.dart';
 import '../../core/themes/app_theme.dart';
+import '../../features/history/history.dart';
+import '../pages/exercises/bloc/exercise_bloc.dart';
 import '../pages/home/home_page.dart';
-import '../pages/log/log_page.dart';
-import '../pages/history/history_page.dart';
 import '../pages/library/library_page.dart';
-import '../pages/targets/targets_page.dart';
+import '../pages/log/bloc/workout_bloc.dart';
+import '../pages/log/log_page.dart';
+import '../pages/meals/bloc/meal_bloc.dart';
+import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../pages/profile/profile_page.dart';
+import '../pages/targets/bloc/targets_bloc.dart';
+import '../pages/targets/targets_page.dart';
+import '../pages/history/history_page.dart';
 
 /// Bottom navigation wrapper for main app pages
 class BottomNavigation extends StatefulWidget {
@@ -17,21 +25,123 @@ class BottomNavigation extends StatefulWidget {
 }
 
 class _BottomNavigationState extends State<BottomNavigation> {
-  int _selectedIndex = 0;
+  static const int _homeTabIndex = 0;
+  static const int _logTabIndex = 1;
+  static const int _historyTabIndex = 2;
+  static const int _libraryTabIndex = 3;
+  static const int _targetsTabIndex = 4;
+  static const int _profileTabIndex = 5;
+  static const int _tabCount = 6;
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const LogPage(),
-    const HistoryPage(),
-    const LibraryPage(), 
-    const TargetsPage(),
-    const ProfilePage(),
-  ];
+  int _selectedIndex = _homeTabIndex;
+
+  final Set<int> _visitedTabs = <int>{_homeTabIndex};
+
+  bool _didRequestExerciseData = false;
+  bool _didRequestMealData = false;
+  bool _didRequestNutritionLogData = false;
+  bool _didRequestTargetsData = false;
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
+
+    _initializeTabIfNeeded(index);
+
     setState(() {
       _selectedIndex = index;
+      _visitedTabs.add(index);
     });
+  }
+
+  void _initializeTabIfNeeded(int index) {
+    final bool isFirstVisit = !_visitedTabs.contains(index);
+    if (!isFirstVisit) {
+      return;
+    }
+
+    switch (index) {
+      case _logTabIndex:
+        _ensureExerciseDataLoaded();
+        _ensureMealDataLoaded();
+        _ensureNutritionLogDataLoaded();
+        break;
+      case _historyTabIndex:
+        // HistoryPage loads its own initial month in initState.
+        break;
+      case _libraryTabIndex:
+        _ensureExerciseDataLoaded();
+        _ensureMealDataLoaded();
+        break;
+      case _targetsTabIndex:
+        _ensureTargetsDataLoaded();
+        break;
+      case _homeTabIndex:
+      case _profileTabIndex:
+        break;
+    }
+  }
+
+  void _ensureExerciseDataLoaded() {
+    if (_didRequestExerciseData) {
+      return;
+    }
+
+    _didRequestExerciseData = true;
+    context.read<ExerciseBloc>().add(LoadExercisesEvent());
+  }
+
+  void _ensureMealDataLoaded() {
+    if (_didRequestMealData) {
+      return;
+    }
+
+    _didRequestMealData = true;
+    context.read<MealBloc>().add(LoadMealsEvent());
+  }
+
+  void _ensureNutritionLogDataLoaded() {
+    if (_didRequestNutritionLogData) {
+      return;
+    }
+
+    _didRequestNutritionLogData = true;
+    context.read<NutritionLogBloc>().add(
+          LoadDailyLogsEvent(DateTime.now()),
+        );
+  }
+
+  void _ensureTargetsDataLoaded() {
+    if (_didRequestTargetsData) {
+      return;
+    }
+
+    _didRequestTargetsData = true;
+    context.read<TargetsBloc>().add(LoadTargetsEvent());
+  }
+
+  Widget _buildPageForIndex(int index) {
+    if (!_visitedTabs.contains(index)) {
+      return const SizedBox.shrink();
+    }
+
+    switch (index) {
+      case _homeTabIndex:
+        return const HomePage();
+      case _logTabIndex:
+        return const LogPage();
+      case _historyTabIndex:
+        return const HistoryPage();
+      case _libraryTabIndex:
+        return const LibraryPage();
+      case _targetsTabIndex:
+        return const TargetsPage();
+      case _profileTabIndex:
+        return const ProfilePage();
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   @override
@@ -39,7 +149,10 @@ class _BottomNavigationState extends State<BottomNavigation> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: List<Widget>.generate(
+          _tabCount,
+          _buildPageForIndex,
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -62,7 +175,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
           showSelectedLabels: true,
           showUnselectedLabels: true,
           elevation: 0,
-          items: const [
+          items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined, size: 22),
               activeIcon: Icon(Icons.home, size: 22),
@@ -81,7 +194,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.library_books_outlined, size: 22),
               activeIcon: Icon(Icons.library_books, size: 22),
-              label: AppStrings.navLibrary, // Changed from navExercises
+              label: AppStrings.navLibrary,
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.flag_outlined, size: 22),
