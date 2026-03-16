@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../config/app_config.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/constants/muscle_groups.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/time_period.dart';
 import '../exercises/bloc/exercise_bloc.dart';
@@ -12,24 +11,14 @@ import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
 import 'helpers/home_progress_mapper.dart';
 import 'helpers/muscle_training_summary_mapper.dart';
+import 'widgets/muscle_group_progress_card.dart';
 import 'widgets/muscle_training_summary_widget.dart';
 import 'widgets/nutrition_summary_card.dart';
 import 'widgets/period_selector_widget.dart';
 import 'widgets/progress_stats_widget.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<HomeBloc>().add(LoadHomeDataEvent());
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -359,10 +348,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 20),
         ProgressStatsWidget(
-          totalSets: progressStats.totalSets,
-          remainingTarget: progressStats.remainingTarget,
-          trainedMuscles: progressStats.trainedMuscles,
-          hasTarget: progressStats.hasTarget,
+          viewData: progressStats,
         ),
       ],
     );
@@ -372,8 +358,8 @@ class _HomePageState extends State<HomePage> {
     BuildContext context,
     HomeLoaded homeState,
   ) {
-    final muscleBreakdown = HomeProgressMapper.buildMuscleBreakdown(
-      weeklySets: homeState.weeklySets,
+    final items = HomeProgressMapper.buildMuscleGroupProgressItems(
+      homeState: homeState,
       exerciseState: context.read<ExerciseBloc>().state,
     );
 
@@ -387,99 +373,11 @@ class _HomePageState extends State<HomePage> {
               ),
         ),
         const SizedBox(height: 12),
-        ...homeState.trainingTargets.map((target) {
-          final currentSets = muscleBreakdown[target.categoryKey] ?? 0;
-          final progress = currentSets / target.weeklyGoal;
-          final isComplete = currentSets >= target.weeklyGoal;
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          MuscleGroups.getDisplayName(target.categoryKey),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                      ),
-                      if (isComplete)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.successGreen.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle,
-                                size: 16,
-                                color: AppTheme.successGreen,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                AppStrings.complete,
-                                style: TextStyle(
-                                  color: AppTheme.successGreen,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text(
-                        '$currentSets / ${target.weeklyGoal} ${AppStrings.sets}',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppTheme.textMedium,
-                            ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${(progress * 100).clamp(0, 100).toInt()}%',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: isComplete
-                                      ? AppTheme.successGreen
-                                      : AppTheme.primaryOrange,
-                                ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress.clamp(0.0, 1.0),
-                      minHeight: 6,
-                      backgroundColor: AppTheme.surfaceDark,
-                      color: isComplete
-                          ? AppTheme.successGreen
-                          : AppTheme.primaryOrange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
+        ...items.map(
+          (item) => MuscleGroupProgressCard(
+            viewData: item,
+          ),
+        ),
       ],
     );
   }

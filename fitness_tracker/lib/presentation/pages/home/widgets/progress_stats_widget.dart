@@ -1,20 +1,44 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../models/home_progress_view_data.dart';
+
+extension on HomeProgressTone {
+  Color get foregroundColor {
+    switch (this) {
+      case HomeProgressTone.success:
+        return AppTheme.successGreen;
+      case HomeProgressTone.warning:
+        return AppTheme.warningAmber;
+      case HomeProgressTone.primary:
+        return AppTheme.primaryOrange;
+      case HomeProgressTone.muted:
+        return AppTheme.textDim;
+    }
+  }
+
+  Color get backgroundTint {
+    switch (this) {
+      case HomeProgressTone.success:
+        return AppTheme.successGreen.withOpacity(0.1);
+      case HomeProgressTone.warning:
+        return AppTheme.warningAmber.withOpacity(0.1);
+      case HomeProgressTone.primary:
+        return AppTheme.primaryOrange.withOpacity(0.1);
+      case HomeProgressTone.muted:
+        return AppTheme.surfaceDark;
+    }
+  }
+}
 
 /// Progress stats display widget for home page
 class ProgressStatsWidget extends StatelessWidget {
-  final int totalSets;
-  final int remainingTarget;
-  final int trainedMuscles;
-  final bool hasTarget;
+  final HomeProgressStatsViewData viewData;
 
   const ProgressStatsWidget({
     super.key,
-    required this.totalSets,
-    required this.remainingTarget,
-    required this.trainedMuscles,
-    this.hasTarget = true,
+    required this.viewData,
   });
 
   @override
@@ -33,9 +57,7 @@ class ProgressStatsWidget extends StatelessWidget {
             child: _buildStatColumn(
               context,
               icon: Icons.fitness_center,
-              value: totalSets.toString(),
-              label: AppStringsPhase7.sets,
-              color: totalSets > 0 ? AppTheme.primaryOrange : AppTheme.textDim,
+              stat: viewData.totalSetsStat,
             ),
           ),
           Container(
@@ -47,9 +69,7 @@ class ProgressStatsWidget extends StatelessWidget {
             child: _buildStatColumn(
               context,
               icon: Icons.flag_outlined,
-              value: hasTarget ? remainingTarget.toString() : '-',
-              label: AppStringsPhase7.target,
-              color: _getTargetColor(remainingTarget),
+              stat: viewData.targetStat,
             ),
           ),
           Container(
@@ -61,9 +81,7 @@ class ProgressStatsWidget extends StatelessWidget {
             child: _buildStatColumn(
               context,
               icon: Icons.auto_awesome,
-              value: trainedMuscles.toString(),
-              label: AppStringsPhase7.muscles,
-              color: trainedMuscles > 0 ? AppTheme.primaryOrange : AppTheme.textDim,
+              stat: viewData.trainedMusclesStat,
             ),
           ),
         ],
@@ -74,10 +92,10 @@ class ProgressStatsWidget extends StatelessWidget {
   Widget _buildStatColumn(
     BuildContext context, {
     required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
+    required HomeProgressStatViewData stat,
   }) {
+    final Color color = stat.tone.foregroundColor;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -88,7 +106,7 @@ class ProgressStatsWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          value,
+          stat.value,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: color,
@@ -96,7 +114,7 @@ class ProgressStatsWidget extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          label,
+          stat.label,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.textMedium,
@@ -105,36 +123,18 @@ class ProgressStatsWidget extends StatelessWidget {
       ],
     );
   }
-
-  /// Get color for target based on remaining count
-  Color _getTargetColor(int remaining) {
-    if (!hasTarget) return AppTheme.textDim;
-    if (remaining <= 0) return AppTheme.successGreen; // Target met/exceeded
-    if (remaining <= 3) return AppTheme.warningAmber; // Close to target
-    return AppTheme.primaryOrange; // Work to do
-  }
 }
 
 /// Detailed progress stats card with additional information
-/// 
+///
 /// Extended version with more detailed breakdowns
 /// Suitable for dedicated progress tracking views
 class DetailedProgressStatsWidget extends StatelessWidget {
-  final int totalSets;
-  final int totalTarget;
-  final int remainingTarget;
-  final int trainedMuscles;
-  final int totalMuscles;
-  final double progressPercentage;
+  final DetailedHomeProgressStatsViewData viewData;
 
   const DetailedProgressStatsWidget({
     super.key,
-    required this.totalSets,
-    required this.totalTarget,
-    required this.remainingTarget,
-    required this.trainedMuscles,
-    this.totalMuscles = 20, // Default to all muscle groups
-    this.progressPercentage = 0.0,
+    required this.viewData,
   });
 
   @override
@@ -145,7 +145,6 @@ class DetailedProgressStatsWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Text(
               AppStringsPhase7.progress,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -153,35 +152,30 @@ class DetailedProgressStatsWidget extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 20),
-
-            // Progress bar
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
-                value: progressPercentage.clamp(0.0, 1.0),
+                value: viewData.progressValue,
                 minHeight: 12,
                 backgroundColor: AppTheme.surfaceDark,
-                color: _getProgressColor(progressPercentage),
+                color: viewData.progressTone.foregroundColor,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '${(progressPercentage * 100).toStringAsFixed(0)}% Complete',
+              viewData.progressLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textMedium,
                   ),
             ),
             const SizedBox(height: 24),
-
-            // Stats grid
             Row(
               children: [
                 Expanded(
                   child: _buildDetailItem(
                     context,
                     icon: Icons.fitness_center,
-                    value: '$totalSets / $totalTarget',
-                    label: 'Sets Completed',
+                    stat: viewData.completedSetsStat,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -189,36 +183,31 @@ class DetailedProgressStatsWidget extends StatelessWidget {
                   child: _buildDetailItem(
                     context,
                     icon: Icons.auto_awesome,
-                    value: '$trainedMuscles / $totalMuscles',
-                    label: 'Muscles Trained',
+                    stat: viewData.trainedMusclesStat,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            
-            // Remaining target
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _getTargetBoxColor(remainingTarget),
+                color: viewData.targetCallout.tone.backgroundTint,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.flag_outlined,
-                    color: _getTargetIconColor(remainingTarget),
+                    color: viewData.targetCallout.tone.foregroundColor,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      remainingTarget <= 0
-                          ? 'Target met! 🎉'
-                          : '$remainingTarget sets remaining',
+                      viewData.targetCallout.message,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: _getTargetIconColor(remainingTarget),
+                            color: viewData.targetCallout.tone.foregroundColor,
                           ),
                     ),
                   ),
@@ -234,50 +223,36 @@ class DetailedProgressStatsWidget extends StatelessWidget {
   Widget _buildDetailItem(
     BuildContext context, {
     required IconData icon,
-    required String value,
-    required String label,
+    required HomeProgressStatViewData stat,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: 18, color: AppTheme.primaryOrange),
+            Icon(
+              icon,
+              size: 18,
+              color: stat.tone.foregroundColor,
+            ),
             const SizedBox(width: 8),
             Text(
-              value,
+              stat.value,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: stat.tone.foregroundColor,
                   ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
-          label,
+          stat.label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.textMedium,
               ),
         ),
       ],
     );
-  }
-
-  Color _getProgressColor(double progress) {
-    if (progress >= 1.0) return AppTheme.successGreen;
-    if (progress >= 0.7) return AppTheme.primaryOrange;
-    return AppTheme.warningAmber;
-  }
-
-  Color _getTargetBoxColor(int remaining) {
-    if (remaining <= 0) return AppTheme.successGreen.withOpacity(0.1);
-    if (remaining <= 3) return AppTheme.warningAmber.withOpacity(0.1);
-    return AppTheme.primaryOrange.withOpacity(0.1);
-  }
-
-  Color _getTargetIconColor(int remaining) {
-    if (remaining <= 0) return AppTheme.successGreen;
-    if (remaining <= 3) return AppTheme.warningAmber;
-    return AppTheme.primaryOrange;
   }
 }
