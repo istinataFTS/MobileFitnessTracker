@@ -216,6 +216,24 @@ class PerformanceMonitor {
     );
   }
 
+  static void logMetricsSnapshot({
+    String category = 'performance',
+  }) {
+    final report = getPerformanceReport();
+    if (report.isEmpty) {
+      AppLogger.debug(
+        'No performance metrics collected yet',
+        category: category,
+      );
+      return;
+    }
+
+    AppLogger.info(
+      'Performance metrics snapshot: $report',
+      category: category,
+    );
+  }
+
   static void clearMetrics() {
     _activeTimers.clear();
     _history.clear();

@@ -6,6 +6,27 @@ import '../../../config/env_config.dart';
 import '../../../core/constants/database_tables.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 
+class UnsupportedDatabaseVersionException implements Exception {
+  const UnsupportedDatabaseVersionException({
+    required this.oldVersion,
+    required this.newVersion,
+    required this.minimumSupportedVersion,
+  });
+
+  final int oldVersion;
+  final int newVersion;
+  final int minimumSupportedVersion;
+
+  @override
+  String toString() {
+    return 'UnsupportedDatabaseVersionException('
+        'oldVersion: $oldVersion, '
+        'newVersion: $newVersion, '
+        'minimumSupportedVersion: $minimumSupportedVersion'
+        ')';
+  }
+}
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -14,6 +35,8 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static Database? _database;
+
+  static const int _minimumSupportedUpgradeVersion = 2;
 
   Future<Database> get database async {
     if (kIsWeb) {
@@ -189,30 +212,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('DROP TABLE IF EXISTS ${DatabaseTables.workoutSets}');
-
-      await db.execute('''
-        CREATE TABLE ${DatabaseTables.workoutSets} (
-          ${DatabaseTables.setId} TEXT PRIMARY KEY,
-          ${DatabaseTables.setExerciseId} TEXT NOT NULL,
-          ${DatabaseTables.setReps} INTEGER NOT NULL,
-          ${DatabaseTables.setWeight} REAL NOT NULL,
-          ${DatabaseTables.setDate} TEXT NOT NULL,
-          ${DatabaseTables.setCreatedAt} TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE INDEX idx_workout_sets_exercise_id
-        ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})
-      ''');
-
-      await db.execute('''
-        CREATE INDEX idx_workout_sets_date
-        ON ${DatabaseTables.workoutSets}(${DatabaseTables.setDate})
-      ''');
-    }
+    _ensureSupportedUpgradePath(oldVersion, newVersion);
 
     if (oldVersion < 3) {
       await db.execute('''
@@ -390,6 +390,18 @@ class DatabaseHelper {
     }
 
     await _createIndexes(db);
+  }
+
+  void _ensureSupportedUpgradePath(int oldVersion, int newVersion) {
+    if (oldVersion >= _minimumSupportedUpgradeVersion) {
+      return;
+    }
+
+    throw UnsupportedDatabaseVersionException(
+      oldVersion: oldVersion,
+      newVersion: newVersion,
+      minimumSupportedVersion: _minimumSupportedUpgradeVersion,
+    );
   }
 
   Future<void> _migrateTargetsToTypedGoals(Database db) async {
