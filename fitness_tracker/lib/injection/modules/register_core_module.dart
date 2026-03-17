@@ -6,7 +6,9 @@ import '../../data/datasources/local/database_helper.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../../data/datasources/remote/noop_auth_remote_datasource.dart';
 import '../../data/repositories/app_session_repository_impl.dart';
+import '../../data/repositories/app_settings_repository_impl.dart';
 import '../../domain/repositories/app_session_repository.dart';
+import '../../domain/repositories/app_settings_repository.dart';
 
 void registerCoreModule(GetIt sl) {
   sl.registerLazySingleton<DatabaseHelper>(DatabaseHelper.new);
@@ -28,6 +30,12 @@ void registerCoreModule(GetIt sl) {
       localDataSource: sl(),
       authRemoteDataSource: sl(),
       syncPolicy: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton<AppSettingsRepository>(
+    () => AppSettingsRepositoryImpl(
+      localDataSource: sl(),
     ),
   );
 }

@@ -1,151 +1,217 @@
 import 'package:flutter/material.dart';
 
-import '../../../config/env_config.dart';
 import '../../../core/constants/app_info.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../domain/entities/app_session.dart';
+import '../../../domain/repositories/app_session_repository.dart';
+import '../../../injection/injection_container.dart' as di;
+import '../history/history_page.dart';
 import '../settings/settings_page.dart';
 import '../targets/targets_page.dart';
 
-/// Simplified Profile page - stats and settings access only
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late final AppSessionRepository _sessionRepository;
+  late Future<AppSession> _sessionFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionRepository = di.sl<AppSessionRepository>();
+    _sessionFuture = _loadSession();
+  }
+
+  Future<AppSession> _loadSession() async {
+    final result = await _sessionRepository.getCurrentSession();
+    return result.fold(
+      (_) => const AppSession.guest(),
+      (session) => session,
+    );
+  }
+
+  Future<void> _refreshSession() async {
+    final nextFuture = _loadSession();
+
+    setState(() {
+      _sessionFuture = nextFuture;
+    });
+
+    await nextFuture;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text(AppStrings.profileTitle),
+        title: const Text('Profile'),
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _buildProfileHeader(context),
-            const SizedBox(height: 24),
-            _buildInfoBanner(context),
-            const SizedBox(height: 32),
-            _buildStatsCards(context),
-            const SizedBox(height: 32),
-            _buildSection(
-              context,
-              title: AppStrings.workoutManagement,
+      body: RefreshIndicator(
+        onRefresh: _refreshSession,
+        color: AppTheme.primaryOrange,
+        child: FutureBuilder<AppSession>(
+          future: _sessionFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primaryOrange,
+                ),
+              );
+            }
+
+            final session = snapshot.data ?? const AppSession.guest();
+
+            return ListView(
+              padding: const EdgeInsets.all(20),
               children: [
-                _buildNavigationTile(
+                const SizedBox(height: 20),
+                _buildHeader(context, session),
+                const SizedBox(height: 24),
+                _buildSessionBanner(context, session),
+                const SizedBox(height: 32),
+                _buildSection(
                   context,
-                  icon: Icons.flag_outlined,
-                  title: AppStrings.manageTargets,
-                  subtitle: AppStrings.manageTargetsDesc,
-                  onTap: () {
-                    Navigator.push(
+                  title: 'Your Space',
+                  children: [
+                    _buildNavigationTile(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const TargetsPage(),
-                      ),
-                    );
-                  },
-                ),
-                _buildNavigationTile(
-                  context,
-                  icon: Icons.settings_outlined,
-                  title: AppStrings.settings,
-                  subtitle: AppStrings.settingsDesc,
-                  onTap: () {
-                    Navigator.push(
+                      icon: Icons.settings_outlined,
+                      title: 'Settings',
+                      subtitle: 'App preferences and local configuration',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildNavigationTile(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
-                      ),
-                    );
-                  },
+                      icon: Icons.flag_outlined,
+                      title: 'Targets',
+                      subtitle: 'Manage your weekly muscle group goals',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TargetsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildNavigationTile(
+                      context,
+                      icon: Icons.history_outlined,
+                      title: 'History',
+                      subtitle: 'Review logged workouts and progress',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const HistoryPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 24),
+                _buildSection(
+                  context,
+                  title: 'Account Status',
+                  children: [
+                    _buildStatusTile(
+                      icon: session.isAuthenticated
+                          ? Icons.verified_user_outlined
+                          : Icons.person_outline,
+                      title: session.isAuthenticated
+                          ? 'Signed-in profile shell'
+                          : 'Guest profile shell',
+                      subtitle: session.isAuthenticated
+                          ? 'Server-owned profile fields can attach here once auth is live'
+                          : 'Ready for auth, identity, and cloud sync later',
+                    ),
+                    _buildStatusTile(
+                      icon: Icons.cloud_sync_outlined,
+                      title: 'Cloud migration readiness',
+                      subtitle: session.requiresInitialCloudMigration
+                          ? 'This session is marked as needing an initial cloud migration'
+                          : 'No initial cloud migration pending',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSection(
+                  context,
+                  title: 'Deferred Until Auth / Supabase',
+                  children: const [
+                    _StaticInfoTile(
+                      icon: Icons.badge_outlined,
+                      title: 'Edit profile',
+                      subtitle:
+                          'Wait until profile data is owned by the authenticated user',
+                    ),
+                    _StaticInfoTile(
+                      icon: Icons.lock_outline,
+                      title: 'Password and sign out',
+                      subtitle:
+                          'Keep these tied to the real auth provider, not a local placeholder',
+                    ),
+                    _StaticInfoTile(
+                      icon: Icons.public_outlined,
+                      title: 'Avatar, handle, privacy, social presence',
+                      subtitle:
+                          'These are server-shaped and should land after Supabase auth',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSection(
+                  context,
+                  title: 'About',
+                  children: [
+                    _buildStatusTile(
+                      icon: Icons.info_outline,
+                      title: AppInfo.name,
+                      subtitle: AppInfo.versionLabel,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
               ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              title: AppStrings.account,
-              children: [
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.person_outline,
-                  title: AppStrings.editProfile,
-                  message: AppStrings.unavailableProfileMessage,
-                ),
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.lock_outline,
-                  title: AppStrings.changePassword,
-                  message: AppStrings.unavailableAuthMessage,
-                ),
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.notifications_outlined,
-                  title: AppStrings.notifications,
-                  message: AppStrings.unavailableSettingsMessage,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              title: AppStrings.preferences,
-              children: [
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.dark_mode_outlined,
-                  title: AppStrings.theme,
-                  subtitle: AppStrings.dark,
-                  message: AppStrings.unavailableSettingsMessage,
-                ),
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.language_outlined,
-                  title: AppStrings.language,
-                  subtitle: AppStrings.english,
-                  message: AppStrings.unavailableSettingsMessage,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              title: AppStrings.support,
-              children: [
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.help_outline,
-                  title: AppStrings.helpSupport,
-                  message: AppStrings.unavailableSupportMessage,
-                ),
-                _buildUnavailableActionTile(
-                  context,
-                  icon: Icons.feedback_outlined,
-                  title: AppStrings.sendFeedback,
-                  message: AppStrings.unavailableFeedbackMessage,
-                ),
-                _buildActionTile(
-                  context,
-                  icon: Icons.info_outline,
-                  title: AppStrings.about,
-                  subtitle: AppInfo.versionLabel,
-                  onTap: () => _showAboutDialog(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            _buildSignOutButton(context),
-            const SizedBox(height: 20),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AppSession session) {
+    final displayName = session.user?.displayName?.trim();
+    final email = session.user?.email.trim();
+
+    final titleText = session.isAuthenticated
+        ? ((displayName != null && displayName.isNotEmpty)
+            ? displayName
+            : 'Signed-in User')
+        : 'Guest';
+
+    final subtitleText = session.isAuthenticated
+        ? (email != null && email.isNotEmpty
+            ? email
+            : 'Authenticated session')
+        : 'Profile features will expand after auth is enabled';
+
     return Column(
       children: [
         Container(
@@ -169,14 +235,15 @@ class ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          EnvConfig.userName,
+          titleText,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
         ),
         const SizedBox(height: 4),
         Text(
-          AppStrings.fitnessEnthusiast,
+          subtitleText,
+          textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textMedium,
               ),
@@ -185,7 +252,11 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoBanner(BuildContext context) {
+  Widget _buildSessionBanner(BuildContext context, AppSession session) {
+    final message = session.isAuthenticated
+        ? 'This page is intentionally thin. The real profile should attach to authenticated server data, not local placeholders.'
+        : 'You are currently in guest mode. This page is ready for auth states now, while keeping profile details deferred until Supabase-backed accounts are in place.';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -204,98 +275,11 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              AppStrings.noProfileStatsYet,
+              message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textMedium,
                   ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsCards(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            context,
-            label: AppStrings.totalWorkouts,
-            value: '24',
-            icon: Icons.fitness_center,
-            color: AppTheme.primaryOrange,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            label: AppStrings.thisWeek,
-            value: '5',
-            icon: Icons.calendar_today,
-            color: AppTheme.successGreen,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            label: AppStrings.streak,
-            value: '7',
-            icon: Icons.local_fire_department,
-            color: AppTheme.warningAmber,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderDark, width: 1),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textMedium,
-                  height: 1.2,
-                ),
           ),
         ],
       ),
@@ -348,123 +332,50 @@ class ProfilePage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right, color: AppTheme.textDim),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: AppTheme.textDim,
+        ),
         onTap: onTap,
       ),
     );
   }
 
-  Widget _buildActionTile(
-    BuildContext context, {
+  Widget _buildStatusTile({
     required IconData icon,
     required String title,
-    String? subtitle,
-    required VoidCallback onTap,
+    required String subtitle,
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(icon, color: AppTheme.textMedium),
         title: Text(title),
-        subtitle: subtitle != null ? Text(subtitle) : null,
-        trailing: const Icon(Icons.chevron_right, color: AppTheme.textDim),
-        onTap: onTap,
+        subtitle: Text(subtitle),
       ),
     );
   }
+}
 
-  Widget _buildUnavailableActionTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String message,
-    String? subtitle,
-  }) {
+class _StaticInfoTile extends StatelessWidget {
+  const _StaticInfoTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(icon, color: AppTheme.textMedium),
         title: Text(title),
-        subtitle: Text(subtitle ?? AppStrings.featureUnavailableLabel),
-        trailing: const Icon(Icons.info_outline, color: AppTheme.textDim),
-        onTap: () => _showUnavailableDialog(
-          context,
-          title: title,
-          message: message,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSignOutButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _showUnavailableDialog(
-          context,
-          title: AppStrings.signOut,
-          message: AppStrings.unavailableAuthMessage,
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.errorRed,
-          side: const BorderSide(color: AppTheme.errorRed),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        icon: const Icon(Icons.logout),
-        label: const Text(
-          AppStrings.signOut,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showUnavailableDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(AppStrings.gotIt),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(AppInfo.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(AppInfo.versionLabel),
-            const SizedBox(height: 8),
-            Text(
-              AppInfo.aboutDescription,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(AppStrings.gotIt),
-          ),
-        ],
+        subtitle: Text(subtitle),
       ),
     );
   }
