@@ -299,6 +299,38 @@ class AppStrings {
   static const String totalWorkouts = 'Total Workouts';
   static const String streak = 'Streak';
 
+  // ==================== Release-Safe Placeholder States ====================
+  static const String unavailableTitle = 'Not available yet';
+  static const String unavailableFeatureMessage =
+      'This action is not available in the current app version.';
+  static const String unavailableSettingsMessage =
+      'This settings option is not available in the current app version.';
+  static const String unavailableAuthMessage =
+      'Authentication is not enabled yet, so sign out is currently unavailable.';
+  static const String unavailableFeedbackMessage =
+      'Feedback sending is not connected yet in this build.';
+  static const String unavailableSupportMessage =
+      'Help and support actions are not connected yet in this build.';
+  static const String unavailableProfileMessage =
+      'Profile management is not connected yet in this build.';
+  static const String featureUnavailableLabel = 'Unavailable';
+  static const String settingsGeneral = 'General';
+  static const String settingsAboutSection = 'About';
+  static const String settingsNotificationsDesc = 'Manage workout reminders';
+  static const String settingsWeekStartDay = 'Week Start Day';
+  static const String settingsWeekStartDayValue = 'Monday';
+  static const String settingsBackupRestore = 'Backup & Restore';
+  static const String settingsBackupRestoreDesc =
+      'Export or import your data';
+  static const String settingsAppVersion = 'App Version';
+  static const String settingsTermsPrivacy = 'Terms & Privacy';
+  static const String settingsReportBug = 'Report a Bug';
+  static const String settingsUnavailableSubtitle =
+      'Not connected in this version';
+  static const String signOutUnavailableSubtitle =
+      'Authentication not enabled';
+  static const String noProfileStatsYet = 'Profile stats are static for now';
+
   // ==================== Muscle Groups ====================
   static const String muscleChest = 'Chest';
   static const String muscleBack = 'Back';
@@ -343,7 +375,8 @@ class AppStrings {
   // ==================== Confirmation Messages ====================
   static const String areYouSure = 'Are you sure?';
   static const String cannotBeUndone = 'This action cannot be undone';
-  static const String deleteConfirmation = 'Are you sure you want to delete this?';
+  static const String deleteConfirmation =
+      'Are you sure you want to delete this?';
 
   // ==================== Muscle Visualization (Phase 7) ====================
   static const String progress = 'Progress';

@@ -25,6 +25,8 @@ class ProfilePage extends StatelessWidget {
           children: [
             const SizedBox(height: 20),
             _buildProfileHeader(context),
+            const SizedBox(height: 24),
+            _buildInfoBanner(context),
             const SizedBox(height: 32),
             _buildStatsCards(context),
             const SizedBox(height: 32),
@@ -67,23 +69,23 @@ class ProfilePage extends StatelessWidget {
               context,
               title: AppStrings.account,
               children: [
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.person_outline,
                   title: AppStrings.editProfile,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableProfileMessage,
                 ),
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.lock_outline,
                   title: AppStrings.changePassword,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableAuthMessage,
                 ),
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.notifications_outlined,
                   title: AppStrings.notifications,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableSettingsMessage,
                 ),
               ],
             ),
@@ -92,19 +94,19 @@ class ProfilePage extends StatelessWidget {
               context,
               title: AppStrings.preferences,
               children: [
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.dark_mode_outlined,
                   title: AppStrings.theme,
                   subtitle: AppStrings.dark,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableSettingsMessage,
                 ),
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.language_outlined,
                   title: AppStrings.language,
                   subtitle: AppStrings.english,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableSettingsMessage,
                 ),
               ],
             ),
@@ -113,17 +115,17 @@ class ProfilePage extends StatelessWidget {
               context,
               title: AppStrings.support,
               children: [
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.help_outline,
                   title: AppStrings.helpSupport,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableSupportMessage,
                 ),
-                _buildActionTile(
+                _buildUnavailableActionTile(
                   context,
                   icon: Icons.feedback_outlined,
                   title: AppStrings.sendFeedback,
-                  onTap: () => _showComingSoon(context),
+                  message: AppStrings.unavailableFeedbackMessage,
                 ),
                 _buildActionTile(
                   context,
@@ -180,6 +182,36 @@ class ProfilePage extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+
+  Widget _buildInfoBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderDark, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color: AppTheme.primaryOrange,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppStrings.noProfileStatsYet,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textMedium,
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -341,11 +373,38 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Widget _buildUnavailableActionTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String message,
+    String? subtitle,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(icon, color: AppTheme.textMedium),
+        title: Text(title),
+        subtitle: Text(subtitle ?? AppStrings.featureUnavailableLabel),
+        trailing: const Icon(Icons.info_outline, color: AppTheme.textDim),
+        onTap: () => _showUnavailableDialog(
+          context,
+          title: title,
+          message: message,
+        ),
+      ),
+    );
+  }
+
   Widget _buildSignOutButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => _showComingSoon(context),
+        onPressed: () => _showUnavailableDialog(
+          context,
+          title: AppStrings.signOut,
+          message: AppStrings.unavailableAuthMessage,
+        ),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppTheme.errorRed,
           side: const BorderSide(color: AppTheme.errorRed),
@@ -363,12 +422,22 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(AppStrings.comingSoon),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(20),
+  void _showUnavailableDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(AppStrings.gotIt),
+          ),
+        ],
       ),
     );
   }

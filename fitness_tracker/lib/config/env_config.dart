@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart' show kDebugMode;
+
+import '../core/logging/app_logger.dart';
 
 class EnvConfig {
   EnvConfig._();
@@ -33,7 +35,15 @@ class EnvConfig {
   static bool get isProduction => environment == 'production';
   static bool get isStaging => environment == 'staging';
 
-  static bool get enableDevicePreview => kDebugMode;
+  /// DevicePreview must be explicitly enabled.
+  /// This avoids dev-only wrappers accidentally becoming part of the runtime path
+  /// just because the build is debug.
+  static const bool _devicePreviewFlag = bool.fromEnvironment(
+    'ENABLE_DEVICE_PREVIEW',
+    defaultValue: false,
+  );
+
+  static bool get enableDevicePreview => kDebugMode && _devicePreviewFlag;
 
   static const bool enablePerformanceMonitoring = bool.fromEnvironment(
     'ENABLE_PERFORMANCE_MONITORING',
@@ -56,9 +66,10 @@ class EnvConfig {
   /// Version 12: Added remote-ready sync metadata columns to exercises.
   /// Version 13: Added remote-ready sync metadata columns to meals and nutrition logs.
   /// Version 14: Added app metadata storage for session and migration state.
+  /// Version 15: Replaced destructive legacy upgrade behavior with explicit compatibility failure.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 14,
+    defaultValue: 15,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(
@@ -132,6 +143,10 @@ class EnvConfig {
       issues.add('API_KEY must be set in production.');
     }
 
+    if (isProduction && enableDevicePreview) {
+      issues.add('ENABLE_DEVICE_PREVIEW must be false in production.');
+    }
+
     return issues;
   }
 
@@ -153,20 +168,41 @@ class EnvConfig {
   }
 
   static void printConfig() {
-    if (!enableDebugLogs) return;
+    if (!enableDebugLogs) {
+      return;
+    }
 
-    debugPrint('========== Environment Configuration ==========');
-    debugPrint('App Name: $appName');
-    debugPrint('App Version: $appVersion');
-    debugPrint('Environment: $environment');
-    debugPrint('Database: $databaseName (v$databaseVersion)');
-    debugPrint('Seed Default Data: $seedDefaultData');
-    debugPrint('Seed Data Version: $seedDataVersion');
-    debugPrint('Force Reseed: $forceReseed');
-    debugPrint('Enable Seeding Logs: $enableSeedingLogs');
-    debugPrint('API Base URL: $apiBaseUrl');
-    debugPrint('API Timeout Seconds: $apiTimeoutSeconds');
-    debugPrint('Log Level: $logLevel');
-    debugPrint('==============================================');
+    AppLogger.debug(
+      '========== Environment Configuration ==========',
+      category: 'config',
+    );
+    AppLogger.debug('App Name: $appName', category: 'config');
+    AppLogger.debug('App Version: $appVersion', category: 'config');
+    AppLogger.debug('Environment: $environment', category: 'config');
+    AppLogger.debug(
+      'Database: $databaseName (v$databaseVersion)',
+      category: 'config',
+    );
+    AppLogger.debug('Seed Default Data: $seedDefaultData', category: 'config');
+    AppLogger.debug('Seed Data Version: $seedDataVersion', category: 'config');
+    AppLogger.debug('Force Reseed: $forceReseed', category: 'config');
+    AppLogger.debug(
+      'Enable Seeding Logs: $enableSeedingLogs',
+      category: 'config',
+    );
+    AppLogger.debug(
+      'Enable Device Preview: $enableDevicePreview',
+      category: 'config',
+    );
+    AppLogger.debug('API Base URL: $apiBaseUrl', category: 'config');
+    AppLogger.debug(
+      'API Timeout Seconds: $apiTimeoutSeconds',
+      category: 'config',
+    );
+    AppLogger.debug('Log Level: $logLevel', category: 'config');
+    AppLogger.debug(
+      '==============================================',
+      category: 'config',
+    );
   }
 }

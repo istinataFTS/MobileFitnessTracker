@@ -26,18 +26,27 @@ class AppHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb || !EnvConfig.enableDevicePreview) {
-      return const FitnessTrackerApp();
+      return const FitnessTrackerApp(
+        useDevicePreviewAdapters: false,
+      );
     }
 
     return DevicePreview(
-      enabled: EnvConfig.enableDevicePreview,
-      builder: (_) => const FitnessTrackerApp(),
+      enabled: true,
+      builder: (_) => const FitnessTrackerApp(
+        useDevicePreviewAdapters: true,
+      ),
     );
   }
 }
 
 class FitnessTrackerApp extends StatelessWidget {
-  const FitnessTrackerApp({super.key});
+  const FitnessTrackerApp({
+    super.key,
+    this.useDevicePreviewAdapters = false,
+  });
+
+  final bool useDevicePreviewAdapters;
 
   Widget _buildWebHome() {
     return const Scaffold(
@@ -125,8 +134,8 @@ class FitnessTrackerApp extends StatelessWidget {
         ),
       ],
       child: AppShell(
-        builder: DevicePreview.appBuilder,
-        locale: DevicePreview.locale(context),
+        builder: useDevicePreviewAdapters ? DevicePreview.appBuilder : null,
+        locale: useDevicePreviewAdapters ? DevicePreview.locale(context) : null,
         home: const AppStartupListener(
           child: BottomNavigation(),
         ),
