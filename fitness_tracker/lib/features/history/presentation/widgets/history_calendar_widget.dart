@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/week_date_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../history_strings.dart';
 
@@ -57,7 +58,7 @@ class HistoryCalendarWidget extends StatelessWidget {
 
   Widget _buildMonthHeader(BuildContext context) {
     final String monthName = DateFormat('MMMM yyyy').format(displayedMonth);
-    final bool isCurrentMonth = _isSameMonth(displayedMonth, today);
+    final bool isCurrentMonth = WeekDateUtils.isSameMonth(displayedMonth, today);
 
     return SizedBox(
       height: _monthHeaderHeight,
@@ -105,26 +106,7 @@ class HistoryCalendarWidget extends StatelessWidget {
   }
 
   Widget _buildWeekdayHeaders(BuildContext context) {
-    final List<String> weekdays = switch (weekStartDay) {
-      WeekStartDay.monday => const <String>[
-          'M',
-          'T',
-          'W',
-          'T',
-          'F',
-          'S',
-          'S',
-        ],
-      WeekStartDay.sunday => const <String>[
-          'S',
-          'M',
-          'T',
-          'W',
-          'T',
-          'F',
-          'S',
-        ],
-    };
+    final List<String> weekdays = WeekDateUtils.weekdayHeaders(weekStartDay);
 
     return SizedBox(
       height: _weekdayHeaderHeight,
@@ -155,8 +137,10 @@ class HistoryCalendarWidget extends StatelessWidget {
     final DateTime lastDayOfMonth =
         DateTime(displayedMonth.year, displayedMonth.month + 1, 0);
 
-    final int leadingEmptyCells =
-        _leadingEmptyCellCount(firstDayOfMonth, weekStartDay);
+    final int leadingEmptyCells = WeekDateUtils.leadingEmptyCellCount(
+      firstDayOfMonth,
+      weekStartDay,
+    );
     final int totalDays = lastDayOfMonth.day;
     final int totalCells = leadingEmptyCells + totalDays;
     final int rows = (totalCells / 7).ceil();
@@ -191,13 +175,15 @@ class HistoryCalendarWidget extends StatelessWidget {
   }
 
   Widget _buildDateCell(BuildContext context, DateTime date) {
-    final bool isToday = _isSameDay(date, today);
-    final bool isSelected =
-        selectedDate != null && _isSameDay(date, selectedDate!);
-    final int activityCount = dateActivityCount[date] ?? 0;
+    final bool isToday = WeekDateUtils.isSameDay(date, today);
+    final bool isSelected = selectedDate != null &&
+        WeekDateUtils.isSameDay(date, selectedDate!);
+    final DateTime normalizedDate = WeekDateUtils.normalizeDate(date);
+    final int activityCount = dateActivityCount[normalizedDate] ?? 0;
     final bool hasActivity = activityCount > 0;
-    final bool isFutureDate =
-        date.isAfter(DateTime(today.year, today.month, today.day));
+
+    final DateTime normalizedToday = WeekDateUtils.normalizeDate(today);
+    final bool isFutureDate = normalizedDate.isAfter(normalizedToday);
 
     Color? backgroundColor;
     if (isSelected) {
@@ -214,7 +200,7 @@ class HistoryCalendarWidget extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: isFutureDate ? null : () => onDateSelected(date),
+      onTap: isFutureDate ? null : () => onDateSelected(normalizedDate),
       child: Container(
         height: _dayItemHeight,
         margin: const EdgeInsets.all(1.5),
@@ -265,25 +251,5 @@ class HistoryCalendarWidget extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  int _leadingEmptyCellCount(
-    DateTime firstDayOfMonth,
-    WeekStartDay weekStartDay,
-  ) {
-    switch (weekStartDay) {
-      case WeekStartDay.monday:
-        return firstDayOfMonth.weekday - 1;
-      case WeekStartDay.sunday:
-        return firstDayOfMonth.weekday % 7;
-    }
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  bool _isSameMonth(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month;
   }
 }

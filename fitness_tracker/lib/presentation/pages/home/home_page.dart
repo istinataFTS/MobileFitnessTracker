@@ -6,6 +6,7 @@ import '../../../config/app_config.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/time_period.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
@@ -187,11 +188,14 @@ class _HomePageState extends State<HomePage> {
     AppSettings settings,
   ) {
     final now = DateTime.now();
-    final weekStart = _startOfWeek(
+    final weekStart = WeekDateUtils.startOfWeek(
       now,
       settings.weekStartDay,
     );
-    final weekEnd = weekStart.add(const Duration(days: 6));
+    final weekEnd = WeekDateUtils.endOfWeek(
+      now,
+      settings.weekStartDay,
+    );
     final dateFormatter = DateFormat('MMM d');
     final weekRange =
         '${dateFormatter.format(weekStart)} - ${dateFormatter.format(weekEnd)}';
@@ -441,17 +445,5 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
-  }
-
-  DateTime _startOfWeek(DateTime date, WeekStartDay weekStartDay) {
-    final normalized = DateTime(date.year, date.month, date.day);
-
-    switch (weekStartDay) {
-      case WeekStartDay.monday:
-        return normalized.subtract(Duration(days: normalized.weekday - 1));
-      case WeekStartDay.sunday:
-        final daysFromSunday = normalized.weekday % 7;
-        return normalized.subtract(Duration(days: daysFromSunday));
-    }
   }
 }

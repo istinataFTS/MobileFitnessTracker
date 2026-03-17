@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/nutrition_log.dart';
@@ -332,7 +333,7 @@ class _WorkoutSetCard extends StatelessWidget {
         .map(MuscleGroups.getDisplayName)
         .join(', ');
 
-    final String displayWeight = _formatWeight(
+    final String displayWeight = WeightUnitUtils.formatForDisplay(
       set.weight,
       weightUnit,
     );
@@ -364,7 +365,10 @@ class _WorkoutSetCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: () => _confirmDelete(context),
+                  onPressed: () => _confirmDelete(
+                    context,
+                    displayWeight,
+                  ),
                   tooltip: 'Delete set',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -409,12 +413,10 @@ class _WorkoutSetCard extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    final String displayWeight = _formatWeight(
-      set.weight,
-      weightUnit,
-    );
-
+  void _confirmDelete(
+    BuildContext context,
+    String displayWeight,
+  ) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
@@ -441,23 +443,6 @@ class _WorkoutSetCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatWeight(double weightKg, WeightUnit unit) {
-    switch (unit) {
-      case WeightUnit.kilograms:
-        return '${_formatNumber(weightKg)} kg';
-      case WeightUnit.pounds:
-        final pounds = weightKg * 2.2046226218;
-        return '${_formatNumber(pounds)} lb';
-    }
-  }
-
-  String _formatNumber(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
   }
 }
 

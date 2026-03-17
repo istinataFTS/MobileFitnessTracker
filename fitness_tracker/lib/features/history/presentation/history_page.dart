@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/calendar_constants.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
+import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
 import '../../../injection/injection_container.dart' as di;
@@ -106,7 +107,7 @@ class _HistoryPageState extends State<HistoryPage> {
               }
 
               final bool selectedDateChanged = _lastSelectedDate == null ||
-                  !_isSameDay(_lastSelectedDate!, selectedDate);
+                  !WeekDateUtils.isSameDay(_lastSelectedDate!, selectedDate);
 
               final bool selectedActivityChanged =
                   selectedActivityCount != _lastSelectedActivityCount;
@@ -341,9 +342,5 @@ class _HistoryPageState extends State<HistoryPage> {
         alignment: 0.08,
       );
     });
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }

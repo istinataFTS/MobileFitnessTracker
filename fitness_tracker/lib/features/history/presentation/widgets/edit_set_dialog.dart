@@ -68,11 +68,10 @@ class _EditSetDialogState extends State<EditSetDialog> {
       return;
     }
 
-    _weightController.text = WeightUnitUtils.formatNumber(
-      WeightUnitUtils.fromStoredKilograms(
-        widget.workoutSet.weight,
-        settings.weightUnit,
-      ),
+    _weightController.text =
+        WeightUnitUtils.formatInputValueFromStoredKilograms(
+      widget.workoutSet.weight,
+      settings.weightUnit,
     );
   }
 

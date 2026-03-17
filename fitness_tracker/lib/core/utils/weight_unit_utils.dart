@@ -66,6 +66,15 @@ class WeightUnitUtils {
     return '$formatted ${unitLabel(unit)}';
   }
 
+  static String formatInputValueFromStoredKilograms(
+    double kilograms,
+    WeightUnit unit,
+  ) {
+    return formatNumber(
+      fromStoredKilograms(kilograms, unit),
+    );
+  }
+
   static String formatNumber(double value) {
     if (value == value.roundToDouble()) {
       return value.toStringAsFixed(0);
