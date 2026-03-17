@@ -5,15 +5,19 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/calendar_constants.dart';
 import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../../../../core/utils/weight_unit_utils.dart';
+import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/repositories/app_settings_repository.dart';
+import '../../../../injection/injection_container.dart' as di;
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
 
-class DayDetailsBottomSheet extends StatelessWidget {
+class DayDetailsBottomSheet extends StatefulWidget {
   final DateTime date;
   final List<WorkoutSet> sets;
 
@@ -24,42 +28,78 @@ class DayDetailsBottomSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bool hasWorkouts = sets.isNotEmpty;
+  State<DayDetailsBottomSheet> createState() => _DayDetailsBottomSheetState();
+}
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundDark,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(CalendarConstants.bottomSheetBorderRadius),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.borderDark,
-              borderRadius: BorderRadius.circular(2),
+class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
+  late final AppSettingsRepository _settingsRepository;
+  late Future<AppSettings> _settingsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsRepository = di.sl<AppSettingsRepository>();
+    _settingsFuture = _loadSettings();
+  }
+
+  Future<AppSettings> _loadSettings() async {
+    final result = await _settingsRepository.getSettings();
+    return result.fold(
+      (_) => const AppSettings.defaults(),
+      (settings) => settings,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AppSettings>(
+      future: _settingsFuture,
+      builder: (context, settingsSnapshot) {
+        final settings =
+            settingsSnapshot.data ?? const AppSettings.defaults();
+
+        final bool hasWorkouts = widget.sets.isNotEmpty;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundDark,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(
+                CalendarConstants.bottomSheetBorderRadius,
+              ),
             ),
           ),
-          _buildHeader(context, hasWorkouts),
-          if (hasWorkouts) const Divider(height: 1),
-          Flexible(
-            child: hasWorkouts
-                ? _buildWorkoutsList(context)
-                : _buildEmptyState(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.borderDark,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              _buildHeader(context, hasWorkouts),
+              if (hasWorkouts) const Divider(height: 1),
+              Flexible(
+                child: hasWorkouts
+                    ? _buildWorkoutsList(
+                        context,
+                        settings.weightUnit,
+                      )
+                    : _buildEmptyState(context),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildHeader(BuildContext context, bool hasWorkouts) {
-    final String dateStr = DateFormat('EEEE, MMM d').format(date);
+    final String dateStr = DateFormat('EEEE, MMM d').format(widget.date);
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -78,7 +118,7 @@ class DayDetailsBottomSheet extends StatelessWidget {
                 if (hasWorkouts) ...<Widget>[
                   const SizedBox(height: 4),
                   Text(
-                    '${sets.length} set${sets.length != 1 ? 's' : ''} logged',
+                    '${widget.sets.length} set${widget.sets.length != 1 ? 's' : ''} logged',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textMedium,
                         ),
@@ -103,7 +143,10 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkoutsList(BuildContext context) {
+  Widget _buildWorkoutsList(
+    BuildContext context,
+    WeightUnit weightUnit,
+  ) {
     return BlocBuilder<ExerciseBloc, ExerciseState>(
       builder: (BuildContext context, ExerciseState exerciseState) {
         if (exerciseState is! ExercisesLoaded) {
@@ -117,24 +160,34 @@ class DayDetailsBottomSheet extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shrinkWrap: true,
-          itemCount: sets.length,
+          itemCount: widget.sets.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (BuildContext context, int index) {
-            final WorkoutSet set = sets[index];
+            final WorkoutSet set = widget.sets[index];
             final Exercise? exercise = exerciseMap[set.exerciseId];
 
             if (exercise == null) {
               return const SizedBox.shrink();
             }
 
-            return _buildSetCard(context, set, exercise);
+            return _buildSetCard(
+              context,
+              set,
+              exercise,
+              weightUnit,
+            );
           },
         );
       },
     );
   }
 
-  Widget _buildSetCard(BuildContext context, WorkoutSet set, Exercise exercise) {
+  Widget _buildSetCard(
+    BuildContext context,
+    WorkoutSet set,
+    Exercise exercise,
+    WeightUnit weightUnit,
+  ) {
     final String muscleGroupsList = exercise.muscleGroups
         .map(MuscleGroups.getDisplayName)
         .join(', ');
@@ -166,7 +219,12 @@ class DayDetailsBottomSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: () => _confirmDelete(context, set, exercise),
+                  onPressed: () => _confirmDelete(
+                    context,
+                    set,
+                    exercise,
+                    weightUnit,
+                  ),
                   tooltip: 'Delete Set',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -185,7 +243,10 @@ class DayDetailsBottomSheet extends StatelessWidget {
                 _buildDetailChip(
                   context,
                   icon: Icons.fitness_center,
-                  label: '${set.weight} kg',
+                  label: WeightUnitUtils.formatForDisplay(
+                    set.weight,
+                    weightUnit,
+                  ),
                 ),
               ],
             ),
@@ -269,7 +330,7 @@ class DayDetailsBottomSheet extends StatelessWidget {
     Navigator.of(context).pop();
     showHistoryWorkoutLogBottomSheet(
       context,
-      selectedDate: date,
+      selectedDate: widget.date,
     );
   }
 
@@ -286,14 +347,24 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, WorkoutSet set, Exercise exercise) {
+  void _confirmDelete(
+    BuildContext context,
+    WorkoutSet set,
+    Exercise exercise,
+    WeightUnit weightUnit,
+  ) {
+    final String displayWeight = WeightUnitUtils.formatForDisplay(
+      set.weight,
+      weightUnit,
+    );
+
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: AppTheme.surfaceDark,
         title: const Text('Delete Set?'),
         content: Text(
-          'Remove ${exercise.name} - ${set.reps} reps @ ${set.weight} kg?',
+          'Remove ${exercise.name} - ${set.reps} reps @ $displayWeight?',
         ),
         actions: <Widget>[
           TextButton(

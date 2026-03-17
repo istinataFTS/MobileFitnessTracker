@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
+import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/workout_set.dart';
@@ -20,6 +21,7 @@ class HistoryDayContent extends StatefulWidget {
   final DateTime? selectedDate;
   final List<WorkoutSet> workoutSets;
   final List<NutritionLog> nutritionLogs;
+  final WeightUnit weightUnit;
   final VoidCallback onClearSelection;
   final int highlightVersion;
 
@@ -28,6 +30,7 @@ class HistoryDayContent extends StatefulWidget {
     required this.selectedDate,
     required this.workoutSets,
     required this.nutritionLogs,
+    required this.weightUnit,
     required this.onClearSelection,
     this.highlightVersion = 0,
   });
@@ -97,6 +100,7 @@ class _HistoryDayContentState extends State<HistoryDayContent> {
           _WorkoutHistorySection(
             date: widget.selectedDate!,
             sets: widget.workoutSets,
+            weightUnit: widget.weightUnit,
           ),
           const SizedBox(height: 16),
           _NutritionHistorySection(
@@ -232,10 +236,12 @@ class _CountChip extends StatelessWidget {
 class _WorkoutHistorySection extends StatelessWidget {
   final DateTime date;
   final List<WorkoutSet> sets;
+  final WeightUnit weightUnit;
 
   const _WorkoutHistorySection({
     required this.date,
     required this.sets,
+    required this.weightUnit,
   });
 
   @override
@@ -290,10 +296,13 @@ class _WorkoutHistorySection extends StatelessWidget {
 
                 return Column(
                   children: <Widget>[
-                    for (int index = 0; index < visibleSets.length; index++) ...<Widget>[
+                    for (int index = 0;
+                        index < visibleSets.length;
+                        index++) ...<Widget>[
                       _WorkoutSetCard(
                         set: visibleSets[index],
                         exercise: exerciseMap[visibleSets[index].exerciseId]!,
+                        weightUnit: weightUnit,
                       ),
                       if (index < visibleSets.length - 1)
                         const SizedBox(height: 12),
@@ -309,10 +318,12 @@ class _WorkoutHistorySection extends StatelessWidget {
 class _WorkoutSetCard extends StatelessWidget {
   final WorkoutSet set;
   final Exercise exercise;
+  final WeightUnit weightUnit;
 
   const _WorkoutSetCard({
     required this.set,
     required this.exercise,
+    required this.weightUnit,
   });
 
   @override
@@ -320,6 +331,11 @@ class _WorkoutSetCard extends StatelessWidget {
     final String muscleGroups = exercise.muscleGroups
         .map(MuscleGroups.getDisplayName)
         .join(', ');
+
+    final String displayWeight = _formatWeight(
+      set.weight,
+      weightUnit,
+    );
 
     return Card(
       margin: EdgeInsets.zero,
@@ -363,7 +379,7 @@ class _WorkoutSetCard extends StatelessWidget {
                 _MetricChip(icon: Icons.repeat, label: '${set.reps} reps'),
                 _MetricChip(
                   icon: Icons.fitness_center,
-                  label: '${set.weight} kg',
+                  label: displayWeight,
                 ),
               ],
             ),
@@ -394,13 +410,18 @@ class _WorkoutSetCard extends StatelessWidget {
   }
 
   void _confirmDelete(BuildContext context) {
+    final String displayWeight = _formatWeight(
+      set.weight,
+      weightUnit,
+    );
+
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: AppTheme.surfaceDark,
         title: const Text('Delete Set?'),
         content: Text(
-          'Remove ${exercise.name} - ${set.reps} reps @ ${set.weight} kg?',
+          'Remove ${exercise.name} - ${set.reps} reps @ $displayWeight?',
         ),
         actions: <Widget>[
           TextButton(
@@ -420,6 +441,23 @@ class _WorkoutSetCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatWeight(double weightKg, WeightUnit unit) {
+    switch (unit) {
+      case WeightUnit.kilograms:
+        return '${_formatNumber(weightKg)} kg';
+      case WeightUnit.pounds:
+        final pounds = weightKg * 2.2046226218;
+        return '${_formatNumber(pounds)} lb';
+    }
+  }
+
+  String _formatNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
   }
 }
 

@@ -3,9 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../config/app_config.dart';
+import '../../../config/env_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/time_period.dart';
+import '../../../domain/repositories/app_settings_repository.dart';
+import '../../../injection/injection_container.dart' as di;
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
@@ -17,23 +21,71 @@ import 'widgets/nutrition_summary_card.dart';
 import 'widgets/period_selector_widget.dart';
 import 'widgets/progress_stats_widget.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: BlocBuilder<HomeBloc, HomeState>(
-          builder: (context, homeState) {
-            return _buildHomeContent(context, homeState);
-          },
-        ),
-      ),
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late final AppSettingsRepository _settingsRepository;
+  late Future<AppSettings> _settingsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsRepository = di.sl<AppSettingsRepository>();
+    _settingsFuture = _loadSettings();
+  }
+
+  Future<AppSettings> _loadSettings() async {
+    final result = await _settingsRepository.getSettings();
+    return result.fold(
+      (_) => const AppSettings.defaults(),
+      (settings) => settings,
     );
   }
 
-  Widget _buildHomeContent(BuildContext context, HomeState homeState) {
+  Future<void> _refreshAll(BuildContext context) async {
+    context.read<HomeBloc>().add(RefreshHomeDataEvent());
+    context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
+
+    final nextSettingsFuture = _loadSettings();
+    if (mounted) {
+      setState(() {
+        _settingsFuture = nextSettingsFuture;
+      });
+    }
+    await nextSettingsFuture;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AppSettings>(
+      future: _settingsFuture,
+      builder: (context, settingsSnapshot) {
+        final settings =
+            settingsSnapshot.data ?? const AppSettings.defaults();
+
+        return Scaffold(
+          body: SafeArea(
+            child: BlocBuilder<HomeBloc, HomeState>(
+              builder: (context, homeState) {
+                return _buildHomeContent(context, homeState, settings);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHomeContent(
+    BuildContext context,
+    HomeState homeState,
+    AppSettings settings,
+  ) {
     if (homeState is HomeLoading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -47,7 +99,7 @@ class HomePage extends StatelessWidget {
     }
 
     if (homeState is HomeLoaded) {
-      return _buildLoadedContent(context, homeState);
+      return _buildLoadedContent(context, homeState, settings);
     }
 
     return const Center(
@@ -106,17 +158,18 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildLoadedContent(BuildContext context, HomeLoaded homeState) {
+  Widget _buildLoadedContent(
+    BuildContext context,
+    HomeLoaded homeState,
+    AppSettings settings,
+  ) {
     return RefreshIndicator(
-      onRefresh: () async {
-        context.read<HomeBloc>().add(RefreshHomeDataEvent());
-        context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
-      },
+      onRefresh: () => _refreshAll(context),
       color: AppTheme.primaryOrange,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _buildGreetingSection(context),
+          _buildGreetingSection(context, settings),
           const SizedBox(height: 24),
           _buildNutritionCard(context, homeState),
           const SizedBox(height: 24),
@@ -129,9 +182,15 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildGreetingSection(BuildContext context) {
+  Widget _buildGreetingSection(
+    BuildContext context,
+    AppSettings settings,
+  ) {
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStart = _startOfWeek(
+      now,
+      settings.weekStartDay,
+    );
     final weekEnd = weekStart.add(const Duration(days: 6));
     final dateFormatter = DateFormat('MMM d');
     final weekRange =
@@ -311,7 +370,9 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: 16),
           TextButton.icon(
             onPressed: () {
-              context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
+              context.read<MuscleVisualBloc>().add(
+                    const RefreshVisualsEvent(),
+                  );
             },
             icon: const Icon(Icons.refresh),
             label: Text(AppStringsPhase7.tryAgain),
@@ -380,5 +441,17 @@ class HomePage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  DateTime _startOfWeek(DateTime date, WeekStartDay weekStartDay) {
+    final normalized = DateTime(date.year, date.month, date.day);
+
+    switch (weekStartDay) {
+      case WeekStartDay.monday:
+        return normalized.subtract(Duration(days: normalized.weekday - 1));
+      case WeekStartDay.sunday:
+        final daysFromSunday = normalized.weekday % 7;
+        return normalized.subtract(Duration(days: daysFromSunday));
+    }
   }
 }

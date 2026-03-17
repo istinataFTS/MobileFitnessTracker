@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/themes/app_theme.dart';
+import '../../../../domain/entities/app_settings.dart';
 import '../history_strings.dart';
 
 class HistoryCalendarWidget extends StatelessWidget {
@@ -9,6 +10,7 @@ class HistoryCalendarWidget extends StatelessWidget {
   final DateTime? selectedDate;
   final DateTime today;
   final Map<DateTime, int> dateActivityCount;
+  final WeekStartDay weekStartDay;
   final ValueChanged<DateTime> onDateSelected;
   final VoidCallback onPreviousMonth;
   final VoidCallback onNextMonth;
@@ -20,6 +22,7 @@ class HistoryCalendarWidget extends StatelessWidget {
     required this.selectedDate,
     required this.today,
     required this.dateActivityCount,
+    required this.weekStartDay,
     required this.onDateSelected,
     required this.onPreviousMonth,
     required this.onNextMonth,
@@ -102,7 +105,26 @@ class HistoryCalendarWidget extends StatelessWidget {
   }
 
   Widget _buildWeekdayHeaders(BuildContext context) {
-    const List<String> weekdays = <String>['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    final List<String> weekdays = switch (weekStartDay) {
+      WeekStartDay.monday => const <String>[
+          'M',
+          'T',
+          'W',
+          'T',
+          'F',
+          'S',
+          'S',
+        ],
+      WeekStartDay.sunday => const <String>[
+          'S',
+          'M',
+          'T',
+          'W',
+          'T',
+          'F',
+          'S',
+        ],
+    };
 
     return SizedBox(
       height: _weekdayHeaderHeight,
@@ -133,9 +155,10 @@ class HistoryCalendarWidget extends StatelessWidget {
     final DateTime lastDayOfMonth =
         DateTime(displayedMonth.year, displayedMonth.month + 1, 0);
 
-    final int firstWeekday = firstDayOfMonth.weekday % 7;
+    final int leadingEmptyCells =
+        _leadingEmptyCellCount(firstDayOfMonth, weekStartDay);
     final int totalDays = lastDayOfMonth.day;
-    final int totalCells = firstWeekday + totalDays;
+    final int totalCells = leadingEmptyCells + totalDays;
     final int rows = (totalCells / 7).ceil();
 
     return Padding(
@@ -145,7 +168,7 @@ class HistoryCalendarWidget extends StatelessWidget {
           return Row(
             children: List<Widget>.generate(7, (int colIndex) {
               final int cellIndex = rowIndex * 7 + colIndex;
-              final int dayNumber = cellIndex - firstWeekday + 1;
+              final int dayNumber = cellIndex - leadingEmptyCells + 1;
 
               if (dayNumber < 1 || dayNumber > totalDays) {
                 return const Expanded(child: SizedBox());
@@ -169,7 +192,8 @@ class HistoryCalendarWidget extends StatelessWidget {
 
   Widget _buildDateCell(BuildContext context, DateTime date) {
     final bool isToday = _isSameDay(date, today);
-    final bool isSelected = selectedDate != null && _isSameDay(date, selectedDate!);
+    final bool isSelected =
+        selectedDate != null && _isSameDay(date, selectedDate!);
     final int activityCount = dateActivityCount[date] ?? 0;
     final bool hasActivity = activityCount > 0;
     final bool isFutureDate =
@@ -241,6 +265,18 @@ class HistoryCalendarWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  int _leadingEmptyCellCount(
+    DateTime firstDayOfMonth,
+    WeekStartDay weekStartDay,
+  ) {
+    switch (weekStartDay) {
+      case WeekStartDay.monday:
+        return firstDayOfMonth.weekday - 1;
+      case WeekStartDay.sunday:
+        return firstDayOfMonth.weekday % 7;
+    }
   }
 
   bool _isSameDay(DateTime a, DateTime b) {

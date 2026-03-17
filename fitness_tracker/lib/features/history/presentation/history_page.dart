@@ -6,6 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/calendar_constants.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
+import '../../../domain/entities/app_settings.dart';
+import '../../../domain/repositories/app_settings_repository.dart';
+import '../../../injection/injection_container.dart' as di;
 import 'bloc/history_bloc.dart';
 import 'bloc/history_effect.dart';
 import 'bloc/history_event.dart';
@@ -28,6 +31,9 @@ class _HistoryPageState extends State<HistoryPage> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _historyDayContentKey = GlobalKey();
 
+  late final AppSettingsRepository _settingsRepository;
+  late Future<AppSettings> _settingsFuture;
+
   int _contentHighlightVersion = 0;
   DateTime? _lastSelectedDate;
   int _lastSelectedActivityCount = 0;
@@ -35,6 +41,9 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
+
+    _settingsRepository = di.sl<AppSettingsRepository>();
+    _settingsFuture = _loadSettings();
 
     final HistoryBloc historyBloc = context.read<HistoryBloc>();
 
@@ -51,6 +60,14 @@ class _HistoryPageState extends State<HistoryPage> {
     historyBloc.add(LoadMonthSetsEvent(DateTime.now()));
   }
 
+  Future<AppSettings> _loadSettings() async {
+    final result = await _settingsRepository.getSettings();
+    return result.fold(
+      (_) => const AppSettings.defaults(),
+      (settings) => settings,
+    );
+  }
+
   @override
   void dispose() {
     _historyEffectsSub?.cancel();
@@ -60,66 +77,79 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(HistoryStrings.title),
-        elevation: 0,
-      ),
-      body: BlocConsumer<HistoryBloc, HistoryState>(
-        listener: (BuildContext context, HistoryState state) {
-          if (state is! HistoryLoaded) {
-            return;
-          }
+    return FutureBuilder<AppSettings>(
+      future: _settingsFuture,
+      builder: (context, settingsSnapshot) {
+        final settings =
+            settingsSnapshot.data ?? const AppSettings.defaults();
 
-          final DateTime? selectedDate = state.selectedDate;
-          final int selectedActivityCount =
-              state.selectedDateSets.length + state.selectedDateNutritionLogs.length;
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text(HistoryStrings.title),
+            elevation: 0,
+          ),
+          body: BlocConsumer<HistoryBloc, HistoryState>(
+            listener: (BuildContext context, HistoryState state) {
+              if (state is! HistoryLoaded) {
+                return;
+              }
 
-          if (selectedDate == null) {
-            _lastSelectedDate = null;
-            _lastSelectedActivityCount = 0;
-            return;
-          }
+              final DateTime? selectedDate = state.selectedDate;
+              final int selectedActivityCount =
+                  state.selectedDateSets.length +
+                      state.selectedDateNutritionLogs.length;
 
-          final bool selectedDateChanged = _lastSelectedDate == null ||
-              !_isSameDay(_lastSelectedDate!, selectedDate);
+              if (selectedDate == null) {
+                _lastSelectedDate = null;
+                _lastSelectedActivityCount = 0;
+                return;
+              }
 
-          final bool selectedActivityChanged =
-              selectedActivityCount != _lastSelectedActivityCount;
+              final bool selectedDateChanged = _lastSelectedDate == null ||
+                  !_isSameDay(_lastSelectedDate!, selectedDate);
 
-          if (selectedDateChanged || selectedActivityChanged) {
-            _focusSelectedDayContent();
+              final bool selectedActivityChanged =
+                  selectedActivityCount != _lastSelectedActivityCount;
 
-            if (mounted) {
-              setState(() {
-                _contentHighlightVersion++;
-              });
-            }
-          }
+              if (selectedDateChanged || selectedActivityChanged) {
+                _focusSelectedDayContent();
 
-          _lastSelectedDate = selectedDate;
-          _lastSelectedActivityCount = selectedActivityCount;
-        },
-        builder: (BuildContext context, HistoryState state) {
-          if (state is HistoryLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                if (mounted) {
+                  setState(() {
+                    _contentHighlightVersion++;
+                  });
+                }
+              }
 
-          if (state is HistoryError) {
-            return _buildErrorState(context, state);
-          }
+              _lastSelectedDate = selectedDate;
+              _lastSelectedActivityCount = selectedActivityCount;
+            },
+            builder: (BuildContext context, HistoryState state) {
+              if (state is HistoryLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          if (state is HistoryLoaded) {
-            return _buildLoadedState(context, state);
-          }
+              if (state is HistoryError) {
+                return _buildErrorState(context, state);
+              }
 
-          return _buildInitialState(context);
-        },
-      ),
+              if (state is HistoryLoaded) {
+                return _buildLoadedState(context, state, settings);
+              }
+
+              return _buildInitialState(context);
+            },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildLoadedState(BuildContext context, HistoryLoaded state) {
+  Widget _buildLoadedState(
+    BuildContext context,
+    HistoryLoaded state,
+    AppSettings settings,
+  ) {
     final Map<DateTime, int> activityCounts =
         HistoryActivityAggregator.buildActivityCounts(
       monthSets: state.monthSets,
@@ -136,44 +166,65 @@ class _HistoryPageState extends State<HistoryPage> {
           _navigateToNextMonth(context, state.currentMonth);
         }
       },
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            HistoryCalendarWidget(
-              displayedMonth: state.currentMonth,
-              selectedDate: state.selectedDate,
-              today: DateTime.now(),
-              dateActivityCount: activityCounts,
-              onDateSelected: (DateTime date) {
-                context.read<HistoryBloc>().add(SelectDateEvent(date));
-              },
-              onPreviousMonth: () {
-                _navigateToPreviousMonth(context, state.currentMonth);
-              },
-              onNextMonth: () {
-                _navigateToNextMonth(context, state.currentMonth);
-              },
-              onTodayTapped: () {
-                context.read<HistoryBloc>().add(NavigateToMonthEvent(DateTime.now()));
-              },
-            ),
-            const SizedBox(height: 24),
-            KeyedSubtree(
-              key: _historyDayContentKey,
-              child: HistoryDayContent(
+      child: RefreshIndicator(
+        color: AppTheme.primaryOrange,
+        onRefresh: () async {
+          context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
+
+          final nextSettingsFuture = _loadSettings();
+          if (mounted) {
+            setState(() {
+              _settingsFuture = nextSettingsFuture;
+            });
+          }
+          await nextSettingsFuture;
+        },
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              HistoryCalendarWidget(
+                displayedMonth: state.currentMonth,
                 selectedDate: state.selectedDate,
-                workoutSets: state.selectedDateSets,
-                nutritionLogs: state.selectedDateNutritionLogs,
-                onClearSelection: () {
-                  context.read<HistoryBloc>().add(const ClearDateSelectionEvent());
+                today: DateTime.now(),
+                dateActivityCount: activityCounts,
+                weekStartDay: settings.weekStartDay,
+                onDateSelected: (DateTime date) {
+                  context.read<HistoryBloc>().add(SelectDateEvent(date));
                 },
-                highlightVersion: _contentHighlightVersion,
+                onPreviousMonth: () {
+                  _navigateToPreviousMonth(context, state.currentMonth);
+                },
+                onNextMonth: () {
+                  _navigateToNextMonth(context, state.currentMonth);
+                },
+                onTodayTapped: () {
+                  context.read<HistoryBloc>().add(
+                        NavigateToMonthEvent(DateTime.now()),
+                      );
+                },
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              KeyedSubtree(
+                key: _historyDayContentKey,
+                child: HistoryDayContent(
+                  selectedDate: state.selectedDate,
+                  workoutSets: state.selectedDateSets,
+                  nutritionLogs: state.selectedDateNutritionLogs,
+                  weightUnit: settings.weightUnit,
+                  onClearSelection: () {
+                    context
+                        .read<HistoryBloc>()
+                        .add(const ClearDateSelectionEvent());
+                  },
+                  highlightVersion: _contentHighlightVersion,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -222,7 +273,9 @@ class _HistoryPageState extends State<HistoryPage> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () {
-                context.read<HistoryBloc>().add(LoadMonthSetsEvent(DateTime.now()));
+                context.read<HistoryBloc>().add(
+                      LoadMonthSetsEvent(DateTime.now()),
+                    );
               },
               child: const Text(HistoryStrings.retry),
             ),
