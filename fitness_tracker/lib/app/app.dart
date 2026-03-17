@@ -18,6 +18,7 @@ import '../presentation/pages/log/bloc/workout_bloc.dart';
 import '../presentation/pages/meals/bloc/meal_bloc.dart';
 import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
+import '../presentation/settings/bloc/app_settings_cubit.dart';
 import 'startup/app_startup_listener.dart';
 
 class AppHost extends StatelessWidget {
@@ -108,6 +109,11 @@ class FitnessTrackerApp extends StatelessWidget {
 
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
+        BlocProvider<AppSettingsCubit>(
+          create: (_) => AppSettingsCubit(
+            repository: di.sl(),
+          )..loadSettings(),
+        ),
         BlocProvider<TargetsBloc>(
           create: (_) => di.sl<TargetsBloc>(),
         ),

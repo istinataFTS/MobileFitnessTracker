@@ -14,8 +14,7 @@ import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../domain/repositories/app_settings_repository.dart';
-import '../../../../injection/injection_container.dart' as di;
+import '../../../settings/bloc/app_settings_cubit.dart';
 import '../../exercises/bloc/exercise_bloc.dart';
 import '../bloc/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
@@ -43,9 +42,6 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
   StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
 
-  late final AppSettingsRepository _settingsRepository;
-  late Future<AppSettings> _settingsFuture;
-
   Exercise? _selectedExercise;
   late DateTime _selectedDate;
   int _selectedIntensity = MuscleStimulus.defaultIntensity;
@@ -54,8 +50,6 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   void initState() {
     super.initState();
 
-    _settingsRepository = di.sl<AppSettingsRepository>();
-    _settingsFuture = _loadSettings();
     _selectedDate = widget.initialDate ?? DateTime.now();
 
     final workoutBloc = context.read<WorkoutBloc>();
@@ -99,14 +93,6 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     });
   }
 
-  Future<AppSettings> _loadSettings() async {
-    final result = await _settingsRepository.getSettings();
-    return result.fold(
-      (_) => const AppSettings.defaults(),
-      (settings) => settings,
-    );
-  }
-
   @override
   void dispose() {
     _workoutEffectsSub?.cancel();
@@ -117,11 +103,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSettings>(
-      future: _settingsFuture,
-      builder: (context, settingsSnapshot) {
-        final settings =
-            settingsSnapshot.data ?? const AppSettings.defaults();
+    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
 
         return BlocConsumer<WorkoutBloc, WorkoutState>(
           listener: (context, state) {

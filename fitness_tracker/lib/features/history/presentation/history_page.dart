@@ -8,8 +8,7 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
-import '../../../domain/repositories/app_settings_repository.dart';
-import '../../../injection/injection_container.dart' as di;
+import '../../../presentation/settings/bloc/app_settings_cubit.dart';
 import 'bloc/history_bloc.dart';
 import 'bloc/history_effect.dart';
 import 'bloc/history_event.dart';
@@ -32,9 +31,6 @@ class _HistoryPageState extends State<HistoryPage> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _historyDayContentKey = GlobalKey();
 
-  late final AppSettingsRepository _settingsRepository;
-  late Future<AppSettings> _settingsFuture;
-
   int _contentHighlightVersion = 0;
   DateTime? _lastSelectedDate;
   int _lastSelectedActivityCount = 0;
@@ -42,9 +38,6 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
-
-    _settingsRepository = di.sl<AppSettingsRepository>();
-    _settingsFuture = _loadSettings();
 
     final HistoryBloc historyBloc = context.read<HistoryBloc>();
 
@@ -61,14 +54,6 @@ class _HistoryPageState extends State<HistoryPage> {
     historyBloc.add(LoadMonthSetsEvent(DateTime.now()));
   }
 
-  Future<AppSettings> _loadSettings() async {
-    final result = await _settingsRepository.getSettings();
-    return result.fold(
-      (_) => const AppSettings.defaults(),
-      (settings) => settings,
-    );
-  }
-
   @override
   void dispose() {
     _historyEffectsSub?.cancel();
@@ -78,11 +63,9 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSettings>(
-      future: _settingsFuture,
-      builder: (context, settingsSnapshot) {
-        final settings =
-            settingsSnapshot.data ?? const AppSettings.defaults();
+    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
 
         return Scaffold(
           appBar: AppBar(
@@ -171,14 +154,7 @@ class _HistoryPageState extends State<HistoryPage> {
         color: AppTheme.primaryOrange,
         onRefresh: () async {
           context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
-
-          final nextSettingsFuture = _loadSettings();
-          if (mounted) {
-            setState(() {
-              _settingsFuture = nextSettingsFuture;
-            });
-          }
-          await nextSettingsFuture;
+          await context.read<AppSettingsCubit>().loadSettings();
         },
         child: SingleChildScrollView(
           controller: _scrollController,

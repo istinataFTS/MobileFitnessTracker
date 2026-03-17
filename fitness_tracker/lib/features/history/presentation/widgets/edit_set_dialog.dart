@@ -7,9 +7,8 @@ import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../domain/repositories/app_settings_repository.dart';
-import '../../../../injection/injection_container.dart' as di;
 import '../../../../presentation/pages/log/widgets/intensity_slider_widget.dart';
+import '../../../../presentation/settings/bloc/app_settings_cubit.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 
@@ -30,49 +29,21 @@ class EditSetDialog extends StatefulWidget {
 class _EditSetDialogState extends State<EditSetDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  late final AppSettingsRepository _settingsRepository;
   late final TextEditingController _repsController;
   late final TextEditingController _weightController;
-
-  late Future<AppSettings> _settingsFuture;
   late int _selectedIntensity;
+
+  WeightUnit? _seededUnit;
 
   @override
   void initState() {
     super.initState();
-
-    _settingsRepository = di.sl<AppSettingsRepository>();
-    _settingsFuture = _loadSettings();
 
     _repsController = TextEditingController(
       text: widget.workoutSet.reps.toString(),
     );
     _weightController = TextEditingController();
     _selectedIntensity = widget.workoutSet.validatedIntensity;
-
-    _seedWeightController();
-  }
-
-  Future<AppSettings> _loadSettings() async {
-    final result = await _settingsRepository.getSettings();
-    return result.fold(
-      (_) => const AppSettings.defaults(),
-      (settings) => settings,
-    );
-  }
-
-  Future<void> _seedWeightController() async {
-    final settings = await _loadSettings();
-
-    if (!mounted) {
-      return;
-    }
-
-    _weightController.text =
-        WeightUnitUtils.formatInputValueFromStoredKilograms(
-      widget.workoutSet.weight,
-      settings.weightUnit,
-    );
   }
 
   @override
@@ -84,11 +55,11 @@ class _EditSetDialogState extends State<EditSetDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSettings>(
-      future: _settingsFuture,
-      builder: (context, settingsSnapshot) {
-        final settings =
-            settingsSnapshot.data ?? const AppSettings.defaults();
+    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
+
+        _seedWeightIfNeeded(settings.weightUnit);
 
         return Dialog(
           backgroundColor: AppTheme.surfaceDark,
@@ -182,6 +153,18 @@ class _EditSetDialogState extends State<EditSetDialog> {
         );
       },
     );
+  }
+
+  void _seedWeightIfNeeded(WeightUnit weightUnit) {
+    if (_seededUnit == weightUnit) {
+      return;
+    }
+
+    _weightController.text = WeightUnitUtils.formatInputValueFromStoredKilograms(
+      widget.workoutSet.weight,
+      weightUnit,
+    );
+    _seededUnit = weightUnit;
   }
 
   void _handleUpdate(WeightUnit weightUnit) {

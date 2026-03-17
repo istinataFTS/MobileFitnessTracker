@@ -9,8 +9,7 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/time_period.dart';
-import '../../../domain/repositories/app_settings_repository.dart';
-import '../../../injection/injection_container.dart' as di;
+import '../../settings/bloc/app_settings_cubit.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
@@ -22,58 +21,24 @@ import 'widgets/nutrition_summary_card.dart';
 import 'widgets/period_selector_widget.dart';
 import 'widgets/progress_stats_widget.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  late final AppSettingsRepository _settingsRepository;
-  late Future<AppSettings> _settingsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _settingsRepository = di.sl<AppSettingsRepository>();
-    _settingsFuture = _loadSettings();
-  }
-
-  Future<AppSettings> _loadSettings() async {
-    final result = await _settingsRepository.getSettings();
-    return result.fold(
-      (_) => const AppSettings.defaults(),
-      (settings) => settings,
-    );
-  }
-
-  Future<void> _refreshAll(BuildContext context) async {
-    context.read<HomeBloc>().add(RefreshHomeDataEvent());
-    context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
-
-    final nextSettingsFuture = _loadSettings();
-    if (mounted) {
-      setState(() {
-        _settingsFuture = nextSettingsFuture;
-      });
-    }
-    await nextSettingsFuture;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSettings>(
-      future: _settingsFuture,
-      builder: (context, settingsSnapshot) {
-        final settings =
-            settingsSnapshot.data ?? const AppSettings.defaults();
+    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
 
         return Scaffold(
           body: SafeArea(
             child: BlocBuilder<HomeBloc, HomeState>(
               builder: (context, homeState) {
-                return _buildHomeContent(context, homeState, settings);
+                return _buildHomeContent(
+                  context,
+                  homeState,
+                  settings,
+                );
               },
             ),
           ),
@@ -165,7 +130,11 @@ class _HomePageState extends State<HomePage> {
     AppSettings settings,
   ) {
     return RefreshIndicator(
-      onRefresh: () => _refreshAll(context),
+      onRefresh: () async {
+        context.read<HomeBloc>().add(RefreshHomeDataEvent());
+        context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
+        await context.read<AppSettingsCubit>().loadSettings();
+      },
       color: AppTheme.primaryOrange,
       child: ListView(
         padding: const EdgeInsets.all(20),

@@ -9,15 +9,14 @@ import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../domain/repositories/app_settings_repository.dart';
-import '../../../../injection/injection_container.dart' as di;
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../../../presentation/settings/bloc/app_settings_cubit.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
 
-class DayDetailsBottomSheet extends StatefulWidget {
+class DayDetailsBottomSheet extends StatelessWidget {
   final DateTime date;
   final List<WorkoutSet> sets;
 
@@ -28,37 +27,11 @@ class DayDetailsBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<DayDetailsBottomSheet> createState() => _DayDetailsBottomSheetState();
-}
-
-class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
-  late final AppSettingsRepository _settingsRepository;
-  late Future<AppSettings> _settingsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _settingsRepository = di.sl<AppSettingsRepository>();
-    _settingsFuture = _loadSettings();
-  }
-
-  Future<AppSettings> _loadSettings() async {
-    final result = await _settingsRepository.getSettings();
-    return result.fold(
-      (_) => const AppSettings.defaults(),
-      (settings) => settings,
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AppSettings>(
-      future: _settingsFuture,
-      builder: (context, settingsSnapshot) {
-        final settings =
-            settingsSnapshot.data ?? const AppSettings.defaults();
-
-        final bool hasWorkouts = widget.sets.isNotEmpty;
+    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
+        final bool hasWorkouts = sets.isNotEmpty;
 
         return Container(
           decoration: BoxDecoration(
@@ -99,7 +72,7 @@ class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
   }
 
   Widget _buildHeader(BuildContext context, bool hasWorkouts) {
-    final String dateStr = DateFormat('EEEE, MMM d').format(widget.date);
+    final String dateStr = DateFormat('EEEE, MMM d').format(date);
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -118,7 +91,7 @@ class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
                 if (hasWorkouts) ...<Widget>[
                   const SizedBox(height: 4),
                   Text(
-                    '${widget.sets.length} set${widget.sets.length != 1 ? 's' : ''} logged',
+                    '${sets.length} set${sets.length != 1 ? 's' : ''} logged',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textMedium,
                         ),
@@ -160,10 +133,10 @@ class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shrinkWrap: true,
-          itemCount: widget.sets.length,
+          itemCount: sets.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (BuildContext context, int index) {
-            final WorkoutSet set = widget.sets[index];
+            final WorkoutSet set = sets[index];
             final Exercise? exercise = exerciseMap[set.exerciseId];
 
             if (exercise == null) {
@@ -330,7 +303,7 @@ class _DayDetailsBottomSheetState extends State<DayDetailsBottomSheet> {
     Navigator.of(context).pop();
     showHistoryWorkoutLogBottomSheet(
       context,
-      selectedDate: widget.date,
+      selectedDate: date,
     );
   }
 
