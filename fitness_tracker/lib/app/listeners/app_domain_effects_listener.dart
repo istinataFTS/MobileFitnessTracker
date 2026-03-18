@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../features/history/history.dart';
-import '../../features/log/presentation/bloc/workout_bloc.dart';
+import '../../features/log/log.dart';
 import '../../presentation/pages/home/bloc/home_bloc.dart';
 import '../../presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import '../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';

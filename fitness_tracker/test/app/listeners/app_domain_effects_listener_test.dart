@@ -2,7 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/app/app.dart';
 import 'package:fitness_tracker/app/listeners/app_domain_effects_listener.dart';
 import 'package:fitness_tracker/features/history/history.dart';
-import 'package:fitness_tracker/features/log/presentation/bloc/workout_bloc.dart';
+import 'package:fitness_tracker/features/log/log.dart';
 import 'package:fitness_tracker/presentation/pages/home/bloc/home_bloc.dart';
 import 'package:fitness_tracker/presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';

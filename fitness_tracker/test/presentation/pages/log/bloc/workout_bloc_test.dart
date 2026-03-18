@@ -6,7 +6,7 @@ import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/muscle_stimulus/record_workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/add_workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/get_weekly_sets.dart';
-import 'package:fitness_tracker/features/log/presentation/bloc/workout_bloc.dart';
+import 'package:fitness_tracker/features/log/log.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
