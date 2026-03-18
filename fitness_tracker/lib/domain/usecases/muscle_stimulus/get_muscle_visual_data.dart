@@ -3,9 +3,9 @@ import 'package:dartz/dartz.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../entities/muscle_visual_data.dart';
-import '../../entities/stimulus_calculation_rules.dart';
 import '../../entities/time_period.dart';
 import '../../repositories/muscle_stimulus_repository.dart';
+import '../../muscle_visual/muscle_visual_contract.dart';
 
 class GetMuscleVisualData {
   final MuscleStimulusRepository muscleStimulusRepository;
@@ -36,6 +36,8 @@ class GetMuscleVisualData {
     try {
       final today = DateTime.now();
       final todayStart = DateTime(today.year, today.month, today.day);
+      final aggregationMode =
+          MuscleVisualContract.aggregationModeForPeriod(TimePeriod.today);
 
       final visualData = <String, MuscleVisualData>{};
 
@@ -47,10 +49,16 @@ class GetMuscleVisualData {
         );
 
         visualData[muscleGroup] = stimulusResult.fold(
-          (_) => MuscleVisualData.untrained(muscleGroup),
+          (_) => MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          ),
           (stimulus) {
             if (stimulus == null) {
-              return MuscleVisualData.untrained(muscleGroup);
+              return MuscleVisualData.untrained(
+                muscleGroup,
+                aggregationMode: aggregationMode,
+              );
             }
 
             final remainingStimulus = stimulus.calculateRemainingStimulus();
@@ -59,6 +67,7 @@ class GetMuscleVisualData {
               muscleGroup: muscleGroup,
               stimulus: remainingStimulus,
               threshold: MuscleStimulus.dailyThreshold,
+              aggregationMode: aggregationMode,
             );
           },
         );
@@ -75,6 +84,8 @@ class GetMuscleVisualData {
     try {
       final today = DateTime.now();
       final todayStart = DateTime(today.year, today.month, today.day);
+      final aggregationMode =
+          MuscleVisualContract.aggregationModeForPeriod(TimePeriod.week);
 
       final visualData = <String, MuscleVisualData>{};
 
@@ -86,7 +97,10 @@ class GetMuscleVisualData {
         );
 
         if (stimulusResult.isLeft()) {
-          visualData[muscleGroup] = MuscleVisualData.untrained(muscleGroup);
+          visualData[muscleGroup] = MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          );
           continue;
         }
 
@@ -104,6 +118,7 @@ class GetMuscleVisualData {
           muscleGroup: muscleGroup,
           stimulus: stimulus.rollingWeeklyLoad,
           threshold: MuscleStimulus.weeklyThreshold,
+          aggregationMode: aggregationMode,
         );
       }
 
@@ -119,6 +134,8 @@ class GetMuscleVisualData {
       final today = DateTime.now();
       final todayStart = DateTime(today.year, today.month, today.day);
       final monthAgo = todayStart.subtract(const Duration(days: 30));
+      final aggregationMode =
+          MuscleVisualContract.aggregationModeForPeriod(TimePeriod.month);
 
       final visualData = <String, MuscleVisualData>{};
 
@@ -131,7 +148,10 @@ class GetMuscleVisualData {
         );
 
         visualData[muscleGroup] = stimulusResult.fold(
-          (_) => MuscleVisualData.untrained(muscleGroup),
+          (_) => MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          ),
           (stimulusList) {
             final monthlyStimulus = stimulusList.fold<double>(
               0.0,
@@ -142,6 +162,7 @@ class GetMuscleVisualData {
               muscleGroup: muscleGroup,
               stimulus: monthlyStimulus,
               threshold: MuscleStimulus.monthlyThreshold,
+              aggregationMode: aggregationMode,
             );
           },
         );
@@ -156,6 +177,9 @@ class GetMuscleVisualData {
   Future<Either<Failure, Map<String, MuscleVisualData>>>
       _getAllTimeVisualData() async {
     try {
+      final aggregationMode =
+          MuscleVisualContract.aggregationModeForPeriod(TimePeriod.allTime);
+
       final visualData = <String, MuscleVisualData>{};
       double maxStimulusAcrossAll = 0.0;
 
@@ -182,16 +206,23 @@ class GetMuscleVisualData {
             await muscleStimulusRepository.getMaxStimulusForMuscle(muscleGroup);
 
         visualData[muscleGroup] = maxResult.fold(
-          (_) => MuscleVisualData.untrained(muscleGroup),
+          (_) => MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          ),
           (maxStimulus) {
             if (maxStimulus == 0) {
-              return MuscleVisualData.untrained(muscleGroup);
+              return MuscleVisualData.untrained(
+                muscleGroup,
+                aggregationMode: aggregationMode,
+              );
             }
 
             return _buildVisualData(
               muscleGroup: muscleGroup,
               stimulus: maxStimulus,
               threshold: threshold,
+              aggregationMode: aggregationMode,
             );
           },
         );
@@ -208,6 +239,8 @@ class GetMuscleVisualData {
     required DateTime todayStart,
   }) async {
     final yesterday = todayStart.subtract(const Duration(days: 1));
+    final aggregationMode =
+        MuscleVisualContract.aggregationModeForPeriod(TimePeriod.week);
 
     final yesterdayResult =
         await muscleStimulusRepository.getStimulusByMuscleAndDate(
@@ -216,19 +249,26 @@ class GetMuscleVisualData {
     );
 
     return yesterdayResult.fold(
-      (_) => MuscleVisualData.untrained(muscleGroup),
+      (_) => MuscleVisualData.untrained(
+        muscleGroup,
+        aggregationMode: aggregationMode,
+      ),
       (yesterdayStimulus) {
         if (yesterdayStimulus == null) {
-          return MuscleVisualData.untrained(muscleGroup);
+          return MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          );
         }
 
-        final decayedLoad =
-            yesterdayStimulus.rollingWeeklyLoad * MuscleStimulus.weeklyDecayFactor;
+        final decayedLoad = yesterdayStimulus.rollingWeeklyLoad *
+            MuscleStimulus.weeklyDecayFactor;
 
         return _buildVisualData(
           muscleGroup: muscleGroup,
           stimulus: decayedLoad,
           threshold: MuscleStimulus.weeklyThreshold,
+          aggregationMode: aggregationMode,
         );
       },
     );
@@ -238,18 +278,13 @@ class GetMuscleVisualData {
     required String muscleGroup,
     required double stimulus,
     required double threshold,
+    required MuscleVisualAggregationMode aggregationMode,
   }) {
-    final visualIntensity = StimulusCalculationRules.calculateVisualIntensity(
-      totalStimulus: stimulus,
-      threshold: threshold,
-    );
-
-    return MuscleVisualData(
+    return MuscleVisualData.fromStimulus(
       muscleGroup: muscleGroup,
-      totalStimulus: stimulus,
-      visualIntensity: visualIntensity,
-      color: MuscleVisualData.getColorForIntensity(visualIntensity),
-      hasTrained: stimulus > 0,
+      stimulus: stimulus,
+      threshold: threshold,
+      aggregationMode: aggregationMode,
     );
   }
 
