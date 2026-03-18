@@ -1,4 +1,5 @@
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
+import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/presentation/pages/home/helpers/body_visualization_mapper.dart';
 import 'package:fitness_tracker/presentation/pages/home/models/body_region_contract.dart';
 import 'package:fitness_tracker/presentation/pages/home/models/body_view.dart';
@@ -12,18 +13,18 @@ void main() {
         BodyRegionContract.forMuscle('front-delts')
             .where((r) => r.view == BodyView.front)
             .length,
-        2,
+        1,
       );
 
       expect(
         BodyRegionContract.forMuscle('rear-delts')
             .where((r) => r.view == BodyView.back)
             .length,
-        2,
+        1,
       );
 
       expect(
-        BodyRegionContract.forMuscle('side-delts')
+        BodyRegionContract.forMuscle('forearms')
             .map((r) => r.view)
             .toSet(),
         {BodyView.front, BodyView.back},
@@ -44,8 +45,13 @@ void main() {
         'front-delts': MuscleVisualData(
           muscleGroup: 'front-delts',
           totalStimulus: 12,
+          threshold: 20,
           visualIntensity: 0.5,
-          color: Colors.orange,
+          bucket: MuscleVisualBucket.heavy,
+          coverageState: MuscleVisualCoverageState.partial,
+          aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+          visibleSurfaces: const {MuscleVisualSurface.front},
+          overflowAmount: 0,
           hasTrained: true,
         ),
       };
@@ -59,9 +65,12 @@ void main() {
           .where((region) => region.muscleGroup == 'front-delts')
           .toList();
 
-      expect(trainedFrontDelts, hasLength(2));
+      expect(trainedFrontDelts, hasLength(1));
       expect(trainedFrontDelts.every((r) => r.hasTrained), isTrue);
-      expect(trainedFrontDelts.every((r) => r.color == Colors.orange), isTrue);
+      expect(
+        trainedFrontDelts.every((r) => r.color == const Color(0xFFFF9800)),
+        isTrue,
+      );
     });
 
     test('fills missing muscles as untrained regions', () {
@@ -72,6 +81,7 @@ void main() {
 
       expect(regions, isNotEmpty);
       expect(regions.every((region) => region.hasTrained == false), isTrue);
+      expect(regions.every((region) => region.overlayOpacity == 0.0), isTrue);
     });
 
     test('reports training only when at least one muscle is trained', () {
@@ -85,8 +95,13 @@ void main() {
           'quads': MuscleVisualData(
             muscleGroup: 'quads',
             totalStimulus: 18,
+            threshold: 20,
             visualIntensity: 0.7,
-            color: Colors.red,
+            bucket: MuscleVisualBucket.maximum,
+            coverageState: MuscleVisualCoverageState.partial,
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const {MuscleVisualSurface.front},
+            overflowAmount: 0,
             hasTrained: true,
           ),
         }),

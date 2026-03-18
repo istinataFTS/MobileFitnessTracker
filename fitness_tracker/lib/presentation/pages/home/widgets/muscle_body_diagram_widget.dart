@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/muscle_visual_data.dart';
+import '../../../../domain/muscle_visual/muscle_visual_contract.dart';
 import '../helpers/body_visualization_mapper.dart';
 import '../models/body_region_visual_data.dart';
 import '../models/body_view.dart';
@@ -36,23 +37,18 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
 
     return RepaintBoundary(
-      child: Container(
-        constraints: const BoxConstraints(
-          maxHeight: 500,
-          maxWidth: 300,
-        ),
+      child: SizedBox(
+        height: 500,
+        width: 300,
         child: AspectRatio(
           aspectRatio: 3 / 5,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _buildBodyOutline(context),
-                _buildRegionOverlays(regions),
-                _buildViewIndicator(context),
-              ],
-            ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _buildBodyOutline(),
+              _buildRegionOverlays(regions),
+              _buildViewIndicator(context),
+            ],
           ),
         ),
       ),
@@ -60,29 +56,61 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
   }
 
   Widget _buildLoadingState(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(
-        maxHeight: 500,
-        maxWidth: 300,
-      ),
+    return SizedBox(
+      height: 500,
+      width: 300,
       child: AspectRatio(
         aspectRatio: 3 / 5,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderDark),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                color: AppTheme.primaryOrange,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppStrings.loadingVisualization,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textMedium,
+                    ),
+              ),
+            ],
           ),
-          child: Center(
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return SizedBox(
+      height: 500,
+      width: 300,
+      child: AspectRatio(
+        aspectRatio: 3 / 5,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const CircularProgressIndicator(
-                  color: AppTheme.primaryOrange,
+                Icon(
+                  Icons.fitness_center,
+                  size: 64,
+                  color: AppTheme.textDim,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  AppStrings.loadingVisualization,
+                  AppStrings.noWorkoutData,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppStrings.noWorkoutDataDesc,
+                  textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.textMedium,
                       ),
@@ -95,78 +123,20 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(
-        maxHeight: 500,
-        maxWidth: 300,
-      ),
-      child: AspectRatio(
-        aspectRatio: 3 / 5,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderDark),
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.fitness_center,
-                    size: 64,
-                    color: AppTheme.textDim,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppStrings.noWorkoutData,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppStrings.noWorkoutDataDesc,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textMedium,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBodyOutline(BuildContext context) {
+  Widget _buildBodyOutline() {
     final imagePath = isFrontView
         ? 'assets/images/body/FrontLook.png'
         : 'assets/images/body/BackLook.png';
 
-    return Image.asset(
-      imagePath,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: AppTheme.surfaceDark,
-          child: Center(
-            child: Text(
-              'Failed to load body image',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textMedium,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        );
-      },
+    return IgnorePointer(
+      ignoring: true,
+      child: Image.asset(
+        imagePath,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 
@@ -190,17 +160,19 @@ class MuscleBodyDiagramWidget extends StatelessWidget {
       top: 12,
       right: 12,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceDark.withOpacity(0.9),
+          color: Colors.black.withOpacity(0.55),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.borderDark),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.18),
+          ),
         ),
         child: Text(
           isFrontView ? AppStrings.frontView : AppStrings.backView,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.primaryOrange,
-                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
         ),
       ),
@@ -218,7 +190,7 @@ class _TintedOverlayRegion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Opacity(
-      opacity: _overlayOpacityFor(region.visualIntensity),
+      opacity: region.overlayOpacity,
       child: ColorFiltered(
         colorFilter: ColorFilter.mode(
           region.color,
@@ -233,13 +205,5 @@ class _TintedOverlayRegion extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  double _overlayOpacityFor(double intensity) {
-    if (intensity <= 0) return 0.0;
-    if (intensity < 0.20) return 0.45;
-    if (intensity < 0.45) return 0.60;
-    if (intensity < 0.70) return 0.72;
-    return 0.85;
   }
 }

@@ -6,33 +6,14 @@ import '../muscle_visual/muscle_visual_contract.dart';
 
 class MuscleVisualData extends Equatable {
   final String muscleGroup;
-
-  /// Total aggregated stimulus value for the selected period semantics.
   final double totalStimulus;
-
-  /// Threshold used for normalization for this period.
   final double threshold;
-
-  /// Visual intensity normalized to 0.0-1.0 range.
   final double visualIntensity;
-
-  /// Explicit visual/state bucket instead of deriving everything from Color.
   final MuscleVisualBucket bucket;
-
-  /// Whether the muscle is empty / partial / full / overflow for the current
-  /// aggregation semantics.
   final MuscleVisualCoverageState coverageState;
-
-  /// How this visual was aggregated for the selected period.
   final MuscleVisualAggregationMode aggregationMode;
-
-  /// Surfaces where this muscle should appear on the 2D model.
   final Set<MuscleVisualSurface> visibleSurfaces;
-
-  /// Amount above threshold. 0 when not overflowing.
   final double overflowAmount;
-
-  /// Whether this muscle has any training data.
   final bool hasTrained;
 
   const MuscleVisualData({
@@ -93,7 +74,48 @@ class MuscleVisualData extends Equatable {
     );
   }
 
-  Color get color => _colorForBucket(bucket, visualIntensity);
+  /// Final locked palette for the 2D human model.
+  /// Kept here so the widget does not invent colors on its own.
+  Color get color {
+    switch (bucket) {
+      case MuscleVisualBucket.empty:
+        return Colors.transparent;
+      case MuscleVisualBucket.light:
+        return const Color(0xFF4CAF50);
+      case MuscleVisualBucket.moderate:
+        return const Color(0xFFFFEB3B);
+      case MuscleVisualBucket.heavy:
+        return const Color(0xFFFF9800);
+      case MuscleVisualBucket.maximum:
+        return const Color(0xFFF44336);
+    }
+  }
+
+  /// Fixed overlay alpha per state so the model looks consistent instead of
+  /// drifting with arbitrary opacity math in the widget.
+  double get overlayOpacity {
+    switch (coverageState) {
+      case MuscleVisualCoverageState.empty:
+        return 0.0;
+      case MuscleVisualCoverageState.partial:
+        switch (bucket) {
+          case MuscleVisualBucket.empty:
+            return 0.0;
+          case MuscleVisualBucket.light:
+            return 0.72;
+          case MuscleVisualBucket.moderate:
+            return 0.78;
+          case MuscleVisualBucket.heavy:
+            return 0.84;
+          case MuscleVisualBucket.maximum:
+            return 0.90;
+        }
+      case MuscleVisualCoverageState.full:
+        return 0.94;
+      case MuscleVisualCoverageState.overflow:
+        return 1.0;
+    }
+  }
 
   bool get appearsOnFront => visibleSurfaces.contains(MuscleVisualSurface.front);
 
@@ -101,9 +123,6 @@ class MuscleVisualData extends Equatable {
 
   bool get isOverflowing =>
       coverageState == MuscleVisualCoverageState.overflow;
-
-  bool get isFullyCovered =>
-      coverageState == MuscleVisualCoverageState.full || isOverflowing;
 
   String get intensityLevel {
     switch (bucket) {
@@ -120,50 +139,7 @@ class MuscleVisualData extends Equatable {
     }
   }
 
-  String get colorName {
-    switch (bucket) {
-      case MuscleVisualBucket.empty:
-        return 'Gray';
-      case MuscleVisualBucket.light:
-        return 'Green';
-      case MuscleVisualBucket.moderate:
-        return 'Yellow';
-      case MuscleVisualBucket.heavy:
-        return 'Orange';
-      case MuscleVisualBucket.maximum:
-        return 'Red';
-    }
-  }
-
-  String get coverageLabel {
-    switch (coverageState) {
-      case MuscleVisualCoverageState.empty:
-        return 'Empty';
-      case MuscleVisualCoverageState.partial:
-        return 'Partial';
-      case MuscleVisualCoverageState.full:
-        return 'Full';
-      case MuscleVisualCoverageState.overflow:
-        return 'Overflow';
-    }
-  }
-
-  String get aggregationLabel {
-    switch (aggregationMode) {
-      case MuscleVisualAggregationMode.remainingDailyCapacity:
-        return 'Daily Remaining Capacity';
-      case MuscleVisualAggregationMode.rollingWeeklyLoad:
-        return 'Rolling Weekly Load';
-      case MuscleVisualAggregationMode.trailingThirtyDayLoad:
-        return 'Trailing 30 Day Load';
-      case MuscleVisualAggregationMode.allTimePeakNormalized:
-        return 'All Time Peak Normalized';
-    }
-  }
-
-  String get displayName {
-    return MuscleStimulus.getDisplayName(muscleGroup);
-  }
+  String get displayName => MuscleStimulus.getDisplayName(muscleGroup);
 
   MuscleVisualData copyWith({
     String? muscleGroup,
@@ -189,40 +165,6 @@ class MuscleVisualData extends Equatable {
       overflowAmount: overflowAmount ?? this.overflowAmount,
       hasTrained: hasTrained ?? this.hasTrained,
     );
-  }
-
-  static Color _colorForBucket(
-    MuscleVisualBucket bucket,
-    double intensity,
-  ) {
-    switch (bucket) {
-      case MuscleVisualBucket.empty:
-        return Colors.grey.withOpacity(0.3);
-      case MuscleVisualBucket.light:
-        final opacity =
-            0.4 + (intensity / MuscleStimulus.colorThresholdGreen) * 0.3;
-        return Colors.green.withOpacity(opacity.clamp(0.0, 1.0));
-      case MuscleVisualBucket.moderate:
-        final normalizedIntensity =
-            (intensity - MuscleStimulus.colorThresholdGreen) /
-                (MuscleStimulus.colorThresholdYellow -
-                    MuscleStimulus.colorThresholdGreen);
-        final opacity = 0.5 + normalizedIntensity * 0.3;
-        return Colors.yellow.withOpacity(opacity.clamp(0.0, 1.0));
-      case MuscleVisualBucket.heavy:
-        final normalizedIntensity =
-            (intensity - MuscleStimulus.colorThresholdYellow) /
-                (MuscleStimulus.colorThresholdOrange -
-                    MuscleStimulus.colorThresholdYellow);
-        final opacity = 0.6 + normalizedIntensity * 0.2;
-        return Colors.orange.withOpacity(opacity.clamp(0.0, 1.0));
-      case MuscleVisualBucket.maximum:
-        final normalizedIntensity =
-            (intensity - MuscleStimulus.colorThresholdRed) /
-                (1.0 - MuscleStimulus.colorThresholdRed);
-        final opacity = 0.7 + normalizedIntensity * 0.3;
-        return Colors.red.withOpacity(opacity.clamp(0.0, 1.0));
-    }
   }
 
   @override

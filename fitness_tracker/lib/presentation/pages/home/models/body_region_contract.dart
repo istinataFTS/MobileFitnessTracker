@@ -1,294 +1,206 @@
-import 'package:equatable/equatable.dart';
-
+import '../../../../domain/entities/time_period.dart';
+import '../../../../domain/muscle_visual/muscle_visual_contract.dart';
 import 'body_view.dart';
 
-class BodyRegionContract extends Equatable {
+class BodyRegionContract {
   final String id;
   final String muscleGroup;
   final BodyView view;
   final String overlayAssetPath;
+  final MuscleVisualAggregationMode defaultAggregationMode;
 
   const BodyRegionContract({
     required this.id,
     required this.muscleGroup,
     required this.view,
     required this.overlayAssetPath,
+    required this.defaultAggregationMode,
   });
 
-  static const List<BodyRegionContract> all = [
-    // ==================== FRONT VIEW ====================
+  static const String _bodyAssetRoot = 'assets/images/body';
 
+  static const List<BodyRegionContract> all = <BodyRegionContract>[
     BodyRegionContract(
-      id: 'front-delts-left',
+      id: 'front-neck',
+      muscleGroup: 'upper-traps',
+      view: BodyView.front,
+      overlayAssetPath: '$_bodyAssetRoot/neckFront.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+    ),
+    BodyRegionContract(
+      id: 'front-upper-traps',
+      muscleGroup: 'upper-traps',
+      view: BodyView.front,
+      overlayAssetPath: '$_bodyAssetRoot/uppertrapsFront.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+    ),
+    BodyRegionContract(
+      id: 'front-front-delts-left-right',
       muscleGroup: 'front-delts',
       view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/front_delts_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/frontdelts.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'front-delts-right',
-      muscleGroup: 'front-delts',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/front_delts_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'side-delts-left-front',
-      muscleGroup: 'side-delts',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/side_delts_left_front.png',
-    ),
-    BodyRegionContract(
-      id: 'side-delts-right-front',
-      muscleGroup: 'side-delts',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/side_delts_right_front.png',
-    ),
-
-    BodyRegionContract(
-      id: 'upper-chest-left',
-      muscleGroup: 'upper-chest',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/upper_chest_left.png',
-    ),
-    BodyRegionContract(
-      id: 'upper-chest-right',
-      muscleGroup: 'upper-chest',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/upper_chest_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'mid-chest-left',
+      id: 'front-chest',
       muscleGroup: 'mid-chest',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/mid_chest_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/chest.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'mid-chest-right',
-      muscleGroup: 'mid-chest',
-      view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/mid_chest_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'lower-chest-left',
-      muscleGroup: 'lower-chest',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/lower_chest_left.png',
-    ),
-    BodyRegionContract(
-      id: 'lower-chest-right',
-      muscleGroup: 'lower-chest',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/lower_chest_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'biceps-left',
+      id: 'front-biceps',
       muscleGroup: 'biceps',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/biceps_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/biceps.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'biceps-right',
-      muscleGroup: 'biceps',
-      view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/biceps_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'forearms-left-front',
+      id: 'front-forearms',
       muscleGroup: 'forearms',
       view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/forearms_left_front.png',
+      overlayAssetPath: '$_bodyAssetRoot/forearmsFront.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'forearms-right-front',
-      muscleGroup: 'forearms',
-      view: BodyView.front,
-      overlayAssetPath:
-          'assets/images/body/overlays/front/forearms_right_front.png',
-    ),
-
-    BodyRegionContract(
-      id: 'abs',
+      id: 'front-abs',
       muscleGroup: 'abs',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/abs.png',
+      overlayAssetPath: '$_bodyAssetRoot/abs.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'obliques-left',
+      id: 'front-obliques',
       muscleGroup: 'obliques',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/obliques_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/obliques.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'obliques-right',
-      muscleGroup: 'obliques',
+      id: 'front-hip-adductors',
+      muscleGroup: 'hip-adductors',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/obliques_right.png',
+      overlayAssetPath: '$_bodyAssetRoot/hipadductorsFront.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'quads-left',
+      id: 'front-love-handles',
+      muscleGroup: 'love-handles',
+      view: BodyView.front,
+      overlayAssetPath: '$_bodyAssetRoot/lovehandles.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+    ),
+    BodyRegionContract(
+      id: 'front-quads',
       muscleGroup: 'quads',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/quads_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/quads.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'quads-right',
-      muscleGroup: 'quads',
+      id: 'front-calves',
+      muscleGroup: 'calves',
       view: BodyView.front,
-      overlayAssetPath: 'assets/images/body/overlays/front/quads_right.png',
-    ),
-
-    // ==================== BACK VIEW ====================
-
-    BodyRegionContract(
-      id: 'rear-delts-left',
-      muscleGroup: 'rear-delts',
-      view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/rear_delts_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/calvesFront.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'rear-delts-right',
-      muscleGroup: 'rear-delts',
-      view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/rear_delts_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'side-delts-left-back',
-      muscleGroup: 'side-delts',
-      view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/side_delts_left_back.png',
-    ),
-    BodyRegionContract(
-      id: 'side-delts-right-back',
-      muscleGroup: 'side-delts',
-      view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/side_delts_right_back.png',
-    ),
-
-    BodyRegionContract(
-      id: 'upper-traps',
+      id: 'back-upper-traps',
       muscleGroup: 'upper-traps',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/upper_traps.png',
+      overlayAssetPath: '$_bodyAssetRoot/uppertraps.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'middle-traps',
+      id: 'back-middle-traps',
       muscleGroup: 'middle-traps',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/middle_traps.png',
+      overlayAssetPath: '$_bodyAssetRoot/middletraps.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'lower-traps',
+      id: 'back-lower-traps',
       muscleGroup: 'lower-traps',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/lower_traps.png',
+      overlayAssetPath: '$_bodyAssetRoot/lowertraps.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'lats-left',
+      id: 'back-rear-delts',
+      muscleGroup: 'rear-delts',
+      view: BodyView.back,
+      overlayAssetPath: '$_bodyAssetRoot/reardeltBack.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+    ),
+    BodyRegionContract(
+      id: 'back-lats',
       muscleGroup: 'lats',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/lats_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/lats.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'lats-right',
+      id: 'back-small-lats',
       muscleGroup: 'lats',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/lats_right.png',
+      overlayAssetPath: '$_bodyAssetRoot/smalllats.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'triceps-left',
+      id: 'back-triceps',
       muscleGroup: 'triceps',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/triceps_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/triceps.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'triceps-right',
-      muscleGroup: 'triceps',
-      view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/triceps_right.png',
-    ),
-
-    BodyRegionContract(
-      id: 'forearms-left-back',
+      id: 'back-forearms',
       muscleGroup: 'forearms',
       view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/forearms_left_back.png',
+      overlayAssetPath: '$_bodyAssetRoot/forearms.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'forearms-right-back',
-      muscleGroup: 'forearms',
-      view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/forearms_right_back.png',
-    ),
-
-    BodyRegionContract(
-      id: 'lower-back',
+      id: 'back-lower-back',
       muscleGroup: 'lower-back',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/lower_back.png',
+      overlayAssetPath: '$_bodyAssetRoot/lowerback.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'glutes-left',
+      id: 'back-glutes',
       muscleGroup: 'glutes',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/glutes_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/glutes.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'glutes-right',
-      muscleGroup: 'glutes',
+      id: 'back-hip-adductors',
+      muscleGroup: 'hip-adductors',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/glutes_right.png',
+      overlayAssetPath: '$_bodyAssetRoot/hipadductors.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'hamstrings-left',
+      id: 'back-hamstrings',
       muscleGroup: 'hamstrings',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/hamstrings_left.png',
+      overlayAssetPath: '$_bodyAssetRoot/hamstring.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'hamstrings-right',
-      muscleGroup: 'hamstrings',
+      id: 'back-quads',
+      muscleGroup: 'quads',
       view: BodyView.back,
-      overlayAssetPath:
-          'assets/images/body/overlays/back/hamstrings_right.png',
+      overlayAssetPath: '$_bodyAssetRoot/quadsback.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
-
     BodyRegionContract(
-      id: 'calves-left',
+      id: 'back-calves',
       muscleGroup: 'calves',
       view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/calves_left.png',
-    ),
-    BodyRegionContract(
-      id: 'calves-right',
-      muscleGroup: 'calves',
-      view: BodyView.back,
-      overlayAssetPath: 'assets/images/body/overlays/back/calves_right.png',
+      overlayAssetPath: '$_bodyAssetRoot/calves.png',
+      defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
   ];
 
@@ -301,7 +213,4 @@ class BodyRegionContract extends Equatable {
         .where((region) => region.muscleGroup == muscleGroup)
         .toList(growable: false);
   }
-
-  @override
-  List<Object?> get props => [id, muscleGroup, view, overlayAssetPath];
 }

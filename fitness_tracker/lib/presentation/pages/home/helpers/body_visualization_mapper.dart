@@ -16,7 +16,10 @@ class BodyVisualizationMapper {
 
     return contracts.map((contract) {
       final muscleVisual = muscleData[contract.muscleGroup] ??
-          MuscleVisualData.untrained(contract.muscleGroup);
+          MuscleVisualData.untrained(
+            contract.muscleGroup,
+            aggregationMode: contract.defaultAggregationMode,
+          );
 
       return BodyRegionVisualData(
         regionId: contract.id,
@@ -25,8 +28,11 @@ class BodyVisualizationMapper {
         view: contract.view,
         overlayAssetPath: contract.overlayAssetPath,
         visualIntensity: muscleVisual.visualIntensity,
+        overlayOpacity: _resolveRegionOpacity(muscleVisual),
         color: _resolveRegionColor(muscleVisual),
         hasTrained: muscleVisual.hasTrained,
+        bucket: muscleVisual.bucket,
+        coverageState: muscleVisual.coverageState,
       );
     }).toList(growable: false);
   }
@@ -41,5 +47,13 @@ class BodyVisualizationMapper {
     }
 
     return data.color;
+  }
+
+  static double _resolveRegionOpacity(MuscleVisualData data) {
+    if (!data.hasTrained) {
+      return 0.0;
+    }
+
+    return data.overlayOpacity;
   }
 }
