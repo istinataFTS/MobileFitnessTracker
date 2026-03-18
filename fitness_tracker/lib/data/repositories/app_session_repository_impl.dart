@@ -40,26 +40,43 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
       final lastCloudSyncAt =
           await localDataSource.readDateTime(_lastCloudSyncAtKey);
 
-      final authMode = authModeValue == AuthMode.authenticated.name
+      final localAuthMode = authModeValue == AuthMode.authenticated.name
           ? AuthMode.authenticated
           : AuthMode.guest;
 
-      AppUser? user;
+      AppUser? localUser;
       if (userJson != null) {
-        user = AppUser(
+        localUser = AppUser(
           id: userJson['id'] as String,
           email: userJson['email'] as String,
           displayName: userJson['displayName'] as String?,
         );
       }
 
-      if (authMode == AuthMode.authenticated && user == null) {
+      if (authRemoteDataSource.isConfigured) {
+        final remoteUser = await authRemoteDataSource.getCurrentUser();
+
+        if (remoteUser != null) {
+          return AppSession(
+            authMode: AuthMode.authenticated,
+            user: remoteUser,
+            requiresInitialCloudMigration: requiresInitialMigration,
+            lastCloudSyncAt: lastCloudSyncAt,
+          );
+        }
+
+        if (localAuthMode == AuthMode.authenticated) {
+          return const AppSession.guest();
+        }
+      }
+
+      if (localAuthMode == AuthMode.authenticated && localUser == null) {
         return const AppSession.guest();
       }
 
       return AppSession(
-        authMode: authMode,
-        user: user,
+        authMode: localAuthMode,
+        user: localUser,
         requiresInitialCloudMigration: requiresInitialMigration,
         lastCloudSyncAt: lastCloudSyncAt,
       );

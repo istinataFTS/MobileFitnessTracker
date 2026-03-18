@@ -12,6 +12,7 @@ import '../../data/repositories/workout_set_repository_impl.dart';
 import '../../data/sync/workout_set_sync_coordinator.dart';
 import '../../data/sync/workout_set_sync_coordinator_impl.dart';
 import '../../domain/repositories/workout_set_repository.dart';
+import '../../domain/services/workout_data_source_preference_resolver.dart';
 import '../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../domain/usecases/workout_sets/delete_workout_set.dart';
 import '../../domain/usecases/workout_sets/get_all_workout_sets.dart';
@@ -29,17 +30,39 @@ void registerWorkoutModule(GetIt sl) {
     ),
   );
 
-  sl.registerLazySingleton(() => AddWorkoutSet(sl()));
+  sl.registerLazySingleton(
+    () => WorkoutDataSourcePreferenceResolver(
+      appSessionRepository: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => AddWorkoutSet(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => GetAllWorkoutSets(sl()));
-  sl.registerLazySingleton(() => GetWeeklySets(sl()));
+  sl.registerLazySingleton(
+    () => GetWeeklySets(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
   sl.registerLazySingleton(
     () => GetSetsByDateRange(
       workoutSetRepository: sl(),
       exerciseRepository: sl(),
+      sourcePreferenceResolver: sl(),
     ),
   );
   sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
-  sl.registerLazySingleton(() => UpdateWorkoutSet(sl()));
+  sl.registerLazySingleton(
+    () => UpdateWorkoutSet(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
 
   sl.registerLazySingleton<WorkoutSetRepository>(
     () => WorkoutSetRepositoryImpl(
