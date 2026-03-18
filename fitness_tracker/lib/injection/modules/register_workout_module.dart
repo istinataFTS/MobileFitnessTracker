@@ -16,7 +16,7 @@ import '../../domain/usecases/workout_sets/get_all_workout_sets.dart';
 import '../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
 import '../../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../../domain/usecases/workout_sets/update_workout_set.dart';
-import '../../features/log/presentation/bloc/workout_bloc.dart';
+import '../../features/log/log.dart';
 
 void registerWorkoutModule(GetIt sl) {
   sl.registerFactory(

@@ -1,18 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../features/history/history.dart';
-import '../home/bloc/home_bloc.dart';
-import '../home/bloc/muscle_visual_bloc.dart';
-import '../nutrition_log/bloc/nutrition_log_bloc.dart';
-import 'bloc/workout_bloc.dart';
-import 'widgets/log_exercise_tab.dart';
-import 'widgets/log_macros_tab.dart';
-import 'widgets/log_meal_tab.dart';
+import '../widgets/log_exercise_tab.dart';
+import '../widgets/log_macros_tab.dart';
+import '../widgets/log_meal_tab.dart';
 
 class LogPage extends StatefulWidget {
   final int initialIndex;
@@ -31,50 +23,12 @@ class LogPage extends StatefulWidget {
 class _LogPageState extends State<LogPage> {
   late int _selectedIndex;
 
-  StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
-  StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
-
   DateTime get _effectiveInitialDate => widget.initialDate ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
-
     _selectedIndex = widget.initialIndex.clamp(0, 2);
-
-    final WorkoutBloc workoutBloc = context.read<WorkoutBloc>();
-    final NutritionLogBloc nutritionLogBloc = context.read<NutritionLogBloc>();
-
-    _workoutEffectsSub = workoutBloc.effects.listen((effect) {
-      if (!mounted) {
-        return;
-      }
-
-      if (effect is WorkoutLoggedEffect) {
-        context.read<HomeBloc>().add(RefreshHomeDataEvent());
-        context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
-        context.read<WorkoutBloc>().add(const RefreshWeeklySetsEvent());
-        context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
-      }
-    });
-
-    _nutritionEffectsSub = nutritionLogBloc.effects.listen((effect) {
-      if (!mounted) {
-        return;
-      }
-
-      if (effect is NutritionLogSuccessEffect) {
-        context.read<HomeBloc>().add(RefreshHomeDataEvent());
-        context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _workoutEffectsSub?.cancel();
-    _nutritionEffectsSub?.cancel();
-    super.dispose();
   }
 
   @override
