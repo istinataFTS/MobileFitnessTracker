@@ -6,6 +6,7 @@ import '../../domain/entities/target.dart';
 class TargetModel extends Target {
   const TargetModel({
     required super.id,
+    super.ownerUserId,
     required super.type,
     required super.categoryKey,
     required super.targetValue,
@@ -19,6 +20,7 @@ class TargetModel extends Target {
   factory TargetModel.fromEntity(Target target) {
     return TargetModel(
       id: target.id,
+      ownerUserId: target.ownerUserId,
       type: target.type,
       categoryKey: target.categoryKey,
       targetValue: target.targetValue,
@@ -38,6 +40,7 @@ class TargetModel extends Target {
 
     return TargetModel(
       id: map[DatabaseTables.targetId] as String,
+      ownerUserId: map['owner_user_id'] as String?,
       type: _targetTypeFromString(
         map[DatabaseTables.targetType] as String,
       ),
@@ -66,6 +69,7 @@ class TargetModel extends Target {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.targetId: id,
+      'owner_user_id': ownerUserId,
       DatabaseTables.targetType: _targetTypeToString(type),
       DatabaseTables.targetCategoryKey: categoryKey,
       DatabaseTables.targetValue: targetValue,
@@ -87,6 +91,7 @@ class TargetModel extends Target {
 
     return TargetModel(
       id: json['id'] as String,
+      ownerUserId: json['ownerUserId'] as String?,
       type: _targetTypeFromString(json['type'] as String),
       categoryKey: json['categoryKey'] as String,
       targetValue: (json['targetValue'] as num).toDouble(),
@@ -107,6 +112,7 @@ class TargetModel extends Target {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'type': _targetTypeToString(type),
       'categoryKey': categoryKey,
       'targetValue': targetValue,

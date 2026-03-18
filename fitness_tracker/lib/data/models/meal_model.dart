@@ -7,6 +7,7 @@ import '../../domain/entities/meal.dart';
 class MealModel extends Meal {
   const MealModel({
     required super.id,
+    super.ownerUserId,
     required super.name,
     required super.servingSizeGrams,
     required super.carbsPer100g,
@@ -21,6 +22,7 @@ class MealModel extends Meal {
   factory MealModel.fromEntity(Meal meal) {
     return MealModel(
       id: meal.id,
+      ownerUserId: meal.ownerUserId,
       name: meal.name,
       servingSizeGrams: meal.servingSizeGrams,
       carbsPer100g: meal.carbsPer100g,
@@ -39,6 +41,7 @@ class MealModel extends Meal {
 
     return MealModel(
       id: map[DatabaseTables.mealId] as String,
+      ownerUserId: map['owner_user_id'] as String?,
       name: map[DatabaseTables.mealName] as String,
       servingSizeGrams: (map[DatabaseTables.mealServingSize] as num).toDouble(),
       carbsPer100g: (map[DatabaseTables.mealCarbsPer100g] as num).toDouble(),
@@ -66,6 +69,7 @@ class MealModel extends Meal {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.mealId: id,
+      'owner_user_id': ownerUserId,
       DatabaseTables.mealName: name,
       DatabaseTables.mealServingSize: servingSizeGrams,
       DatabaseTables.mealCarbsPer100g: carbsPer100g,
@@ -85,6 +89,7 @@ class MealModel extends Meal {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'name': name,
       'servingSizeGrams': servingSizeGrams,
       'carbsPer100g': carbsPer100g,
@@ -151,6 +156,8 @@ class MealModel extends Meal {
   @override
   MealModel copyWith({
     String? id,
+    String? ownerUserId,
+    bool clearOwnerUserId = false,
     String? name,
     double? servingSizeGrams,
     double? carbsPer100g,
@@ -163,6 +170,7 @@ class MealModel extends Meal {
   }) {
     return MealModel(
       id: id ?? this.id,
+      ownerUserId: clearOwnerUserId ? null : (ownerUserId ?? this.ownerUserId),
       name: name ?? this.name,
       servingSizeGrams: servingSizeGrams ?? this.servingSizeGrams,
       carbsPer100g: carbsPer100g ?? this.carbsPer100g,
@@ -177,6 +185,7 @@ class MealModel extends Meal {
 
   factory MealModel.withCalculatedMacros({
     required String id,
+    String? ownerUserId,
     required String name,
     double servingSizeGrams = 100,
     double? carbsPer100g,
@@ -230,6 +239,7 @@ class MealModel extends Meal {
 
     return MealModel(
       id: id,
+      ownerUserId: ownerUserId,
       name: name,
       servingSizeGrams: servingSizeGrams,
       carbsPer100g: carbsPer100g ?? 0,

@@ -4,6 +4,7 @@ import 'entity_sync_metadata.dart';
 
 class Meal extends Equatable {
   final String id;
+  final String? ownerUserId;
   final String name;
   final double servingSizeGrams;
   final double carbsPer100g;
@@ -16,6 +17,7 @@ class Meal extends Equatable {
 
   const Meal({
     required this.id,
+    this.ownerUserId,
     required this.name,
     required this.servingSizeGrams,
     required this.carbsPer100g,
@@ -27,6 +29,8 @@ class Meal extends Equatable {
     EntitySyncMetadata? syncMetadata,
   })  : updatedAt = updatedAt ?? createdAt,
         syncMetadata = syncMetadata ?? const EntitySyncMetadata();
+
+  bool get isOwnedByAuthenticatedUser => ownerUserId != null;
 
   double get proteinPerServing => (proteinPer100g * servingSizeGrams) / 100;
   double get carbsPerServing => (carbsPer100g * servingSizeGrams) / 100;
@@ -56,6 +60,8 @@ class Meal extends Equatable {
 
   Meal copyWith({
     String? id,
+    String? ownerUserId,
+    bool clearOwnerUserId = false,
     String? name,
     double? servingSizeGrams,
     double? carbsPer100g,
@@ -68,6 +74,7 @@ class Meal extends Equatable {
   }) {
     return Meal(
       id: id ?? this.id,
+      ownerUserId: clearOwnerUserId ? null : (ownerUserId ?? this.ownerUserId),
       name: name ?? this.name,
       servingSizeGrams: servingSizeGrams ?? this.servingSizeGrams,
       carbsPer100g: carbsPer100g ?? this.carbsPer100g,
@@ -83,6 +90,7 @@ class Meal extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        ownerUserId,
         name,
         servingSizeGrams,
         carbsPer100g,

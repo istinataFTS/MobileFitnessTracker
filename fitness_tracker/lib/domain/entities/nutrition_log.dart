@@ -4,6 +4,7 @@ import 'entity_sync_metadata.dart';
 
 class NutritionLog extends Equatable {
   final String id;
+  final String? ownerUserId;
   final String? mealId;
   final String mealName;
   final double? gramsConsumed;
@@ -18,6 +19,7 @@ class NutritionLog extends Equatable {
 
   const NutritionLog({
     required this.id,
+    this.ownerUserId,
     this.mealId,
     required this.mealName,
     this.gramsConsumed,
@@ -32,6 +34,7 @@ class NutritionLog extends Equatable {
   })  : updatedAt = updatedAt ?? createdAt,
         syncMetadata = syncMetadata ?? const EntitySyncMetadata();
 
+  bool get isOwnedByAuthenticatedUser => ownerUserId != null;
   bool get isMealLog => mealId != null;
   bool get isDirectMacroLog => mealId == null;
 
@@ -54,6 +57,8 @@ class NutritionLog extends Equatable {
 
   NutritionLog copyWith({
     String? id,
+    String? ownerUserId,
+    bool clearOwnerUserId = false,
     String? mealId,
     String? mealName,
     double? gramsConsumed,
@@ -68,6 +73,7 @@ class NutritionLog extends Equatable {
   }) {
     return NutritionLog(
       id: id ?? this.id,
+      ownerUserId: clearOwnerUserId ? null : (ownerUserId ?? this.ownerUserId),
       mealId: mealId ?? this.mealId,
       mealName: mealName ?? this.mealName,
       gramsConsumed: gramsConsumed ?? this.gramsConsumed,
@@ -85,6 +91,7 @@ class NutritionLog extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        ownerUserId,
         mealId,
         mealName,
         gramsConsumed,

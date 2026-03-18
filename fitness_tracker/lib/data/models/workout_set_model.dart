@@ -7,6 +7,7 @@ import '../../domain/entities/workout_set.dart';
 class WorkoutSetModel extends WorkoutSet {
   const WorkoutSetModel({
     required super.id,
+    super.ownerUserId,
     required super.exerciseId,
     required super.reps,
     required super.weight,
@@ -20,6 +21,7 @@ class WorkoutSetModel extends WorkoutSet {
   factory WorkoutSetModel.fromEntity(WorkoutSet set) {
     return WorkoutSetModel(
       id: set.id,
+      ownerUserId: set.ownerUserId,
       exerciseId: set.exerciseId,
       reps: set.reps,
       weight: set.weight,
@@ -37,6 +39,7 @@ class WorkoutSetModel extends WorkoutSet {
 
     return WorkoutSetModel(
       id: map[DatabaseTables.setId] as String,
+      ownerUserId: map['owner_user_id'] as String?,
       exerciseId: map[DatabaseTables.setExerciseId] as String,
       reps: map[DatabaseTables.setReps] as int,
       weight: (map[DatabaseTables.setWeight] as num).toDouble(),
@@ -62,6 +65,7 @@ class WorkoutSetModel extends WorkoutSet {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.setId: id,
+      'owner_user_id': ownerUserId,
       DatabaseTables.setExerciseId: exerciseId,
       DatabaseTables.setReps: reps,
       DatabaseTables.setWeight: weight,
@@ -83,6 +87,7 @@ class WorkoutSetModel extends WorkoutSet {
 
     return WorkoutSetModel(
       id: json['id'] as String,
+      ownerUserId: json['ownerUserId'] as String?,
       exerciseId: json['exerciseId'] as String,
       reps: json['reps'] as int,
       weight: (json['weight'] as num).toDouble(),
@@ -103,6 +108,7 @@ class WorkoutSetModel extends WorkoutSet {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'exerciseId': exerciseId,
       'reps': reps,
       'weight': weight,

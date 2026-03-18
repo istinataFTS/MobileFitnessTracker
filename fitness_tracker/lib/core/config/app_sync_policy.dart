@@ -1,6 +1,7 @@
 import '../enums/auth_mode.dart';
 import '../enums/conflict_resolution_strategy.dart';
 import '../enums/sync_trigger.dart';
+import 'app_data_architecture.dart';
 
 class AppSyncPolicy {
   final bool offlineFirst;
@@ -31,13 +32,25 @@ class AppSyncPolicy {
     return true;
   }
 
+  /// This is the currently accepted target architecture for authenticated mode:
+  ///
+  /// - offline-first
+  /// - guest mode remains local-only
+  /// - authenticated data is user-scoped
+  /// - remote becomes authoritative after login
+  /// - local storage remains available for offline behavior and migration
+  /// - initial authenticated session may upload guest/local data
   static const AppSyncPolicy productionDefault = AppSyncPolicy(
-    offlineFirst: true,
-    localStoreAcceptsWrites: true,
-    remoteIsSourceOfTruthWhenAuthenticated: true,
-    guestModeUsesLocalStorageOnly: true,
-    authenticatedModeUsesUserScopedData: true,
-    initialCloudSyncUploadsLocalData: true,
+    offlineFirst: AppDataArchitecture.offlineFirst,
+    localStoreAcceptsWrites: AppDataArchitecture.localStoreAcceptsWrites,
+    remoteIsSourceOfTruthWhenAuthenticated:
+        AppDataArchitecture.authenticatedRemoteIsSourceOfTruth,
+    guestModeUsesLocalStorageOnly:
+        AppDataArchitecture.guestModeUsesLocalStorageOnly,
+    authenticatedModeUsesUserScopedData:
+        AppDataArchitecture.authenticatedModeUsesUserScopedData,
+    initialCloudSyncUploadsLocalData:
+        AppDataArchitecture.initialAuthenticatedSessionMigratesGuestData,
     conflictResolutionStrategy: ConflictResolutionStrategy.serverWins,
     syncTriggers: <SyncTrigger>[
       SyncTrigger.appLaunch,

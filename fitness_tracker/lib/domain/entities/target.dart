@@ -20,6 +20,7 @@ enum MacroTargetType {
 
 class Target extends Equatable {
   final String id;
+  final String? ownerUserId;
   final TargetType type;
   final String categoryKey;
   final double targetValue;
@@ -31,6 +32,7 @@ class Target extends Equatable {
 
   const Target({
     required this.id,
+    this.ownerUserId,
     required this.type,
     required this.categoryKey,
     required this.targetValue,
@@ -42,6 +44,7 @@ class Target extends Equatable {
   })  : updatedAt = updatedAt ?? createdAt,
         syncMetadata = syncMetadata ?? const EntitySyncMetadata();
 
+  bool get isOwnedByAuthenticatedUser => ownerUserId != null;
   bool get isMuscleTarget => type == TargetType.muscleSets;
   bool get isMacroTarget => type == TargetType.macro;
 
@@ -59,6 +62,8 @@ class Target extends Equatable {
 
   Target copyWith({
     String? id,
+    String? ownerUserId,
+    bool clearOwnerUserId = false,
     TargetType? type,
     String? categoryKey,
     double? targetValue,
@@ -70,6 +75,7 @@ class Target extends Equatable {
   }) {
     return Target(
       id: id ?? this.id,
+      ownerUserId: clearOwnerUserId ? null : (ownerUserId ?? this.ownerUserId),
       type: type ?? this.type,
       categoryKey: categoryKey ?? this.categoryKey,
       targetValue: targetValue ?? this.targetValue,
@@ -84,6 +90,7 @@ class Target extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        ownerUserId,
         type,
         categoryKey,
         targetValue,

@@ -6,6 +6,7 @@ import '../../domain/entities/nutrition_log.dart';
 class NutritionLogModel extends NutritionLog {
   const NutritionLogModel({
     required super.id,
+    super.ownerUserId,
     super.mealId,
     required super.mealName,
     super.gramsConsumed,
@@ -22,6 +23,7 @@ class NutritionLogModel extends NutritionLog {
   factory NutritionLogModel.fromEntity(NutritionLog log) {
     return NutritionLogModel(
       id: log.id,
+      ownerUserId: log.ownerUserId,
       mealId: log.mealId,
       mealName: log.mealName,
       gramsConsumed: log.gramsConsumed,
@@ -43,6 +45,7 @@ class NutritionLogModel extends NutritionLog {
 
     return NutritionLogModel(
       id: map[DatabaseTables.nutritionLogId] as String,
+      ownerUserId: map['owner_user_id'] as String?,
       mealId: map[DatabaseTables.nutritionLogMealId] as String?,
       mealName: map[DatabaseTables.nutritionLogMealName] as String,
       gramsConsumed:
@@ -73,6 +76,7 @@ class NutritionLogModel extends NutritionLog {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.nutritionLogId: id,
+      'owner_user_id': ownerUserId,
       DatabaseTables.nutritionLogMealId: mealId,
       DatabaseTables.nutritionLogMealName: mealName,
       DatabaseTables.nutritionLogGrams: gramsConsumed,
@@ -94,6 +98,7 @@ class NutritionLogModel extends NutritionLog {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'mealId': mealId,
       'mealName': mealName,
       'gramsConsumed': gramsConsumed,
