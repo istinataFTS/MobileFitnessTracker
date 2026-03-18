@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env_config.dart';
 import '../../core/logging/app_logger.dart';
@@ -13,6 +14,7 @@ import 'app_debug_diagnostics_runner.dart';
 class AppBootstrapper {
   static const String _startupTimerName = 'app_initialization';
   static const String _dependencyInitTimerName = 'dependency_initialization';
+  static const String _supabaseInitTimerName = 'supabase_initialization';
   static const String _dataSeedTimerName = 'default_data_seed';
   static const String _diagnosticsTimerName = 'startup_diagnostics';
   static const String _systemUiTimerName = 'system_ui_configuration';
@@ -28,6 +30,7 @@ class AppBootstrapper {
       EnvConfig.ensureValidRuntimeConfig();
 
       _initializeLifecycle();
+      await _initializeRemoteBackend();
       await _initializeDependencies();
       await _seedDefaultDataIfNeeded();
       await _runDiagnosticsIfNeeded();
@@ -68,6 +71,44 @@ class AppBootstrapper {
   void _initializeLifecycle() {
     AppLogger.debug('Initializing app lifecycle manager', category: 'bootstrap');
     AppLifecycleManager().initialize();
+  }
+
+  Future<void> _initializeRemoteBackend() async {
+    if (kIsWeb) {
+      AppLogger.info(
+        'Skipping remote backend initialization on web bootstrap path',
+        category: 'bootstrap',
+      );
+      return;
+    }
+
+    if (!EnvConfig.isSupabaseConfigured) {
+      AppLogger.info(
+        'Supabase is disabled or not configured; continuing without remote backend',
+        category: 'bootstrap',
+      );
+      return;
+    }
+
+    AppLogger.info('Initializing Supabase', category: 'bootstrap');
+
+    await PerformanceMonitor.trackAsync<void>(
+      _supabaseInitTimerName,
+      () => Supabase.initialize(
+        url: EnvConfig.supabaseUrl,
+        anonKey: EnvConfig.supabaseAnonKey,
+      ),
+      slowThresholdMs: 300,
+      category: 'bootstrap',
+    );
+
+    final summary = PerformanceMonitor.getSummary(_supabaseInitTimerName);
+    if (summary != null) {
+      AppLogger.info(
+        'Supabase initialized in ${summary.latestMs}ms',
+        category: 'bootstrap',
+      );
+    }
   }
 
   Future<void> _initializeDependencies() async {

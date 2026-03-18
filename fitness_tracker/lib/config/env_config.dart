@@ -107,6 +107,26 @@ class EnvConfig {
     defaultValue: 30,
   );
 
+  static const bool enableSupabase = bool.fromEnvironment(
+    'ENABLE_SUPABASE',
+    defaultValue: false,
+  );
+
+  static const String supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: '',
+  );
+
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: '',
+  );
+
+  static bool get isSupabaseConfigured =>
+      enableSupabase &&
+      supabaseUrl.trim().isNotEmpty &&
+      supabaseAnonKey.trim().isNotEmpty;
+
   static bool get enableDebugLogs => isDevelopment || kDebugMode;
 
   static const String logLevel = String.fromEnvironment(
@@ -145,6 +165,13 @@ class EnvConfig {
 
     if (isProduction && enableDevicePreview) {
       issues.add('ENABLE_DEVICE_PREVIEW must be false in production.');
+    }
+
+    if (enableSupabase &&
+        (supabaseUrl.trim().isEmpty || supabaseAnonKey.trim().isEmpty)) {
+      issues.add(
+        'SUPABASE_URL and SUPABASE_ANON_KEY must both be set when ENABLE_SUPABASE is true.',
+      );
     }
 
     return issues;
@@ -197,6 +224,11 @@ class EnvConfig {
     AppLogger.debug('API Base URL: $apiBaseUrl', category: 'config');
     AppLogger.debug(
       'API Timeout Seconds: $apiTimeoutSeconds',
+      category: 'config',
+    );
+    AppLogger.debug('Enable Supabase: $enableSupabase', category: 'config');
+    AppLogger.debug(
+      'Supabase Configured: $isSupabaseConfigured',
       category: 'config',
     );
     AppLogger.debug('Log Level: $logLevel', category: 'config');

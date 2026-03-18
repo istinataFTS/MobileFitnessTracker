@@ -1,0 +1,84 @@
+import '../../../domain/entities/workout_set.dart';
+import '../../dtos/supabase/supabase_workout_set_dto.dart';
+import 'supabase_client_provider.dart';
+import 'workout_set_remote_datasource.dart';
+
+class SupabaseWorkoutSetRemoteDataSource
+    implements WorkoutSetRemoteDataSource {
+  static const String _tableName = 'workout_sets';
+
+  final SupabaseClientProvider clientProvider;
+
+  const SupabaseWorkoutSetRemoteDataSource({
+    required this.clientProvider,
+  });
+
+  @override
+  bool get isConfigured => clientProvider.isConfigured;
+
+  @override
+  Future<List<WorkoutSet>> getAllSets() async {
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .order('performed_at', ascending: false);
+
+    final rows = _asMapList(data);
+
+    return rows.map(_mapRowToEntity).toList();
+  }
+
+  @override
+  Future<WorkoutSet?> getSetById(String id) async {
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+
+    if (data == null) {
+      return null;
+    }
+
+    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+  }
+
+  @override
+  Future<WorkoutSet> upsertSet(WorkoutSet set) async {
+    final dto = SupabaseWorkoutSetDto.fromEntity(set);
+
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .upsert(dto.toMap())
+        .select()
+        .single();
+
+    final row = Map<String, dynamic>.from(data as Map);
+    return _mapRowToEntity(row);
+  }
+
+  @override
+  Future<void> deleteSet({
+    required String localId,
+    String? serverId,
+  }) async {
+    final remoteId = serverId ?? localId;
+
+    await clientProvider.client.from(_tableName).delete().eq('id', remoteId);
+  }
+
+  WorkoutSet _mapRowToEntity(Map<String, dynamic> row) {
+    final dto = SupabaseWorkoutSetDto.fromMap(row);
+    return dto.toEntity(
+      localId: dto.id,
+      syncMetadata: dto.toSyncedMetadata(),
+    );
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic data) {
+    final list = (data as List<dynamic>);
+    return list
+        .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+  }
+}

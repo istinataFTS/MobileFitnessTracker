@@ -1,10 +1,12 @@
 import 'package:get_it/get_it.dart';
 
+import '../../config/env_config.dart';
 import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
 import '../../data/datasources/local/pending_sync_delete_local_datasource_impl.dart';
 import '../../data/datasources/local/workout_set_local_datasource.dart';
 import '../../data/datasources/local/workout_set_local_datasource_impl.dart';
 import '../../data/datasources/remote/noop_workout_set_remote_datasource.dart';
+import '../../data/datasources/remote/supabase_workout_set_remote_datasource.dart';
 import '../../data/datasources/remote/workout_set_remote_datasource.dart';
 import '../../data/repositories/workout_set_repository_impl.dart';
 import '../../data/sync/workout_set_sync_coordinator.dart';
@@ -64,6 +66,8 @@ void registerWorkoutModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<WorkoutSetRemoteDataSource>(
-    NoopWorkoutSetRemoteDataSource.new,
+    () => EnvConfig.isSupabaseConfigured
+        ? SupabaseWorkoutSetRemoteDataSource(clientProvider: sl())
+        : const NoopWorkoutSetRemoteDataSource(),
   );
 }
