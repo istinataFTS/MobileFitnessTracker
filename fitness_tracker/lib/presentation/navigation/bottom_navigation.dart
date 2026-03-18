@@ -7,14 +7,13 @@ import '../../features/history/history.dart';
 import '../pages/exercises/bloc/exercise_bloc.dart';
 import '../pages/home/home_page.dart';
 import '../pages/library/library_page.dart';
-import '../pages/log/bloc/workout_bloc.dart';
-import '../pages/log/log_page.dart';
+import '../../features/log/presentation/bloc/workout_bloc.dart';
+import '../../features/log/presentation/pages/log_page.dart';
 import '../pages/meals/bloc/meal_bloc.dart';
 import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../pages/profile/profile_page.dart';
 import '../pages/targets/bloc/targets_bloc.dart';
 import '../pages/targets/targets_page.dart';
-import '../pages/history/history_page.dart';
 
 /// Bottom navigation wrapper for main app pages
 class BottomNavigation extends StatefulWidget {

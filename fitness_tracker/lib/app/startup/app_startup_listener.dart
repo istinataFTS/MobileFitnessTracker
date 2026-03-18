@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/time_period.dart';
 import '../../presentation/pages/home/bloc/home_bloc.dart';
 import '../../presentation/pages/home/bloc/muscle_visual_bloc.dart';
-import '../../presentation/pages/log/bloc/workout_bloc.dart';
+import '../../features/log/presentation/bloc/workout_bloc.dart';
 
 class AppStartupListener extends StatefulWidget {
   const AppStartupListener({

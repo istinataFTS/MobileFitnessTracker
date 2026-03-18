@@ -14,7 +14,7 @@ import '../presentation/navigation/bottom_navigation.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../presentation/pages/home/bloc/home_bloc.dart';
 import '../presentation/pages/home/bloc/muscle_visual_bloc.dart';
-import '../presentation/pages/log/bloc/workout_bloc.dart';
+import '../features/log/presentation/bloc/workout_bloc.dart';
 import '../presentation/pages/meals/bloc/meal_bloc.dart';
 import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
