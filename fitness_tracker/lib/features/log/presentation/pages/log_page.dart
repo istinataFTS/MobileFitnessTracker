@@ -6,14 +6,22 @@ import '../widgets/log_exercise_tab.dart';
 import '../widgets/log_macros_tab.dart';
 import '../widgets/log_meal_tab.dart';
 
+typedef LogTabBuilder = Widget Function(DateTime initialDate);
+
 class LogPage extends StatefulWidget {
   final int initialIndex;
   final DateTime? initialDate;
+  final LogTabBuilder? exerciseTabBuilder;
+  final LogTabBuilder? mealTabBuilder;
+  final LogTabBuilder? macrosTabBuilder;
 
   const LogPage({
     super.key,
     this.initialIndex = 0,
     this.initialDate,
+    this.exerciseTabBuilder,
+    this.mealTabBuilder,
+    this.macrosTabBuilder,
   });
 
   @override
@@ -21,6 +29,9 @@ class LogPage extends StatefulWidget {
 }
 
 class _LogPageState extends State<LogPage> {
+  static const int _minTabIndex = 0;
+  static const int _maxTabIndex = 2;
+
   late int _selectedIndex;
 
   DateTime get _effectiveInitialDate => widget.initialDate ?? DateTime.now();
@@ -28,7 +39,7 @@ class _LogPageState extends State<LogPage> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialIndex.clamp(0, 2);
+    _selectedIndex = widget.initialIndex.clamp(_minTabIndex, _maxTabIndex);
   }
 
   @override
@@ -131,13 +142,28 @@ class _LogPageState extends State<LogPage> {
   Widget _buildContent() {
     switch (_selectedIndex) {
       case 0:
-        return LogExerciseTab(initialDate: _effectiveInitialDate);
+        return _buildExerciseTab();
       case 1:
-        return LogMealTab(initialDate: _effectiveInitialDate);
+        return _buildMealTab();
       case 2:
-        return LogMacrosTab(initialDate: _effectiveInitialDate);
+        return _buildMacrosTab();
       default:
-        return LogExerciseTab(initialDate: _effectiveInitialDate);
+        return _buildExerciseTab();
     }
+  }
+
+  Widget _buildExerciseTab() {
+    return widget.exerciseTabBuilder?.call(_effectiveInitialDate) ??
+        LogExerciseTab(initialDate: _effectiveInitialDate);
+  }
+
+  Widget _buildMealTab() {
+    return widget.mealTabBuilder?.call(_effectiveInitialDate) ??
+        LogMealTab(initialDate: _effectiveInitialDate);
+  }
+
+  Widget _buildMacrosTab() {
+    return widget.macrosTabBuilder?.call(_effectiveInitialDate) ??
+        LogMacrosTab(initialDate: _effectiveInitialDate);
   }
 }

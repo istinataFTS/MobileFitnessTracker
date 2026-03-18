@@ -1,73 +1,26 @@
-import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/app/app.dart';
-import 'package:fitness_tracker/features/log/log.dart';
-import 'package:fitness_tracker/presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import 'package:fitness_tracker/features/log/presentation/pages/log_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-
-class MockWorkoutBloc extends MockBloc<WorkoutEvent, WorkoutState>
-    implements WorkoutBloc {}
-
-class MockNutritionLogBloc
-    extends MockBloc<NutritionLogEvent, NutritionLogState>
-    implements NutritionLogBloc {}
-
-class FakeWorkoutEvent extends Fake implements WorkoutEvent {}
-
-class FakeWorkoutState extends Fake implements WorkoutState {}
-
-class FakeNutritionLogEvent extends Fake implements NutritionLogEvent {}
-
-class FakeNutritionLogState extends Fake implements NutritionLogState {}
 
 void main() {
-  late MockWorkoutBloc workoutBloc;
-  late MockNutritionLogBloc nutritionLogBloc;
-
-  setUpAll(() {
-    registerFallbackValue(FakeWorkoutEvent());
-    registerFallbackValue(FakeWorkoutState());
-    registerFallbackValue(FakeNutritionLogEvent());
-    registerFallbackValue(FakeNutritionLogState());
-  });
-
-  setUp(() {
-    workoutBloc = MockWorkoutBloc();
-    nutritionLogBloc = MockNutritionLogBloc();
-
-    when(() => workoutBloc.state).thenReturn(WorkoutInitial());
-    when(() => nutritionLogBloc.state).thenReturn(NutritionLogInitial());
-
-    when(() => workoutBloc.add(any())).thenReturn(null);
-    when(() => nutritionLogBloc.add(any())).thenReturn(null);
-
-    when(() => workoutBloc.effects)
-        .thenAnswer((_) => const Stream<WorkoutUiEffect>.empty());
-    when(() => nutritionLogBloc.effects)
-        .thenAnswer((_) => const Stream<NutritionLogUiEffect>.empty());
-
-    whenListen(
-      workoutBloc,
-      const Stream<WorkoutState>.empty(),
-      initialState: WorkoutInitial(),
-    );
-    whenListen(
-      nutritionLogBloc,
-      const Stream<NutritionLogState>.empty(),
-      initialState: NutritionLogInitial(),
-    );
-  });
-
-  Widget buildSubject() {
+  Widget buildSubject({
+    int initialIndex = 0,
+    DateTime? initialDate,
+  }) {
     return AppShell(
-      home: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<WorkoutBloc>.value(value: workoutBloc),
-          BlocProvider<NutritionLogBloc>.value(value: nutritionLogBloc),
-        ],
-        child: const LogPage(),
+      home: LogPage(
+        initialIndex: initialIndex,
+        initialDate: initialDate,
+        exerciseTabBuilder: (_) => const Center(
+          child: Text('exercise-tab-content'),
+        ),
+        mealTabBuilder: (_) => const Center(
+          child: Text('meal-tab-content'),
+        ),
+        macrosTabBuilder: (_) => const Center(
+          child: Text('macros-tab-content'),
+        ),
       ),
     );
   }
@@ -82,6 +35,15 @@ void main() {
       expect(find.text('Macros'), findsOneWidget);
     });
 
+    testWidgets('shows the exercise tab by default', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      expect(find.text('exercise-tab-content'), findsOneWidget);
+      expect(find.text('meal-tab-content'), findsNothing);
+      expect(find.text('macros-tab-content'), findsNothing);
+    });
+
     testWidgets('switches tabs when tapped', (tester) async {
       await tester.pumpWidget(buildSubject());
       await tester.pumpAndSettle();
@@ -89,12 +51,34 @@ void main() {
       await tester.tap(find.text('Meal'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Meal'), findsWidgets);
+      expect(find.text('exercise-tab-content'), findsNothing);
+      expect(find.text('meal-tab-content'), findsOneWidget);
+      expect(find.text('macros-tab-content'), findsNothing);
 
       await tester.tap(find.text('Macros'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Macros'), findsWidgets);
+      expect(find.text('exercise-tab-content'), findsNothing);
+      expect(find.text('meal-tab-content'), findsNothing);
+      expect(find.text('macros-tab-content'), findsOneWidget);
+    });
+
+    testWidgets('respects the initial tab index', (tester) async {
+      await tester.pumpWidget(buildSubject(initialIndex: 2));
+      await tester.pumpAndSettle();
+
+      expect(find.text('exercise-tab-content'), findsNothing);
+      expect(find.text('meal-tab-content'), findsNothing);
+      expect(find.text('macros-tab-content'), findsOneWidget);
+    });
+
+    testWidgets('clamps an invalid initial tab index', (tester) async {
+      await tester.pumpWidget(buildSubject(initialIndex: 99));
+      await tester.pumpAndSettle();
+
+      expect(find.text('exercise-tab-content'), findsOneWidget);
+      expect(find.text('meal-tab-content'), findsNothing);
+      expect(find.text('macros-tab-content'), findsNothing);
     });
   });
 }
