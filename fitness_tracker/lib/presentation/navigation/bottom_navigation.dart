@@ -4,11 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/themes/app_theme.dart';
 import '../../features/history/history.dart';
-import '../pages/exercises/bloc/exercise_bloc.dart';
-import '../pages/home/home_page.dart';
-import '../pages/library/library_page.dart';
+import '../../features/home/presentation/home_page.dart';
 import '../../features/log/presentation/bloc/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
+import '../pages/exercises/bloc/exercise_bloc.dart';
+import '../pages/library/library_page.dart';
 import '../pages/meals/bloc/meal_bloc.dart';
 import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../pages/profile/profile_page.dart';
@@ -67,7 +67,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
         _ensureNutritionLogDataLoaded();
         break;
       case _historyTabIndex:
-        // HistoryPage loads its own initial month in initState.
         break;
       case _libraryTabIndex:
         _ensureExerciseDataLoaded();

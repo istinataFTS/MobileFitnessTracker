@@ -246,6 +246,32 @@ void main() {
     expect(find.text('Muscle Groups'), findsOneWidget);
   });
 
+  testWidgets('shows current period in selector', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.text('Week'), findsWidgets);
+  });
+
+  testWidgets('changing period dispatches ChangePeriodEvent', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    await tester.tap(find.text('Week').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Month').last);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => muscleVisualBloc.add(ChangePeriodEvent(TimePeriod.month)),
+    ).called(1);
+  });
+
   testWidgets(
     'loaded home with visual error shows retry action for visuals',
     (WidgetTester tester) async {

@@ -3,11 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../domain/entities/time_period.dart';
 import '../../../presentation/settings/bloc/app_settings_cubit.dart';
 import '../application/home_bloc.dart';
 import '../application/muscle_visual_bloc.dart';
 import 'mappers/home_view_data_mapper.dart';
 import 'models/home_view_data.dart';
+import 'widgets/period_selector_widget.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -50,6 +52,14 @@ class HomePage extends StatelessWidget {
                       settings: settingsState.settings,
                     );
 
+                    final TimePeriod selectedPeriod =
+                        muscleState is MuscleVisualLoaded
+                            ? muscleState.currentPeriod
+                            : TimePeriod.week;
+
+                    final bool selectorEnabled =
+                        muscleState is! MuscleVisualLoading;
+
                     return RefreshIndicator(
                       color: AppTheme.primaryOrange,
                       onRefresh: () async {
@@ -70,6 +80,13 @@ class HomePage extends StatelessWidget {
                           _ProgressCard(
                             viewData: viewData.progress,
                             selectedPeriodLabel: viewData.period,
+                            selectedPeriod: selectedPeriod,
+                            selectorEnabled: selectorEnabled,
+                            onPeriodChanged: (TimePeriod nextPeriod) {
+                              context.read<MuscleVisualBloc>().add(
+                                    ChangePeriodEvent(nextPeriod),
+                                  );
+                            },
                             onRetryVisuals: () {
                               context.read<MuscleVisualBloc>().add(
                                     const RefreshVisualsEvent(),
@@ -191,10 +208,11 @@ class _NutritionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         viewData.totalCaloriesLabel,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryOrange,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryOrange,
+                                ),
                       ),
                     ],
                   ),
@@ -344,11 +362,17 @@ class _ProgressCard extends StatelessWidget {
   const _ProgressCard({
     required this.viewData,
     required this.selectedPeriodLabel,
+    required this.selectedPeriod,
+    required this.selectorEnabled,
+    required this.onPeriodChanged,
     required this.onRetryVisuals,
   });
 
   final HomeProgressCardViewData viewData;
   final String selectedPeriodLabel;
+  final TimePeriod selectedPeriod;
+  final bool selectorEnabled;
+  final ValueChanged<TimePeriod> onPeriodChanged;
   final VoidCallback onRetryVisuals;
 
   @override
@@ -360,26 +384,40 @@ class _ProgressCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryOrange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.analytics,
-                    color: AppTheme.primaryOrange,
+                Expanded(
+                  child: Row(
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryOrange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.analytics,
+                          color: AppTheme.primaryOrange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${AppStrings.progress} • $selectedPeriodLabel',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${AppStrings.progress} • $selectedPeriodLabel',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
+                PeriodSelectorWidget(
+                  selectedPeriod: selectedPeriod,
+                  onPeriodChanged: onPeriodChanged,
+                  enabled: selectorEnabled,
                 ),
               ],
             ),
@@ -443,9 +481,10 @@ class _ProgressCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.displayName,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ),
                       Text(

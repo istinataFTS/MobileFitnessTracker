@@ -25,9 +25,7 @@ class HomeViewDataMapper {
   }) {
     final List<Target> trainingTargets = homeState.trainingTargets;
     final List<Target> macroTargets = homeState.macroTargets;
-    final TimePeriod currentPeriod = muscleVisualState is MuscleVisualLoaded
-        ? muscleVisualState.currentPeriod
-        : TimePeriod.week;
+    final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
 
     return HomePageViewData(
       greeting: '${AppStrings.hello}, ${EnvConfig.userName}!',
@@ -53,6 +51,22 @@ class HomeViewDataMapper {
       period: _periodLabel(currentPeriod),
       showMuscleGroups: trainingTargets.isNotEmpty,
     );
+  }
+
+  static TimePeriod _resolveCurrentPeriod(MuscleVisualState muscleVisualState) {
+    if (muscleVisualState is MuscleVisualLoaded) {
+      return muscleVisualState.currentPeriod;
+    }
+
+    if (muscleVisualState is MuscleVisualLoading) {
+      return muscleVisualState.period;
+    }
+
+    if (muscleVisualState is MuscleVisualError) {
+      return muscleVisualState.period;
+    }
+
+    return TimePeriod.week;
   }
 
   static HomeNutritionCardViewData _mapNutrition({
@@ -114,7 +128,8 @@ class HomeViewDataMapper {
     final bool isComplete = hasTarget && actual >= target;
     final double progressValue =
         hasTarget ? (actual / target).clamp(0.0, 1.0) : 0.0;
-    final double remaining = hasTarget ? (target - actual).clamp(0.0, target) : 0.0;
+    final double remaining =
+        hasTarget ? (target - actual).clamp(0.0, target) : 0.0;
 
     return HomeMacroProgressViewData(
       label: label,
@@ -141,9 +156,6 @@ class HomeViewDataMapper {
       (int sum, Target target) => sum + target.weeklyGoal,
     );
     final int remainingTarget = (totalTarget - totalSets).clamp(0, totalTarget);
-    final HomeTone targetTone = remainingTarget <= 0
-        ? HomeTone.success
-        : (remainingTarget <= 3 ? HomeTone.warning : HomeTone.primary);
 
     if (muscleVisualState is MuscleVisualLoading ||
         muscleVisualState is MuscleVisualInitial) {
@@ -152,7 +164,7 @@ class HomeViewDataMapper {
         remainingTargetLabel:
             totalTarget > 0 ? remainingTarget.toString() : '-',
         trainedMusclesLabel: '-',
-        targetTone: targetTone,
+        targetTone: _targetTone(remainingTarget, showTarget: totalTarget > 0),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: true,
         errorMessage: null,
@@ -165,7 +177,7 @@ class HomeViewDataMapper {
         remainingTargetLabel:
             totalTarget > 0 ? remainingTarget.toString() : '-',
         trainedMusclesLabel: '-',
-        targetTone: targetTone,
+        targetTone: _targetTone(remainingTarget, showTarget: totalTarget > 0),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: false,
         errorMessage: muscleVisualState.message,
@@ -173,6 +185,8 @@ class HomeViewDataMapper {
     }
 
     final MuscleVisualLoaded loaded = muscleVisualState as MuscleVisualLoaded;
+    final bool showTarget =
+        loaded.currentPeriod == TimePeriod.week && totalTarget > 0;
 
     final List<MuscleVisualData> trained = loaded.muscleData.values
         .where(
@@ -186,13 +200,9 @@ class HomeViewDataMapper {
 
     return HomeProgressCardViewData(
       totalSetsLabel: totalSets.toString(),
-      remainingTargetLabel: loaded.currentPeriod == TimePeriod.week && totalTarget > 0
-          ? remainingTarget.toString()
-          : '-',
+      remainingTargetLabel: showTarget ? remainingTarget.toString() : '-',
       trainedMusclesLabel: loaded.trainedMuscleCount.toString(),
-      targetTone: loaded.currentPeriod == TimePeriod.week
-          ? targetTone
-          : HomeTone.muted,
+      targetTone: _targetTone(remainingTarget, showTarget: showTarget),
       muscleSummary: trained
           .take(6)
           .map(
@@ -207,6 +217,25 @@ class HomeViewDataMapper {
       isLoading: false,
       errorMessage: null,
     );
+  }
+
+  static HomeTone _targetTone(
+    int remainingTarget, {
+    required bool showTarget,
+  }) {
+    if (!showTarget) {
+      return HomeTone.muted;
+    }
+
+    if (remainingTarget <= 0) {
+      return HomeTone.success;
+    }
+
+    if (remainingTarget <= 3) {
+      return HomeTone.warning;
+    }
+
+    return HomeTone.primary;
   }
 
   static List<HomeMuscleGroupProgressViewData> _mapMuscleGroupProgress({
