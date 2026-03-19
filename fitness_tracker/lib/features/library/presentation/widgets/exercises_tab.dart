@@ -7,11 +7,9 @@ import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../application/library_exercise_filters.dart';
+import '../models/library_exercise_view_data.dart';
 
-/// Feature-owned exercises library tab.
-///
-/// Library owns exercise browsing, local search, and muscle-group filtering
-/// while continuing to use the existing exercise bloc boundary for now.
 class ExercisesTab extends StatefulWidget {
   const ExercisesTab({super.key});
 
@@ -49,6 +47,7 @@ class ExercisesTab extends StatefulWidget {
 
 class _ExercisesTabState extends State<ExercisesTab> {
   final TextEditingController _searchController = TextEditingController();
+
   String _searchQuery = '';
   String? _selectedMuscleFilter;
 
@@ -56,6 +55,14 @@ class _ExercisesTabState extends State<ExercisesTab> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _selectedMuscleFilter = null;
+    });
   }
 
   @override
@@ -101,17 +108,29 @@ class _ExercisesTabState extends State<ExercisesTab> {
         final List<Exercise> allExercises =
             state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
-        final List<Exercise> filteredExercises = _applyFilters(allExercises);
+        final List<Exercise> filteredExercises = LibraryExerciseFilters.apply(
+          exercises: allExercises,
+          query: _searchQuery,
+          selectedMuscle: _selectedMuscleFilter,
+        );
+
+        final LibraryExercisePageViewData viewData =
+            LibraryExerciseViewDataMapper.map(
+          allExercises: allExercises,
+          filteredExercises: filteredExercises,
+          searchQuery: _searchQuery,
+          selectedMuscle: _selectedMuscleFilter,
+        );
 
         return Column(
           children: <Widget>[
-            _buildBrowseHeader(context, allExercises, filteredExercises),
+            _buildBrowseHeader(context, viewData),
             Expanded(
-              child: allExercises.isEmpty
+              child: !viewData.hasExercises
                   ? _buildEmptyState(context)
-                  : filteredExercises.isEmpty
+                  : !viewData.hasResults
                       ? _buildNoResultsState(context)
-                      : _buildExercisesList(context, filteredExercises),
+                      : _buildExercisesList(context, viewData.items),
             ),
             _buildAddButton(context),
           ],
@@ -120,29 +139,9 @@ class _ExercisesTabState extends State<ExercisesTab> {
     );
   }
 
-  List<Exercise> _applyFilters(List<Exercise> source) {
-    return source.where((Exercise exercise) {
-      final String normalizedQuery = _searchQuery.trim().toLowerCase();
-
-      final bool matchesQuery = normalizedQuery.isEmpty ||
-          exercise.name.toLowerCase().contains(normalizedQuery) ||
-          exercise.muscleGroups.any(
-            (String muscle) => MuscleGroups.getDisplayName(muscle)
-                .toLowerCase()
-                .contains(normalizedQuery),
-          );
-
-      final bool matchesMuscle = _selectedMuscleFilter == null ||
-          exercise.muscleGroups.contains(_selectedMuscleFilter);
-
-      return matchesQuery && matchesMuscle;
-    }).toList();
-  }
-
   Widget _buildBrowseHeader(
     BuildContext context,
-    List<Exercise> allExercises,
-    List<Exercise> filteredExercises,
+    LibraryExercisePageViewData viewData,
   ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
@@ -231,7 +230,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
           ),
           const SizedBox(height: 12),
           Text(
-            '${filteredExercises.length} of ${allExercises.length} exercises',
+            viewData.resultCountLabel,
             key: ExercisesTab.resultCountKey,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textMedium,
@@ -326,13 +325,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
               const SizedBox(height: 16),
               TextButton.icon(
                 key: ExercisesTab.clearFiltersButtonKey,
-                onPressed: () {
-                  setState(() {
-                    _searchController.clear();
-                    _searchQuery = '';
-                    _selectedMuscleFilter = null;
-                  });
-                },
+                onPressed: _resetFilters,
                 icon: const Icon(Icons.restart_alt),
                 label: const Text('Clear filters'),
               ),
@@ -384,18 +377,25 @@ class _ExercisesTabState extends State<ExercisesTab> {
     );
   }
 
-  Widget _buildExercisesList(BuildContext context, List<Exercise> exercises) {
+  Widget _buildExercisesList(
+    BuildContext context,
+    List<LibraryExerciseItemViewData> items,
+  ) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      itemCount: exercises.length,
+      itemCount: items.length,
       itemBuilder: (BuildContext context, int index) {
-        final Exercise exercise = exercises[index];
-        return _buildExerciseCard(context, exercise);
+        return _buildExerciseCard(context, items[index]);
       },
     );
   }
 
-  Widget _buildExerciseCard(BuildContext context, Exercise exercise) {
+  Widget _buildExerciseCard(
+    BuildContext context,
+    LibraryExerciseItemViewData item,
+  ) {
+    final Exercise exercise = item.exercise;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -424,7 +424,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      exercise.name,
+                      item.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -433,7 +433,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
-                      children: exercise.muscleGroups.take(3).map((String mg) {
+                      children: item.muscleTags.map((String tag) {
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -444,7 +444,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            MuscleGroups.getDisplayName(mg),
+                            tag,
                             style: const TextStyle(
                               color: AppTheme.primaryOrange,
                               fontSize: 11,
@@ -454,11 +454,11 @@ class _ExercisesTabState extends State<ExercisesTab> {
                         );
                       }).toList(),
                     ),
-                    if (exercise.muscleGroups.length > 3)
+                    if (item.overflowLabel != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          '+${exercise.muscleGroups.length - 3} more',
+                          item.overflowLabel!,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppTheme.textDim,
                               ),
@@ -476,7 +476,8 @@ class _ExercisesTabState extends State<ExercisesTab> {
                     _confirmDeleteExercise(context, exercise);
                   }
                 },
-                itemBuilder: (BuildContext context) => const <PopupMenuEntry<String>>[
+                itemBuilder: (BuildContext context) =>
+                    const <PopupMenuEntry<String>>[
                   PopupMenuItem<String>(
                     value: 'edit',
                     child: Row(
@@ -491,7 +492,11 @@ class _ExercisesTabState extends State<ExercisesTab> {
                     value: 'delete',
                     child: Row(
                       children: <Widget>[
-                        Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: AppTheme.errorRed,
+                        ),
                         SizedBox(width: 12),
                         Text(
                           AppStrings.delete,
@@ -683,7 +688,10 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
 
   Widget _buildContent(BuildContext context) {
     return StatefulBuilder(
-      builder: (BuildContext context, void Function(void Function()) setInnerState) {
+      builder: (
+        BuildContext context,
+        void Function(void Function()) setInnerState,
+      ) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(

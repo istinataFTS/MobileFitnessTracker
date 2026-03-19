@@ -2,55 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/constants/app_strings.dart';
-import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
-import '../../../../domain/entities/exercise.dart';
-import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../../../domain/entities/meal.dart';
+import '../../../../presentation/pages/meals/bloc/meal_bloc.dart';
+import '../../application/library_meal_filters.dart';
+import '../models/library_meal_view_data.dart';
 
-/// Feature-owned exercises library tab.
-///
-/// Library owns exercise browsing, local search, and muscle-group filtering
-/// while continuing to use the existing exercise bloc boundary for now.
-class ExercisesTab extends StatefulWidget {
-  const ExercisesTab({super.key});
+class MealsTab extends StatefulWidget {
+  const MealsTab({super.key});
 
   static const Key searchFieldKey = ValueKey<String>(
-    'library_exercises_search_field',
+    'library_meals_search_field',
   );
   static const Key clearSearchButtonKey = ValueKey<String>(
-    'library_exercises_clear_search_button',
-  );
-  static const Key allMusclesChipKey = ValueKey<String>(
-    'library_exercises_all_muscles_chip',
+    'library_meals_clear_search_button',
   );
   static const Key resultCountKey = ValueKey<String>(
-    'library_exercises_result_count',
+    'library_meals_result_count',
   );
   static const Key retryButtonKey = ValueKey<String>(
-    'library_exercises_retry_button',
+    'library_meals_retry_button',
   );
-  static const Key clearFiltersButtonKey = ValueKey<String>(
-    'library_exercises_clear_filters_button',
+  static const Key clearResultsButtonKey = ValueKey<String>(
+    'library_meals_clear_results_button',
   );
   static const Key addButtonKey = ValueKey<String>(
-    'library_exercises_add_button',
+    'library_meals_add_button',
   );
   static const Key loadingIndicatorKey = ValueKey<String>(
-    'library_exercises_loading_indicator',
+    'library_meals_loading_indicator',
   );
 
-  static Key muscleChipKey(String muscle) =>
-      ValueKey<String>('library_exercises_muscle_chip_$muscle');
-
   @override
-  State<ExercisesTab> createState() => _ExercisesTabState();
+  State<MealsTab> createState() => _MealsTabState();
 }
 
-class _ExercisesTabState extends State<ExercisesTab> {
+class _MealsTabState extends State<MealsTab> {
   final TextEditingController _searchController = TextEditingController();
+
   String _searchQuery = '';
-  String? _selectedMuscleFilter;
 
   @override
   void dispose() {
@@ -58,11 +48,18 @@ class _ExercisesTabState extends State<ExercisesTab> {
     super.dispose();
   }
 
+  void _resetSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<ExerciseBloc, ExerciseState>(
-      listener: (BuildContext context, ExerciseState state) {
-        if (state is ExerciseOperationSuccess) {
+    return BlocConsumer<MealBloc, MealState>(
+      listener: (BuildContext context, MealState state) {
+        if (state is MealOperationSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -73,7 +70,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
           );
         }
 
-        if (state is ExerciseError) {
+        if (state is MealError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -84,34 +81,43 @@ class _ExercisesTabState extends State<ExercisesTab> {
           );
         }
       },
-      builder: (BuildContext context, ExerciseState state) {
-        if (state is ExerciseLoading) {
+      builder: (BuildContext context, MealState state) {
+        if (state is MealLoading) {
           return const Center(
             child: CircularProgressIndicator(
-              key: ExercisesTab.loadingIndicatorKey,
+              key: MealsTab.loadingIndicatorKey,
               color: AppTheme.primaryOrange,
             ),
           );
         }
 
-        if (state is ExerciseError) {
+        if (state is MealError) {
           return _buildErrorState(context, state.message);
         }
 
-        final List<Exercise> allExercises =
-            state is ExercisesLoaded ? state.exercises : <Exercise>[];
+        final List<Meal> allMeals =
+            state is MealsLoaded ? state.meals : <Meal>[];
 
-        final List<Exercise> filteredExercises = _applyFilters(allExercises);
+        final List<Meal> filteredMeals = LibraryMealFilters.apply(
+          meals: allMeals,
+          query: _searchQuery,
+        );
+
+        final LibraryMealPageViewData viewData = LibraryMealViewDataMapper.map(
+          allMeals: allMeals,
+          filteredMeals: filteredMeals,
+          searchQuery: _searchQuery,
+        );
 
         return Column(
           children: <Widget>[
-            _buildBrowseHeader(context, allExercises, filteredExercises),
+            _buildBrowseHeader(context, viewData),
             Expanded(
-              child: allExercises.isEmpty
+              child: !viewData.hasMeals
                   ? _buildEmptyState(context)
-                  : filteredExercises.isEmpty
+                  : !viewData.hasResults
                       ? _buildNoResultsState(context)
-                      : _buildExercisesList(context, filteredExercises),
+                      : _buildMealsList(context, viewData.items),
             ),
             _buildAddButton(context),
           ],
@@ -120,29 +126,9 @@ class _ExercisesTabState extends State<ExercisesTab> {
     );
   }
 
-  List<Exercise> _applyFilters(List<Exercise> source) {
-    return source.where((Exercise exercise) {
-      final String normalizedQuery = _searchQuery.trim().toLowerCase();
-
-      final bool matchesQuery = normalizedQuery.isEmpty ||
-          exercise.name.toLowerCase().contains(normalizedQuery) ||
-          exercise.muscleGroups.any(
-            (String muscle) => MuscleGroups.getDisplayName(muscle)
-                .toLowerCase()
-                .contains(normalizedQuery),
-          );
-
-      final bool matchesMuscle = _selectedMuscleFilter == null ||
-          exercise.muscleGroups.contains(_selectedMuscleFilter);
-
-      return matchesQuery && matchesMuscle;
-    }).toList();
-  }
-
   Widget _buildBrowseHeader(
     BuildContext context,
-    List<Exercise> allExercises,
-    List<Exercise> filteredExercises,
+    LibraryMealPageViewData viewData,
   ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
@@ -153,21 +139,16 @@ class _ExercisesTabState extends State<ExercisesTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           TextField(
-            key: ExercisesTab.searchFieldKey,
+            key: MealsTab.searchFieldKey,
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search exercises or muscle groups',
+              hintText: 'Search meals',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      key: ExercisesTab.clearSearchButtonKey,
+                      key: MealsTab.clearSearchButtonKey,
                       icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                      },
+                      onPressed: _resetSearch,
                     )
                   : null,
             ),
@@ -178,61 +159,9 @@ class _ExercisesTabState extends State<ExercisesTab> {
             },
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    key: ExercisesTab.allMusclesChipKey,
-                    label: const Text('All muscles'),
-                    selected: _selectedMuscleFilter == null,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedMuscleFilter = null;
-                      });
-                    },
-                    selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
-                    labelStyle: TextStyle(
-                      color: _selectedMuscleFilter == null
-                          ? AppTheme.primaryOrange
-                          : AppTheme.textMedium,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                ...MuscleGroups.all.map(
-                  (String muscle) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      key: ExercisesTab.muscleChipKey(muscle),
-                      label: Text(MuscleGroups.getDisplayName(muscle)),
-                      selected: _selectedMuscleFilter == muscle,
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedMuscleFilter =
-                              _selectedMuscleFilter == muscle ? null : muscle;
-                        });
-                      },
-                      selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
-                      labelStyle: TextStyle(
-                        color: _selectedMuscleFilter == muscle
-                            ? AppTheme.primaryOrange
-                            : AppTheme.textMedium,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
           Text(
-            '${filteredExercises.length} of ${allExercises.length} exercises',
-            key: ExercisesTab.resultCountKey,
+            viewData.resultCountLabel,
+            key: MealsTab.resultCountKey,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textMedium,
                 ),
@@ -257,21 +186,21 @@ class _ExercisesTabState extends State<ExercisesTab> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.fitness_center_outlined,
+                Icons.restaurant_outlined,
                 size: 60,
                 color: AppTheme.primaryOrange,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              AppStrings.noExercisesYet,
+              'No meals yet',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
             ),
             const SizedBox(height: 12),
             Text(
-              AppStrings.createExercisesDescription,
+              'Create reusable meals here so nutrition logging stays fast and consistent.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppTheme.textMedium,
@@ -279,9 +208,9 @@ class _ExercisesTabState extends State<ExercisesTab> {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => _showAddExerciseDialog(context),
+              onPressed: () => _showAddMealDialog(context),
               icon: const Icon(Icons.add),
-              label: const Text(AppStrings.addFirstExercise),
+              label: const Text('Add first meal'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -317,7 +246,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
               ),
               const SizedBox(height: 12),
               Text(
-                'No exercises match the current search or filter.',
+                'No meals match the current search.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppTheme.textMedium,
@@ -325,16 +254,10 @@ class _ExercisesTabState extends State<ExercisesTab> {
               ),
               const SizedBox(height: 16),
               TextButton.icon(
-                key: ExercisesTab.clearFiltersButtonKey,
-                onPressed: () {
-                  setState(() {
-                    _searchController.clear();
-                    _searchQuery = '';
-                    _selectedMuscleFilter = null;
-                  });
-                },
+                key: MealsTab.clearResultsButtonKey,
+                onPressed: _resetSearch,
                 icon: const Icon(Icons.restart_alt),
-                label: const Text('Clear filters'),
+                label: const Text('Clear search'),
               ),
             ],
           ),
@@ -357,7 +280,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Error Loading Exercises',
+              'Error Loading Meals',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -372,9 +295,9 @@ class _ExercisesTabState extends State<ExercisesTab> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              key: ExercisesTab.retryButtonKey,
+              key: MealsTab.retryButtonKey,
               onPressed: () {
-                context.read<ExerciseBloc>().add(LoadExercisesEvent());
+                context.read<MealBloc>().add(LoadMealsEvent());
               },
               child: const Text('Retry'),
             ),
@@ -384,22 +307,29 @@ class _ExercisesTabState extends State<ExercisesTab> {
     );
   }
 
-  Widget _buildExercisesList(BuildContext context, List<Exercise> exercises) {
+  Widget _buildMealsList(
+    BuildContext context,
+    List<LibraryMealItemViewData> items,
+  ) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      itemCount: exercises.length,
+      itemCount: items.length,
       itemBuilder: (BuildContext context, int index) {
-        final Exercise exercise = exercises[index];
-        return _buildExerciseCard(context, exercise);
+        return _buildMealCard(context, items[index]);
       },
     );
   }
 
-  Widget _buildExerciseCard(BuildContext context, Exercise exercise) {
+  Widget _buildMealCard(
+    BuildContext context,
+    LibraryMealItemViewData item,
+  ) {
+    final Meal meal = item.meal;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => _showEditExerciseDialog(context, exercise),
+        onTap: () => _showEditMealDialog(context, meal),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -413,7 +343,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Icons.fitness_center,
+                  Icons.restaurant,
                   color: AppTheme.primaryOrange,
                   size: 24,
                 ),
@@ -424,46 +354,25 @@ class _ExercisesTabState extends State<ExercisesTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      exercise.name,
+                      item.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: exercise.muscleGroups.take(3).map((String mg) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                    const SizedBox(height: 6),
+                    Text(
+                      item.subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.textMedium,
                           ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryOrange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            MuscleGroups.getDisplayName(mg),
-                            style: const TextStyle(
-                              color: AppTheme.primaryOrange,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList(),
                     ),
-                    if (exercise.muscleGroups.length > 3)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          '+${exercise.muscleGroups.length - 3} more',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textDim,
-                              ),
-                        ),
-                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.macroSummary,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textDim,
+                          ),
+                    ),
                   ],
                 ),
               ),
@@ -471,19 +380,20 @@ class _ExercisesTabState extends State<ExercisesTab> {
                 icon: const Icon(Icons.more_vert, color: AppTheme.textDim),
                 onSelected: (String value) {
                   if (value == 'edit') {
-                    _showEditExerciseDialog(context, exercise);
+                    _showEditMealDialog(context, meal);
                   } else if (value == 'delete') {
-                    _confirmDeleteExercise(context, exercise);
+                    _confirmDeleteMeal(context, meal);
                   }
                 },
-                itemBuilder: (BuildContext context) => const <PopupMenuEntry<String>>[
+                itemBuilder: (BuildContext context) =>
+                    const <PopupMenuEntry<String>>[
                   PopupMenuItem<String>(
                     value: 'edit',
                     child: Row(
                       children: <Widget>[
                         Icon(Icons.edit_outlined, size: 20),
                         SizedBox(width: 12),
-                        Text(AppStrings.edit),
+                        Text('Edit'),
                       ],
                     ),
                   ),
@@ -491,10 +401,14 @@ class _ExercisesTabState extends State<ExercisesTab> {
                     value: 'delete',
                     child: Row(
                       children: <Widget>[
-                        Icon(Icons.delete_outline, size: 20, color: AppTheme.errorRed),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: AppTheme.errorRed,
+                        ),
                         SizedBox(width: 12),
                         Text(
-                          AppStrings.delete,
+                          'Delete',
                           style: TextStyle(color: AppTheme.errorRed),
                         ),
                       ],
@@ -522,11 +436,11 @@ class _ExercisesTabState extends State<ExercisesTab> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            key: ExercisesTab.addButtonKey,
-            onPressed: () => _showAddExerciseDialog(context),
+            key: MealsTab.addButtonKey,
+            onPressed: () => _showAddMealDialog(context),
             icon: const Icon(Icons.add),
             label: const Text(
-              AppStrings.addExercise,
+              'Add Meal',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -541,44 +455,44 @@ class _ExercisesTabState extends State<ExercisesTab> {
     );
   }
 
-  void _showAddExerciseDialog(BuildContext context) {
+  void _showAddMealDialog(BuildContext context) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => BlocProvider.value(
-        value: context.read<ExerciseBloc>(),
-        child: const _ExerciseDialog(),
+        value: context.read<MealBloc>(),
+        child: const _MealDialog(),
       ),
     );
   }
 
-  void _showEditExerciseDialog(BuildContext context, Exercise exercise) {
+  void _showEditMealDialog(BuildContext context, Meal meal) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => BlocProvider.value(
-        value: context.read<ExerciseBloc>(),
-        child: _ExerciseDialog(exercise: exercise),
+        value: context.read<MealBloc>(),
+        child: _MealDialog(meal: meal),
       ),
     );
   }
 
-  void _confirmDeleteExercise(BuildContext context, Exercise exercise) {
+  void _confirmDeleteMeal(BuildContext context, Meal meal) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text(AppStrings.deleteExercise),
-        content: Text('${AppStrings.deleteExerciseConfirm}\n\n${exercise.name}'),
+        title: const Text('Delete Meal'),
+        content: Text('Are you sure you want to delete this meal?\n\n${meal.name}'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text(AppStrings.cancel),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              context.read<ExerciseBloc>().add(DeleteExerciseEvent(exercise.id));
+              context.read<MealBloc>().add(DeleteMealEvent(meal.id));
               Navigator.pop(dialogContext);
             },
             style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
-            child: const Text(AppStrings.delete),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -586,44 +500,70 @@ class _ExercisesTabState extends State<ExercisesTab> {
   }
 }
 
-class _ExerciseDialog extends StatefulWidget {
-  const _ExerciseDialog({this.exercise});
+class _MealDialog extends StatefulWidget {
+  const _MealDialog({this.meal});
 
-  final Exercise? exercise;
+  final Meal? meal;
 
   @override
-  State<_ExerciseDialog> createState() => _ExerciseDialogState();
+  State<_MealDialog> createState() => _MealDialogState();
 }
 
-class _ExerciseDialogState extends State<_ExerciseDialog> {
+class _MealDialogState extends State<_MealDialog> {
   late final TextEditingController _nameController;
-  late final Set<String> _selectedMuscles;
+  late final TextEditingController _servingSizeController;
+  late final TextEditingController _proteinController;
+  late final TextEditingController _carbsController;
+  late final TextEditingController _fatController;
+  late final TextEditingController _caloriesController;
+
   final Uuid _uuid = const Uuid();
 
-  bool get isEditing => widget.exercise != null;
+  bool get isEditing => widget.meal != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.exercise?.name ?? '');
-    _selectedMuscles =
-        Set<String>.from(widget.exercise?.muscleGroups ?? const <String>[]);
+
+    final Meal? meal = widget.meal;
+
+    _nameController = TextEditingController(text: meal?.name ?? '');
+    _servingSizeController = TextEditingController(
+      text: (meal?.servingSizeGrams ?? 100).toStringAsFixed(0),
+    );
+    _proteinController = TextEditingController(
+      text: (meal?.proteinPer100g ?? 0).toStringAsFixed(0),
+    );
+    _carbsController = TextEditingController(
+      text: (meal?.carbsPer100g ?? 0).toStringAsFixed(0),
+    );
+    _fatController = TextEditingController(
+      text: (meal?.fatPer100g ?? 0).toStringAsFixed(0),
+    );
+    _caloriesController = TextEditingController(
+      text: (meal?.caloriesPer100g ?? 0).toStringAsFixed(0),
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _servingSizeController.dispose();
+    _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
+    _caloriesController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isValid =
-        _nameController.text.trim().isNotEmpty && _selectedMuscles.isNotEmpty;
+    final bool isValid = _nameController.text.trim().isNotEmpty &&
+        _parseDouble(_servingSizeController.text) > 0;
 
     return Dialog(
       child: Container(
-        constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
+        constraints: const BoxConstraints(maxHeight: 700, maxWidth: 520),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -638,16 +578,14 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(AppStrings.cancel),
+                      child: const Text('Cancel'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: isValid ? _handleSave : null,
-                      child: Text(
-                        isEditing ? AppStrings.saveChanges : AppStrings.add,
-                      ),
+                      child: Text(isEditing ? 'Save Changes' : 'Add'),
                     ),
                   ),
                 ],
@@ -666,7 +604,7 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
         children: <Widget>[
           Expanded(
             child: Text(
-              isEditing ? AppStrings.editExercise : AppStrings.addExercise,
+              isEditing ? 'Edit Meal' : 'Add Meal',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -682,82 +620,100 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   }
 
   Widget _buildContent(BuildContext context) {
-    return StatefulBuilder(
-      builder: (BuildContext context, void Function(void Function()) setInnerState) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.exerciseName,
-                  hintText: AppStrings.exerciseNameHint,
-                  prefixIcon: Icon(Icons.fitness_center),
-                ),
-                textCapitalization: TextCapitalization.words,
-                autofocus: !isEditing,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                AppStrings.muscleGroups,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: MuscleGroups.all.map((String muscle) {
-                  final bool isSelected = _selectedMuscles.contains(muscle);
-                  return FilterChip(
-                    label: Text(MuscleGroups.getDisplayName(muscle)),
-                    selected: isSelected,
-                    onSelected: (bool selected) {
-                      setInnerState(() {
-                        if (selected) {
-                          _selectedMuscles.add(muscle);
-                        } else {
-                          _selectedMuscles.remove(muscle);
-                        }
-                      });
-                      setState(() {});
-                    },
-                    selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
-                    checkmarkColor: AppTheme.primaryOrange,
-                    backgroundColor: AppTheme.surfaceDark,
-                  );
-                }).toList(),
-              ),
-            ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: <Widget>[
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Meal Name',
+              hintText: 'Chicken bowl',
+              prefixIcon: Icon(Icons.restaurant),
+            ),
+            textCapitalization: TextCapitalization.words,
+            autofocus: !isEditing,
+            onChanged: (_) => setState(() {}),
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          TextField(
+            controller: _servingSizeController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Serving Size (g)',
+              prefixIcon: Icon(Icons.scale_outlined),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _proteinController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Protein per 100g',
+              prefixIcon: Icon(Icons.fitness_center),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _carbsController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Carbs per 100g',
+              prefixIcon: Icon(Icons.bakery_dining_outlined),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _fatController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Fat per 100g',
+              prefixIcon: Icon(Icons.opacity_outlined),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _caloriesController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Calories per 100g',
+              prefixIcon: Icon(Icons.local_fire_department_outlined),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   void _handleSave() {
-    final String name = _nameController.text.trim();
+    final Meal nextMeal = Meal(
+      id: widget.meal?.id ?? _uuid.v4(),
+      name: _nameController.text.trim(),
+      servingSizeGrams: _parseDouble(_servingSizeController.text, fallback: 100),
+      proteinPer100g: _parseDouble(_proteinController.text),
+      carbsPer100g: _parseDouble(_carbsController.text),
+      fatPer100g: _parseDouble(_fatController.text),
+      caloriesPer100g: _parseDouble(_caloriesController.text),
+      createdAt: widget.meal?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      syncMetadata: widget.meal?.syncMetadata,
+      ownerUserId: widget.meal?.ownerUserId,
+    );
 
     if (isEditing) {
-      final Exercise updatedExercise = widget.exercise!.copyWith(
-        name: name,
-        muscleGroups: _selectedMuscles.toList(),
-      );
-      context.read<ExerciseBloc>().add(UpdateExerciseEvent(updatedExercise));
+      context.read<MealBloc>().add(UpdateMealEvent(nextMeal));
     } else {
-      final Exercise newExercise = Exercise(
-        id: _uuid.v4(),
-        name: name,
-        muscleGroups: _selectedMuscles.toList(),
-        createdAt: DateTime.now(),
-      );
-      context.read<ExerciseBloc>().add(AddExerciseEvent(newExercise));
+      context.read<MealBloc>().add(AddMealEvent(nextMeal));
     }
 
     Navigator.pop(context);
+  }
+
+  double _parseDouble(
+    String value, {
+    double fallback = 0,
+  }) {
+    return double.tryParse(value.trim()) ?? fallback;
   }
 }
