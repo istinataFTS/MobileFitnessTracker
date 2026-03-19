@@ -49,8 +49,6 @@ void _registerAppComposition(GetIt sl) {
     () => HomeBloc(
       getAllTargets: sl(),
       getWeeklySets: sl(),
-      getSetsByDateRange: sl(),
-      getAllExercises: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
     ),

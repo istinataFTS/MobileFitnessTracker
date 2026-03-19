@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
-import '../../../config/app_config.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
@@ -13,6 +12,7 @@ import '../../settings/bloc/app_settings_cubit.dart';
 import '../exercises/bloc/exercise_bloc.dart';
 import 'bloc/home_bloc.dart';
 import 'bloc/muscle_visual_bloc.dart';
+import 'helpers/home_nutrition_mapper.dart';
 import 'helpers/home_progress_mapper.dart';
 import 'helpers/muscle_training_summary_mapper.dart';
 import 'widgets/muscle_group_progress_card.dart';
@@ -141,7 +141,7 @@ class HomePage extends StatelessWidget {
         children: [
           _buildGreetingSection(context, settings),
           const SizedBox(height: 24),
-          _buildNutritionCard(context, homeState),
+          _buildNutritionCard(homeState),
           const SizedBox(height: 24),
           _buildMuscleVisualizationCard(context, homeState),
           const SizedBox(height: 24),
@@ -189,9 +189,11 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildNutritionCard(BuildContext context, HomeLoaded homeState) {
+  Widget _buildNutritionCard(HomeLoaded homeState) {
+    final viewData = HomeNutritionMapper.map(homeState);
+
     return NutritionSummaryCard(
-      nutritionStats: homeState.nutritionStats,
+      viewData: viewData,
     );
   }
 

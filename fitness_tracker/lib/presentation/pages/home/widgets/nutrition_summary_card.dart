@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/themes/app_theme.dart';
-import '../bloc/home_bloc.dart';
+import '../models/home_nutrition_view_data.dart';
 
 class NutritionSummaryCard extends StatelessWidget {
-  final HomeNutritionStats nutritionStats;
+  final HomeNutritionSummaryViewData viewData;
 
   const NutritionSummaryCard({
     super.key,
-    required this.nutritionStats,
+    required this.viewData,
   });
 
   @override
@@ -23,7 +23,7 @@ class NutritionSummaryCard extends StatelessWidget {
             const SizedBox(height: 20),
             _buildCaloriesSummary(context),
             const SizedBox(height: 20),
-            ...nutritionStats.macroProgressItems.map(
+            ...viewData.macroItems.map(
               (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: _buildMacroProgress(context, item),
@@ -93,7 +93,7 @@ class NutritionSummaryCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${nutritionStats.totalCalories.round()} kcal',
+                viewData.totalCaloriesLabel,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.primaryOrange,
@@ -106,20 +106,13 @@ class NutritionSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMacroProgress(BuildContext context, MacroProgress item) {
+  Widget _buildMacroProgress(
+    BuildContext context,
+    HomeMacroProgressItemViewData item,
+  ) {
     final progressColor = item.isComplete
         ? AppTheme.successGreen
         : AppTheme.primaryOrange;
-
-    final progressText = item.hasTarget
-        ? '${item.actual.toStringAsFixed(0)} / ${item.target.toStringAsFixed(0)} ${item.unit}'
-        : '${item.actual.toStringAsFixed(0)} ${item.unit}';
-
-    final trailingText = item.hasTarget
-        ? item.isComplete
-            ? 'Done'
-            : '${item.remaining.toStringAsFixed(0)} ${item.unit} left'
-        : 'No target';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +128,7 @@ class NutritionSummaryCard extends StatelessWidget {
               ),
             ),
             Text(
-              trailingText,
+              item.trailingText,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: item.hasTarget ? progressColor : AppTheme.textDim,
                     fontWeight: FontWeight.w600,
@@ -145,7 +138,7 @@ class NutritionSummaryCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          progressText,
+          item.progressText,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textMedium,
               ),
@@ -154,7 +147,7 @@ class NutritionSummaryCard extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: item.hasTarget ? item.progress : 0,
+            value: item.hasTarget ? item.progressValue : 0,
             minHeight: 8,
             backgroundColor: AppTheme.surfaceDark,
             color: progressColor,
@@ -165,9 +158,7 @@ class NutritionSummaryCard extends StatelessWidget {
   }
 
   Widget _buildRecentLogsSection(BuildContext context) {
-    final recentLogs = nutritionStats.todaysLogs.take(3).toList();
-
-    if (recentLogs.isEmpty) {
+    if (!viewData.hasLogs) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -195,7 +186,7 @@ class NutritionSummaryCard extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 12),
-        ...recentLogs.map(
+        ...viewData.recentLogs.map(
           (log) => Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
@@ -217,17 +208,14 @@ class NutritionSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        log.mealName,
+                        log.title,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${log.proteinGrams.toStringAsFixed(0)}P • '
-                        '${log.carbsGrams.toStringAsFixed(0)}C • '
-                        '${log.fatGrams.toStringAsFixed(0)}F • '
-                        '${log.calories.round()} kcal',
+                        log.subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppTheme.textMedium,
                             ),

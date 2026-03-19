@@ -17,17 +17,12 @@ void main() {
   HomeLoaded buildHomeState({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
-    required HomeStats stats,
   }) {
     return HomeLoaded(
       targets: targets,
       weeklySets: weeklySets,
-      stats: stats,
-      nutritionStats: const HomeNutritionStats(
-        todaysLogs: <NutritionLog>[],
-        dailyMacros: <String, double>{},
-        macroProgressItems: <MacroProgress>[],
-      ),
+      todaysLogs: const <NutritionLog>[],
+      dailyMacros: const <String, double>{},
     );
   }
 
@@ -83,13 +78,12 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: const <WorkoutSet>[],
-        stats: const HomeStats(
-          totalWeeklySets: 9,
-          totalWeeklyTarget: 12,
-          remainingTarget: 3,
-          trainedMuscleCount: 1,
-          progressPercentage: 75,
+        weeklySets: List<WorkoutSet>.generate(
+          9,
+          (index) => buildWorkoutSet(
+            id: 'set-$index',
+            exerciseId: 'exercise-1',
+          ),
         ),
       );
 
@@ -140,13 +134,12 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: const <WorkoutSet>[],
-        stats: const HomeStats(
-          totalWeeklySets: 9,
-          totalWeeklyTarget: 12,
-          remainingTarget: 3,
-          trainedMuscleCount: 1,
-          progressPercentage: 75,
+        weeklySets: List<WorkoutSet>.generate(
+          9,
+          (index) => buildWorkoutSet(
+            id: 'set-$index',
+            exerciseId: 'exercise-1',
+          ),
         ),
       );
 
@@ -181,13 +174,12 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: const <WorkoutSet>[],
-        stats: const HomeStats(
-          totalWeeklySets: 12,
-          totalWeeklyTarget: 12,
-          remainingTarget: 0,
-          trainedMuscleCount: 2,
-          progressPercentage: 100,
+        weeklySets: List<WorkoutSet>.generate(
+          12,
+          (index) => buildWorkoutSet(
+            id: 'set-$index',
+            exerciseId: 'exercise-1',
+          ),
         ),
       );
 
@@ -276,13 +268,6 @@ void main() {
           buildWorkoutSet(id: 'set-2', exerciseId: 'exercise-1'),
           buildWorkoutSet(id: 'set-3', exerciseId: 'exercise-2'),
         ],
-        stats: const HomeStats(
-          totalWeeklySets: 3,
-          totalWeeklyTarget: 5,
-          remainingTarget: 2,
-          trainedMuscleCount: 2,
-          progressPercentage: 60,
-        ),
       );
 
       final exerciseState = ExercisesLoaded(
@@ -332,13 +317,6 @@ void main() {
         weeklySets: <WorkoutSet>[
           buildWorkoutSet(id: 'set-1', exerciseId: 'exercise-1'),
         ],
-        stats: const HomeStats(
-          totalWeeklySets: 1,
-          totalWeeklyTarget: 4,
-          remainingTarget: 3,
-          trainedMuscleCount: 0,
-          progressPercentage: 25,
-        ),
       );
 
       final items = HomeProgressMapper.buildMuscleGroupProgressItems(

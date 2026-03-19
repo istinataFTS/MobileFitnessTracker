@@ -1,6 +1,8 @@
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_groups.dart';
+import '../../../../domain/entities/target.dart';
 import '../../../../domain/entities/time_period.dart';
+import '../../../../domain/entities/workout_set.dart';
 import '../../../pages/exercises/bloc/exercise_bloc.dart';
 import '../bloc/home_bloc.dart';
 import '../bloc/muscle_visual_bloc.dart';
@@ -13,17 +15,19 @@ class HomeProgressMapper {
     required HomeLoaded homeState,
     required MuscleVisualLoaded muscleState,
   }) {
-    final int totalSets = homeState.stats.totalWeeklySets;
+    final int totalSets = homeState.weeklySets.length;
+    final int totalTarget = _totalWeeklyTarget(homeState.trainingTargets);
+    final int remainingTarget =
+        (totalTarget - totalSets).clamp(0, totalTarget).toInt();
     final int trainedMuscles = muscleState.trainedMuscleCount;
-    final bool showTarget =
-        muscleState.currentPeriod == TimePeriod.week &&
-            homeState.stats.hasTargets;
 
-    final String targetValue =
-        showTarget ? homeState.stats.remainingTarget.toString() : '-';
+    final bool showTarget =
+        muscleState.currentPeriod == TimePeriod.week && totalTarget > 0;
+
+    final String targetValue = showTarget ? remainingTarget.toString() : '-';
 
     final HomeProgressTone targetTone = showTarget
-        ? _targetTone(homeState.stats.remainingTarget)
+        ? _targetTone(remainingTarget)
         : HomeProgressTone.muted;
 
     return HomeProgressStatsViewData(
@@ -114,6 +118,27 @@ class HomeProgressMapper {
     }).toList(growable: false);
   }
 
+  static int totalWeeklyTarget(HomeLoaded homeState) {
+    return _totalWeeklyTarget(homeState.trainingTargets);
+  }
+
+  static int remainingWeeklyTarget(HomeLoaded homeState) {
+    final int totalTarget = totalWeeklyTarget(homeState);
+    final int totalSets = homeState.weeklySets.length;
+    return (totalTarget - totalSets).clamp(0, totalTarget).toInt();
+  }
+
+  static double weeklyProgress(HomeLoaded homeState) {
+    final int totalTarget = totalWeeklyTarget(homeState);
+    final int totalSets = homeState.weeklySets.length;
+
+    if (totalTarget <= 0) {
+      return 0.0;
+    }
+
+    return (totalSets / totalTarget).clamp(0.0, 1.0);
+  }
+
   static HomeProgressTone _targetTone(int remainingTarget) {
     if (remainingTarget <= 0) {
       return HomeProgressTone.success;
@@ -138,11 +163,18 @@ class HomeProgressMapper {
     return HomeProgressTone.warning;
   }
 
+  static int _totalWeeklyTarget(List<Target> trainingTargets) {
+    return trainingTargets.fold<int>(
+      0,
+      (sum, target) => sum + target.weeklyGoal,
+    );
+  }
+
   static Map<String, int> buildMuscleBreakdown({
-    required List weeklySets,
+    required List<WorkoutSet> weeklySets,
     required ExerciseState exerciseState,
   }) {
-    final Map<String, int> muscleBreakdown = {};
+    final Map<String, int> muscleBreakdown = <String, int>{};
 
     if (exerciseState is! ExercisesLoaded) {
       return muscleBreakdown;
