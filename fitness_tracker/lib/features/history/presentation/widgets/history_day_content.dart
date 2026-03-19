@@ -14,6 +14,7 @@ import '../../../../domain/entities/workout_set.dart';
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
+import '../helpers/history_nutrition_summary_builder.dart';
 import 'edit_nutrition_log_dialog.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
@@ -457,7 +458,7 @@ class _NutritionHistorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _NutritionTotals totals = _NutritionTotals.fromLogs(logs);
+    final summary = HistoryNutritionSummaryBuilder.buildSummary(logs);
 
     return _HistorySectionCard(
       icon: Icons.restaurant_menu,
@@ -473,24 +474,14 @@ class _NutritionHistorySection extends StatelessWidget {
           : Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: <Widget>[
-                _SummaryChip(
-                  label: 'Protein',
-                  value: '${totals.protein.toStringAsFixed(0)}g',
-                ),
-                _SummaryChip(
-                  label: 'Carbs',
-                  value: '${totals.carbs.toStringAsFixed(0)}g',
-                ),
-                _SummaryChip(
-                  label: 'Fats',
-                  value: '${totals.fats.toStringAsFixed(0)}g',
-                ),
-                _SummaryChip(
-                  label: 'Calories',
-                  value: '${totals.calories.round()} kcal',
-                ),
-              ],
+              children: summary.metrics
+                  .map(
+                    (metric) => _SummaryChip(
+                      label: metric.label,
+                      value: metric.value,
+                    ),
+                  )
+                  .toList(growable: false),
             ),
       child: logs.isEmpty
           ? _InlineEmptyHint(
@@ -525,6 +516,9 @@ class _NutritionLogCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String time = DateFormat('HH:mm').format(log.loggedAt);
+    final macros = HistoryNutritionSummaryBuilder.buildLogMacros(log);
+    final consumedGramsLabel =
+        HistoryNutritionSummaryBuilder.buildConsumedGramsLabel(log);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -574,11 +568,11 @@ class _NutritionLogCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            if (log.gramsConsumed != null)
+            if (consumedGramsLabel != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  '${log.gramsConsumed!.toStringAsFixed(0)} g consumed',
+                  consumedGramsLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.textMedium,
                       ),
@@ -590,19 +584,19 @@ class _NutritionLogCard extends StatelessWidget {
               children: <Widget>[
                 _MacroChip(
                   label: 'P',
-                  value: '${log.proteinGrams.toStringAsFixed(0)}g',
+                  value: macros.proteinLabel,
                 ),
                 _MacroChip(
                   label: 'C',
-                  value: '${log.carbsGrams.toStringAsFixed(0)}g',
+                  value: macros.carbsLabel,
                 ),
                 _MacroChip(
                   label: 'F',
-                  value: '${log.fatGrams.toStringAsFixed(0)}g',
+                  value: macros.fatsLabel,
                 ),
                 _MacroChip(
                   label: 'Kcal',
-                  value: '${log.calories.round()}',
+                  value: macros.caloriesLabel,
                 ),
               ],
             ),
@@ -939,41 +933,6 @@ class _HintCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _NutritionTotals {
-  final double protein;
-  final double carbs;
-  final double fats;
-  final double calories;
-
-  const _NutritionTotals({
-    required this.protein,
-    required this.carbs,
-    required this.fats,
-    required this.calories,
-  });
-
-  factory _NutritionTotals.fromLogs(List<NutritionLog> logs) {
-    double protein = 0;
-    double carbs = 0;
-    double fats = 0;
-    double calories = 0;
-
-    for (final NutritionLog log in logs) {
-      protein += log.proteinGrams;
-      carbs += log.carbsGrams;
-      fats += log.fatGrams;
-      calories += log.calories;
-    }
-
-    return _NutritionTotals(
-      protein: protein,
-      carbs: carbs,
-      fats: fats,
-      calories: calories,
     );
   }
 }
