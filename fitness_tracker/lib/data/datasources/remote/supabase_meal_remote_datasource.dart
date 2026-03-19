@@ -1,16 +1,15 @@
-import '../../../domain/entities/workout_set.dart';
-import '../../dtos/supabase/supabase_workout_set_dto.dart';
+import '../../../domain/entities/meal.dart';
+import '../../dtos/supabase/supabase_meal_dto.dart';
+import 'meal_remote_datasource.dart';
 import 'supabase_client_provider.dart';
-import 'workout_set_remote_datasource.dart';
 
-class SupabaseWorkoutSetRemoteDataSource
-    implements WorkoutSetRemoteDataSource {
-  static const String _tableName = 'workout_sets';
+class SupabaseMealRemoteDataSource implements MealRemoteDataSource {
+  static const String _tableName = 'meals';
   static const String _userIdColumn = 'user_id';
 
   final SupabaseClientProvider clientProvider;
 
-  const SupabaseWorkoutSetRemoteDataSource({
+  const SupabaseMealRemoteDataSource({
     required this.clientProvider,
   });
 
@@ -18,25 +17,24 @@ class SupabaseWorkoutSetRemoteDataSource
   bool get isConfigured => clientProvider.isConfigured;
 
   @override
-  Future<List<WorkoutSet>> getAllSets() async {
+  Future<List<Meal>> getAllMeals() async {
     final userId = _currentUserIdOrNull();
     if (userId == null) {
-      return const <WorkoutSet>[];
+      return const <Meal>[];
     }
 
     final dynamic data = await clientProvider.client
         .from(_tableName)
         .select()
         .eq(_userIdColumn, userId)
-        .order('performed_at', ascending: false);
+        .order('updated_at', ascending: false);
 
     final rows = _asMapList(data);
-
     return rows.map(_mapRowToEntity).toList();
   }
 
   @override
-  Future<WorkoutSet?> getSetById(String id) async {
+  Future<Meal?> getMealById(String id) async {
     final userId = _currentUserIdOrNull();
     if (userId == null) {
       return null;
@@ -57,10 +55,49 @@ class SupabaseWorkoutSetRemoteDataSource
   }
 
   @override
-  Future<WorkoutSet> upsertSet(WorkoutSet set) async {
+  Future<Meal?> getMealByName(String name) async {
+    final userId = _currentUserIdOrNull();
+    if (userId == null) {
+      return null;
+    }
+
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .eq(_userIdColumn, userId)
+        .eq('name', name)
+        .maybeSingle();
+
+    if (data == null) {
+      return null;
+    }
+
+    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+  }
+
+  @override
+  Future<List<Meal>> searchMealsByName(String searchTerm) async {
+    final userId = _currentUserIdOrNull();
+    if (userId == null) {
+      return const <Meal>[];
+    }
+
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .eq(_userIdColumn, userId)
+        .ilike('name', '%$searchTerm%')
+        .order('updated_at', ascending: false);
+
+    final rows = _asMapList(data);
+    return rows.map(_mapRowToEntity).toList();
+  }
+
+  @override
+  Future<Meal> upsertMeal(Meal meal) async {
     final userId = _requireAuthenticatedUserId();
 
-    final dto = SupabaseWorkoutSetDto.fromEntity(set);
+    final dto = SupabaseMealDto.fromEntity(meal);
     final payload = <String, dynamic>{
       ...dto.toMap(),
       _userIdColumn: userId,
@@ -77,7 +114,7 @@ class SupabaseWorkoutSetRemoteDataSource
   }
 
   @override
-  Future<void> deleteSet({
+  Future<void> deleteMeal({
     required String localId,
     String? serverId,
   }) async {
@@ -91,8 +128,8 @@ class SupabaseWorkoutSetRemoteDataSource
         .eq('id', remoteId);
   }
 
-  WorkoutSet _mapRowToEntity(Map<String, dynamic> row) {
-    final dto = SupabaseWorkoutSetDto.fromMap(row);
+  Meal _mapRowToEntity(Map<String, dynamic> row) {
+    final dto = SupabaseMealDto.fromMap(row);
     return dto.toEntity(
       localId: dto.id,
       syncMetadata: dto.toSyncedMetadata(),
@@ -117,9 +154,7 @@ class SupabaseWorkoutSetRemoteDataSource
   String _requireAuthenticatedUserId() {
     final userId = _currentUserIdOrNull();
     if (userId == null || userId.isEmpty) {
-      throw StateError(
-        'Supabase workout set access requires an authenticated user.',
-      );
+      throw StateError('Supabase meal access requires an authenticated user.');
     }
 
     return userId;

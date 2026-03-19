@@ -1,19 +1,31 @@
 import 'package:dartz/dartz.dart';
+
 import '../../../core/errors/failures.dart';
 import '../../repositories/nutrition_log_repository.dart';
+import '../../services/authenticated_data_source_preference_resolver.dart';
 
 /// Use case for calculating total daily macros from all nutrition logs
 /// Returns aggregated totals: protein, carbs, fats, calories
 class GetDailyMacros {
   final NutritionLogRepository repository;
+  final AuthenticatedDataSourcePreferenceResolver sourcePreferenceResolver;
 
-  const GetDailyMacros(this.repository);
+  const GetDailyMacros(
+    this.repository, {
+    required this.sourcePreferenceResolver,
+  });
 
   /// Calculate total macros for a specific date
   /// Returns map with keys: 'protein', 'carbs', 'fats', 'calories'
   Future<Either<Failure, Map<String, double>>> call(DateTime date) async {
-    final result = await repository.getLogsForDate(date);
-    
+    final sourcePreference =
+        await sourcePreferenceResolver.resolveReadPreference();
+
+    final result = await repository.getLogsForDate(
+      date,
+      sourcePreference: sourcePreference,
+    );
+
     return result.fold(
       (failure) => Left(failure),
       (logs) {

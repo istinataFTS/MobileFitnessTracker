@@ -1,16 +1,17 @@
-import '../../../domain/entities/workout_set.dart';
-import '../../dtos/supabase/supabase_workout_set_dto.dart';
+import '../../../domain/entities/nutrition_log.dart';
+import '../../dtos/supabase/supabase_nutrition_log_dto.dart';
+import 'nutrition_log_remote_datasource.dart';
 import 'supabase_client_provider.dart';
-import 'workout_set_remote_datasource.dart';
 
-class SupabaseWorkoutSetRemoteDataSource
-    implements WorkoutSetRemoteDataSource {
-  static const String _tableName = 'workout_sets';
+class SupabaseNutritionLogRemoteDataSource
+    implements NutritionLogRemoteDataSource {
+  static const String _tableName = 'nutrition_logs';
   static const String _userIdColumn = 'user_id';
+  static const String _loggedAtColumn = 'logged_at';
 
   final SupabaseClientProvider clientProvider;
 
-  const SupabaseWorkoutSetRemoteDataSource({
+  const SupabaseNutritionLogRemoteDataSource({
     required this.clientProvider,
   });
 
@@ -18,25 +19,24 @@ class SupabaseWorkoutSetRemoteDataSource
   bool get isConfigured => clientProvider.isConfigured;
 
   @override
-  Future<List<WorkoutSet>> getAllSets() async {
+  Future<List<NutritionLog>> getAllLogs() async {
     final userId = _currentUserIdOrNull();
     if (userId == null) {
-      return const <WorkoutSet>[];
+      return const <NutritionLog>[];
     }
 
     final dynamic data = await clientProvider.client
         .from(_tableName)
         .select()
         .eq(_userIdColumn, userId)
-        .order('performed_at', ascending: false);
+        .order(_loggedAtColumn, ascending: false);
 
     final rows = _asMapList(data);
-
     return rows.map(_mapRowToEntity).toList();
   }
 
   @override
-  Future<WorkoutSet?> getSetById(String id) async {
+  Future<NutritionLog?> getLogById(String id) async {
     final userId = _currentUserIdOrNull();
     if (userId == null) {
       return null;
@@ -57,10 +57,58 @@ class SupabaseWorkoutSetRemoteDataSource
   }
 
   @override
-  Future<WorkoutSet> upsertSet(WorkoutSet set) async {
+  Future<List<NutritionLog>> getLogsByDate(DateTime date) {
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+
+    return getLogsByDateRange(start, end);
+  }
+
+  @override
+  Future<List<NutritionLog>> getLogsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final userId = _currentUserIdOrNull();
+    if (userId == null) {
+      return const <NutritionLog>[];
+    }
+
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .eq(_userIdColumn, userId)
+        .gte(_loggedAtColumn, startDate.toIso8601String())
+        .lt(_loggedAtColumn, endDate.toIso8601String())
+        .order(_loggedAtColumn, ascending: false);
+
+    final rows = _asMapList(data);
+    return rows.map(_mapRowToEntity).toList();
+  }
+
+  @override
+  Future<List<NutritionLog>> getLogsByMealId(String mealId) async {
+    final userId = _currentUserIdOrNull();
+    if (userId == null) {
+      return const <NutritionLog>[];
+    }
+
+    final dynamic data = await clientProvider.client
+        .from(_tableName)
+        .select()
+        .eq(_userIdColumn, userId)
+        .eq('meal_id', mealId)
+        .order(_loggedAtColumn, ascending: false);
+
+    final rows = _asMapList(data);
+    return rows.map(_mapRowToEntity).toList();
+  }
+
+  @override
+  Future<NutritionLog> upsertLog(NutritionLog log) async {
     final userId = _requireAuthenticatedUserId();
 
-    final dto = SupabaseWorkoutSetDto.fromEntity(set);
+    final dto = SupabaseNutritionLogDto.fromEntity(log);
     final payload = <String, dynamic>{
       ...dto.toMap(),
       _userIdColumn: userId,
@@ -77,7 +125,7 @@ class SupabaseWorkoutSetRemoteDataSource
   }
 
   @override
-  Future<void> deleteSet({
+  Future<void> deleteLog({
     required String localId,
     String? serverId,
   }) async {
@@ -91,8 +139,8 @@ class SupabaseWorkoutSetRemoteDataSource
         .eq('id', remoteId);
   }
 
-  WorkoutSet _mapRowToEntity(Map<String, dynamic> row) {
-    final dto = SupabaseWorkoutSetDto.fromMap(row);
+  NutritionLog _mapRowToEntity(Map<String, dynamic> row) {
+    final dto = SupabaseNutritionLogDto.fromMap(row);
     return dto.toEntity(
       localId: dto.id,
       syncMetadata: dto.toSyncedMetadata(),
@@ -118,7 +166,7 @@ class SupabaseWorkoutSetRemoteDataSource
     final userId = _currentUserIdOrNull();
     if (userId == null || userId.isEmpty) {
       throw StateError(
-        'Supabase workout set access requires an authenticated user.',
+        'Supabase nutrition log access requires an authenticated user.',
       );
     }
 

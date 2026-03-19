@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import '../../config/env_config.dart';
 import '../../data/datasources/local/meal_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource_impl.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
@@ -9,6 +10,8 @@ import '../../data/datasources/remote/meal_remote_datasource.dart';
 import '../../data/datasources/remote/noop_meal_remote_datasource.dart';
 import '../../data/datasources/remote/noop_nutrition_log_remote_datasource.dart';
 import '../../data/datasources/remote/nutrition_log_remote_datasource.dart';
+import '../../data/datasources/remote/supabase_meal_remote_datasource.dart';
+import '../../data/datasources/remote/supabase_nutrition_log_remote_datasource.dart';
 import '../../data/repositories/meal_repository_impl.dart';
 import '../../data/repositories/nutrition_log_repository_impl.dart';
 import '../../data/sync/meal_sync_coordinator.dart';
@@ -17,6 +20,7 @@ import '../../data/sync/nutrition_log_sync_coordinator.dart';
 import '../../data/sync/nutrition_log_sync_coordinator_impl.dart';
 import '../../domain/repositories/meal_repository.dart';
 import '../../domain/repositories/nutrition_log_repository.dart';
+import '../../domain/services/authenticated_data_source_preference_resolver.dart';
 import '../../domain/usecases/meals/add_meal.dart';
 import '../../domain/usecases/meals/delete_meal.dart';
 import '../../domain/usecases/meals/get_all_meals.dart';
@@ -54,19 +58,75 @@ void registerMealsNutritionModule(GetIt sl) {
     ),
   );
 
-  sl.registerLazySingleton(() => GetAllMeals(sl()));
-  sl.registerLazySingleton(() => GetMealById(sl()));
-  sl.registerLazySingleton(() => GetMealByName(sl()));
-  sl.registerLazySingleton(() => AddMeal(sl()));
-  sl.registerLazySingleton(() => UpdateMeal(sl()));
+  sl.registerLazySingleton(
+    () => AuthenticatedDataSourcePreferenceResolver(
+      appSessionRepository: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => GetAllMeals(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetMealById(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetMealByName(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => AddMeal(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => UpdateMeal(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => DeleteMeal(sl()));
 
-  sl.registerLazySingleton(() => GetLogsForDate(sl()));
-  sl.registerLazySingleton(() => GetLogsByDateRange(sl()));
-  sl.registerLazySingleton(() => AddNutritionLog(sl()));
-  sl.registerLazySingleton(() => UpdateNutritionLog(sl()));
+  sl.registerLazySingleton(
+    () => GetLogsForDate(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetLogsByDateRange(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => AddNutritionLog(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => UpdateNutritionLog(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => DeleteNutritionLog(sl()));
-  sl.registerLazySingleton(() => GetDailyMacros(sl()));
+  sl.registerLazySingleton(
+    () => GetDailyMacros(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
 
   sl.registerLazySingleton<MealRepository>(
     () => MealRepositoryImpl(
@@ -109,10 +169,14 @@ void registerMealsNutritionModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<MealRemoteDataSource>(
-    NoopMealRemoteDataSource.new,
+    () => EnvConfig.isSupabaseConfigured
+        ? SupabaseMealRemoteDataSource(clientProvider: sl())
+        : const NoopMealRemoteDataSource(),
   );
 
   sl.registerLazySingleton<NutritionLogRemoteDataSource>(
-    NoopNutritionLogRemoteDataSource.new,
+    () => EnvConfig.isSupabaseConfigured
+        ? SupabaseNutritionLogRemoteDataSource(clientProvider: sl())
+        : const NoopNutritionLogRemoteDataSource(),
   );
 }
