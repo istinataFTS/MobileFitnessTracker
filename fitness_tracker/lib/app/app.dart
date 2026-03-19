@@ -9,12 +9,12 @@ import '../config/env_config.dart';
 import '../core/constants/app_strings.dart';
 import '../core/themes/app_theme.dart';
 import '../features/history/history.dart';
+import '../features/home/application/home_bloc.dart';
+import '../features/home/application/muscle_visual_bloc.dart';
 import '../features/log/log.dart';
 import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
-import '../presentation/pages/home/bloc/home_bloc.dart';
-import '../presentation/pages/home/bloc/muscle_visual_bloc.dart';
 import '../presentation/pages/meals/bloc/meal_bloc.dart';
 import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
@@ -175,7 +175,7 @@ class AppShell extends StatelessWidget {
       builder: builder,
       home: home,
       scrollBehavior: const MaterialScrollBehavior().copyWith(
-        dragDevices: const {
+        dragDevices: const <PointerDeviceKind>{
           PointerDeviceKind.mouse,
           PointerDeviceKind.touch,
           PointerDeviceKind.stylus,

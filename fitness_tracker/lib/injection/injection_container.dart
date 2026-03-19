@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:get_it/get_it.dart';
 
 import '../data/datasources/local/database_helper.dart';
-import '../presentation/pages/home/bloc/home_bloc.dart';
+import '../features/home/application/home_bloc.dart';
 import 'modules/register_core_module.dart';
 import 'modules/register_exercises_module.dart';
 import 'modules/register_history_module.dart';
@@ -51,6 +51,7 @@ void _registerAppComposition(GetIt sl) {
       getWeeklySets: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
+      getAllExercises: sl(),
     ),
   );
 }
