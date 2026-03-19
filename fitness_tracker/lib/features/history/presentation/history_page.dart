@@ -8,7 +8,7 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
-import '../../../presentation/settings/bloc/app_settings_cubit.dart';
+import '../../settings/application/app_settings_cubit.dart';
 import 'bloc/history_bloc.dart';
 import 'bloc/history_effect.dart';
 import 'bloc/history_event.dart';

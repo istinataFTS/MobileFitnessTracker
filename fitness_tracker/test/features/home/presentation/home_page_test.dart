@@ -11,7 +11,7 @@ import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
-import 'package:fitness_tracker/presentation/settings/bloc/app_settings_cubit.dart';
+import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

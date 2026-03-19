@@ -6,7 +6,7 @@ import '../../../domain/entities/app_session.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../../injection/injection_container.dart' as di;
 import '../history/history_page.dart';
-import '../settings/settings_page.dart';
+import '../../../features/settings/presentation/settings_page.dart';
 import '../targets/targets_page.dart';
 
 class ProfilePage extends StatefulWidget {

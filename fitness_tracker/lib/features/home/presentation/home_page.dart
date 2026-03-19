@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/time_period.dart';
-import '../../../presentation/settings/bloc/app_settings_cubit.dart';
+import '../../settings/application/app_settings_cubit.dart';
 import '../application/home_bloc.dart';
 import '../application/muscle_visual_bloc.dart';
 import 'mappers/home_view_data_mapper.dart';

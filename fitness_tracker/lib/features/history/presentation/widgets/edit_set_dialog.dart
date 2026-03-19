@@ -8,7 +8,7 @@ import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../features/log/presentation/widgets/intensity_slider_widget.dart';
-import '../../../../presentation/settings/bloc/app_settings_cubit.dart';
+import '../../../settings/application/app_settings_cubit.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 

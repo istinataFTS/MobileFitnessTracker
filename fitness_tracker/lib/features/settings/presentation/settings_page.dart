@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_info.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
-import '../../settings/bloc/app_settings_cubit.dart';
+import '../application/app_settings_cubit.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -12,10 +12,10 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AppSettingsCubit, AppSettingsState>(
-      listenWhen: (previous, current) =>
+      listenWhen: (AppSettingsState previous, AppSettingsState current) =>
           previous.errorMessage != current.errorMessage ||
           previous.isSaving != current.isSaving,
-      listener: (context, state) {
+      listener: (BuildContext context, AppSettingsState state) {
         if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -25,8 +25,8 @@ class SettingsPage extends StatelessWidget {
           context.read<AppSettingsCubit>().clearError();
         }
       },
-      builder: (context, state) {
-        final settings = state.settings;
+      builder: (BuildContext context, AppSettingsState state) {
+        final AppSettings settings = state.settings;
 
         return Scaffold(
           backgroundColor: AppTheme.backgroundDark,
@@ -40,13 +40,14 @@ class SettingsPage extends StatelessWidget {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: () => context.read<AppSettingsCubit>().loadSettings(),
+                  onRefresh: () =>
+                      context.read<AppSettingsCubit>().refreshSettings(),
                   color: AppTheme.primaryOrange,
                   child: ListView(
                     padding: const EdgeInsets.all(20),
-                    children: [
+                    children: <Widget>[
                       _buildInfoBanner(context),
-                      if (state.errorMessage != null) ...[
+                      if (state.errorMessage != null) ...<Widget>[
                         const SizedBox(height: 16),
                         _buildErrorBanner(context, state.errorMessage!),
                       ],
@@ -54,7 +55,7 @@ class SettingsPage extends StatelessWidget {
                       _buildSection(
                         context,
                         title: 'General',
-                        children: [
+                        children: <Widget>[
                           Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: SwitchListTile(
@@ -70,13 +71,14 @@ class SettingsPage extends StatelessWidget {
                               ),
                               onChanged: state.isSaving
                                   ? null
-                                  : (value) async {
-                                      final success = await context
+                                  : (bool value) async {
+                                      final bool success = await context
                                           .read<AppSettingsCubit>()
                                           .setNotificationsEnabled(value);
 
                                       if (success && context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
                                             content: Text('Settings saved'),
                                           ),
@@ -107,7 +109,7 @@ class SettingsPage extends StatelessWidget {
                       _buildSection(
                         context,
                         title: 'About',
-                        children: [
+                        children: <Widget>[
                           _buildReadOnlyTile(
                             icon: Icons.info_outline,
                             title: 'App Version',
@@ -125,7 +127,7 @@ class SettingsPage extends StatelessWidget {
                       _buildSection(
                         context,
                         title: 'Deferred Until Auth / Cloud',
-                        children: [
+                        children: <Widget>[
                           _buildDeferredTile(
                             icon: Icons.dark_mode_outlined,
                             title: 'Theme',
@@ -151,7 +153,7 @@ class SettingsPage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (state.isSaving) ...[
+                      if (state.isSaving) ...<Widget>[
                         const SizedBox(height: 24),
                         const Center(
                           child: Padding(
@@ -174,14 +176,14 @@ class SettingsPage extends StatelessWidget {
     BuildContext context,
     AppSettings settings,
   ) async {
-    final selected = await showModalBottomSheet<WeekStartDay>(
+    final WeekStartDay? selected = await showModalBottomSheet<WeekStartDay>(
       context: context,
       backgroundColor: AppTheme.surfaceDark,
-      builder: (context) {
+      builder: (BuildContext context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: <Widget>[
               _buildBottomSheetOption<WeekStartDay>(
                 value: WeekStartDay.monday,
                 title: 'Monday',
@@ -202,7 +204,7 @@ class SettingsPage extends StatelessWidget {
       return;
     }
 
-    final success =
+    final bool success =
         await context.read<AppSettingsCubit>().setWeekStartDay(selected);
 
     if (success && context.mounted) {
@@ -218,14 +220,14 @@ class SettingsPage extends StatelessWidget {
     BuildContext context,
     AppSettings settings,
   ) async {
-    final selected = await showModalBottomSheet<WeightUnit>(
+    final WeightUnit? selected = await showModalBottomSheet<WeightUnit>(
       context: context,
       backgroundColor: AppTheme.surfaceDark,
-      builder: (context) {
+      builder: (BuildContext context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: <Widget>[
               _buildBottomSheetOption<WeightUnit>(
                 value: WeightUnit.kilograms,
                 title: 'Kilograms (kg)',
@@ -246,7 +248,7 @@ class SettingsPage extends StatelessWidget {
       return;
     }
 
-    final success = await context.read<AppSettingsCubit>().setWeightUnit(
+    final bool success = await context.read<AppSettingsCubit>().setWeightUnit(
           selected,
         );
 
@@ -265,7 +267,7 @@ class SettingsPage extends StatelessWidget {
     required bool selected,
   }) {
     return Builder(
-      builder: (context) {
+      builder: (BuildContext context) {
         return ListTile(
           title: Text(title),
           trailing: selected
@@ -291,7 +293,7 @@ class SettingsPage extends StatelessWidget {
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           const Icon(
             Icons.tune,
             color: AppTheme.primaryOrange,
@@ -323,7 +325,7 @@ class SettingsPage extends StatelessWidget {
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           const Icon(
             Icons.error_outline,
             color: AppTheme.errorRed,
@@ -349,7 +351,7 @@ class SettingsPage extends StatelessWidget {
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
