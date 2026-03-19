@@ -27,28 +27,33 @@ void main() {
     await cubit.close();
   });
 
-  test('initial state uses defaults and starts loading', () {
+  test('initial state uses defaults and starts idle until loaded', () {
     expect(cubit.state.settings, const AppSettings.defaults());
-    expect(cubit.state.isLoading, isTrue);
+    expect(cubit.state.isLoading, isFalse);
     expect(cubit.state.isSaving, isFalse);
     expect(cubit.state.hasLoaded, isFalse);
     expect(cubit.state.errorMessage, isNull);
   });
 
-  test('ensureLoaded does not load while initial loading flag is true', () async {
-    await cubit.ensureLoaded();
-
-    verifyNever(() => repository.getSettings());
-    expect(cubit.state.isLoading, isTrue);
-    expect(cubit.state.hasLoaded, isFalse);
-  });
-
-  test('ensureLoaded loads settings only once after successful load', () async {
+  test('ensureLoaded triggers first load when not loaded yet', () async {
     when(() => repository.getSettings()).thenAnswer(
       (_) async => const Right(loadedSettings),
     );
 
-    await cubit.loadSettings();
+    await cubit.ensureLoaded();
+
+    verify(() => repository.getSettings()).called(1);
+    expect(cubit.state.settings, loadedSettings);
+    expect(cubit.state.hasLoaded, isTrue);
+    expect(cubit.state.isLoading, isFalse);
+  });
+
+  test('ensureLoaded does not load twice after successful load', () async {
+    when(() => repository.getSettings()).thenAnswer(
+      (_) async => const Right(loadedSettings),
+    );
+
+    await cubit.ensureLoaded();
     await cubit.ensureLoaded();
 
     verify(() => repository.getSettings()).called(1);

@@ -56,11 +56,21 @@ void main() {
       initialState: initialState,
     );
 
+    when(() => cubit.ensureLoaded()).thenAnswer((_) async {});
     when(() => cubit.refreshSettings()).thenAnswer((_) async {});
     when(() => cubit.setNotificationsEnabled(any())).thenAnswer((_) async => true);
     when(() => cubit.setWeekStartDay(any())).thenAnswer((_) async => true);
     when(() => cubit.setWeightUnit(any())).thenAnswer((_) async => true);
     when(() => cubit.clearError()).thenReturn(null);
+  });
+
+  testWidgets('calls ensureLoaded when page opens', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    verify(() => cubit.ensureLoaded()).called(1);
   });
 
   testWidgets('shows loading state with dedicated loading indicator', (
@@ -94,6 +104,8 @@ void main() {
     expect(find.byKey(SettingsPage.notificationsSwitchKey), findsOneWidget);
     expect(find.byKey(SettingsPage.weekStartTileKey), findsOneWidget);
     expect(find.byKey(SettingsPage.weightUnitTileKey), findsOneWidget);
+    expect(find.textContaining('Week preview:'), findsOneWidget);
+    expect(find.textContaining('Display preview:'), findsOneWidget);
   });
 
   testWidgets('toggling notifications delegates to cubit', (
