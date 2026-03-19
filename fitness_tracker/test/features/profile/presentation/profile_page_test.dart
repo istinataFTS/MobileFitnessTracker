@@ -73,14 +73,18 @@ void main() {
     expect(find.byKey(ProfilePage.titleKey), findsOneWidget);
     expect(find.byKey(ProfilePage.subtitleKey), findsOneWidget);
     expect(find.byKey(ProfilePage.sessionBannerKey), findsOneWidget);
+    expect(find.byKey(ProfilePage.accountModeBannerKey), findsOneWidget);
     expect(find.byKey(ProfilePage.settingsTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.targetsTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.historyTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.accountStatusTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.cloudMigrationTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.lastSyncTileKey), findsOneWidget);
+    expect(find.byKey(ProfilePage.deferredSectionKey), findsOneWidget);
+    expect(find.byKey(ProfilePage.appVersionTileKey), findsOneWidget);
 
     expect(find.text('Guest'), findsOneWidget);
+    expect(find.text('Guest profile shell'), findsWidgets);
     expect(find.text('No initial cloud migration pending'), findsOneWidget);
     expect(find.text('No successful cloud sync recorded yet'), findsOneWidget);
   });
@@ -110,8 +114,11 @@ void main() {
     expect(find.byKey(ProfilePage.subtitleKey), findsOneWidget);
     expect(find.text('Marin Dinchev'), findsOneWidget);
     expect(find.text('marin@test.com'), findsOneWidget);
-    expect(find.text('Signed-in profile shell'), findsOneWidget);
-    expect(find.text('This session is marked as needing an initial cloud migration'), findsOneWidget);
+    expect(find.text('Signed-in profile shell'), findsWidgets);
+    expect(
+      find.text('This session is marked as needing an initial cloud migration'),
+      findsOneWidget,
+    );
     expect(find.text('2026-03-18 14:45'), findsOneWidget);
   });
 

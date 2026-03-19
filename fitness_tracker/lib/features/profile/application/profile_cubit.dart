@@ -20,7 +20,7 @@ class ProfileState extends Equatable {
   factory ProfileState.initial() {
     return const ProfileState(
       session: AppSession.guest(),
-      isLoading: true,
+      isLoading: false,
       hasLoaded: false,
       errorMessage: null,
     );
@@ -59,7 +59,23 @@ class ProfileCubit extends Cubit<ProfileState> {
 
   final AppSessionRepository _repository;
 
+  Future<void> ensureLoaded() async {
+    if (state.hasLoaded || state.isLoading) {
+      return;
+    }
+
+    await _loadProfile();
+  }
+
   Future<void> loadProfile() async {
+    await _loadProfile();
+  }
+
+  Future<void> refreshProfile() async {
+    await _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
     emit(
       state.copyWith(
         isLoading: true,
@@ -92,8 +108,6 @@ class ProfileCubit extends Cubit<ProfileState> {
       },
     );
   }
-
-  Future<void> refreshProfile() => loadProfile();
 
   void clearError() {
     if (state.errorMessage == null) {

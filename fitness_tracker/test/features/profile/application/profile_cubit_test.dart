@@ -23,11 +23,35 @@ void main() {
     await cubit.close();
   });
 
-  test('initial state starts loading with guest shell', () {
+  test('initial state starts idle with guest shell before first load', () {
     expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.isLoading, isTrue);
+    expect(cubit.state.isLoading, isFalse);
     expect(cubit.state.hasLoaded, isFalse);
     expect(cubit.state.errorMessage, isNull);
+  });
+
+  test('ensureLoaded triggers first session load', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    await cubit.ensureLoaded();
+
+    verify(() => repository.getCurrentSession()).called(1);
+    expect(cubit.state.session, const AppSession.guest());
+    expect(cubit.state.isLoading, isFalse);
+    expect(cubit.state.hasLoaded, isTrue);
+  });
+
+  test('ensureLoaded does not load again after successful load', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    await cubit.ensureLoaded();
+    await cubit.ensureLoaded();
+
+    verify(() => repository.getCurrentSession()).called(1);
   });
 
   test('loadProfile stores authenticated session on success', () async {
