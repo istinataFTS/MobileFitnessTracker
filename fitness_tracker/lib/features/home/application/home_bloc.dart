@@ -56,14 +56,6 @@ class HomeLoaded extends HomeState {
   final Map<String, double> dailyMacros;
   final List<Exercise> exercises;
 
-  List<Target> get trainingTargets => targets
-      .where((Target target) => target.isWeeklyMuscleTarget)
-      .toList(growable: false);
-
-  List<Target> get macroTargets => targets
-      .where((Target target) => target.isDailyMacroTarget)
-      .toList(growable: false);
-
   @override
   List<Object?> get props => <Object?>[
         targets,

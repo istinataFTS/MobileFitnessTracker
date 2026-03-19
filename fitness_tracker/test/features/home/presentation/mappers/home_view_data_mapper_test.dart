@@ -200,6 +200,9 @@ void main() {
       );
 
       expect(result.greeting, contains('Hello'));
+      expect(result.progress.title, 'Progress • Week');
+      expect(result.progress.selectedPeriod, TimePeriod.week);
+      expect(result.progress.selectorEnabled, isTrue);
       expect(result.progress.totalSetsLabel, '3');
       expect(result.progress.remainingTargetLabel, '1');
       expect(result.progress.trainedMusclesLabel, '1');
@@ -218,7 +221,6 @@ void main() {
       expect(result.muscleGroups.single.progressLabel, '3 / 4 sets');
       expect(result.muscleGroups.single.percentageLabel, '75%');
 
-      expect(result.period, isNotEmpty);
       expect(result.progress.muscleSummary, hasLength(1));
       expect(result.progress.muscleSummary.single.displayName, 'Chest');
     });
@@ -265,6 +267,8 @@ void main() {
         settings: settings,
       );
 
+      expect(result.progress.title, 'Progress • Month');
+      expect(result.progress.selectedPeriod, TimePeriod.month);
       expect(result.progress.remainingTargetLabel, '-');
       expect(result.progress.targetTone, HomeTone.muted);
     });
@@ -297,11 +301,13 @@ void main() {
         settings: settings,
       );
 
+      expect(result.progress.title, 'Progress • Week');
+      expect(result.progress.selectedPeriod, TimePeriod.week);
+      expect(result.progress.selectorEnabled, isFalse);
       expect(result.progress.isLoading, isTrue);
       expect(result.progress.errorMessage, isNull);
       expect(result.progress.totalSetsLabel, '1');
       expect(result.progress.remainingTargetLabel, '3');
-      expect(result.period, isNotEmpty);
     });
 
     test('returns error progress card while preserving computed totals', () {
@@ -336,6 +342,8 @@ void main() {
         settings: settings,
       );
 
+      expect(result.progress.selectedPeriod, TimePeriod.week);
+      expect(result.progress.selectorEnabled, isTrue);
       expect(result.progress.isLoading, isFalse);
       expect(result.progress.errorMessage, 'visuals failed');
       expect(result.progress.totalSetsLabel, '2');

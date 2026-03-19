@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../domain/entities/time_period.dart';
+
 enum HomeTone {
   muted,
   primary,
@@ -15,7 +17,6 @@ class HomePageViewData extends Equatable {
     required this.nutrition,
     required this.progress,
     required this.muscleGroups,
-    required this.period,
     required this.showMuscleGroups,
   });
 
@@ -24,7 +25,6 @@ class HomePageViewData extends Equatable {
   final HomeNutritionCardViewData nutrition;
   final HomeProgressCardViewData progress;
   final List<HomeMuscleGroupProgressViewData> muscleGroups;
-  final String period;
   final bool showMuscleGroups;
 
   @override
@@ -34,7 +34,6 @@ class HomePageViewData extends Equatable {
         nutrition,
         progress,
         muscleGroups,
-        period,
         showMuscleGroups,
       ];
 }
@@ -106,6 +105,9 @@ class HomeRecentNutritionEntryViewData extends Equatable {
 
 class HomeProgressCardViewData extends Equatable {
   const HomeProgressCardViewData({
+    required this.title,
+    required this.selectedPeriod,
+    required this.selectorEnabled,
     required this.totalSetsLabel,
     required this.remainingTargetLabel,
     required this.trainedMusclesLabel,
@@ -115,6 +117,9 @@ class HomeProgressCardViewData extends Equatable {
     required this.errorMessage,
   });
 
+  final String title;
+  final TimePeriod selectedPeriod;
+  final bool selectorEnabled;
   final String totalSetsLabel;
   final String remainingTargetLabel;
   final String trainedMusclesLabel;
@@ -125,6 +130,9 @@ class HomeProgressCardViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
+        title,
+        selectedPeriod,
+        selectorEnabled,
         totalSetsLabel,
         remainingTargetLabel,
         trainedMusclesLabel,

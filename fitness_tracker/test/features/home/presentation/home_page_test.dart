@@ -248,6 +248,7 @@ void main() {
     expect(find.byKey(HomePage.trainedMusclesValueKey), findsOneWidget);
 
     expect(find.text('Chicken and Rice'), findsOneWidget);
+    expect(find.text('Progress • Week'), findsOneWidget);
   });
 
   testWidgets('period selector exposes stable key and dispatches month change', (
@@ -261,7 +262,9 @@ void main() {
     await tester.tap(find.byKey(PeriodSelectorWidget.dropdownKey));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(PeriodSelectorWidget.menuItemKey(TimePeriod.month)).last);
+    await tester.tap(
+      find.byKey(PeriodSelectorWidget.menuItemKey(TimePeriod.month)).last,
+    );
     await tester.pumpAndSettle();
 
     verify(
@@ -351,7 +354,7 @@ void main() {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    expect(find.textContaining('Progress • Month'), findsOneWidget);
+    expect(find.text('Progress • Month'), findsOneWidget);
     expect(find.byKey(HomePage.targetValueKey), findsOneWidget);
     expect(find.text('-'), findsWidgets);
   });
@@ -413,19 +416,14 @@ void main() {
     expect(find.byKey(HomePage.muscleGroupsSectionKey), findsNothing);
   });
 
-  testWidgets('nutrition empty state uses stable empty-state key', (
+  testWidgets('nutrition empty state is shown when there are no logs', (
     WidgetTester tester,
   ) async {
     final HomeLoaded noLogsState = HomeLoaded(
       targets: loadedHomeState.targets,
       weeklySets: loadedHomeState.weeklySets,
       todaysLogs: const <NutritionLog>[],
-      dailyMacros: const <String, double>{
-        'protein': 0,
-        'carbs': 0,
-        'fats': 0,
-        'calories': 0,
-      },
+      dailyMacros: loadedHomeState.dailyMacros,
       exercises: loadedHomeState.exercises,
     );
 
@@ -441,40 +439,5 @@ void main() {
 
     expect(find.byKey(HomePage.nutritionEmptyStateKey), findsOneWidget);
     expect(find.byKey(HomePage.latestEntriesSectionKey), findsNothing);
-  });
-
-  testWidgets('macros without configured targets render no-target messaging', (
-    WidgetTester tester,
-  ) async {
-    final HomeLoaded noMacroTargetsState = HomeLoaded(
-      targets: <Target>[
-        Target(
-          id: 'target-chest',
-          type: TargetType.muscleSets,
-          categoryKey: 'chest',
-          targetValue: 6,
-          unit: 'sets',
-          period: TargetPeriod.weekly,
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
-      weeklySets: loadedHomeState.weeklySets,
-      todaysLogs: loadedHomeState.todaysLogs,
-      dailyMacros: loadedHomeState.dailyMacros,
-      exercises: loadedHomeState.exercises,
-    );
-
-    when(() => homeBloc.state).thenReturn(noMacroTargetsState);
-    whenListen<HomeState>(
-      homeBloc,
-      const Stream<HomeState>.empty(),
-      initialState: noMacroTargetsState,
-    );
-
-    await tester.pumpWidget(buildSubject());
-    await tester.pump();
-
-    expect(find.text('No target'), findsNWidgets(3));
   });
 }

@@ -23,8 +23,8 @@ class HomeViewDataMapper {
     required MuscleVisualState muscleVisualState,
     required AppSettings settings,
   }) {
-    final List<Target> trainingTargets = homeState.trainingTargets;
-    final List<Target> macroTargets = homeState.macroTargets;
+    final List<Target> trainingTargets = _filterTrainingTargets(homeState.targets);
+    final List<Target> macroTargets = _filterMacroTargets(homeState.targets);
     final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
 
     return HomePageViewData(
@@ -42,15 +42,27 @@ class HomeViewDataMapper {
         weeklySets: homeState.weeklySets,
         trainingTargets: trainingTargets,
         muscleVisualState: muscleVisualState,
+        currentPeriod: currentPeriod,
       ),
       muscleGroups: _mapMuscleGroupProgress(
         targets: trainingTargets,
         weeklySets: homeState.weeklySets,
         exercises: homeState.exercises,
       ),
-      period: _periodLabel(currentPeriod),
       showMuscleGroups: trainingTargets.isNotEmpty,
     );
+  }
+
+  static List<Target> _filterTrainingTargets(List<Target> targets) {
+    return targets
+        .where((Target target) => target.isWeeklyMuscleTarget)
+        .toList(growable: false);
+  }
+
+  static List<Target> _filterMacroTargets(List<Target> targets) {
+    return targets
+        .where((Target target) => target.isDailyMacroTarget)
+        .toList(growable: false);
   }
 
   static TimePeriod _resolveCurrentPeriod(MuscleVisualState muscleVisualState) {
@@ -75,7 +87,8 @@ class HomeViewDataMapper {
     required List<NutritionLog> todaysLogs,
   }) {
     final Map<String, double> targetMap = <String, double>{
-      for (final Target target in macroTargets) target.categoryKey: target.targetValue,
+      for (final Target target in macroTargets)
+        target.categoryKey: target.targetValue,
     };
 
     return HomeNutritionCardViewData(
@@ -149,6 +162,7 @@ class HomeViewDataMapper {
     required List<WorkoutSet> weeklySets,
     required List<Target> trainingTargets,
     required MuscleVisualState muscleVisualState,
+    required TimePeriod currentPeriod,
   }) {
     final int totalSets = weeklySets.length;
     final int totalTarget = trainingTargets.fold<int>(
@@ -156,15 +170,22 @@ class HomeViewDataMapper {
       (int sum, Target target) => sum + target.weeklyGoal,
     );
     final int remainingTarget = (totalTarget - totalSets).clamp(0, totalTarget);
+    final bool selectorEnabled = muscleVisualState is! MuscleVisualLoading;
 
     if (muscleVisualState is MuscleVisualLoading ||
         muscleVisualState is MuscleVisualInitial) {
       return HomeProgressCardViewData(
+        title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+        selectedPeriod: currentPeriod,
+        selectorEnabled: selectorEnabled,
         totalSetsLabel: totalSets.toString(),
         remainingTargetLabel:
             totalTarget > 0 ? remainingTarget.toString() : '-',
         trainedMusclesLabel: '-',
-        targetTone: _targetTone(remainingTarget, showTarget: totalTarget > 0),
+        targetTone: _targetTone(
+          remainingTarget,
+          showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
+        ),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: true,
         errorMessage: null,
@@ -173,11 +194,19 @@ class HomeViewDataMapper {
 
     if (muscleVisualState is MuscleVisualError) {
       return HomeProgressCardViewData(
+        title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+        selectedPeriod: currentPeriod,
+        selectorEnabled: selectorEnabled,
         totalSetsLabel: totalSets.toString(),
         remainingTargetLabel:
-            totalTarget > 0 ? remainingTarget.toString() : '-',
+            totalTarget > 0 && currentPeriod == TimePeriod.week
+                ? remainingTarget.toString()
+                : '-',
         trainedMusclesLabel: '-',
-        targetTone: _targetTone(remainingTarget, showTarget: totalTarget > 0),
+        targetTone: _targetTone(
+          remainingTarget,
+          showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
+        ),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: false,
         errorMessage: muscleVisualState.message,
@@ -199,6 +228,9 @@ class HomeViewDataMapper {
       );
 
     return HomeProgressCardViewData(
+      title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+      selectedPeriod: currentPeriod,
+      selectorEnabled: selectorEnabled,
       totalSetsLabel: totalSets.toString(),
       remainingTargetLabel: showTarget ? remainingTarget.toString() : '-',
       trainedMusclesLabel: loaded.trainedMuscleCount.toString(),
