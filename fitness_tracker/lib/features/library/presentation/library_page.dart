@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
 import 'widgets/exercises_tab.dart';
 import 'widgets/meals_tab.dart';
 
-/// Unified Library page with tabs for Exercises and Meals
-/// Replaces the old standalone ExercisesPage
+/// Feature-owned Library page.
+///
+/// Library owns reusable browse/search/filter surfaces for discovery and
+/// lightweight management of exercises and meals.
 class LibraryPage extends StatelessWidget {
   const LibraryPage({super.key});
 
@@ -17,12 +20,12 @@ class LibraryPage extends StatelessWidget {
         backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
           title: const Text(AppStrings.libraryTitle),
-          automaticallyImplyLeading: false, // No back button - it's a main tab
-          bottom: TabBar(
+          automaticallyImplyLeading: false,
+          bottom: const TabBar(
             indicatorColor: AppTheme.primaryOrange,
             labelColor: AppTheme.primaryOrange,
             unselectedLabelColor: AppTheme.textDim,
-            tabs: const [
+            tabs: <Widget>[
               Tab(
                 icon: Icon(Icons.fitness_center),
                 text: AppStrings.exercisesTab,
@@ -33,7 +36,7 @@ class LibraryPage extends StatelessWidget {
               ),
             ],
           ),
-          actions: [
+          actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.info_outline),
               onPressed: () => _showInfoDialog(context),
@@ -42,7 +45,7 @@ class LibraryPage extends StatelessWidget {
           ],
         ),
         body: const TabBarView(
-          children: [
+          children: <Widget>[
             ExercisesTab(),
             MealsTab(),
           ],
@@ -52,22 +55,24 @@ class LibraryPage extends StatelessWidget {
   }
 
   void _showInfoDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('About Library'),
-        content: const Text(
-          'Manage your workout exercises and meal library here.\n\n'
-          'Exercises tab: Create custom exercises and assign them to muscle groups.\n\n'
-          'Meals tab: Create meals with their nutritional information for quick logging.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(AppStrings.gotIt),
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('About Library'),
+          content: const Text(
+            'Manage reusable exercises and meals here.\n\n'
+            'Exercises: browse, search, filter, create, edit, and remove exercises.\n\n'
+            'Meals: browse, search, create, edit, and remove meals for faster nutrition logging.',
           ),
-        ],
-      ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text(AppStrings.gotIt),
+            ),
+          ],
+        );
+      },
     );
   }
 }
