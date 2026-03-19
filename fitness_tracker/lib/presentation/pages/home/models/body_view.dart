@@ -1,4 +1,0 @@
-enum BodyView {
-  front,
-  back,
-}

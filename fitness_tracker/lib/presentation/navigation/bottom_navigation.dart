@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/themes/app_theme.dart';
 import '../../features/history/history.dart';
-import '../../features/home/presentation/home_page.dart';
+import '../../features/home/home.dart';
 import '../../features/library/library.dart';
 import '../../features/log/presentation/bloc/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
