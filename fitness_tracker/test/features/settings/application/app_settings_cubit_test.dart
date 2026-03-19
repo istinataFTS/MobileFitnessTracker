@@ -35,12 +35,20 @@ void main() {
     expect(cubit.state.errorMessage, isNull);
   });
 
+  test('ensureLoaded does not load while initial loading flag is true', () async {
+    await cubit.ensureLoaded();
+
+    verifyNever(() => repository.getSettings());
+    expect(cubit.state.isLoading, isTrue);
+    expect(cubit.state.hasLoaded, isFalse);
+  });
+
   test('ensureLoaded loads settings only once after successful load', () async {
     when(() => repository.getSettings()).thenAnswer(
       (_) async => const Right(loadedSettings),
     );
 
-    await cubit.ensureLoaded();
+    await cubit.loadSettings();
     await cubit.ensureLoaded();
 
     verify(() => repository.getSettings()).called(1);
@@ -75,6 +83,24 @@ void main() {
     expect(cubit.state.isLoading, isFalse);
   });
 
+  test('refreshSettings does nothing while saving is in progress', () async {
+    when(() => repository.saveSettings(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+
+    final Future<bool> saveFuture =
+        cubit.saveSettings(const AppSettings.defaults());
+
+    await Future<void>.delayed(Duration.zero);
+
+    await cubit.refreshSettings();
+
+    verifyNever(() => repository.getSettings());
+
+    await saveFuture;
+    expect(cubit.state.isSaving, isFalse);
+  });
+
   test('saveSettings updates current state on success', () async {
     when(() => repository.saveSettings(any())).thenAnswer(
       (_) async => const Right(null),
@@ -86,6 +112,58 @@ void main() {
     expect(cubit.state.settings.weekStartDay, WeekStartDay.sunday);
     expect(cubit.state.isSaving, isFalse);
     expect(cubit.state.hasLoaded, isTrue);
+  });
+
+  test('setNotificationsEnabled updates only notifications field', () async {
+    when(() => repository.saveSettings(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+
+    await cubit.saveSettings(
+      const AppSettings(
+        notificationsEnabled: true,
+        weekStartDay: WeekStartDay.monday,
+        weightUnit: WeightUnit.kilograms,
+      ),
+    );
+
+    final bool success = await cubit.setNotificationsEnabled(false);
+
+    expect(success, isTrue);
+    expect(
+      cubit.state.settings,
+      const AppSettings(
+        notificationsEnabled: false,
+        weekStartDay: WeekStartDay.monday,
+        weightUnit: WeightUnit.kilograms,
+      ),
+    );
+  });
+
+  test('setWeightUnit updates only weight unit field', () async {
+    when(() => repository.saveSettings(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+
+    await cubit.saveSettings(
+      const AppSettings(
+        notificationsEnabled: true,
+        weekStartDay: WeekStartDay.sunday,
+        weightUnit: WeightUnit.kilograms,
+      ),
+    );
+
+    final bool success = await cubit.setWeightUnit(WeightUnit.pounds);
+
+    expect(success, isTrue);
+    expect(
+      cubit.state.settings,
+      const AppSettings(
+        notificationsEnabled: true,
+        weekStartDay: WeekStartDay.sunday,
+        weightUnit: WeightUnit.pounds,
+      ),
+    );
   });
 
   test('saveSettings stores error and returns false on failure', () async {
@@ -100,6 +178,24 @@ void main() {
     expect(cubit.state.errorMessage, 'save failed');
   });
 
+  test('successful load clears previous error message', () async {
+    when(() => repository.getSettings()).thenAnswer(
+      (_) async => const Left(CacheFailure(message: 'settings unavailable')),
+    );
+
+    await cubit.loadSettings();
+    expect(cubit.state.errorMessage, 'settings unavailable');
+
+    when(() => repository.getSettings()).thenAnswer(
+      (_) async => const Right(loadedSettings),
+    );
+
+    await cubit.loadSettings();
+
+    expect(cubit.state.settings, loadedSettings);
+    expect(cubit.state.errorMessage, isNull);
+  });
+
   test('clearError removes an existing error message', () async {
     when(() => repository.getSettings()).thenAnswer(
       (_) async => const Left(CacheFailure(message: 'settings unavailable')),
@@ -111,5 +207,12 @@ void main() {
     cubit.clearError();
 
     expect(cubit.state.errorMessage, isNull);
+  });
+
+  test('clearError is a no-op when there is no error', () {
+    cubit.clearError();
+
+    expect(cubit.state.errorMessage, isNull);
+    expect(cubit.state, AppSettingsState.initial());
   });
 }

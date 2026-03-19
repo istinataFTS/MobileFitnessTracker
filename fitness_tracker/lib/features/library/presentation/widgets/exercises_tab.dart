@@ -15,6 +15,34 @@ import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
 class ExercisesTab extends StatefulWidget {
   const ExercisesTab({super.key});
 
+  static const Key searchFieldKey = ValueKey<String>(
+    'library_exercises_search_field',
+  );
+  static const Key clearSearchButtonKey = ValueKey<String>(
+    'library_exercises_clear_search_button',
+  );
+  static const Key allMusclesChipKey = ValueKey<String>(
+    'library_exercises_all_muscles_chip',
+  );
+  static const Key resultCountKey = ValueKey<String>(
+    'library_exercises_result_count',
+  );
+  static const Key retryButtonKey = ValueKey<String>(
+    'library_exercises_retry_button',
+  );
+  static const Key clearFiltersButtonKey = ValueKey<String>(
+    'library_exercises_clear_filters_button',
+  );
+  static const Key addButtonKey = ValueKey<String>(
+    'library_exercises_add_button',
+  );
+  static const Key loadingIndicatorKey = ValueKey<String>(
+    'library_exercises_loading_indicator',
+  );
+
+  static Key muscleChipKey(String muscle) =>
+      ValueKey<String>('library_exercises_muscle_chip_$muscle');
+
   @override
   State<ExercisesTab> createState() => _ExercisesTabState();
 }
@@ -60,6 +88,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
         if (state is ExerciseLoading) {
           return const Center(
             child: CircularProgressIndicator(
+              key: ExercisesTab.loadingIndicatorKey,
               color: AppTheme.primaryOrange,
             ),
           );
@@ -72,8 +101,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
         final List<Exercise> allExercises =
             state is ExercisesLoaded ? state.exercises : <Exercise>[];
 
-        final List<Exercise> filteredExercises =
-            _applyFilters(allExercises);
+        final List<Exercise> filteredExercises = _applyFilters(allExercises);
 
         return Column(
           children: <Widget>[
@@ -125,12 +153,14 @@ class _ExercisesTabState extends State<ExercisesTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           TextField(
+            key: ExercisesTab.searchFieldKey,
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search exercises or muscle groups',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
+                      key: ExercisesTab.clearSearchButtonKey,
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         setState(() {
@@ -156,6 +186,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
+                    key: ExercisesTab.allMusclesChipKey,
                     label: const Text('All muscles'),
                     selected: _selectedMuscleFilter == null,
                     onSelected: (_) {
@@ -176,6 +207,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
                   (String muscle) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
+                      key: ExercisesTab.muscleChipKey(muscle),
                       label: Text(MuscleGroups.getDisplayName(muscle)),
                       selected: _selectedMuscleFilter == muscle,
                       onSelected: (_) {
@@ -200,6 +232,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
           const SizedBox(height: 12),
           Text(
             '${filteredExercises.length} of ${allExercises.length} exercises',
+            key: ExercisesTab.resultCountKey,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textMedium,
                 ),
@@ -292,6 +325,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
               ),
               const SizedBox(height: 16),
               TextButton.icon(
+                key: ExercisesTab.clearFiltersButtonKey,
                 onPressed: () {
                   setState(() {
                     _searchController.clear();
@@ -338,6 +372,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
+              key: ExercisesTab.retryButtonKey,
               onPressed: () {
                 context.read<ExerciseBloc>().add(LoadExercisesEvent());
               },
@@ -487,6 +522,7 @@ class _ExercisesTabState extends State<ExercisesTab> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
+            key: ExercisesTab.addButtonKey,
             onPressed: () => _showAddExerciseDialog(context),
             icon: const Icon(Icons.add),
             label: const Text(

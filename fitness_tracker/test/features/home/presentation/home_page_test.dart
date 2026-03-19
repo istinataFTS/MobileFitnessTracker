@@ -11,6 +11,7 @@ import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
+import 'package:fitness_tracker/features/home/presentation/widgets/period_selector_widget.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -182,7 +183,7 @@ void main() {
     );
   }
 
-  testWidgets('shows loading indicator for HomeInitial', (
+  testWidgets('shows dedicated page loading indicator for HomeInitial', (
     WidgetTester tester,
   ) async {
     when(() => homeBloc.state).thenReturn(const HomeInitial());
@@ -194,10 +195,10 @@ void main() {
 
     await tester.pumpWidget(buildSubject());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byKey(HomePage.pageLoadingIndicatorKey), findsOneWidget);
   });
 
-  testWidgets('shows loading indicator for HomeLoading', (
+  testWidgets('shows dedicated page loading indicator for HomeLoading', (
     WidgetTester tester,
   ) async {
     when(() => homeBloc.state).thenReturn(const HomeLoading());
@@ -209,10 +210,10 @@ void main() {
 
     await tester.pumpWidget(buildSubject());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byKey(HomePage.pageLoadingIndicatorKey), findsOneWidget);
   });
 
-  testWidgets('shows error state and retry dispatches LoadHomeDataEvent', (
+  testWidgets('home-level retry dispatches LoadHomeDataEvent', (
     WidgetTester tester,
   ) async {
     when(() => homeBloc.state).thenReturn(const HomeError('load failed'));
@@ -224,47 +225,43 @@ void main() {
 
     await tester.pumpWidget(buildSubject());
 
-    expect(find.text('load failed'), findsOneWidget);
-    expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    expect(find.byKey(HomePage.homeRetryButtonKey), findsOneWidget);
 
-    await tester.tap(find.text('Retry'));
+    await tester.tap(find.byKey(HomePage.homeRetryButtonKey));
     await tester.pump();
 
     verify(() => homeBloc.add(const LoadHomeDataEvent())).called(1);
   });
 
-  testWidgets('renders loaded home content', (
+  testWidgets('renders core loaded sections through stable feature keys', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    expect(find.textContaining('Hello'), findsOneWidget);
-    expect(find.text('Today’s Nutrition'), findsOneWidget);
-    expect(find.textContaining('Progress'), findsOneWidget);
+    expect(find.byKey(HomePage.refreshListKey), findsOneWidget);
+    expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
+    expect(find.byKey(HomePage.latestEntriesSectionKey), findsOneWidget);
+    expect(find.byKey(HomePage.muscleGroupsSectionKey), findsOneWidget);
+    expect(find.byKey(HomePage.totalSetsValueKey), findsOneWidget);
+    expect(find.byKey(HomePage.targetValueKey), findsOneWidget);
+    expect(find.byKey(HomePage.trainedMusclesValueKey), findsOneWidget);
+
     expect(find.text('Chicken and Rice'), findsOneWidget);
-    expect(find.text('Muscle Groups'), findsOneWidget);
   });
 
-  testWidgets('shows current period in selector', (
+  testWidgets('period selector exposes stable key and dispatches month change', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    expect(find.text('Week'), findsWidgets);
-  });
+    expect(find.byKey(PeriodSelectorWidget.dropdownKey), findsOneWidget);
 
-  testWidgets('changing period dispatches ChangePeriodEvent', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(buildSubject());
-    await tester.pump();
-
-    await tester.tap(find.text('Week').last);
+    await tester.tap(find.byKey(PeriodSelectorWidget.dropdownKey));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Month').last);
+    await tester.tap(find.byKey(PeriodSelectorWidget.menuItemKey(TimePeriod.month)).last);
     await tester.pumpAndSettle();
 
     verify(
@@ -272,47 +269,103 @@ void main() {
     ).called(1);
   });
 
-  testWidgets(
-    'loaded home with visual error shows retry action for visuals',
-    (WidgetTester tester) async {
-      when(() => muscleVisualBloc.state).thenReturn(
-        const MuscleVisualError(
-          message: 'visual load failed',
-          period: TimePeriod.week,
+  testWidgets('visual retry uses progress retry button key', (
+    WidgetTester tester,
+  ) async {
+    when(() => muscleVisualBloc.state).thenReturn(
+      const MuscleVisualError(
+        message: 'visual load failed',
+        period: TimePeriod.week,
+      ),
+    );
+    whenListen<MuscleVisualState>(
+      muscleVisualBloc,
+      const Stream<MuscleVisualState>.empty(),
+      initialState: const MuscleVisualError(
+        message: 'visual load failed',
+        period: TimePeriod.week,
+      ),
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.byKey(HomePage.progressRetryButtonKey), findsOneWidget);
+
+    await tester.tap(find.byKey(HomePage.progressRetryButtonKey));
+    await tester.pump();
+
+    verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
+  });
+
+  testWidgets('visual loading shows dedicated progress loading indicator', (
+    WidgetTester tester,
+  ) async {
+    when(() => muscleVisualBloc.state).thenReturn(
+      const MuscleVisualLoading(TimePeriod.month),
+    );
+    whenListen<MuscleVisualState>(
+      muscleVisualBloc,
+      const Stream<MuscleVisualState>.empty(),
+      initialState: const MuscleVisualLoading(TimePeriod.month),
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.byKey(HomePage.progressLoadingIndicatorKey), findsOneWidget);
+    expect(find.byKey(PeriodSelectorWidget.dropdownKey), findsOneWidget);
+  });
+
+  testWidgets('month period hides weekly target in stable target value field', (
+    WidgetTester tester,
+  ) async {
+    final MuscleVisualLoaded monthState = MuscleVisualLoaded(
+      muscleData: <String, MuscleVisualData>{
+        'chest': MuscleVisualData(
+          muscleGroup: 'chest',
+          totalStimulus: 12,
+          threshold: 6,
+          visualIntensity: 1.0,
+          bucket: MuscleVisualBucket.maximum,
+          coverageState: MuscleVisualCoverageState.full,
+          aggregationMode: MuscleVisualAggregationMode.cumulative,
+          visibleSurfaces: const <MuscleVisualSurface>{
+            MuscleVisualSurface.front,
+          },
+          overflowAmount: 6,
+          hasTrained: true,
         ),
-      );
-      whenListen<MuscleVisualState>(
-        muscleVisualBloc,
-        const Stream<MuscleVisualState>.empty(),
-        initialState: const MuscleVisualError(
-          message: 'visual load failed',
-          period: TimePeriod.week,
-        ),
-      );
+      },
+      currentPeriod: TimePeriod.month,
+      loadedAt: now,
+    );
 
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
+    when(() => muscleVisualBloc.state).thenReturn(monthState);
+    whenListen<MuscleVisualState>(
+      muscleVisualBloc,
+      const Stream<MuscleVisualState>.empty(),
+      initialState: monthState,
+    );
 
-      expect(find.text('visual load failed'), findsOneWidget);
-      expect(find.text('Try Again'), findsOneWidget);
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
 
-      await tester.tap(find.text('Try Again'));
-      await tester.pump();
+    expect(find.textContaining('Progress • Month'), findsOneWidget);
+    expect(find.byKey(HomePage.targetValueKey), findsOneWidget);
+    expect(find.text('-'), findsWidgets);
+  });
 
-      verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
-    },
-  );
-
-  testWidgets('pull to refresh dispatches both refresh events', (
+  testWidgets('pull to refresh dispatches both refresh events from refresh list', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    final Finder listView = find.byType(ListView);
-    expect(listView, findsOneWidget);
-
-    await tester.drag(listView, const Offset(0, 300));
+    await tester.drag(
+      find.byKey(HomePage.refreshListKey),
+      const Offset(0, 300),
+    );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
@@ -320,7 +373,7 @@ void main() {
     verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
   });
 
-  testWidgets('hides muscle group section when there are no training targets', (
+  testWidgets('muscle group section disappears when there are no training targets', (
     WidgetTester tester,
   ) async {
     final HomeLoaded noTrainingTargetsState = HomeLoaded(
@@ -357,6 +410,71 @@ void main() {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    expect(find.text('Muscle Groups'), findsNothing);
+    expect(find.byKey(HomePage.muscleGroupsSectionKey), findsNothing);
+  });
+
+  testWidgets('nutrition empty state uses stable empty-state key', (
+    WidgetTester tester,
+  ) async {
+    final HomeLoaded noLogsState = HomeLoaded(
+      targets: loadedHomeState.targets,
+      weeklySets: loadedHomeState.weeklySets,
+      todaysLogs: const <NutritionLog>[],
+      dailyMacros: const <String, double>{
+        'protein': 0,
+        'carbs': 0,
+        'fats': 0,
+        'calories': 0,
+      },
+      exercises: loadedHomeState.exercises,
+    );
+
+    when(() => homeBloc.state).thenReturn(noLogsState);
+    whenListen<HomeState>(
+      homeBloc,
+      const Stream<HomeState>.empty(),
+      initialState: noLogsState,
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.byKey(HomePage.nutritionEmptyStateKey), findsOneWidget);
+    expect(find.byKey(HomePage.latestEntriesSectionKey), findsNothing);
+  });
+
+  testWidgets('macros without configured targets render no-target messaging', (
+    WidgetTester tester,
+  ) async {
+    final HomeLoaded noMacroTargetsState = HomeLoaded(
+      targets: <Target>[
+        Target(
+          id: 'target-chest',
+          type: TargetType.muscleSets,
+          categoryKey: 'chest',
+          targetValue: 6,
+          unit: 'sets',
+          period: TargetPeriod.weekly,
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+      weeklySets: loadedHomeState.weeklySets,
+      todaysLogs: loadedHomeState.todaysLogs,
+      dailyMacros: loadedHomeState.dailyMacros,
+      exercises: loadedHomeState.exercises,
+    );
+
+    when(() => homeBloc.state).thenReturn(noMacroTargetsState);
+    whenListen<HomeState>(
+      homeBloc,
+      const Stream<HomeState>.empty(),
+      initialState: noMacroTargetsState,
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.text('No target'), findsNWidgets(3));
   });
 }

@@ -16,6 +16,16 @@ class PeriodSelectorWidget extends StatelessWidget {
     this.enabled = true,
   });
 
+  static const Key containerKey = ValueKey<String>(
+    'home_period_selector_container',
+  );
+  static const Key dropdownKey = ValueKey<String>(
+    'home_period_selector_dropdown',
+  );
+
+  static Key menuItemKey(TimePeriod period) =>
+      ValueKey<String>('home_period_selector_item_${period.name}');
+
   final TimePeriod selectedPeriod;
   final ValueChanged<TimePeriod> onPeriodChanged;
   final bool enabled;
@@ -23,6 +33,7 @@ class PeriodSelectorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: containerKey,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
@@ -34,6 +45,7 @@ class PeriodSelectorWidget extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<TimePeriod>(
+          key: dropdownKey,
           value: selectedPeriod,
           onChanged: enabled
               ? (TimePeriod? value) {
@@ -89,6 +101,7 @@ class PeriodSelectorWidget extends StatelessWidget {
     required IconData icon,
   }) {
     return DropdownMenuItem<TimePeriod>(
+      key: menuItemKey(value),
       value: value,
       child: Row(
         children: <Widget>[

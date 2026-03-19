@@ -14,6 +14,43 @@ import 'widgets/period_selector_widget.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
+  static const Key pageLoadingIndicatorKey = ValueKey<String>(
+    'home_page_loading_indicator',
+  );
+  static const Key refreshListKey = ValueKey<String>(
+    'home_refresh_list',
+  );
+  static const Key progressCardKey = ValueKey<String>(
+    'home_progress_card',
+  );
+  static const Key progressLoadingIndicatorKey = ValueKey<String>(
+    'home_progress_loading_indicator',
+  );
+  static const Key progressRetryButtonKey = ValueKey<String>(
+    'home_progress_retry_button',
+  );
+  static const Key homeRetryButtonKey = ValueKey<String>(
+    'home_page_retry_button',
+  );
+  static const Key nutritionEmptyStateKey = ValueKey<String>(
+    'home_nutrition_empty_state',
+  );
+  static const Key latestEntriesSectionKey = ValueKey<String>(
+    'home_latest_entries_section',
+  );
+  static const Key muscleGroupsSectionKey = ValueKey<String>(
+    'home_muscle_groups_section',
+  );
+  static const Key totalSetsValueKey = ValueKey<String>(
+    'home_total_sets_value',
+  );
+  static const Key targetValueKey = ValueKey<String>(
+    'home_target_value',
+  );
+  static const Key trainedMusclesValueKey = ValueKey<String>(
+    'home_trained_muscles_value',
+  );
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AppSettingsCubit, AppSettingsState>(
@@ -25,6 +62,7 @@ class HomePage extends StatelessWidget {
                 if (homeState is HomeLoading || homeState is HomeInitial) {
                   return const Center(
                     child: CircularProgressIndicator(
+                      key: pageLoadingIndicatorKey,
                       color: AppTheme.primaryOrange,
                     ),
                   );
@@ -55,7 +93,11 @@ class HomePage extends StatelessWidget {
                     final TimePeriod selectedPeriod =
                         muscleState is MuscleVisualLoaded
                             ? muscleState.currentPeriod
-                            : TimePeriod.week;
+                            : muscleState is MuscleVisualLoading
+                                ? muscleState.period
+                                : muscleState is MuscleVisualError
+                                    ? muscleState.period
+                                    : TimePeriod.week;
 
                     final bool selectorEnabled =
                         muscleState is! MuscleVisualLoading;
@@ -71,6 +113,7 @@ class HomePage extends StatelessWidget {
                             );
                       },
                       child: ListView(
+                        key: refreshListKey,
                         padding: const EdgeInsets.all(20),
                         children: <Widget>[
                           _GreetingSection(viewData: viewData),
@@ -229,6 +272,7 @@ class _NutritionCard extends StatelessWidget {
             const SizedBox(height: 8),
             if (!viewData.hasEntries)
               Container(
+                key: HomePage.nutritionEmptyStateKey,
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -246,6 +290,7 @@ class _NutritionCard extends StatelessWidget {
             else ...<Widget>[
               Text(
                 'Latest Entries',
+                key: HomePage.latestEntriesSectionKey,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -378,6 +423,7 @@ class _ProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      key: HomePage.progressCardKey,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -427,6 +473,7 @@ class _ProgressCard extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 32),
                   child: CircularProgressIndicator(
+                    key: HomePage.progressLoadingIndicatorKey,
                     color: AppTheme.primaryOrange,
                   ),
                 ),
@@ -449,6 +496,7 @@ class _ProgressCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   TextButton.icon(
+                    key: HomePage.progressRetryButtonKey,
                     onPressed: onRetryVisuals,
                     icon: const Icon(Icons.refresh),
                     label: const Text(AppStrings.tryAgain),
@@ -522,6 +570,7 @@ class _ProgressStatsRow extends StatelessWidget {
     };
 
     Widget stat({
+      required Key valueKey,
       required IconData icon,
       required String value,
       required String label,
@@ -534,6 +583,7 @@ class _ProgressStatsRow extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               value,
+              key: valueKey,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: color,
@@ -562,6 +612,7 @@ class _ProgressStatsRow extends StatelessWidget {
       child: Row(
         children: <Widget>[
           stat(
+            valueKey: HomePage.totalSetsValueKey,
             icon: Icons.fitness_center,
             value: viewData.totalSetsLabel,
             label: AppStrings.sets,
@@ -569,6 +620,7 @@ class _ProgressStatsRow extends StatelessWidget {
           ),
           Container(width: 1, height: 60, color: AppTheme.borderDark),
           stat(
+            valueKey: HomePage.targetValueKey,
             icon: Icons.flag_outlined,
             value: viewData.remainingTargetLabel,
             label: AppStrings.target,
@@ -576,6 +628,7 @@ class _ProgressStatsRow extends StatelessWidget {
           ),
           Container(width: 1, height: 60, color: AppTheme.borderDark),
           stat(
+            valueKey: HomePage.trainedMusclesValueKey,
             icon: Icons.auto_awesome,
             value: viewData.trainedMusclesLabel,
             label: AppStrings.muscles,
@@ -597,6 +650,7 @@ class _MuscleGroupSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      key: HomePage.muscleGroupsSectionKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
@@ -728,6 +782,7 @@ class _HomeErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
+              key: HomePage.homeRetryButtonKey,
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text(AppStrings.retry),

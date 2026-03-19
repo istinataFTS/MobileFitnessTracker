@@ -9,6 +9,28 @@ import '../application/app_settings_cubit.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
+  static const Key loadingIndicatorKey = ValueKey<String>(
+    'settings_loading_indicator',
+  );
+  static const Key refreshListKey = ValueKey<String>(
+    'settings_refresh_list',
+  );
+  static const Key notificationsSwitchKey = ValueKey<String>(
+    'settings_notifications_switch',
+  );
+  static const Key weekStartTileKey = ValueKey<String>(
+    'settings_week_start_tile',
+  );
+  static const Key weightUnitTileKey = ValueKey<String>(
+    'settings_weight_unit_tile',
+  );
+  static const Key savingIndicatorKey = ValueKey<String>(
+    'settings_saving_indicator',
+  );
+  static const Key errorBannerKey = ValueKey<String>(
+    'settings_error_banner',
+  );
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AppSettingsCubit, AppSettingsState>(
@@ -36,6 +58,7 @@ class SettingsPage extends StatelessWidget {
           body: state.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
+                    key: loadingIndicatorKey,
                     color: AppTheme.primaryOrange,
                   ),
                 )
@@ -44,6 +67,7 @@ class SettingsPage extends StatelessWidget {
                       context.read<AppSettingsCubit>().refreshSettings(),
                   color: AppTheme.primaryOrange,
                   child: ListView(
+                    key: refreshListKey,
                     padding: const EdgeInsets.all(20),
                     children: <Widget>[
                       _buildInfoBanner(context),
@@ -59,6 +83,7 @@ class SettingsPage extends StatelessWidget {
                           Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: SwitchListTile(
+                              key: notificationsSwitchKey,
                               value: settings.notificationsEnabled,
                               activeColor: AppTheme.primaryOrange,
                               secondary: const Icon(
@@ -88,6 +113,7 @@ class SettingsPage extends StatelessWidget {
                             ),
                           ),
                           _buildSelectionTile(
+                            key: weekStartTileKey,
                             icon: Icons.calendar_month_outlined,
                             title: 'Week Start Day',
                             subtitle: settings.weekStartDayLabel,
@@ -96,6 +122,7 @@ class SettingsPage extends StatelessWidget {
                                 : () => _selectWeekStartDay(context, settings),
                           ),
                           _buildSelectionTile(
+                            key: weightUnitTileKey,
                             icon: Icons.straighten_outlined,
                             title: 'Weight Units',
                             subtitle: settings.weightUnitLabel,
@@ -159,6 +186,7 @@ class SettingsPage extends StatelessWidget {
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
                             child: CircularProgressIndicator(
+                              key: savingIndicatorKey,
                               color: AppTheme.primaryOrange,
                             ),
                           ),
@@ -314,6 +342,7 @@ class SettingsPage extends StatelessWidget {
 
   Widget _buildErrorBanner(BuildContext context, String message) {
     return Container(
+      key: errorBannerKey,
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -382,6 +411,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildSelectionTile({
+    required Key key,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -390,6 +420,7 @@ class SettingsPage extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        key: key,
         leading: Icon(icon, color: AppTheme.primaryOrange),
         title: Text(title),
         subtitle: Text(subtitle),

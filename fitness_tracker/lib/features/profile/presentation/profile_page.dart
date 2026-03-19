@@ -14,6 +14,40 @@ import '../application/profile_cubit.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  static const Key loadingIndicatorKey = ValueKey<String>(
+    'profile_loading_indicator',
+  );
+  static const Key refreshListKey = ValueKey<String>(
+    'profile_refresh_list',
+  );
+  static const Key titleKey = ValueKey<String>(
+    'profile_title',
+  );
+  static const Key subtitleKey = ValueKey<String>(
+    'profile_subtitle',
+  );
+  static const Key sessionBannerKey = ValueKey<String>(
+    'profile_session_banner',
+  );
+  static const Key settingsTileKey = ValueKey<String>(
+    'profile_settings_tile',
+  );
+  static const Key targetsTileKey = ValueKey<String>(
+    'profile_targets_tile',
+  );
+  static const Key historyTileKey = ValueKey<String>(
+    'profile_history_tile',
+  );
+  static const Key accountStatusTileKey = ValueKey<String>(
+    'profile_account_status_tile',
+  );
+  static const Key cloudMigrationTileKey = ValueKey<String>(
+    'profile_cloud_migration_tile',
+  );
+  static const Key lastSyncTileKey = ValueKey<String>(
+    'profile_last_sync_tile',
+  );
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider<ProfileCubit>(
@@ -60,6 +94,7 @@ class _ProfileView extends StatelessWidget {
           body: state.isLoading
               ? const Center(
                   child: CircularProgressIndicator(
+                    key: ProfilePage.loadingIndicatorKey,
                     color: AppTheme.primaryOrange,
                   ),
                 )
@@ -67,6 +102,7 @@ class _ProfileView extends StatelessWidget {
                   onRefresh: () => context.read<ProfileCubit>().refreshProfile(),
                   color: AppTheme.primaryOrange,
                   child: ListView(
+                    key: ProfilePage.refreshListKey,
                     padding: const EdgeInsets.all(20),
                     children: <Widget>[
                       const SizedBox(height: 20),
@@ -78,6 +114,7 @@ class _ProfileView extends StatelessWidget {
                         title: 'Your Space',
                         children: <Widget>[
                           _NavigationTile(
+                            tileKey: ProfilePage.settingsTileKey,
                             icon: Icons.settings_outlined,
                             title: 'Settings',
                             subtitle: 'App preferences and local configuration',
@@ -91,6 +128,7 @@ class _ProfileView extends StatelessWidget {
                             },
                           ),
                           _NavigationTile(
+                            tileKey: ProfilePage.targetsTileKey,
                             icon: Icons.flag_outlined,
                             title: 'Targets',
                             subtitle: 'Manage your weekly muscle group goals',
@@ -104,6 +142,7 @@ class _ProfileView extends StatelessWidget {
                             },
                           ),
                           _NavigationTile(
+                            tileKey: ProfilePage.historyTileKey,
                             icon: Icons.history_outlined,
                             title: 'History',
                             subtitle: 'Review logged workouts and progress',
@@ -123,6 +162,7 @@ class _ProfileView extends StatelessWidget {
                         title: 'Account Status',
                         children: <Widget>[
                           _StatusTile(
+                            tileKey: ProfilePage.accountStatusTileKey,
                             icon: session.isAuthenticated
                                 ? Icons.verified_user_outlined
                                 : Icons.person_outline,
@@ -134,6 +174,7 @@ class _ProfileView extends StatelessWidget {
                                 : 'Ready for auth, identity, and cloud sync later',
                           ),
                           _StatusTile(
+                            tileKey: ProfilePage.cloudMigrationTileKey,
                             icon: Icons.cloud_sync_outlined,
                             title: 'Cloud migration readiness',
                             subtitle: session.requiresInitialCloudMigration
@@ -141,6 +182,7 @@ class _ProfileView extends StatelessWidget {
                                 : 'No initial cloud migration pending',
                           ),
                           _StatusTile(
+                            tileKey: ProfilePage.lastSyncTileKey,
                             icon: Icons.sync_outlined,
                             title: 'Last cloud sync',
                             subtitle: session.lastCloudSyncAt != null
@@ -251,6 +293,7 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           titleText,
+          key: ProfilePage.titleKey,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -258,6 +301,7 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           subtitleText,
+          key: ProfilePage.subtitleKey,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textMedium,
@@ -282,6 +326,7 @@ class _ProfileSessionBanner extends StatelessWidget {
         : 'You are currently in guest mode. This page is ready for auth states now, while keeping profile details deferred until Supabase-backed accounts are in place.';
 
     return Container(
+      key: ProfilePage.sessionBannerKey,
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -342,12 +387,14 @@ class _ProfileSection extends StatelessWidget {
 
 class _NavigationTile extends StatelessWidget {
   const _NavigationTile({
+    required this.tileKey,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
 
+  final Key tileKey;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -358,6 +405,7 @@ class _NavigationTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        key: tileKey,
         leading: Container(
           width: 40,
           height: 40,
@@ -384,11 +432,13 @@ class _NavigationTile extends StatelessWidget {
 
 class _StatusTile extends StatelessWidget {
   const _StatusTile({
+    this.tileKey,
     required this.icon,
     required this.title,
     required this.subtitle,
   });
 
+  final Key? tileKey;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -398,6 +448,7 @@ class _StatusTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        key: tileKey,
         leading: Icon(icon, color: AppTheme.textMedium),
         title: Text(title),
         subtitle: Text(subtitle),
