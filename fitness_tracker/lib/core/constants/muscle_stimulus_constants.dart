@@ -6,7 +6,7 @@ class MuscleStimulus {
   MuscleStimulus._();
 
   // ==================== MUSCLE GROUPS ====================
-  /// Complete list of 20 muscle groups for detailed tracking
+  /// Complete list of muscle groups for detailed tracking
   static const List<String> allMuscleGroups = [
     frontDelts,
     sideDelts,
@@ -23,14 +23,17 @@ class MuscleStimulus {
     forearms,
     abs,
     obliques,
+    lovehandles,
     lowerBack,
     glutes,
+    hipadductors,
     quads,
     hamstrings,
     calves,
   ];
 
-  // Individual muscle group constants (kebab-case for database consistency)
+  // Individual muscle group constants (kebab-case for database consistency
+  // on existing groups, plus new explicit keys for the added regions)
   static const String frontDelts = 'front-delts';
   static const String sideDelts = 'side-delts';
   static const String rearDelts = 'rear-delts';
@@ -46,8 +49,10 @@ class MuscleStimulus {
   static const String forearms = 'forearms';
   static const String abs = 'abs';
   static const String obliques = 'obliques';
+  static const String lovehandles = 'lovehandles';
   static const String lowerBack = 'lower-back';
   static const String glutes = 'glutes';
+  static const String hipadductors = 'hipadductors';
   static const String quads = 'quads';
   static const String hamstrings = 'hamstrings';
   static const String calves = 'calves';
@@ -70,8 +75,10 @@ class MuscleStimulus {
     forearms: 'Forearms',
     abs: 'Abs',
     obliques: 'Obliques',
+    lovehandles: 'Love Handles',
     lowerBack: 'Lower Back',
     glutes: 'Glutes',
+    hipadductors: 'Hip Adductors',
     quads: 'Quads',
     hamstrings: 'Hamstrings',
     calves: 'Calves',
@@ -105,12 +112,14 @@ class MuscleStimulus {
     triceps: 0.032,
     forearms: 0.035,
 
-    // Core
+    // Core / waist
     abs: 0.020,
     obliques: 0.020,
+    lovehandles: 0.020,
 
-    // Legs
+    // Hips / legs
     glutes: 0.022,
+    hipadductors: 0.021,
     quads: 0.021,
     hamstrings: 0.022,
     calves: 0.033,

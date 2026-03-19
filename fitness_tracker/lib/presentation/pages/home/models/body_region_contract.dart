@@ -35,7 +35,7 @@ class BodyRegionContract {
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'front-front-delts-left-right',
+      id: 'front-front-delts',
       muscleGroup: 'front-delts',
       view: BodyView.front,
       overlayAssetPath: '$_bodyAssetRoot/frontdelts.png',
@@ -77,17 +77,17 @@ class BodyRegionContract {
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'front-hip-adductors',
-      muscleGroup: 'hip-adductors',
+      id: 'front-lovehandles',
+      muscleGroup: 'lovehandles',
       view: BodyView.front,
-      overlayAssetPath: '$_bodyAssetRoot/hipadductorsFront.png',
+      overlayAssetPath: '$_bodyAssetRoot/lovehandles.png',
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'front-love-handles',
-      muscleGroup: 'love-handles',
+      id: 'front-hipadductors',
+      muscleGroup: 'hipadductors',
       view: BodyView.front,
-      overlayAssetPath: '$_bodyAssetRoot/lovehandles.png',
+      overlayAssetPath: '$_bodyAssetRoot/hipadductorsFront.png',
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
@@ -140,7 +140,7 @@ class BodyRegionContract {
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'back-small-lats',
+      id: 'back-smalllats',
       muscleGroup: 'lats',
       view: BodyView.back,
       overlayAssetPath: '$_bodyAssetRoot/smalllats.png',
@@ -161,7 +161,7 @@ class BodyRegionContract {
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'back-lower-back',
+      id: 'back-lowerback',
       muscleGroup: 'lower-back',
       view: BodyView.back,
       overlayAssetPath: '$_bodyAssetRoot/lowerback.png',
@@ -175,8 +175,8 @@ class BodyRegionContract {
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
     ),
     BodyRegionContract(
-      id: 'back-hip-adductors',
-      muscleGroup: 'hip-adductors',
+      id: 'back-hipadductors',
+      muscleGroup: 'hipadductors',
       view: BodyView.back,
       overlayAssetPath: '$_bodyAssetRoot/hipadductors.png',
       defaultAggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
