@@ -8,12 +8,14 @@ class AppSettingsState extends Equatable {
   final AppSettings settings;
   final bool isLoading;
   final bool isSaving;
+  final bool hasLoaded;
   final String? errorMessage;
 
   const AppSettingsState({
     required this.settings,
     required this.isLoading,
     required this.isSaving,
+    required this.hasLoaded,
     this.errorMessage,
   });
 
@@ -22,6 +24,7 @@ class AppSettingsState extends Equatable {
       settings: AppSettings.defaults(),
       isLoading: true,
       isSaving: false,
+      hasLoaded: false,
       errorMessage: null,
     );
   }
@@ -30,6 +33,7 @@ class AppSettingsState extends Equatable {
     AppSettings? settings,
     bool? isLoading,
     bool? isSaving,
+    bool? hasLoaded,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
@@ -37,6 +41,7 @@ class AppSettingsState extends Equatable {
       settings: settings ?? this.settings,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
+      hasLoaded: hasLoaded ?? this.hasLoaded,
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
@@ -47,6 +52,7 @@ class AppSettingsState extends Equatable {
         settings,
         isLoading,
         isSaving,
+        hasLoaded,
         errorMessage,
       ];
 }
@@ -58,6 +64,14 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
         super(AppSettingsState.initial());
 
   final AppSettingsRepository _repository;
+
+  Future<void> ensureLoaded() async {
+    if (state.hasLoaded || state.isSaving) {
+      return;
+    }
+
+    await loadSettings();
+  }
 
   Future<void> loadSettings() async {
     emit(
@@ -75,6 +89,7 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
           state.copyWith(
             settings: const AppSettings.defaults(),
             isLoading: false,
+            hasLoaded: true,
             errorMessage: failure.message,
           ),
         );
@@ -84,6 +99,7 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
           state.copyWith(
             settings: settings,
             isLoading: false,
+            hasLoaded: true,
             clearErrorMessage: true,
           ),
         );
@@ -116,6 +132,7 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
           state.copyWith(
             settings: nextSettings,
             isSaving: false,
+            hasLoaded: true,
             clearErrorMessage: true,
           ),
         );

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../config/env_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../../core/utils/week_date_utils.dart';
+import '../../../core/utils/week_range_label_formatter.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/time_period.dart';
 import '../../settings/bloc/app_settings_cubit.dart';
@@ -133,7 +132,6 @@ class HomePage extends StatelessWidget {
       onRefresh: () async {
         context.read<HomeBloc>().add(RefreshHomeDataEvent());
         context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
-        await context.read<AppSettingsCubit>().loadSettings();
       },
       color: AppTheme.primaryOrange,
       child: ListView(
@@ -156,18 +154,10 @@ class HomePage extends StatelessWidget {
     BuildContext context,
     AppSettings settings,
   ) {
-    final now = DateTime.now();
-    final weekStart = WeekDateUtils.startOfWeek(
-      now,
-      settings.weekStartDay,
+    final weekRange = WeekRangeLabelFormatter.formatForDate(
+      DateTime.now(),
+      weekStartDay: settings.weekStartDay,
     );
-    final weekEnd = WeekDateUtils.endOfWeek(
-      now,
-      settings.weekStartDay,
-    );
-    final dateFormatter = DateFormat('MMM d');
-    final weekRange =
-        '${dateFormatter.format(weekStart)} - ${dateFormatter.format(weekEnd)}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

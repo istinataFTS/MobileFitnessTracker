@@ -154,7 +154,6 @@ class _HistoryPageState extends State<HistoryPage> {
         color: AppTheme.primaryOrange,
         onRefresh: () async {
           context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
-          await context.read<AppSettingsCubit>().loadSettings();
         },
         child: SingleChildScrollView(
           controller: _scrollController,
