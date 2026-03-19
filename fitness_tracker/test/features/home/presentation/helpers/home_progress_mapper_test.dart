@@ -1,13 +1,14 @@
+import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/presentation/pages/exercises/bloc/exercise_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/home/bloc/home_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/home/bloc/muscle_visual_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/home/helpers/home_progress_mapper.dart';
-import 'package:fitness_tracker/presentation/pages/home/models/home_progress_view_data.dart';
+import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
+import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
+import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,12 +18,14 @@ void main() {
   HomeLoaded buildHomeState({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
+    required List<Exercise> exercises,
   }) {
     return HomeLoaded(
       targets: targets,
       weeklySets: weeklySets,
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
+      exercises: exercises,
     );
   }
 
@@ -56,6 +59,20 @@ void main() {
     );
   }
 
+  Exercise buildExercise({
+    required String id,
+    required List<String> muscleGroups,
+  }) {
+    return Exercise(
+      id: id,
+      name: 'Exercise $id',
+      muscleGroups: muscleGroups,
+      equipment: 'barbell',
+      instructions: const <String>[],
+      createdAt: createdAt,
+    );
+  }
+
   MuscleVisualLoaded buildMuscleVisualState({
     required TimePeriod period,
     required Map<String, MuscleVisualData> muscleData,
@@ -67,10 +84,15 @@ void main() {
     );
   }
 
-  group('HomeProgressMapper.buildProgressStats', () {
-    test('builds weekly progress stats with target tone when target is nearly met',
-        () {
-      final homeState = buildHomeState(
+  const AppSettings settings = AppSettings(
+    notificationsEnabled: true,
+    weekStartDay: WeekStartDay.monday,
+    weightUnit: WeightUnit.kilograms,
+  );
+
+  group('HomeViewDataMapper progress mapping', () {
+    test('builds weekly progress card with warning tone when target is nearly met', () {
+      final HomeLoaded homeState = buildHomeState(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -80,14 +102,20 @@ void main() {
         ],
         weeklySets: List<WorkoutSet>.generate(
           9,
-          (index) => buildWorkoutSet(
+          (int index) => buildWorkoutSet(
             id: 'set-$index',
             exerciseId: 'exercise-1',
           ),
         ),
+        exercises: <Exercise>[
+          buildExercise(
+            id: 'exercise-1',
+            muscleGroups: const <String>['chest'],
+          ),
+        ],
       );
 
-      final muscleState = buildMuscleVisualState(
+      final MuscleVisualLoaded visualState = buildMuscleVisualState(
         period: TimePeriod.week,
         muscleData: <String, MuscleVisualData>{
           'chest': const MuscleVisualData(
@@ -107,26 +135,22 @@ void main() {
         },
       );
 
-      final result = HomeProgressMapper.buildProgressStats(
+      final HomePageViewData result = HomeViewDataMapper.map(
         homeState: homeState,
-        muscleState: muscleState,
+        muscleVisualState: visualState,
+        settings: settings,
       );
 
-      expect(result.totalSetsStat.value, '9');
-      expect(result.totalSetsStat.label, 'Sets');
-      expect(result.totalSetsStat.tone, HomeProgressTone.primary);
-
-      expect(result.targetStat.value, '3');
-      expect(result.targetStat.label, 'Target');
-      expect(result.targetStat.tone, HomeProgressTone.warning);
-
-      expect(result.trainedMusclesStat.value, '1');
-      expect(result.trainedMusclesStat.label, 'Muscles');
-      expect(result.trainedMusclesStat.tone, HomeProgressTone.primary);
+      expect(result.progress.totalSetsLabel, '9');
+      expect(result.progress.remainingTargetLabel, '3');
+      expect(result.progress.trainedMusclesLabel, '1');
+      expect(result.progress.targetTone, HomeTone.warning);
+      expect(result.progress.isLoading, isFalse);
+      expect(result.progress.errorMessage, isNull);
     });
 
     test('hides target value for non-week periods', () {
-      final homeState = buildHomeState(
+      final HomeLoaded homeState = buildHomeState(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -136,14 +160,20 @@ void main() {
         ],
         weeklySets: List<WorkoutSet>.generate(
           9,
-          (index) => buildWorkoutSet(
+          (int index) => buildWorkoutSet(
             id: 'set-$index',
             exerciseId: 'exercise-1',
           ),
         ),
+        exercises: <Exercise>[
+          buildExercise(
+            id: 'exercise-1',
+            muscleGroups: const <String>['chest'],
+          ),
+        ],
       );
 
-      final muscleState = buildMuscleVisualState(
+      final MuscleVisualLoaded visualState = buildMuscleVisualState(
         period: TimePeriod.allTime,
         muscleData: <String, MuscleVisualData>{
           'chest': const MuscleVisualData(
@@ -156,17 +186,18 @@ void main() {
         },
       );
 
-      final result = HomeProgressMapper.buildProgressStats(
+      final HomePageViewData result = HomeViewDataMapper.map(
         homeState: homeState,
-        muscleState: muscleState,
+        muscleVisualState: visualState,
+        settings: settings,
       );
 
-      expect(result.targetStat.value, '-');
-      expect(result.targetStat.tone, HomeProgressTone.muted);
+      expect(result.progress.remainingTargetLabel, '-');
+      expect(result.progress.targetTone, HomeTone.muted);
     });
 
     test('uses success tone when remaining target is zero', () {
-      final homeState = buildHomeState(
+      final HomeLoaded homeState = buildHomeState(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -176,14 +207,20 @@ void main() {
         ],
         weeklySets: List<WorkoutSet>.generate(
           12,
-          (index) => buildWorkoutSet(
+          (int index) => buildWorkoutSet(
             id: 'set-$index',
             exerciseId: 'exercise-1',
           ),
         ),
+        exercises: <Exercise>[
+          buildExercise(
+            id: 'exercise-1',
+            muscleGroups: const <String>['chest'],
+          ),
+        ],
       );
 
-      final muscleState = buildMuscleVisualState(
+      final MuscleVisualLoaded visualState = buildMuscleVisualState(
         period: TimePeriod.week,
         muscleData: <String, MuscleVisualData>{
           'chest': const MuscleVisualData(
@@ -203,54 +240,18 @@ void main() {
         },
       );
 
-      final result = HomeProgressMapper.buildProgressStats(
+      final HomePageViewData result = HomeViewDataMapper.map(
         homeState: homeState,
-        muscleState: muscleState,
+        muscleVisualState: visualState,
+        settings: settings,
       );
 
-      expect(result.targetStat.value, '0');
-      expect(result.targetStat.tone, HomeProgressTone.success);
-    });
-  });
-
-  group('HomeProgressMapper.buildDetailedProgressStats', () {
-    test('builds detailed progress stats view data', () {
-      final result = HomeProgressMapper.buildDetailedProgressStats(
-        totalSets: 8,
-        totalTarget: 10,
-        remainingTarget: 2,
-        trainedMuscles: 4,
-        totalMuscles: 20,
-        progressPercentage: 0.8,
-      );
-
-      expect(result.progressValue, 0.8);
-      expect(result.progressLabel, '80% Complete');
-      expect(result.progressTone, HomeProgressTone.primary);
-      expect(result.completedSetsStat.value, '8 / 10');
-      expect(result.trainedMusclesStat.value, '4 / 20');
-      expect(result.targetCallout.message, '2 sets remaining');
-      expect(result.targetCallout.tone, HomeProgressTone.warning);
+      expect(result.progress.remainingTargetLabel, '0');
+      expect(result.progress.targetTone, HomeTone.success);
     });
 
-    test('marks completed target callout as success', () {
-      final result = HomeProgressMapper.buildDetailedProgressStats(
-        totalSets: 12,
-        totalTarget: 12,
-        remainingTarget: 0,
-        trainedMuscles: 5,
-        progressPercentage: 1.0,
-      );
-
-      expect(result.progressTone, HomeProgressTone.success);
-      expect(result.targetCallout.message, 'Target met! 🎉');
-      expect(result.targetCallout.tone, HomeProgressTone.success);
-    });
-  });
-
-  group('HomeProgressMapper.buildMuscleGroupProgressItems', () {
-    test('builds progress items with completion badge and success tone', () {
-      final homeState = buildHomeState(
+    test('builds muscle group progress items with completion state', () {
+      final HomeLoaded homeState = buildHomeState(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -268,78 +269,47 @@ void main() {
           buildWorkoutSet(id: 'set-2', exerciseId: 'exercise-1'),
           buildWorkoutSet(id: 'set-3', exerciseId: 'exercise-2'),
         ],
-      );
-
-      final exerciseState = ExercisesLoaded(
-        <dynamic>[
-          _TestExercise(
+        exercises: <Exercise>[
+          buildExercise(
             id: 'exercise-1',
             muscleGroups: const <String>['chest'],
           ),
-          _TestExercise(
+          buildExercise(
             id: 'exercise-2',
             muscleGroups: const <String>['quads'],
           ),
         ],
       );
 
-      final items = HomeProgressMapper.buildMuscleGroupProgressItems(
+      final HomePageViewData result = HomeViewDataMapper.map(
         homeState: homeState,
-        exerciseState: exerciseState,
+        muscleVisualState: const MuscleVisualInitial(),
+        settings: settings,
       );
 
-      expect(items, hasLength(2));
+      expect(result.muscleGroups, hasLength(2));
 
-      final chest = items.firstWhere((item) => item.categoryKey == 'chest');
+      final HomeMuscleGroupProgressViewData chest =
+          result.muscleGroups.firstWhere((HomeMuscleGroupProgressViewData item) {
+        return item.title == 'Chest';
+      });
+
       expect(chest.progressLabel, '2 / 2 sets');
       expect(chest.percentageLabel, '100%');
       expect(chest.progressValue, 1.0);
-      expect(chest.showCompleteBadge, isTrue);
-      expect(chest.tone, MuscleGroupProgressTone.success);
+      expect(chest.isComplete, isTrue);
+      expect(chest.tone, HomeTone.success);
 
-      final quads = items.firstWhere((item) => item.categoryKey == 'quads');
+      final HomeMuscleGroupProgressViewData quads =
+          result.muscleGroups.firstWhere((HomeMuscleGroupProgressViewData item) {
+        return item.title == 'Quads';
+      });
+
       expect(quads.progressLabel, '1 / 3 sets');
       expect(quads.percentageLabel, '33%');
       expect(quads.progressValue, closeTo(0.3333, 0.001));
-      expect(quads.showCompleteBadge, isFalse);
-      expect(quads.tone, MuscleGroupProgressTone.primary);
+      expect(quads.isComplete, isFalse);
+      expect(quads.tone, HomeTone.primary);
     });
-
-    test('returns empty breakdown-driven values when exercises are not loaded', () {
-      final homeState = buildHomeState(
-        targets: <Target>[
-          buildTrainingTarget(
-            id: 'target-1',
-            categoryKey: 'chest',
-            targetValue: 4,
-          ),
-        ],
-        weeklySets: <WorkoutSet>[
-          buildWorkoutSet(id: 'set-1', exerciseId: 'exercise-1'),
-        ],
-      );
-
-      final items = HomeProgressMapper.buildMuscleGroupProgressItems(
-        homeState: homeState,
-        exerciseState: ExerciseInitial(),
-      );
-
-      expect(items, hasLength(1));
-      expect(items.single.progressLabel, '0 / 4 sets');
-      expect(items.single.percentageLabel, '0%');
-      expect(items.single.progressValue, 0);
-      expect(items.single.showCompleteBadge, isFalse);
-      expect(items.single.tone, MuscleGroupProgressTone.primary);
-    });
-  });
-}
-
-class _TestExercise {
-  final String id;
-  final List<String> muscleGroups;
-
-  const _TestExercise({
-    required this.id,
-    required this.muscleGroups,
   });
 }

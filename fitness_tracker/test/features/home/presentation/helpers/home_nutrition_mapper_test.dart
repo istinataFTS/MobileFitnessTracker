@@ -1,11 +1,15 @@
+import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
-import 'package:fitness_tracker/presentation/pages/home/bloc/home_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/home/helpers/home_nutrition_mapper.dart';
+import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
+import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
+import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final createdAt = DateTime(2024, 1, 1);
+  final DateTime createdAt = DateTime(2024, 1, 1);
 
   Target buildMacroTarget({
     required String id,
@@ -46,8 +50,14 @@ void main() {
     );
   }
 
+  const AppSettings settings = AppSettings(
+    notificationsEnabled: true,
+    weekStartDay: WeekStartDay.monday,
+    weightUnit: WeightUnit.kilograms,
+  );
+
   test('maps nutrition summary with macro targets and recent logs', () {
-    final state = HomeLoaded(
+    final HomeLoaded state = HomeLoaded(
       targets: <Target>[
         buildMacroTarget(
           id: 'protein-target',
@@ -86,31 +96,36 @@ void main() {
         'fats': 15,
         'calories': 660,
       },
+      exercises: const <Exercise>[],
     );
 
-    final viewData = HomeNutritionMapper.map(state);
+    final HomePageViewData viewData = HomeViewDataMapper.map(
+      homeState: state,
+      muscleVisualState: const MuscleVisualInitial(),
+      settings: settings,
+    );
 
-    expect(viewData.totalCaloriesLabel, '660 kcal');
-    expect(viewData.hasLogs, isTrue);
-    expect(viewData.macroItems, hasLength(3));
-    expect(viewData.recentLogs, hasLength(2));
+    expect(viewData.nutrition.totalCaloriesLabel, '660 kcal');
+    expect(viewData.nutrition.hasEntries, isTrue);
+    expect(viewData.nutrition.macros, hasLength(3));
+    expect(viewData.nutrition.recentEntries, hasLength(2));
 
-    expect(viewData.macroItems[0].label, 'Protein');
-    expect(viewData.macroItems[0].progressText, '60 / 150 g');
-    expect(viewData.macroItems[0].trailingText, '90 g left');
-    expect(viewData.macroItems[0].hasTarget, isTrue);
+    expect(viewData.nutrition.macros[0].label, 'Protein');
+    expect(viewData.nutrition.macros[0].progressLabel, '60 / 150 g');
+    expect(viewData.nutrition.macros[0].trailingLabel, '90 g left');
+    expect(viewData.nutrition.macros[0].hasTarget, isTrue);
 
-    expect(viewData.macroItems[2].label, 'Fats');
-    expect(viewData.macroItems[2].hasTarget, isFalse);
-    expect(viewData.macroItems[2].trailingText, 'No target');
+    expect(viewData.nutrition.macros[2].label, 'Fats');
+    expect(viewData.nutrition.macros[2].hasTarget, isFalse);
+    expect(viewData.nutrition.macros[2].trailingLabel, 'No target');
 
-    expect(viewData.recentLogs[0].title, 'Chicken Rice');
-    expect(viewData.recentLogs[0].isMealLog, isTrue);
-    expect(viewData.recentLogs[1].isMealLog, isFalse);
+    expect(viewData.nutrition.recentEntries[0].title, 'Chicken Rice');
+    expect(viewData.nutrition.recentEntries[0].isMealLog, isTrue);
+    expect(viewData.nutrition.recentEntries[1].isMealLog, isFalse);
   });
 
   test('maps empty nutrition state without logs', () {
-    final state = HomeLoaded(
+    final HomeLoaded state = HomeLoaded(
       targets: const <Target>[],
       weeklySets: const [],
       todaysLogs: const <NutritionLog>[],
@@ -120,13 +135,18 @@ void main() {
         'fats': 0,
         'calories': 0,
       },
+      exercises: const <Exercise>[],
     );
 
-    final viewData = HomeNutritionMapper.map(state);
+    final HomePageViewData viewData = HomeViewDataMapper.map(
+      homeState: state,
+      muscleVisualState: const MuscleVisualInitial(),
+      settings: settings,
+    );
 
-    expect(viewData.totalCaloriesLabel, '0 kcal');
-    expect(viewData.hasLogs, isFalse);
-    expect(viewData.recentLogs, isEmpty);
-    expect(viewData.macroItems, hasLength(3));
+    expect(viewData.nutrition.totalCaloriesLabel, '0 kcal');
+    expect(viewData.nutrition.hasEntries, isFalse);
+    expect(viewData.nutrition.recentEntries, isEmpty);
+    expect(viewData.nutrition.macros, hasLength(3));
   });
 }
