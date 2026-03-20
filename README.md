@@ -1,11 +1,13 @@
 # MobileFitnessTracker 💪
 
 MobileFitnessTracker is a Flutter-based mobile application built to help users track workouts, meals, nutrition, and personal fitness goals in one place.
+
 The project is designed around a clean feature-based structure, scalable architecture, and a cloud-backed data model that uses Supabase as the primary backend while still supporting offline usage.
 
 ## Project Overview
 
 MobileFitnessTracker is making sure recording workouts and nutrition is effortless and easy to maintain day by day.  
+
 Users can log workouts, record meals, monitor nutrition, create/remove/edit exercises and meals, track progress, and set personal targets for training and nutrition.
 
 The long-term direction of the project is to combine:
