@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 
 import '../data/datasources/local/database_helper.dart';
 import '../features/home/application/home_bloc.dart';
+import '../features/home/application/usecases/load_home_dashboard_data.dart';
 import 'modules/register_core_module.dart';
 import 'modules/register_exercises_module.dart';
 import 'modules/register_history_module.dart';
@@ -45,13 +46,19 @@ Future<void> resetDependencies() {
 }
 
 void _registerAppComposition(GetIt sl) {
-  sl.registerFactory(
-    () => HomeBloc(
+  sl.registerLazySingleton(
+    () => LoadHomeDashboardData(
       getAllTargets: sl(),
       getWeeklySets: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
       getAllExercises: sl(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => HomeBloc(
+      loadHomeDashboardData: sl(),
     ),
   );
 }

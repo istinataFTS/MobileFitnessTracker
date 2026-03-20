@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../domain/entities/app_settings.dart';
+
 class SettingsPageViewData extends Equatable {
   const SettingsPageViewData({
     required this.infoMessage,
@@ -12,9 +14,11 @@ class SettingsPageViewData extends Equatable {
     required this.weekStartTitle,
     required this.weekStartSubtitle,
     required this.weekStartPreview,
+    required this.weekStartOptions,
     required this.weightUnitTitle,
     required this.weightUnitSubtitle,
     required this.weightUnitPreview,
+    required this.weightUnitOptions,
     required this.appVersionTitle,
     required this.appVersionSubtitle,
     required this.storageModeTitle,
@@ -35,9 +39,11 @@ class SettingsPageViewData extends Equatable {
   final String weekStartTitle;
   final String weekStartSubtitle;
   final String weekStartPreview;
+  final List<SettingsSelectionOptionViewData<WeekStartDay>> weekStartOptions;
   final String weightUnitTitle;
   final String weightUnitSubtitle;
   final String weightUnitPreview;
+  final List<SettingsSelectionOptionViewData<WeightUnit>> weightUnitOptions;
   final String appVersionTitle;
   final String appVersionSubtitle;
   final String storageModeTitle;
@@ -59,9 +65,11 @@ class SettingsPageViewData extends Equatable {
         weekStartTitle,
         weekStartSubtitle,
         weekStartPreview,
+        weekStartOptions,
         weightUnitTitle,
         weightUnitSubtitle,
         weightUnitPreview,
+        weightUnitOptions,
         appVersionTitle,
         appVersionSubtitle,
         storageModeTitle,
@@ -70,6 +78,25 @@ class SettingsPageViewData extends Equatable {
         isLoading,
         isSaving,
         errorMessage,
+      ];
+}
+
+class SettingsSelectionOptionViewData<T> extends Equatable {
+  const SettingsSelectionOptionViewData({
+    required this.value,
+    required this.title,
+    required this.selected,
+  });
+
+  final T value;
+  final String title;
+  final bool selected;
+
+  @override
+  List<Object?> get props => <Object?>[
+        value,
+        title,
+        selected,
       ];
 }
 

@@ -5,7 +5,7 @@ import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
 import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
@@ -15,14 +15,14 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final DateTime createdAt = DateTime(2024, 1, 1);
 
-  HomeLoaded buildHomeState({
+  HomeDashboardData buildHomeData({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
     required List<NutritionLog> todaysLogs,
     required Map<String, double> dailyMacros,
     required List<Exercise> exercises,
   }) {
-    return HomeLoaded(
+    return HomeDashboardData(
       targets: targets,
       weeklySets: weeklySets,
       todaysLogs: todaysLogs,
@@ -130,8 +130,8 @@ void main() {
   );
 
   group('HomeViewDataMapper.map', () {
-    test('builds full page view data from loaded home and loaded visuals', () {
-      final HomeLoaded homeState = buildHomeState(
+    test('builds full page view data from loaded home data and loaded visuals', () {
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'training-1',
@@ -194,7 +194,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: visualState,
         settings: settings,
       );
@@ -226,7 +226,7 @@ void main() {
     });
 
     test('hides target label and mutes target tone outside weekly period', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'training-1',
@@ -262,7 +262,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: visualState,
         settings: settings,
       );
@@ -274,7 +274,7 @@ void main() {
     });
 
     test('returns loading progress card while visuals are loading', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'training-1',
@@ -296,7 +296,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: const MuscleVisualLoading(TimePeriod.week),
         settings: settings,
       );
@@ -311,7 +311,7 @@ void main() {
     });
 
     test('returns error progress card while preserving computed totals', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'training-1',
@@ -334,7 +334,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: const MuscleVisualError(
           message: 'visuals failed',
           period: TimePeriod.week,
@@ -351,7 +351,7 @@ void main() {
     });
 
     test('builds completed muscle group progress with success tone', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'training-1',
@@ -375,7 +375,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
       );

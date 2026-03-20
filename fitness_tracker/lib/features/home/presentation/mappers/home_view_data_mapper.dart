@@ -11,7 +11,7 @@ import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/target.dart';
 import '../../../../domain/entities/time_period.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../application/home_bloc.dart';
+import '../../application/models/home_dashboard_data.dart';
 import '../../application/muscle_visual_bloc.dart';
 import '../models/home_view_data.dart';
 
@@ -19,12 +19,12 @@ class HomeViewDataMapper {
   const HomeViewDataMapper._();
 
   static HomePageViewData map({
-    required HomeLoaded homeState,
+    required HomeDashboardData homeData,
     required MuscleVisualState muscleVisualState,
     required AppSettings settings,
   }) {
-    final List<Target> trainingTargets = _filterTrainingTargets(homeState.targets);
-    final List<Target> macroTargets = _filterMacroTargets(homeState.targets);
+    final List<Target> trainingTargets = _filterTrainingTargets(homeData.targets);
+    final List<Target> macroTargets = _filterMacroTargets(homeData.targets);
     final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
 
     return HomePageViewData(
@@ -35,19 +35,19 @@ class HomeViewDataMapper {
       ),
       nutrition: _mapNutrition(
         macroTargets: macroTargets,
-        dailyMacros: homeState.dailyMacros,
-        todaysLogs: homeState.todaysLogs,
+        dailyMacros: homeData.dailyMacros,
+        todaysLogs: homeData.todaysLogs,
       ),
       progress: _mapProgress(
-        weeklySets: homeState.weeklySets,
+        weeklySets: homeData.weeklySets,
         trainingTargets: trainingTargets,
         muscleVisualState: muscleVisualState,
         currentPeriod: currentPeriod,
       ),
       muscleGroups: _mapMuscleGroupProgress(
         targets: trainingTargets,
-        weeklySets: homeState.weeklySets,
-        exercises: homeState.exercises,
+        weeklySets: homeData.weeklySets,
+        exercises: homeData.exercises,
       ),
       showMuscleGroups: trainingTargets.isNotEmpty,
     );

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../application/app_settings_cubit.dart';
+import '../domain/settings_display_formatter.dart';
 import 'mappers/settings_page_view_data_mapper.dart';
 import 'models/settings_page_view_data.dart';
 import 'settings_page_keys.dart';
@@ -15,7 +16,8 @@ class SettingsPage extends StatefulWidget {
 
   static const Key loadingIndicatorKey = SettingsPageKeys.loadingIndicatorKey;
   static const Key refreshListKey = SettingsPageKeys.refreshListKey;
-  static const Key notificationsSwitchKey = SettingsPageKeys.notificationsSwitchKey;
+  static const Key notificationsSwitchKey =
+      SettingsPageKeys.notificationsSwitchKey;
   static const Key weekStartTileKey = SettingsPageKeys.weekStartTileKey;
   static const Key weightUnitTileKey = SettingsPageKeys.weightUnitTileKey;
   static const Key savingIndicatorKey = SettingsPageKeys.savingIndicatorKey;
@@ -51,7 +53,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save settings: $errorMessage'),
+            content: Text(
+              SettingsDisplayFormatter.saveErrorMessage(errorMessage),
+            ),
           ),
         );
         context.read<AppSettingsCubit>().clearError();
@@ -80,10 +84,10 @@ class _SettingsPageState extends State<SettingsPage> {
             },
             onWeekStartTapped: state.isSaving
                 ? () {}
-                : () => _selectWeekStartDay(context, state.settings),
+                : () => _selectWeekStartDay(context, viewData, state.settings),
             onWeightUnitTapped: state.isSaving
                 ? () {}
-                : () => _selectWeightUnit(context, state.settings),
+                : () => _selectWeightUnit(context, viewData, state.settings),
           ),
         );
       },
@@ -92,6 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _selectWeekStartDay(
     BuildContext context,
+    SettingsPageViewData viewData,
     AppSettings settings,
   ) async {
     final WeekStartDay? selected = await showModalBottomSheet<WeekStartDay>(
@@ -99,18 +104,18 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: AppTheme.surfaceDark,
       builder: (BuildContext context) {
         return SettingsOptionSheet<WeekStartDay>(
-          options: <SettingsOption<WeekStartDay>>[
-            SettingsOption<WeekStartDay>(
-              value: WeekStartDay.monday,
-              title: 'Monday',
-              selected: settings.weekStartDay == WeekStartDay.monday,
-            ),
-            SettingsOption<WeekStartDay>(
-              value: WeekStartDay.sunday,
-              title: 'Sunday',
-              selected: settings.weekStartDay == WeekStartDay.sunday,
-            ),
-          ],
+          options: viewData.weekStartOptions
+              .map(
+                (
+                  SettingsSelectionOptionViewData<WeekStartDay> option,
+                ) =>
+                    SettingsOption<WeekStartDay>(
+                  value: option.value,
+                  title: option.title,
+                  selected: option.selected,
+                ),
+              )
+              .toList(growable: false),
         );
       },
     );
@@ -129,6 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _selectWeightUnit(
     BuildContext context,
+    SettingsPageViewData viewData,
     AppSettings settings,
   ) async {
     final WeightUnit? selected = await showModalBottomSheet<WeightUnit>(
@@ -136,18 +142,18 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: AppTheme.surfaceDark,
       builder: (BuildContext context) {
         return SettingsOptionSheet<WeightUnit>(
-          options: <SettingsOption<WeightUnit>>[
-            SettingsOption<WeightUnit>(
-              value: WeightUnit.kilograms,
-              title: 'Kilograms (kg)',
-              selected: settings.weightUnit == WeightUnit.kilograms,
-            ),
-            SettingsOption<WeightUnit>(
-              value: WeightUnit.pounds,
-              title: 'Pounds (lb)',
-              selected: settings.weightUnit == WeightUnit.pounds,
-            ),
-          ],
+          options: viewData.weightUnitOptions
+              .map(
+                (
+                  SettingsSelectionOptionViewData<WeightUnit> option,
+                ) =>
+                    SettingsOption<WeightUnit>(
+                  value: option.value,
+                  title: option.title,
+                  selected: option.selected,
+                ),
+              )
+              .toList(growable: false),
         );
       },
     );
@@ -176,7 +182,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Settings saved'),
+        content: Text(SettingsDisplayFormatter.saveSuccessMessage),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
 import 'package:fitness_tracker/features/home/presentation/widgets/period_selector_widget.dart';
@@ -50,7 +51,7 @@ void main() {
     errorMessage: null,
   );
 
-  final HomeLoaded loadedHomeState = HomeLoaded(
+  final HomeDashboardData loadedHomeData = HomeDashboardData(
     targets: <Target>[
       Target(
         id: 'target-chest',
@@ -113,6 +114,10 @@ void main() {
         syncMetadata: const EntitySyncMetadata(),
       ),
     ],
+  );
+
+  final HomeLoaded loadedHomeState = HomeLoaded(
+    data: loadedHomeData,
   );
 
   final MuscleVisualLoaded loadedMuscleState = MuscleVisualLoaded(
@@ -380,27 +385,29 @@ void main() {
     WidgetTester tester,
   ) async {
     final HomeLoaded noTrainingTargetsState = HomeLoaded(
-      targets: <Target>[
-        Target(
-          id: 'target-protein',
-          type: TargetType.macro,
-          categoryKey: 'protein',
-          targetValue: 180,
-          unit: 'g',
-          period: TargetPeriod.daily,
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
-      weeklySets: const <WorkoutSet>[],
-      todaysLogs: const <NutritionLog>[],
-      dailyMacros: const <String, double>{
-        'protein': 0,
-        'carbs': 0,
-        'fats': 0,
-        'calories': 0,
-      },
-      exercises: const <Exercise>[],
+      data: HomeDashboardData(
+        targets: <Target>[
+          Target(
+            id: 'target-protein',
+            type: TargetType.macro,
+            categoryKey: 'protein',
+            targetValue: 180,
+            unit: 'g',
+            period: TargetPeriod.daily,
+            createdAt: now,
+            syncMetadata: const EntitySyncMetadata(),
+          ),
+        ],
+        weeklySets: const <WorkoutSet>[],
+        todaysLogs: const <NutritionLog>[],
+        dailyMacros: const <String, double>{
+          'protein': 0,
+          'carbs': 0,
+          'fats': 0,
+          'calories': 0,
+        },
+        exercises: const <Exercise>[],
+      ),
     );
 
     when(() => homeBloc.state).thenReturn(noTrainingTargetsState);
@@ -420,11 +427,13 @@ void main() {
     WidgetTester tester,
   ) async {
     final HomeLoaded noLogsState = HomeLoaded(
-      targets: loadedHomeState.targets,
-      weeklySets: loadedHomeState.weeklySets,
-      todaysLogs: const <NutritionLog>[],
-      dailyMacros: loadedHomeState.dailyMacros,
-      exercises: loadedHomeState.exercises,
+      data: HomeDashboardData(
+        targets: loadedHomeData.targets,
+        weeklySets: loadedHomeData.weeklySets,
+        todaysLogs: const <NutritionLog>[],
+        dailyMacros: loadedHomeData.dailyMacros,
+        exercises: loadedHomeData.exercises,
+      ),
     );
 
     when(() => homeBloc.state).thenReturn(noLogsState);

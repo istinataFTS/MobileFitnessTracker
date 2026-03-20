@@ -1,26 +1,17 @@
 import '../../../../core/constants/app_info.dart';
-import '../../../../core/utils/week_range_label_formatter.dart';
-import '../../../../core/utils/weight_unit_utils.dart';
+import '../../../../domain/entities/app_settings.dart';
 import '../../../settings/application/app_settings_cubit.dart';
+import '../../domain/settings_display_formatter.dart';
 import '../models/settings_page_view_data.dart';
 
 class SettingsPageViewDataMapper {
   const SettingsPageViewDataMapper._();
 
   static SettingsPageViewData map(AppSettingsState state) {
-    final settings = state.settings;
-    final String sampleWeekRange = WeekRangeLabelFormatter.formatForDate(
-      DateTime(2026, 3, 19),
-      weekStartDay: settings.weekStartDay,
-    );
-    final String sampleWeight = WeightUnitUtils.formatForDisplay(
-      82.5,
-      settings.weightUnit,
-    );
+    final AppSettings settings = state.settings;
 
     return SettingsPageViewData(
-      infoMessage:
-          'These settings are stored locally today and are safe to keep when the app moves to Supabase-backed accounts later.',
+      infoMessage: SettingsDisplayFormatter.infoMessage,
       generalSectionTitle: 'General',
       aboutSectionTitle: 'About',
       deferredSectionTitle: 'Deferred Until Auth / Cloud',
@@ -29,14 +20,42 @@ class SettingsPageViewDataMapper {
       notificationsEnabled: settings.notificationsEnabled,
       weekStartTitle: 'Week Start Day',
       weekStartSubtitle: settings.weekStartDayLabel,
-      weekStartPreview: 'Week preview: $sampleWeekRange',
+      weekStartPreview: SettingsDisplayFormatter.weekPreview(
+        settings.weekStartDay,
+      ),
+      weekStartOptions: <SettingsSelectionOptionViewData<WeekStartDay>>[
+        SettingsSelectionOptionViewData<WeekStartDay>(
+          value: WeekStartDay.monday,
+          title: 'Monday',
+          selected: settings.weekStartDay == WeekStartDay.monday,
+        ),
+        SettingsSelectionOptionViewData<WeekStartDay>(
+          value: WeekStartDay.sunday,
+          title: 'Sunday',
+          selected: settings.weekStartDay == WeekStartDay.sunday,
+        ),
+      ],
       weightUnitTitle: 'Weight Units',
       weightUnitSubtitle: settings.weightUnitLabel,
-      weightUnitPreview: 'Display preview: $sampleWeight',
+      weightUnitPreview: SettingsDisplayFormatter.weightPreview(
+        settings.weightUnit,
+      ),
+      weightUnitOptions: <SettingsSelectionOptionViewData<WeightUnit>>[
+        SettingsSelectionOptionViewData<WeightUnit>(
+          value: WeightUnit.kilograms,
+          title: 'Kilograms (kg)',
+          selected: settings.weightUnit == WeightUnit.kilograms,
+        ),
+        SettingsSelectionOptionViewData<WeightUnit>(
+          value: WeightUnit.pounds,
+          title: 'Pounds (lb)',
+          selected: settings.weightUnit == WeightUnit.pounds,
+        ),
+      ],
       appVersionTitle: 'App Version',
       appVersionSubtitle: AppInfo.versionLabel,
       storageModeTitle: 'Storage Mode',
-      storageModeSubtitle: 'Local device settings now, account sync later',
+      storageModeSubtitle: SettingsDisplayFormatter.storageModeSubtitle,
       deferredItems: const <DeferredSettingsItemViewData>[
         DeferredSettingsItemViewData(
           title: 'Theme',

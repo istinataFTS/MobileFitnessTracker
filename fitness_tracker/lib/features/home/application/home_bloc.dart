@@ -1,15 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../domain/entities/exercise.dart';
-import '../../../domain/entities/nutrition_log.dart';
-import '../../../domain/entities/target.dart';
-import '../../../domain/entities/workout_set.dart';
-import '../../../domain/usecases/exercises/get_all_exercises.dart';
-import '../../../domain/usecases/nutrition_logs/get_daily_macros.dart';
-import '../../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
-import '../../../domain/usecases/targets/get_all_targets.dart';
-import '../../../domain/usecases/workout_sets/get_weekly_sets.dart';
+import 'models/home_dashboard_data.dart';
+import 'usecases/load_home_dashboard_data.dart';
 
 abstract class HomeEvent extends Equatable {
   const HomeEvent();
@@ -43,27 +36,13 @@ class HomeLoading extends HomeState {
 
 class HomeLoaded extends HomeState {
   const HomeLoaded({
-    required this.targets,
-    required this.weeklySets,
-    required this.todaysLogs,
-    required this.dailyMacros,
-    required this.exercises,
+    required this.data,
   });
 
-  final List<Target> targets;
-  final List<WorkoutSet> weeklySets;
-  final List<NutritionLog> todaysLogs;
-  final Map<String, double> dailyMacros;
-  final List<Exercise> exercises;
+  final HomeDashboardData data;
 
   @override
-  List<Object?> get props => <Object?>[
-        targets,
-        weeklySets,
-        todaysLogs,
-        dailyMacros,
-        exercises,
-      ];
+  List<Object?> get props => <Object?>[data];
 }
 
 class HomeError extends HomeState {
@@ -77,21 +56,14 @@ class HomeError extends HomeState {
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc({
-    required this.getAllTargets,
-    required this.getWeeklySets,
-    required this.getLogsForDate,
-    required this.getDailyMacros,
-    required this.getAllExercises,
-  }) : super(const HomeInitial()) {
+    required LoadHomeDashboardData loadHomeDashboardData,
+  })  : _loadHomeDashboardData = loadHomeDashboardData,
+        super(const HomeInitial()) {
     on<LoadHomeDataEvent>(_onLoadHomeData);
     on<RefreshHomeDataEvent>(_onRefreshHomeData);
   }
 
-  final GetAllTargets getAllTargets;
-  final GetWeeklySets getWeeklySets;
-  final GetLogsForDate getLogsForDate;
-  final GetDailyMacros getDailyMacros;
-  final GetAllExercises getAllExercises;
+  final LoadHomeDashboardData _loadHomeDashboardData;
 
   Future<void> _onLoadHomeData(
     LoadHomeDataEvent event,
@@ -115,56 +87,18 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit, {
     bool preserveCurrentStateOnFailure = false,
   }) async {
-    final targetsResult = await getAllTargets();
+    final result = await _loadHomeDashboardData();
 
-    await targetsResult.fold(
-      (failure) async {
+    result.fold(
+      (failure) {
         _emitErrorOrPreserve(
           emit,
           failure.message,
           preserveCurrentStateOnFailure,
         );
       },
-      (targets) async {
-        final weeklySetsResult = await getWeeklySets();
-
-        await weeklySetsResult.fold(
-          (failure) async {
-            _emitErrorOrPreserve(
-              emit,
-              failure.message,
-              preserveCurrentStateOnFailure,
-            );
-          },
-          (weeklySets) async {
-            final exercisesResult = await getAllExercises();
-
-            await exercisesResult.fold(
-              (failure) async {
-                _emitErrorOrPreserve(
-                  emit,
-                  failure.message,
-                  preserveCurrentStateOnFailure,
-                );
-              },
-              (exercises) async {
-                final List<NutritionLog> todaysLogs = await _loadTodayLogs();
-                final Map<String, double> dailyMacros =
-                    await _loadDailyMacros();
-
-                emit(
-                  HomeLoaded(
-                    targets: targets,
-                    weeklySets: weeklySets,
-                    todaysLogs: todaysLogs,
-                    dailyMacros: dailyMacros,
-                    exercises: exercises,
-                  ),
-                );
-              },
-            );
-          },
-        );
+      (data) {
+        emit(HomeLoaded(data: data));
       },
     );
   }
@@ -181,38 +115,4 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
     emit(HomeError(message));
   }
-
-  Future<List<NutritionLog>> _loadTodayLogs() async {
-    final DateTime today = DateTime.now();
-    final logsResult = await getLogsForDate(today);
-
-    return logsResult.fold<List<NutritionLog>>(
-      (_) => <NutritionLog>[],
-      (logs) {
-        final List<NutritionLog> sortedLogs = <NutritionLog>[...logs]
-          ..sort(
-            (NutritionLog a, NutritionLog b) =>
-                b.createdAt.compareTo(a.createdAt),
-          );
-        return sortedLogs;
-      },
-    );
-  }
-
-  Future<Map<String, double>> _loadDailyMacros() async {
-    final DateTime today = DateTime.now();
-    final macrosResult = await getDailyMacros(today);
-
-    return macrosResult.fold<Map<String, double>>(
-      (_) => _emptyDailyMacros,
-      (macros) => macros,
-    );
-  }
-
-  static const Map<String, double> _emptyDailyMacros = <String, double>{
-    'protein': 0.0,
-    'carbs': 0.0,
-    'fats': 0.0,
-    'calories': 0.0,
-  };
 }
