@@ -112,14 +112,6 @@ class AppBootstrapper {
   }
 
   Future<void> _initializeDependencies() async {
-    if (kIsWeb) {
-      AppLogger.info(
-        'Skipping dependency initialization for web-specific bootstrap path',
-        category: 'bootstrap',
-      );
-      return;
-    }
-
     AppLogger.info('Initializing dependencies', category: 'bootstrap');
     await PerformanceMonitor.trackAsync<void>(
       _dependencyInitTimerName,

@@ -10,7 +10,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/nutrition_log.dart';
-import '../../nutrition_log/bloc/nutrition_log_bloc.dart';
+import '../../../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 class LogMacrosTab extends StatefulWidget {
   final DateTime? initialDate;

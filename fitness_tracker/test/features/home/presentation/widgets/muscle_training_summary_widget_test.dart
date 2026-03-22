@@ -8,6 +8,7 @@ import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
@@ -49,40 +50,42 @@ void main() {
   );
 
   final HomeLoaded loadedHomeState = HomeLoaded(
-    targets: <Target>[
-      Target(
-        id: 'target-chest',
-        type: TargetType.muscleSets,
-        categoryKey: 'chest',
-        targetValue: 6,
-        unit: 'sets',
-        period: TargetPeriod.weekly,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
-    weeklySets: <WorkoutSet>[
-      WorkoutSet(
-        id: 'set-1',
-        exerciseId: 'bench-press',
-        reps: 8,
-        weight: 80,
-        date: now,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
-    todaysLogs: const <NutritionLog>[],
-    dailyMacros: const <String, double>{},
-    exercises: <Exercise>[
-      Exercise(
-        id: 'bench-press',
-        name: 'Bench Press',
-        muscleGroups: <String>['chest'],
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
+    data: HomeDashboardData(
+      targets: <Target>[
+        Target(
+          id: 'target-chest',
+          type: TargetType.muscleSets,
+          categoryKey: 'chest',
+          targetValue: 6,
+          unit: 'sets',
+          period: TargetPeriod.weekly,
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+      weeklySets: <WorkoutSet>[
+        WorkoutSet(
+          id: 'set-1',
+          exerciseId: 'bench-press',
+          reps: 8,
+          weight: 80,
+          date: now,
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+      todaysLogs: const <NutritionLog>[],
+      dailyMacros: const <String, double>{},
+      exercises: <Exercise>[
+        Exercise(
+          id: 'bench-press',
+          name: 'Bench Press',
+          muscleGroups: <String>['chest'],
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+    ),
   );
 
   setUpAll(() {

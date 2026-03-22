@@ -9,6 +9,7 @@ import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
@@ -49,7 +50,7 @@ void main() {
     errorMessage: null,
   );
 
-  final HomeLoaded loadedHomeState = HomeLoaded(
+  final HomeDashboardData loadedHomeData = HomeDashboardData(
     targets: <Target>[
       Target(
         id: 'target-chest',
@@ -86,6 +87,10 @@ void main() {
         syncMetadata: const EntitySyncMetadata(),
       ),
     ],
+  );
+
+  final HomeLoaded loadedHomeState = HomeLoaded(
+    data: loadedHomeData,
   );
 
   final MuscleVisualLoaded loadedMuscleState = MuscleVisualLoaded(

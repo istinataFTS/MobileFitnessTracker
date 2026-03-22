@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_strings.dart';
-import '../../../core/themes/app_theme.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/themes/app_theme.dart';
 import '../widgets/log_exercise_tab.dart';
 import '../widgets/log_macros_tab.dart';
 import '../widgets/log_meal_tab.dart';

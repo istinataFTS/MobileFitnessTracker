@@ -12,13 +12,13 @@ import '../features/history/history.dart';
 import '../features/home/application/home_bloc.dart';
 import '../features/home/application/muscle_visual_bloc.dart';
 import '../features/log/log.dart';
+import '../features/settings/application/app_settings_cubit.dart';
 import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
 import '../presentation/pages/exercises/bloc/exercise_bloc.dart';
 import '../presentation/pages/meals/bloc/meal_bloc.dart';
 import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../presentation/pages/targets/bloc/targets_bloc.dart';
-import '../features/settings/application/app_settings_cubit.dart';
 import 'listeners/app_domain_effects_listener.dart';
 import 'startup/app_startup_listener.dart';
 
@@ -50,64 +50,8 @@ class FitnessTrackerApp extends StatelessWidget {
 
   final bool useDevicePreviewAdapters;
 
-  Widget _buildWebHome() {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(
-              Icons.web,
-              size: 100,
-              color: AppTheme.primaryOrange,
-            ),
-            SizedBox(height: 20),
-            Text(
-              AppStrings.webMobileOnlyTitle,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textLight,
-              ),
-            ),
-            SizedBox(height: 10),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                AppStrings.webMobileOnlyDescription,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.textMedium,
-                ),
-              ),
-            ),
-            SizedBox(height: 8),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                AppStrings.webMobileOnlyInstruction,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textDim,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return AppShell(
-        home: _buildWebHome(),
-      );
-    }
-
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AppSettingsCubit>(

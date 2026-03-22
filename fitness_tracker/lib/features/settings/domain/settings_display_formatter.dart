@@ -5,15 +5,15 @@ import '../../../domain/entities/app_settings.dart';
 class SettingsDisplayFormatter {
   const SettingsDisplayFormatter._();
 
-  static const DateTime _defaultSampleDate = DateTime(2026, 3, 19);
+  static final DateTime _defaultSampleDate = DateTime(2026, 3, 19);
   static const double _defaultSampleWeightKg = 82.5;
 
   static String weekPreview(
     WeekStartDay weekStartDay, {
-    DateTime sampleDate = _defaultSampleDate,
+    DateTime? sampleDate,
   }) {
     final String range = WeekRangeLabelFormatter.formatForDate(
-      sampleDate,
+      sampleDate ?? _defaultSampleDate,
       weekStartDay: weekStartDay,
     );
 

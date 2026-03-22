@@ -1,3 +1,5 @@
+import '../../models/nutrition_log_model.dart';
+
 abstract class NutritionLogLocalDataSource {
   Future<List<NutritionLogModel>> getAllLogs();
 

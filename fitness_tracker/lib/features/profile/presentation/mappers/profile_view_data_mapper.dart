@@ -51,7 +51,7 @@ class ProfileViewDataMapper {
       accountModeSubtitle: accountModeSubtitle,
       cloudMigrationSubtitle: cloudMigrationSubtitle,
       lastSyncSubtitle: lastSyncSubtitle,
-      infoTiles: const <ProfileInfoTileViewData>[
+      infoTiles: <ProfileInfoTileViewData>[
         ProfileInfoTileViewData(
           title: AppInfo.name,
           subtitle: AppInfo.versionLabel,

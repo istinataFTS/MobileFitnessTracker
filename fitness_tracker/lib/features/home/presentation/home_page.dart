@@ -68,7 +68,7 @@ class HomePage extends StatelessWidget {
                     MuscleVisualState muscleState,
                   ) {
                     final HomePageViewData viewData = HomeViewDataMapper.map(
-                      homeState: loadedState,
+                      homeData: loadedState.data,
                       muscleVisualState: muscleState,
                       settings: settingsState.settings,
                     );

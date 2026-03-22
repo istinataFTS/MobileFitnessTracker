@@ -5,7 +5,7 @@ import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
 import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
@@ -15,12 +15,12 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final DateTime createdAt = DateTime(2024, 1, 1);
 
-  HomeLoaded buildHomeState({
+  HomeDashboardData buildHomeData({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
     required List<Exercise> exercises,
   }) {
-    return HomeLoaded(
+    return HomeDashboardData(
       targets: targets,
       weeklySets: weeklySets,
       todaysLogs: const <NutritionLog>[],
@@ -92,7 +92,7 @@ void main() {
 
   group('HomeViewDataMapper progress mapping', () {
     test('builds weekly progress card with warning tone when target is nearly met', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -136,7 +136,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: visualState,
         settings: settings,
       );
@@ -150,7 +150,7 @@ void main() {
     });
 
     test('hides target value for non-week periods', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -187,7 +187,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: visualState,
         settings: settings,
       );
@@ -197,7 +197,7 @@ void main() {
     });
 
     test('uses success tone when remaining target is zero', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -241,7 +241,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: visualState,
         settings: settings,
       );
@@ -251,7 +251,7 @@ void main() {
     });
 
     test('builds muscle group progress items with completion state', () {
-      final HomeLoaded homeState = buildHomeState(
+      final HomeDashboardData homeData = buildHomeData(
         targets: <Target>[
           buildTrainingTarget(
             id: 'target-1',
@@ -282,7 +282,7 @@ void main() {
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
-        homeState: homeState,
+        homeData: homeData,
         muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
       );
