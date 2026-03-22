@@ -1,8 +1,8 @@
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
-import 'package:fitness_tracker/presentation/pages/home/helpers/body_visualization_mapper.dart';
-import 'package:fitness_tracker/presentation/pages/home/models/body_region_contract.dart';
-import 'package:fitness_tracker/presentation/pages/home/models/body_view.dart';
+import 'package:fitness_tracker/features/home/presentation/helpers/body_visualization_mapper.dart';
+import 'package:fitness_tracker/features/home/presentation/models/body_region_contract.dart';
+import 'package:fitness_tracker/features/home/presentation/models/body_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

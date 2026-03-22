@@ -22,7 +22,7 @@ class AppSettingsState extends Equatable {
   factory AppSettingsState.initial() {
     return const AppSettingsState(
       settings: AppSettings.defaults(),
-      isLoading: true,
+      isLoading: false,
       isSaving: false,
       hasLoaded: false,
       errorMessage: null,
@@ -74,11 +74,15 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
   }
 
   Future<void> loadSettings() async {
+    if (state.isLoading || state.isSaving) {
+      return;
+    }
+
     await _loadSettings();
   }
 
   Future<void> refreshSettings() async {
-    if (state.isSaving) {
+    if (state.isSaving || state.isLoading) {
       return;
     }
 
