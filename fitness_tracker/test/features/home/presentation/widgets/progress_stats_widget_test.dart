@@ -50,47 +50,45 @@ void main() {
     errorMessage: null,
   );
 
-  final HomeDashboardData loadedHomeData = HomeDashboardData(
-    targets: <Target>[
-      Target(
-        id: 'target-chest',
-        type: TargetType.muscleSets,
-        categoryKey: 'chest',
-        targetValue: 12,
-        unit: 'sets',
-        period: TargetPeriod.weekly,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
-    weeklySets: List<WorkoutSet>.generate(
-      9,
-      (int index) => WorkoutSet(
-        id: 'set-$index',
-        exerciseId: 'bench-press',
-        reps: 8,
-        weight: 80,
-        intensity: 8,
-        date: now,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ),
-    todaysLogs: const <NutritionLog>[],
-    dailyMacros: const <String, double>{},
-    exercises: <Exercise>[
-      Exercise(
-        id: 'bench-press',
-        name: 'Bench Press',
-        muscleGroups: <String>['chest'],
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
-  );
-
   final HomeLoaded loadedHomeState = HomeLoaded(
-    data: loadedHomeData,
+    data: HomeDashboardData(
+      targets: <Target>[
+        Target(
+          id: 'target-chest',
+          type: TargetType.muscleSets,
+          categoryKey: 'chest',
+          targetValue: 12,
+          unit: 'sets',
+          period: TargetPeriod.weekly,
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+      weeklySets: List<WorkoutSet>.generate(
+        9,
+        (int index) => WorkoutSet(
+          id: 'set-$index',
+          exerciseId: 'bench-press',
+          reps: 8,
+          weight: 80,
+          intensity: 8,
+          date: now,
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ),
+      todaysLogs: const <NutritionLog>[],
+      dailyMacros: const <String, double>{},
+      exercises: <Exercise>[
+        Exercise(
+          id: 'bench-press',
+          name: 'Bench Press',
+          muscleGroups: <String>['chest'],
+          createdAt: now,
+          syncMetadata: const EntitySyncMetadata(),
+        ),
+      ],
+    ),
   );
 
   final MuscleVisualLoaded loadedMuscleState = MuscleVisualLoaded(

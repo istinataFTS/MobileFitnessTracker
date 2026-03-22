@@ -2,7 +2,7 @@ import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
-import 'package:fitness_tracker/features/home/application/home_bloc.dart';
+import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
 import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
@@ -57,7 +57,7 @@ void main() {
   );
 
   test('maps nutrition summary with macro targets and recent logs', () {
-    final HomeLoaded state = HomeLoaded(
+    final HomeDashboardData homeData = HomeDashboardData(
       targets: <Target>[
         buildMacroTarget(
           id: 'protein-target',
@@ -100,7 +100,7 @@ void main() {
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(
-      homeState: state,
+      homeData: homeData,
       muscleVisualState: const MuscleVisualInitial(),
       settings: settings,
     );
@@ -125,7 +125,7 @@ void main() {
   });
 
   test('maps empty nutrition state without logs', () {
-    final HomeLoaded state = HomeLoaded(
+    final HomeDashboardData homeData = HomeDashboardData(
       targets: const <Target>[],
       weeklySets: const [],
       todaysLogs: const <NutritionLog>[],
@@ -139,7 +139,7 @@ void main() {
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(
-      homeState: state,
+      homeData: homeData,
       muscleVisualState: const MuscleVisualInitial(),
       settings: settings,
     );
