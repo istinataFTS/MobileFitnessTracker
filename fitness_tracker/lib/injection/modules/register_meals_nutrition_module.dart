@@ -33,7 +33,7 @@ import '../../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../../domain/usecases/nutrition_logs/get_logs_by_date_range.dart';
 import '../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../domain/usecases/nutrition_logs/update_nutrition_log.dart';
-import '../../presentation/pages/meals/bloc/meal_bloc.dart';
+import '../../features/library/application/meal_bloc.dart';
 import '../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 void registerMealsNutritionModule(GetIt sl) {
