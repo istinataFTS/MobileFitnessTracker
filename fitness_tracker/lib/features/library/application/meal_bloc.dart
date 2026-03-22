@@ -1,64 +1,73 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../../domain/entities/meal.dart';
-import '../../../../domain/usecases/meals/get_all_meals.dart';
-import '../../../../domain/usecases/meals/get_meal_by_id.dart';
-import '../../../../domain/usecases/meals/get_meal_by_name.dart';
-import '../../../../domain/usecases/meals/add_meal.dart';
-import '../../../../domain/usecases/meals/update_meal.dart';
-import '../../../../domain/usecases/meals/delete_meal.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-// ==================== Events ====================
+import '../../../domain/entities/meal.dart';
+import '../../../domain/usecases/meals/add_meal.dart';
+import '../../../domain/usecases/meals/delete_meal.dart';
+import '../../../domain/usecases/meals/get_all_meals.dart';
+import '../../../domain/usecases/meals/get_meal_by_id.dart';
+import '../../../domain/usecases/meals/get_meal_by_name.dart';
+import '../../../domain/usecases/meals/update_meal.dart';
 
 abstract class MealEvent extends Equatable {
   const MealEvent();
+
   @override
-  List<Object?> get props => [];
+  List<Object?> get props => <Object?>[];
 }
 
 class LoadMealsEvent extends MealEvent {}
 
 class LoadMealByIdEvent extends MealEvent {
-  final String id;
   const LoadMealByIdEvent(this.id);
+
+  final String id;
+
   @override
-  List<Object?> get props => [id];
+  List<Object?> get props => <Object?>[id];
 }
 
 class LoadMealByNameEvent extends MealEvent {
-  final String name;
   const LoadMealByNameEvent(this.name);
+
+  final String name;
+
   @override
-  List<Object?> get props => [name];
+  List<Object?> get props => <Object?>[name];
 }
 
 class AddMealEvent extends MealEvent {
-  final Meal meal;
   const AddMealEvent(this.meal);
+
+  final Meal meal;
+
   @override
-  List<Object?> get props => [meal];
+  List<Object?> get props => <Object?>[meal];
 }
 
 class UpdateMealEvent extends MealEvent {
-  final Meal meal;
   const UpdateMealEvent(this.meal);
+
+  final Meal meal;
+
   @override
-  List<Object?> get props => [meal];
+  List<Object?> get props => <Object?>[meal];
 }
 
 class DeleteMealEvent extends MealEvent {
-  final String id;
   const DeleteMealEvent(this.id);
-  @override
-  List<Object?> get props => [id];
-}
 
-// ==================== States ====================
+  final String id;
+
+  @override
+  List<Object?> get props => <Object?>[id];
+}
 
 abstract class MealState extends Equatable {
   const MealState();
+
   @override
-  List<Object?> get props => [];
+  List<Object?> get props => <Object?>[];
 }
 
 class MealInitial extends MealState {}
@@ -66,43 +75,42 @@ class MealInitial extends MealState {}
 class MealLoading extends MealState {}
 
 class MealsLoaded extends MealState {
-  final List<Meal> meals;
   const MealsLoaded(this.meals);
+
+  final List<Meal> meals;
+
   @override
-  List<Object?> get props => [meals];
+  List<Object?> get props => <Object?>[meals];
 }
 
 class MealLoaded extends MealState {
-  final Meal meal;
   const MealLoaded(this.meal);
+
+  final Meal meal;
+
   @override
-  List<Object?> get props => [meal];
+  List<Object?> get props => <Object?>[meal];
 }
 
 class MealError extends MealState {
-  final String message;
   const MealError(this.message);
+
+  final String message;
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => <Object?>[message];
 }
 
 class MealOperationSuccess extends MealState {
-  final String message;
   const MealOperationSuccess(this.message);
+
+  final String message;
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => <Object?>[message];
 }
 
-// ==================== BLoC ====================
-
 class MealBloc extends Bloc<MealEvent, MealState> {
-  final GetAllMeals getAllMeals;
-  final GetMealById getMealById;
-  final GetMealByName getMealByName;
-  final AddMeal addMeal;
-  final UpdateMeal updateMeal;
-  final DeleteMeal deleteMeal;
-
   MealBloc({
     required this.getAllMeals,
     required this.getMealById,
@@ -118,6 +126,13 @@ class MealBloc extends Bloc<MealEvent, MealState> {
     on<UpdateMealEvent>(_onUpdateMeal);
     on<DeleteMealEvent>(_onDeleteMeal);
   }
+
+  final GetAllMeals getAllMeals;
+  final GetMealById getMealById;
+  final GetMealByName getMealByName;
+  final AddMeal addMeal;
+  final UpdateMeal updateMeal;
+  final DeleteMeal deleteMeal;
 
   Future<void> _onLoadMeals(
     LoadMealsEvent event,

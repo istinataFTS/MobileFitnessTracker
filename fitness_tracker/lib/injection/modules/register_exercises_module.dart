@@ -15,7 +15,7 @@ import '../../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../../domain/usecases/exercises/get_exercises_for_muscle.dart';
 import '../../domain/usecases/exercises/seed_exercises.dart';
 import '../../domain/usecases/exercises/update_exercise.dart';
-import '../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../features/library/application/exercise_bloc.dart';
 
 void registerExercisesModule(GetIt sl) {
   sl.registerFactory(

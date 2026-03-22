@@ -1,11 +1,11 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/meal.dart';
+import 'package:fitness_tracker/features/library/application/exercise_bloc.dart';
+import 'package:fitness_tracker/features/library/application/meal_bloc.dart';
 import 'package:fitness_tracker/features/library/presentation/library_page.dart';
 import 'package:fitness_tracker/features/library/presentation/widgets/exercises_tab.dart';
 import 'package:fitness_tracker/features/library/presentation/widgets/meals_tab.dart';
-import 'package:fitness_tracker/presentation/pages/exercises/bloc/exercise_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/meals/bloc/meal_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -6,7 +6,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/exercise.dart';
-import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../application/exercise_bloc.dart';
 import '../../application/library_exercise_filters.dart';
 import '../models/library_exercise_view_data.dart';
 

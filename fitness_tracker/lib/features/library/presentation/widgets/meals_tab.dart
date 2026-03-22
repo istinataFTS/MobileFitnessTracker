@@ -4,8 +4,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/meal.dart';
-import '../../../../presentation/pages/meals/bloc/meal_bloc.dart';
 import '../../application/library_meal_filters.dart';
+import '../../application/meal_bloc.dart';
 import '../models/library_meal_view_data.dart';
 
 class MealsTab extends StatefulWidget {

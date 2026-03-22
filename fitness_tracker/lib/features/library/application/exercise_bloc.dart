@@ -1,64 +1,73 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../../domain/entities/exercise.dart';
-import '../../../../domain/usecases/exercises/get_all_exercises.dart';
-import '../../../../domain/usecases/exercises/get_exercise_by_id.dart';
-import '../../../../domain/usecases/exercises/get_exercises_for_muscle.dart';
-import '../../../../domain/usecases/exercises/add_exercise.dart';
-import '../../../../domain/usecases/exercises/update_exercise.dart';
-import '../../../../domain/usecases/exercises/delete_exercise.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-// ==================== Events ====================
+import '../../../domain/entities/exercise.dart';
+import '../../../domain/usecases/exercises/add_exercise.dart';
+import '../../../domain/usecases/exercises/delete_exercise.dart';
+import '../../../domain/usecases/exercises/get_all_exercises.dart';
+import '../../../domain/usecases/exercises/get_exercise_by_id.dart';
+import '../../../domain/usecases/exercises/get_exercises_for_muscle.dart';
+import '../../../domain/usecases/exercises/update_exercise.dart';
 
 abstract class ExerciseEvent extends Equatable {
   const ExerciseEvent();
+
   @override
-  List<Object?> get props => [];
+  List<Object?> get props => <Object?>[];
 }
 
 class LoadExercisesEvent extends ExerciseEvent {}
 
 class LoadExerciseByIdEvent extends ExerciseEvent {
-  final String id;
   const LoadExerciseByIdEvent(this.id);
+
+  final String id;
+
   @override
-  List<Object?> get props => [id];
+  List<Object?> get props => <Object?>[id];
 }
 
 class LoadExercisesForMuscleEvent extends ExerciseEvent {
-  final String muscleGroup;
   const LoadExercisesForMuscleEvent(this.muscleGroup);
+
+  final String muscleGroup;
+
   @override
-  List<Object?> get props => [muscleGroup];
+  List<Object?> get props => <Object?>[muscleGroup];
 }
 
 class AddExerciseEvent extends ExerciseEvent {
-  final Exercise exercise;
   const AddExerciseEvent(this.exercise);
+
+  final Exercise exercise;
+
   @override
-  List<Object?> get props => [exercise];
+  List<Object?> get props => <Object?>[exercise];
 }
 
 class UpdateExerciseEvent extends ExerciseEvent {
-  final Exercise exercise;
   const UpdateExerciseEvent(this.exercise);
+
+  final Exercise exercise;
+
   @override
-  List<Object?> get props => [exercise];
+  List<Object?> get props => <Object?>[exercise];
 }
 
 class DeleteExerciseEvent extends ExerciseEvent {
-  final String id;
   const DeleteExerciseEvent(this.id);
-  @override
-  List<Object?> get props => [id];
-}
 
-// ==================== States ====================
+  final String id;
+
+  @override
+  List<Object?> get props => <Object?>[id];
+}
 
 abstract class ExerciseState extends Equatable {
   const ExerciseState();
+
   @override
-  List<Object?> get props => [];
+  List<Object?> get props => <Object?>[];
 }
 
 class ExerciseInitial extends ExerciseState {}
@@ -66,43 +75,42 @@ class ExerciseInitial extends ExerciseState {}
 class ExerciseLoading extends ExerciseState {}
 
 class ExercisesLoaded extends ExerciseState {
-  final List<Exercise> exercises;
   const ExercisesLoaded(this.exercises);
+
+  final List<Exercise> exercises;
+
   @override
-  List<Object?> get props => [exercises];
+  List<Object?> get props => <Object?>[exercises];
 }
 
 class ExerciseLoaded extends ExerciseState {
-  final Exercise exercise;
   const ExerciseLoaded(this.exercise);
+
+  final Exercise exercise;
+
   @override
-  List<Object?> get props => [exercise];
+  List<Object?> get props => <Object?>[exercise];
 }
 
 class ExerciseError extends ExerciseState {
-  final String message;
   const ExerciseError(this.message);
+
+  final String message;
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => <Object?>[message];
 }
 
 class ExerciseOperationSuccess extends ExerciseState {
-  final String message;
   const ExerciseOperationSuccess(this.message);
+
+  final String message;
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => <Object?>[message];
 }
 
-// ==================== BLoC ====================
-
 class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
-  final GetAllExercises getAllExercises;
-  final GetExerciseById getExerciseById;
-  final GetExercisesForMuscle getExercisesForMuscle;
-  final AddExercise addExercise;
-  final UpdateExercise updateExercise;
-  final DeleteExercise deleteExercise;
-
   ExerciseBloc({
     required this.getAllExercises,
     required this.getExerciseById,
@@ -118,6 +126,13 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     on<UpdateExerciseEvent>(_onUpdateExercise);
     on<DeleteExerciseEvent>(_onDeleteExercise);
   }
+
+  final GetAllExercises getAllExercises;
+  final GetExerciseById getExerciseById;
+  final GetExercisesForMuscle getExercisesForMuscle;
+  final AddExercise addExercise;
+  final UpdateExercise updateExercise;
+  final DeleteExercise deleteExercise;
 
   Future<void> _onLoadExercises(
     LoadExercisesEvent event,
