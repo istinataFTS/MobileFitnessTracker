@@ -10,64 +10,60 @@ import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
-import '../../../settings/application/app_settings_cubit.dart';
+import '../../../settings/presentation/settings_scope.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
 
 class DayDetailsBottomSheet extends StatelessWidget {
+  const DayDetailsBottomSheet({
+    required this.date,
+    required this.sets,
+    super.key,
+  });
+
   final DateTime date;
   final List<WorkoutSet> sets;
 
-  const DayDetailsBottomSheet({
-    super.key,
-    required this.date,
-    required this.sets,
-  });
-
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
-      builder: (context, settingsState) {
-        final settings = settingsState.settings;
-        final bool hasWorkouts = sets.isNotEmpty;
+    final WeightUnit weightUnit = SettingsScope.weightUnitOf(context);
+    final bool hasWorkouts = sets.isNotEmpty;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: AppTheme.backgroundDark,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(
-                CalendarConstants.bottomSheetBorderRadius,
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundDark,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(
+            CalendarConstants.bottomSheetBorderRadius,
+          ),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.borderDark,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.borderDark,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              _buildHeader(context, hasWorkouts),
-              if (hasWorkouts) const Divider(height: 1),
-              Flexible(
-                child: hasWorkouts
-                    ? _buildWorkoutsList(
-                        context,
-                        settings.weightUnit,
-                      )
-                    : _buildEmptyState(context),
-              ),
-            ],
+          _buildHeader(context, hasWorkouts),
+          if (hasWorkouts) const Divider(height: 1),
+          Flexible(
+            child: hasWorkouts
+                ? _buildWorkoutsList(
+                    context,
+                    weightUnit,
+                  )
+                : _buildEmptyState(context),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -184,7 +180,12 @@ class DayDetailsBottomSheet extends StatelessWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showEditDialog(context, set, exercise),
+                  onPressed: () => _showEditDialog(
+                    context,
+                    set,
+                    exercise,
+                    weightUnit,
+                  ),
                   tooltip: 'Edit Set',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -307,7 +308,12 @@ class DayDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-  void _showEditDialog(BuildContext context, WorkoutSet set, Exercise exercise) {
+  void _showEditDialog(
+    BuildContext context,
+    WorkoutSet set,
+    Exercise exercise,
+    WeightUnit weightUnit,
+  ) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => BlocProvider.value(
@@ -315,6 +321,7 @@ class DayDetailsBottomSheet extends StatelessWidget {
         child: EditSetDialog(
           workoutSet: set,
           exercise: exercise,
+          weightUnit: weightUnit,
         ),
       ),
     );

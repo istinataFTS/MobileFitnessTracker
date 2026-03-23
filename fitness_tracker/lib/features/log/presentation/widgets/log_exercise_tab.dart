@@ -15,15 +15,11 @@ import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
-import '../../../settings/application/app_settings_cubit.dart';
+import '../../../settings/presentation/settings_scope.dart';
 import '../bloc/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
 
 class LogExerciseTab extends StatefulWidget {
-  final DateTime? initialDate;
-  final bool showSuccessFeedback;
-  final ValueChanged<DateTime>? onLoggedSuccess;
-
   const LogExerciseTab({
     super.key,
     this.initialDate,
@@ -31,14 +27,18 @@ class LogExerciseTab extends StatefulWidget {
     this.onLoggedSuccess,
   });
 
+  final DateTime? initialDate;
+  final bool showSuccessFeedback;
+  final ValueChanged<DateTime>? onLoggedSuccess;
+
   @override
   State<LogExerciseTab> createState() => _LogExerciseTabState();
 }
 
 class _LogExerciseTabState extends State<LogExerciseTab> {
-  final _uuid = const Uuid();
-  final _repsController = TextEditingController();
-  final _weightController = TextEditingController();
+  final Uuid _uuid = const Uuid();
+  final TextEditingController _repsController = TextEditingController();
+  final TextEditingController _weightController = TextEditingController();
 
   StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
 
@@ -52,7 +52,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
     _selectedDate = widget.initialDate ?? DateTime.now();
 
-    final workoutBloc = context.read<WorkoutBloc>();
+    final WorkoutBloc workoutBloc = context.read<WorkoutBloc>();
     _workoutEffectsSub = workoutBloc.effects.listen((effect) {
       if (!mounted) {
         return;
@@ -65,12 +65,12 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: <Widget>[
                   Text(
                     effect.message,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  if (effect.affectedMuscles.isNotEmpty) ...[
+                  if (effect.affectedMuscles.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 4),
                     Text(
                       'Training: ${effect.affectedMuscles.map((m) => MuscleGroups.getDisplayName(m)).join(", ")}',
@@ -103,78 +103,75 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
-      builder: (context, settingsState) {
-        final settings = settingsState.settings;
+    final WeightUnit weightUnit = SettingsScope.weightUnitOf(context);
 
-        return BlocConsumer<WorkoutBloc, WorkoutState>(
-          listener: (context, state) {
-            if (state is WorkoutError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppTheme.errorRed,
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(20),
+    return BlocConsumer<WorkoutBloc, WorkoutState>(
+      listener: (BuildContext context, WorkoutState state) {
+        if (state is WorkoutError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppTheme.errorRed,
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(20),
+            ),
+          );
+        }
+      },
+      builder: (BuildContext context, WorkoutState workoutState) {
+        return BlocBuilder<ExerciseBloc, ExerciseState>(
+          builder: (BuildContext context, ExerciseState exerciseState) {
+            if (exerciseState is ExerciseLoading) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primaryOrange,
                 ),
               );
             }
-          },
-          builder: (context, workoutState) {
-            return BlocBuilder<ExerciseBloc, ExerciseState>(
-              builder: (context, exerciseState) {
-                if (exerciseState is ExerciseLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: AppTheme.primaryOrange,
-                    ),
-                  );
-                }
 
-                if (exerciseState is ExerciseError) {
-                  return _buildErrorState(context);
-                }
+            if (exerciseState is ExerciseError) {
+              return _buildErrorState(context);
+            }
 
-                final exercises = exerciseState is ExercisesLoaded
+            final List<Exercise> exercises =
+                exerciseState is ExercisesLoaded
                     ? exerciseState.exercises
                     : <Exercise>[];
 
-                if (exercises.isEmpty) {
-                  return _buildEmptyExercisesState(context);
-                }
+            if (exercises.isEmpty) {
+              return _buildEmptyExercisesState(context);
+            }
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildExerciseSelector(exercises),
-                      const SizedBox(height: 24),
-                      _buildRepsInput(),
-                      const SizedBox(height: 20),
-                      _buildWeightInput(settings.weightUnit),
-                      const SizedBox(height: 20),
-                      IntensitySliderWidget(
-                        intensity: _selectedIntensity,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedIntensity = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _buildDatePicker(context),
-                      const SizedBox(height: 20),
-                      _buildMuscleGroupInfo(),
-                      const SizedBox(height: 28),
-                      _buildLogButton(
-                        workoutState,
-                        settings.weightUnit,
-                      ),
-                    ],
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _buildExerciseSelector(exercises),
+                  const SizedBox(height: 24),
+                  _buildRepsInput(),
+                  const SizedBox(height: 20),
+                  _buildWeightInput(weightUnit),
+                  const SizedBox(height: 20),
+                  IntensitySliderWidget(
+                    intensity: _selectedIntensity,
+                    onChanged: (int value) {
+                      setState(() {
+                        _selectedIntensity = value;
+                      });
+                    },
                   ),
-                );
-              },
+                  const SizedBox(height: 20),
+                  _buildDatePicker(context),
+                  const SizedBox(height: 20),
+                  _buildMuscleGroupInfo(),
+                  const SizedBox(height: 28),
+                  _buildLogButton(
+                    workoutState,
+                    weightUnit,
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -188,7 +185,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children: <Widget>[
             const Icon(
               Icons.error_outline,
               size: 64,
@@ -218,7 +215,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   Widget _buildExerciseSelector(List<Exercise> exercises) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Text(
           AppStrings.exercise,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -237,7 +234,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               border: Border.all(color: AppTheme.borderDark),
             ),
             child: Row(
-              children: [
+              children: <Widget>[
                 Container(
                   width: 40,
                   height: 40,
@@ -276,7 +273,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children: <Widget>[
             const Icon(
               Icons.fitness_center_outlined,
               size: 64,
@@ -307,7 +304,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   Widget _buildRepsInput() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Text(
           AppStrings.reps,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -318,7 +315,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         TextField(
           controller: _repsController,
           keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          inputFormatters: <TextInputFormatter>[
+            FilteringTextInputFormatter.digitsOnly,
+          ],
           decoration: const InputDecoration(
             hintText: '0',
             prefixIcon: Icon(Icons.repeat),
@@ -332,7 +331,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   Widget _buildWeightInput(WeightUnit weightUnit) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Text(
           AppStrings.weight,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -343,7 +342,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         TextField(
           controller: _weightController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
+          inputFormatters: <TextInputFormatter>[
             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
           ],
           decoration: InputDecoration(
@@ -362,7 +361,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   Widget _buildDatePicker(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         Text(
           AppStrings.workoutDate,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -381,7 +380,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               border: Border.all(color: AppTheme.borderDark),
             ),
             child: Row(
-              children: [
+              children: <Widget>[
                 Container(
                   width: 40,
                   height: 40,
@@ -430,9 +429,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           Row(
-            children: [
+            children: <Widget>[
               const Icon(
                 Icons.info_outline,
                 color: AppTheme.primaryOrange,
@@ -452,7 +451,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _selectedExercise!.muscleGroups.map((mg) {
+            children: _selectedExercise!.muscleGroups.map((String mg) {
               return Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -482,8 +481,8 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     WorkoutState state,
     WeightUnit weightUnit,
   ) {
-    final isLoading = state is WorkoutLoading;
-    final canLog = _selectedExercise != null &&
+    final bool isLoading = state is WorkoutLoading;
+    final bool canLog = _selectedExercise != null &&
         _repsController.text.isNotEmpty &&
         _weightController.text.isNotEmpty;
 
@@ -515,16 +514,16 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       context: context,
       backgroundColor: AppTheme.surfaceDark,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (BuildContext context) {
         return SafeArea(
           child: SizedBox(
             height: 420,
             child: Column(
-              children: [
+              children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(
-                    children: [
+                    children: <Widget>[
                       Expanded(
                         child: Text(
                           AppStrings.selectExercise,
@@ -545,9 +544,10 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                 Expanded(
                   child: ListView.builder(
                     itemCount: exercises.length,
-                    itemBuilder: (context, index) {
-                      final exercise = exercises[index];
-                      final isSelected = _selectedExercise?.id == exercise.id;
+                    itemBuilder: (BuildContext context, int index) {
+                      final Exercise exercise = exercises[index];
+                      final bool isSelected =
+                          _selectedExercise?.id == exercise.id;
 
                       return ListTile(
                         title: Text(
@@ -561,7 +561,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                         ),
                         subtitle: Text(
                           exercise.muscleGroups
-                              .map((mg) => MuscleGroups.getDisplayName(mg))
+                              .map((String mg) => MuscleGroups.getDisplayName(mg))
                               .join(', '),
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -593,12 +593,12 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final picked = await showDatePicker(
+    final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      builder: (context, child) {
+      builder: (BuildContext context, Widget? child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
@@ -625,14 +625,14 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       return;
     }
 
-    final reps = int.tryParse(_repsController.text);
-    final enteredWeight = double.tryParse(_weightController.text);
+    final int? reps = int.tryParse(_repsController.text);
+    final double? enteredWeight = double.tryParse(_weightController.text);
 
     if (reps == null || enteredWeight == null) {
       return;
     }
 
-    final workoutSet = WorkoutSet(
+    final WorkoutSet workoutSet = WorkoutSet(
       id: _uuid.v4(),
       exerciseId: _selectedExercise!.id,
       reps: reps,

@@ -5,9 +5,8 @@ import '../../../core/themes/app_theme.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
-import '../../../features/settings/presentation/settings_scope.dart';
+import '../../../features/targets/targets.dart';
 import '../../../injection/injection_container.dart' as di;
-import '../../../presentation/pages/targets/targets_page.dart';
 import '../application/profile_cubit.dart';
 import 'mappers/profile_view_data_mapper.dart';
 import 'models/profile_view_data.dart';
@@ -26,7 +25,8 @@ class ProfilePage extends StatelessWidget {
   static const Key targetsTileKey = ProfilePageKeys.targetsTileKey;
   static const Key historyTileKey = ProfilePageKeys.historyTileKey;
   static const Key accountStatusTileKey = ProfilePageKeys.accountStatusTileKey;
-  static const Key cloudMigrationTileKey = ProfilePageKeys.cloudMigrationTileKey;
+  static const Key cloudMigrationTileKey =
+      ProfilePageKeys.cloudMigrationTileKey;
   static const Key lastSyncTileKey = ProfilePageKeys.lastSyncTileKey;
   static const Key accountModeBannerKey = ProfilePageKeys.accountModeBannerKey;
   static const Key deferredSectionKey = ProfilePageKeys.deferredSectionKey;
@@ -116,9 +116,7 @@ class _ProfileViewState extends State<_ProfileView> {
               Navigator.push(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => HistoryPage(
-                    settings: SettingsScope.of(context),
-                  ),
+                  builder: (_) => const HistoryPage(),
                 ),
               );
             },
