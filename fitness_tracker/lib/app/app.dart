@@ -15,6 +15,7 @@ import '../features/library/application/exercise_bloc.dart';
 import '../features/library/application/meal_bloc.dart';
 import '../features/log/log.dart';
 import '../features/settings/application/app_settings_cubit.dart';
+import '../features/settings/presentation/settings_scope.dart';
 import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
 import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
@@ -84,12 +85,14 @@ class FitnessTrackerApp extends StatelessWidget {
           create: (_) => di.sl<NutritionLogBloc>(),
         ),
       ],
-      child: AppShell(
-        builder: useDevicePreviewAdapters ? DevicePreview.appBuilder : null,
-        locale: useDevicePreviewAdapters ? DevicePreview.locale(context) : null,
-        home: const AppStartupListener(
-          child: AppDomainEffectsListener(
-            child: BottomNavigation(),
+      child: SettingsScope(
+        child: AppShell(
+          builder: useDevicePreviewAdapters ? DevicePreview.appBuilder : null,
+          locale: useDevicePreviewAdapters ? DevicePreview.locale(context) : null,
+          home: const AppStartupListener(
+            child: AppDomainEffectsListener(
+              child: BottomNavigation(),
+            ),
           ),
         ),
       ),

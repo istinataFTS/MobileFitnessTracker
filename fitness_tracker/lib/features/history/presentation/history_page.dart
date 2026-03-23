@@ -8,7 +8,6 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
-import '../../settings/application/app_settings_cubit.dart';
 import 'bloc/history_bloc.dart';
 import 'bloc/history_effect.dart';
 import 'bloc/history_event.dart';
@@ -19,7 +18,12 @@ import 'widgets/history_calendar_widget.dart';
 import 'widgets/history_day_content.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  const HistoryPage({
+    required this.settings,
+    super.key,
+  });
+
+  final AppSettings settings;
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -63,69 +67,65 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
-      builder: (context, settingsState) {
-        final settings = settingsState.settings;
+    final AppSettings settings = widget.settings;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text(HistoryStrings.title),
-            elevation: 0,
-          ),
-          body: BlocConsumer<HistoryBloc, HistoryState>(
-            listener: (BuildContext context, HistoryState state) {
-              if (state is! HistoryLoaded) {
-                return;
-              }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(HistoryStrings.title),
+        elevation: 0,
+      ),
+      body: BlocConsumer<HistoryBloc, HistoryState>(
+        listener: (BuildContext context, HistoryState state) {
+          if (state is! HistoryLoaded) {
+            return;
+          }
 
-              final DateTime? selectedDate = state.selectedDate;
-              final int selectedActivityCount =
-                  state.selectedDateSets.length +
-                      state.selectedDateNutritionLogs.length;
+          final DateTime? selectedDate = state.selectedDate;
+          final int selectedActivityCount =
+              state.selectedDateSets.length +
+                  state.selectedDateNutritionLogs.length;
 
-              if (selectedDate == null) {
-                _lastSelectedDate = null;
-                _lastSelectedActivityCount = 0;
-                return;
-              }
+          if (selectedDate == null) {
+            _lastSelectedDate = null;
+            _lastSelectedActivityCount = 0;
+            return;
+          }
 
-              final bool selectedDateChanged = _lastSelectedDate == null ||
-                  !WeekDateUtils.isSameDay(_lastSelectedDate!, selectedDate);
+          final bool selectedDateChanged = _lastSelectedDate == null ||
+              !WeekDateUtils.isSameDay(_lastSelectedDate!, selectedDate);
 
-              final bool selectedActivityChanged =
-                  selectedActivityCount != _lastSelectedActivityCount;
+          final bool selectedActivityChanged =
+              selectedActivityCount != _lastSelectedActivityCount;
 
-              if (selectedDateChanged || selectedActivityChanged) {
-                _focusSelectedDayContent();
+          if (selectedDateChanged || selectedActivityChanged) {
+            _focusSelectedDayContent();
 
-                if (mounted) {
-                  setState(() {
-                    _contentHighlightVersion++;
-                  });
-                }
-              }
+            if (mounted) {
+              setState(() {
+                _contentHighlightVersion++;
+              });
+            }
+          }
 
-              _lastSelectedDate = selectedDate;
-              _lastSelectedActivityCount = selectedActivityCount;
-            },
-            builder: (BuildContext context, HistoryState state) {
-              if (state is HistoryLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          _lastSelectedDate = selectedDate;
+          _lastSelectedActivityCount = selectedActivityCount;
+        },
+        builder: (BuildContext context, HistoryState state) {
+          if (state is HistoryLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-              if (state is HistoryError) {
-                return _buildErrorState(context, state);
-              }
+          if (state is HistoryError) {
+            return _buildErrorState(context, state);
+          }
 
-              if (state is HistoryLoaded) {
-                return _buildLoadedState(context, state, settings);
-              }
+          if (state is HistoryLoaded) {
+            return _buildLoadedState(context, state, settings);
+          }
 
-              return _buildInitialState(context);
-            },
-          ),
-        );
-      },
+          return _buildInitialState(context);
+        },
+      ),
     );
   }
 
