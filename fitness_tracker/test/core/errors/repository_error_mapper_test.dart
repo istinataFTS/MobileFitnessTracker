@@ -7,34 +7,34 @@ void main() {
   group('RepositoryErrorMapper', () {
     test('maps ValidationException to ValidationFailure', () {
       final Failure result = RepositoryErrorMapper.map(
-        const ValidationException('Invalid input'),
+        const ValidationException('invalid input'),
       );
 
-      expect(result, const ValidationFailure('Invalid input'));
+      expect(result, const ValidationFailure('invalid input'));
     });
 
     test('maps CacheDatabaseException to DatabaseFailure', () {
       final Failure result = RepositoryErrorMapper.map(
-        const CacheDatabaseException('DB failed'),
+        const CacheDatabaseException('db failed'),
       );
 
-      expect(result, const DatabaseFailure('DB failed'));
+      expect(result, const DatabaseFailure('db failed'));
     });
 
     test('maps CacheException to CacheFailure', () {
       final Failure result = RepositoryErrorMapper.map(
-        const CacheException('Cache failed'),
+        const CacheException('cache failed'),
       );
 
-      expect(result, const CacheFailure('Cache failed'));
+      expect(result, const CacheFailure('cache failed'));
     });
 
     test('maps ArgumentError to ValidationFailure', () {
       final Failure result = RepositoryErrorMapper.map(
-        ArgumentError('Bad argument'),
+        ArgumentError('bad argument'),
       );
 
-      expect(result, const ValidationFailure('Bad argument'));
+      expect(result, const ValidationFailure('bad argument'));
     });
 
     test('maps unknown errors to UnexpectedFailure', () {
@@ -42,10 +42,7 @@ void main() {
         StateError('boom'),
       );
 
-      expect(
-        result,
-        const UnexpectedFailure('Unexpected error: Bad state: boom'),
-      );
+      expect(result, const UnexpectedFailure('Unexpected error: Bad state: boom'));
     });
   });
 }
