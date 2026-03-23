@@ -13,7 +13,6 @@ import 'package:fitness_tracker/features/home/application/models/home_dashboard_
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
 import 'package:fitness_tracker/features/home/presentation/widgets/period_selector_widget.dart';
-import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,9 +23,6 @@ class MockHomeBloc extends MockBloc<HomeEvent, HomeState> implements HomeBloc {}
 class MockMuscleVisualBloc
     extends MockBloc<MuscleVisualEvent, MuscleVisualState>
     implements MuscleVisualBloc {}
-
-class MockAppSettingsCubit extends MockCubit<AppSettingsState>
-    implements AppSettingsCubit {}
 
 class FakeHomeEvent extends Fake implements HomeEvent {}
 
@@ -39,17 +35,10 @@ class FakeMuscleVisualState extends Fake implements MuscleVisualState {}
 void main() {
   late MockHomeBloc homeBloc;
   late MockMuscleVisualBloc muscleVisualBloc;
-  late MockAppSettingsCubit appSettingsCubit;
 
   final DateTime now = DateTime(2026, 3, 19, 10, 0);
 
-  final AppSettingsState settingsState = AppSettingsState(
-    settings: const AppSettings.defaults(),
-    isLoading: false,
-    isSaving: false,
-    hasLoaded: true,
-    errorMessage: null,
-  );
+  const AppSettings settings = AppSettings.defaults();
 
   final HomeDashboardData loadedHomeData = HomeDashboardData(
     targets: <Target>[
@@ -151,14 +140,6 @@ void main() {
   setUp(() {
     homeBloc = MockHomeBloc();
     muscleVisualBloc = MockMuscleVisualBloc();
-    appSettingsCubit = MockAppSettingsCubit();
-
-    when(() => appSettingsCubit.state).thenReturn(settingsState);
-    whenListen<AppSettingsState>(
-      appSettingsCubit,
-      Stream<AppSettingsState>.fromIterable(<AppSettingsState>[settingsState]),
-      initialState: settingsState,
-    );
 
     when(() => homeBloc.state).thenReturn(loadedHomeState);
     whenListen<HomeState>(
@@ -178,12 +159,11 @@ void main() {
   Widget buildSubject() {
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
-        BlocProvider<AppSettingsCubit>.value(value: appSettingsCubit),
         BlocProvider<HomeBloc>.value(value: homeBloc),
         BlocProvider<MuscleVisualBloc>.value(value: muscleVisualBloc),
       ],
       child: const MaterialApp(
-        home: HomePage(),
+        home: HomePage(settings: settings),
       ),
     );
   }

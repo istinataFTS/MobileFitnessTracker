@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/constants/app_strings.dart';
 import '../../core/themes/app_theme.dart';
+import '../../domain/entities/app_settings.dart';
 import '../../features/history/history.dart';
 import '../../features/home/home.dart';
 import '../../features/library/application/exercise_bloc.dart';
@@ -11,6 +12,7 @@ import '../../features/library/library.dart';
 import '../../features/log/presentation/bloc/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
 import '../../features/profile/profile.dart';
+import '../../features/settings/application/app_settings_cubit.dart';
 import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import '../pages/targets/bloc/targets_bloc.dart';
 import '../pages/targets/targets_page.dart';
@@ -126,7 +128,12 @@ class _BottomNavigationState extends State<BottomNavigation> {
 
     switch (index) {
       case _homeTabIndex:
-        return const HomePage();
+        return BlocSelector<AppSettingsCubit, AppSettingsState, AppSettings>(
+          selector: (AppSettingsState state) => state.settings,
+          builder: (BuildContext context, AppSettings settings) {
+            return HomePage(settings: settings);
+          },
+        );
       case _logTabIndex:
         return const LogPage();
       case _historyTabIndex:

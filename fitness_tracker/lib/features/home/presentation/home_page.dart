@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/themes/app_theme.dart';
-import '../../settings/application/app_settings_cubit.dart';
+import '../../../domain/entities/app_settings.dart';
 import '../application/home_bloc.dart';
 import '../application/muscle_visual_bloc.dart';
 import 'home_page_keys.dart';
@@ -12,7 +12,12 @@ import 'models/home_view_data.dart';
 import 'widgets/home_content.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({
+    required this.settings,
+    super.key,
+  });
+
+  final AppSettings settings;
 
   static const Key pageLoadingIndicatorKey =
       HomePageKeys.pageLoadingIndicatorKey;
@@ -36,71 +41,67 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AppSettingsCubit, AppSettingsState>(
-      builder: (BuildContext context, AppSettingsState settingsState) {
-        return Scaffold(
-          body: SafeArea(
-            child: BlocBuilder<HomeBloc, HomeState>(
-              builder: (BuildContext context, HomeState homeState) {
-                if (homeState is HomeLoading || homeState is HomeInitial) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      key: HomePageKeys.pageLoadingIndicatorKey,
-                      color: AppTheme.primaryOrange,
-                    ),
-                  );
-                }
+    return Scaffold(
+      body: SafeArea(
+        child: BlocBuilder<HomeBloc, HomeState>(
+          builder: (BuildContext context, HomeState homeState) {
+            if (homeState is HomeLoading || homeState is HomeInitial) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  key: HomePageKeys.pageLoadingIndicatorKey,
+                  color: AppTheme.primaryOrange,
+                ),
+              );
+            }
 
-                if (homeState is HomeError) {
-                  return _HomeErrorState(
-                    message: homeState.message,
-                    onRetry: () {
-                      context.read<HomeBloc>().add(const LoadHomeDataEvent());
-                    },
-                  );
-                }
+            if (homeState is HomeError) {
+              return _HomeErrorState(
+                message: homeState.message,
+                onRetry: () {
+                  context.read<HomeBloc>().add(const LoadHomeDataEvent());
+                },
+              );
+            }
 
-                final HomeLoaded loadedState = homeState as HomeLoaded;
+            final HomeLoaded loadedState = homeState as HomeLoaded;
 
-                return BlocBuilder<MuscleVisualBloc, MuscleVisualState>(
-                  builder: (
-                    BuildContext context,
-                    MuscleVisualState muscleState,
-                  ) {
-                    final HomePageViewData viewData = HomeViewDataMapper.map(
-                      homeData: loadedState.data,
-                      muscleVisualState: muscleState,
-                      settings: settingsState.settings,
-                    );
+            return BlocBuilder<MuscleVisualBloc, MuscleVisualState>(
+              builder: (
+                BuildContext context,
+                MuscleVisualState muscleState,
+              ) {
+                final HomePageViewData viewData = HomeViewDataMapper.map(
+                  homeData: loadedState.data,
+                  muscleVisualState: muscleState,
+                  settings: settings,
+                );
 
-                    return HomeContent(
-                      viewData: viewData,
-                      onRefresh: () async {
-                        context.read<HomeBloc>().add(
-                              const RefreshHomeDataEvent(),
-                            );
-                        context.read<MuscleVisualBloc>().add(
-                              const RefreshVisualsEvent(),
-                            );
-                      },
-                      onPeriodChanged: (period) {
-                        context.read<MuscleVisualBloc>().add(
-                              ChangePeriodEvent(period),
-                            );
-                      },
-                      onRetryVisuals: () {
-                        context.read<MuscleVisualBloc>().add(
-                              const RefreshVisualsEvent(),
-                            );
-                      },
-                    );
+                return HomeContent(
+                  viewData: viewData,
+                  onRefresh: () async {
+                    context.read<HomeBloc>().add(
+                          const RefreshHomeDataEvent(),
+                        );
+                    context.read<MuscleVisualBloc>().add(
+                          const RefreshVisualsEvent(),
+                        );
+                  },
+                  onPeriodChanged: (period) {
+                    context.read<MuscleVisualBloc>().add(
+                          ChangePeriodEvent(period),
+                        );
+                  },
+                  onRetryVisuals: () {
+                    context.read<MuscleVisualBloc>().add(
+                          const RefreshVisualsEvent(),
+                        );
                   },
                 );
               },
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
