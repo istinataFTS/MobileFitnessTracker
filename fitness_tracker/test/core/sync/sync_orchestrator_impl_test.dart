@@ -3,6 +3,7 @@ import 'package:fitness_tracker/core/config/app_sync_policy.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/network/network_status_service.dart';
 import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
@@ -15,8 +16,11 @@ import 'package:mocktail/mocktail.dart';
 
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
+class MockNetworkStatusService extends Mock implements NetworkStatusService {}
+
 void main() {
   late MockAppSessionRepository repository;
+  late MockNetworkStatusService networkStatusService;
   late SyncOrchestrator orchestrator;
   late List<String> executionLog;
 
@@ -35,6 +39,7 @@ void main() {
 
   setUp(() {
     repository = MockAppSessionRepository();
+    networkStatusService = MockNetworkStatusService();
     executionLog = <String>[];
 
     when(() => repository.syncPolicy)
@@ -43,11 +48,15 @@ void main() {
     when(() => repository.recordSuccessfulCloudSync(any()))
         .thenAnswer((_) async => const Right(null));
 
+    when(() => networkStatusService.isNetworkAvailable())
+        .thenAnswer((_) async => true);
+
     orchestrator = SyncOrchestratorImpl(
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
-      remoteSyncAvailability: const RemoteSyncAvailability(
+      remoteSyncAvailability: RemoteSyncAvailability(
         hasRemoteConfiguration: true,
+        networkStatusService: networkStatusService,
       ),
       features: <SyncFeature>[
         SyncFeature(
@@ -78,7 +87,8 @@ void main() {
     verifyNever(() => repository.recordSuccessfulCloudSync(any()));
   });
 
-  test('runs feature sync in registration order for authenticated session', () async {
+  test('runs feature sync in registration order for authenticated session',
+      () async {
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => Right(authenticatedSession()),
     );
@@ -102,12 +112,14 @@ void main() {
     expect(executionLog, isEmpty);
   });
 
-  test('fails when one feature sync throws and does not record sync time', () async {
+  test('fails when one feature sync throws and does not record sync time',
+      () async {
     orchestrator = SyncOrchestratorImpl(
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
-      remoteSyncAvailability: const RemoteSyncAvailability(
+      remoteSyncAvailability: RemoteSyncAvailability(
         hasRemoteConfiguration: true,
+        networkStatusService: networkStatusService,
       ),
       features: <SyncFeature>[
         SyncFeature(
@@ -164,5 +176,20 @@ void main() {
     expect(result.status, SyncRunStatus.completed);
     expect(executionLog, <String>['targets', 'workout_sets']);
     verify(() => repository.recordSuccessfulCloudSync(any())).called(1);
+  });
+
+  test('skips when network is unavailable', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+    when(() => networkStatusService.isNetworkAvailable())
+        .thenAnswer((_) async => false);
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.status, SyncRunStatus.skipped);
+    expect(result.message, 'network unavailable');
+    expect(executionLog, isEmpty);
+    verifyNever(() => repository.recordSuccessfulCloudSync(any()));
   });
 }

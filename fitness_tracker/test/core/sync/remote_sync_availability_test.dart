@@ -121,7 +121,8 @@ void main() {
       expect(decision.reason, 'network unavailable');
     });
 
-    test('allows authenticated sync when prerequisites are satisfied', () async {
+    test('allows authenticated sync when prerequisites are satisfied',
+        () async {
       when(() => networkStatusService.isNetworkAvailable())
           .thenAnswer((_) async => true);
 

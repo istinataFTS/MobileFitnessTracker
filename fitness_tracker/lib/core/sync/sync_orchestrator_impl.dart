@@ -45,7 +45,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
         );
       },
       (session) async {
-        final availability = remoteSyncAvailability.evaluate(
+        final availability = await remoteSyncAvailability.evaluate(
           session: session,
           trigger: trigger,
         );
