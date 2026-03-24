@@ -69,6 +69,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.targetType} TEXT NOT NULL,
         ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
         ${DatabaseTables.targetValue} REAL NOT NULL,
@@ -91,6 +92,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.setExerciseId} TEXT NOT NULL,
         ${DatabaseTables.setReps} INTEGER NOT NULL,
         ${DatabaseTables.setWeight} REAL NOT NULL,
@@ -108,6 +110,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.exerciseName} TEXT NOT NULL UNIQUE,
         ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
         ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL,
@@ -122,6 +125,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.meals} (
         ${DatabaseTables.mealId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
         ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
         ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
@@ -140,6 +144,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.nutritionLogs} (
         ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.nutritionLogMealId} TEXT,
         ${DatabaseTables.nutritionLogMealName} TEXT NOT NULL DEFAULT '',
         ${DatabaseTables.nutritionLogGrams} REAL,
@@ -389,6 +394,10 @@ class DatabaseHelper {
       await _createAppMetadataTable(db);
     }
 
+    if (oldVersion < 15) {
+      await _migrateOwnershipColumns(db);
+    }
+
     await _createIndexes(db);
   }
 
@@ -412,6 +421,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.targetType} TEXT NOT NULL,
         ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
         ${DatabaseTables.targetValue} REAL NOT NULL,
@@ -434,6 +444,7 @@ class DatabaseHelper {
         <String, Object?>{
           DatabaseTables.targetId:
               legacyTarget[DatabaseTables.targetId] as String,
+          DatabaseTables.ownerUserId: null,
           DatabaseTables.targetType: 'muscle_sets',
           DatabaseTables.targetCategoryKey:
               legacyTarget[DatabaseTables.legacyTargetMuscleGroup] as String,
@@ -641,6 +652,53 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _migrateOwnershipColumns(Database db) async {
+    await _addNullableTextColumnIfMissing(
+      db,
+      tableName: DatabaseTables.targets,
+      columnName: DatabaseTables.ownerUserId,
+    );
+    await _addNullableTextColumnIfMissing(
+      db,
+      tableName: DatabaseTables.workoutSets,
+      columnName: DatabaseTables.ownerUserId,
+    );
+    await _addNullableTextColumnIfMissing(
+      db,
+      tableName: DatabaseTables.exercises,
+      columnName: DatabaseTables.ownerUserId,
+    );
+    await _addNullableTextColumnIfMissing(
+      db,
+      tableName: DatabaseTables.meals,
+      columnName: DatabaseTables.ownerUserId,
+    );
+    await _addNullableTextColumnIfMissing(
+      db,
+      tableName: DatabaseTables.nutritionLogs,
+      columnName: DatabaseTables.ownerUserId,
+    );
+  }
+
+  Future<void> _addNullableTextColumnIfMissing(
+    Database db, {
+    required String tableName,
+    required String columnName,
+  }) async {
+    final columns = await db.rawQuery('PRAGMA table_info($tableName)');
+    final exists = columns.any(
+      (row) => row['name'] == columnName,
+    );
+
+    if (exists) {
+      return;
+    }
+
+    await db.execute(
+      'ALTER TABLE $tableName ADD COLUMN $columnName TEXT',
+    );
+  }
+
   Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
@@ -668,6 +726,11 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_server_id
       ON ${DatabaseTables.targets}(${DatabaseTables.targetServerId})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_targets_owner_user_id
+      ON ${DatabaseTables.targets}(${DatabaseTables.ownerUserId})
     ''');
 
     await db.execute('''
@@ -701,6 +764,11 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_owner_user_id
+      ON ${DatabaseTables.workoutSets}(${DatabaseTables.ownerUserId})
+    ''');
+
+    await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_exercises_name
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
     ''');
@@ -721,6 +789,11 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_exercises_owner_user_id
+      ON ${DatabaseTables.exercises}(${DatabaseTables.ownerUserId})
+    ''');
+
+    await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_meals_name
       ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
     ''');
@@ -738,6 +811,11 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_meals_server_id
       ON ${DatabaseTables.meals}(${DatabaseTables.mealServerId})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_meals_owner_user_id
+      ON ${DatabaseTables.meals}(${DatabaseTables.ownerUserId})
     ''');
 
     await db.execute('''
@@ -768,6 +846,11 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_nutrition_logs_server_id
       ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.nutritionLogServerId})
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_nutrition_logs_owner_user_id
+      ON ${DatabaseTables.nutritionLogs}(${DatabaseTables.ownerUserId})
     ''');
 
     await db.execute('''

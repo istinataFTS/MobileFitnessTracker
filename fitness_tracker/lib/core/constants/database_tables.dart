@@ -11,6 +11,8 @@ class DatabaseTables {
   static const String pendingSyncDeletes = 'pending_sync_deletes';
   static const String appMetadata = 'app_metadata';
 
+  static const String ownerUserId = 'owner_user_id';
+
   static const String targetId = 'id';
   static const String targetType = 'type';
   static const String targetCategoryKey = 'category_key';
