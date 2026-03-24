@@ -1,5 +1,6 @@
 import '../../core/enums/sync_trigger.dart';
 import '../../domain/entities/app_session.dart';
+import '../network/network_status_service.dart';
 
 class RemoteSyncAvailabilityDecision {
   final bool isAllowed;
@@ -20,22 +21,24 @@ class RemoteSyncAvailabilityDecision {
 
 class RemoteSyncAvailability {
   final bool hasRemoteConfiguration;
+  final NetworkStatusService networkStatusService;
 
   const RemoteSyncAvailability({
     required this.hasRemoteConfiguration,
+    required this.networkStatusService,
   });
 
-  RemoteSyncAvailabilityDecision evaluate({
+  Future<RemoteSyncAvailabilityDecision> evaluate({
     required AppSession session,
     required SyncTrigger trigger,
-    bool isNetworkAvailable = true,
-  }) {
+  }) async {
     if (!hasRemoteConfiguration) {
       return const RemoteSyncAvailabilityDecision.denied(
         'remote backend not configured',
       );
     }
 
+    final isNetworkAvailable = await networkStatusService.isNetworkAvailable();
     if (!isNetworkAvailable) {
       return const RemoteSyncAvailabilityDecision.denied(
         'network unavailable',

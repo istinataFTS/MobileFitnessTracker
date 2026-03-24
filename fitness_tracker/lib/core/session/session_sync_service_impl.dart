@@ -1,4 +1,5 @@
 import '../../core/logging/app_logger.dart';
+import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../sync/sync_orchestrator.dart';
 import '../enums/sync_trigger.dart';
 import 'session_sync_service.dart';
@@ -7,10 +8,12 @@ import '../../domain/repositories/app_session_repository.dart';
 
 class SessionSyncServiceImpl implements SessionSyncService {
   final AppSessionRepository appSessionRepository;
+  final AuthRemoteDataSource authRemoteDataSource;
   final SyncOrchestrator syncOrchestrator;
 
   const SessionSyncServiceImpl({
     required this.appSessionRepository,
+    required this.authRemoteDataSource,
     required this.syncOrchestrator,
   });
 
@@ -134,5 +137,54 @@ class SessionSyncServiceImpl implements SessionSyncService {
           syncResult: syncResult,
         );
     }
+  }
+
+  @override
+  Future<SessionSyncActionResult> signOut() async {
+    final signOutResult = await authRemoteDataSource.signOut();
+
+    return await signOutResult.fold(
+      (failure) async {
+        AppLogger.warning(
+          'Remote sign-out failed: ${failure.message}',
+          category: 'session',
+        );
+
+        return SessionSyncActionResult(
+          status: SessionSyncActionStatus.failed,
+          message: 'sign-out failed: ${failure.message}',
+        );
+      },
+      (_) async {
+        final clearSessionResult = await appSessionRepository.clearSession();
+
+        return await clearSessionResult.fold(
+          (failure) async {
+            AppLogger.error(
+              'Remote sign-out succeeded but local session clear failed',
+              category: 'session',
+              error: failure,
+            );
+
+            return SessionSyncActionResult(
+              status: SessionSyncActionStatus.failed,
+              message:
+                  'sign-out succeeded remotely but local session reset failed: ${failure.message}',
+            );
+          },
+          (_) async {
+            AppLogger.info(
+              'Session signed out and local session reset completed',
+              category: 'session',
+            );
+
+            return const SessionSyncActionResult(
+              status: SessionSyncActionStatus.completed,
+              message: 'sign-out completed successfully',
+            );
+          },
+        );
+      },
+    );
   }
 }

@@ -28,4 +28,6 @@ abstract class AuthSessionService {
     required String email,
     required String password,
   });
+
+  Future<SessionSyncActionResult> signOut();
 }

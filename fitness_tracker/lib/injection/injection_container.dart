@@ -96,6 +96,7 @@ void _registerAppComposition(GetIt sl) {
   sl.registerLazySingleton<SessionSyncService>(
     () => SessionSyncServiceImpl(
       appSessionRepository: sl(),
+      authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
     ),
   );

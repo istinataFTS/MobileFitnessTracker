@@ -29,4 +29,6 @@ abstract class SessionSyncService {
   Future<SessionSyncActionResult> establishAuthenticatedSession(AppUser user);
 
   Future<SessionSyncActionResult> runManualRefresh();
+
+  Future<SessionSyncActionResult> signOut();
 }

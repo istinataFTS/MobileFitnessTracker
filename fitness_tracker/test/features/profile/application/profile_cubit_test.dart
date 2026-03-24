@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:fitness_tracker/core/auth/auth_session_service.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
@@ -13,18 +14,23 @@ class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 class MockSessionSyncService extends Mock implements SessionSyncService {}
 
+class MockAuthSessionService extends Mock implements AuthSessionService {}
+
 void main() {
   late MockAppSessionRepository repository;
   late MockSessionSyncService sessionSyncService;
+  late MockAuthSessionService authSessionService;
   late ProfileCubit cubit;
 
   setUp(() {
     repository = MockAppSessionRepository();
     sessionSyncService = MockSessionSyncService();
+    authSessionService = MockAuthSessionService();
 
     cubit = ProfileCubit(
       repository: repository,
       sessionSyncService: sessionSyncService,
+      authSessionService: authSessionService,
     );
   });
 
@@ -152,6 +158,44 @@ void main() {
     expect(cubit.state.session, const AppSession.guest());
     expect(cubit.state.errorMessage,
         'manual refresh failed: session is not authenticated');
+  });
+
+  test('signOut resets session to guest on success', () async {
+    when(() => authSessionService.signOut()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.completed,
+        message: 'sign-out completed successfully',
+      ),
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    await cubit.signOut();
+
+    verify(() => authSessionService.signOut()).called(1);
+    verify(() => repository.getCurrentSession()).called(1);
+    expect(cubit.state.session, const AppSession.guest());
+    expect(cubit.state.errorMessage, isNull);
+  });
+
+  test('signOut surfaces sign-out failure', () async {
+    when(() => authSessionService.signOut()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.failed,
+        message: 'sign-out failed: remote sign-out failed',
+      ),
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    await cubit.signOut();
+
+    expect(cubit.state.session, const AppSession.guest());
+    expect(cubit.state.errorMessage, 'sign-out failed: remote sign-out failed');
   });
 
   test('refreshProfile combines manual refresh and session load failures', () async {

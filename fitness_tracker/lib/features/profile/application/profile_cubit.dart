@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/auth/auth_session_service.dart';
 import '../../../core/session/session_sync_service.dart';
 import '../../../domain/entities/app_session.dart';
 import '../../../domain/repositories/app_session_repository.dart';
@@ -56,12 +57,15 @@ class ProfileCubit extends Cubit<ProfileState> {
   ProfileCubit({
     required AppSessionRepository repository,
     required SessionSyncService sessionSyncService,
+    required AuthSessionService authSessionService,
   })  : _repository = repository,
         _sessionSyncService = sessionSyncService,
+        _authSessionService = authSessionService,
         super(ProfileState.initial());
 
   final AppSessionRepository _repository;
   final SessionSyncService _sessionSyncService;
+  final AuthSessionService _authSessionService;
 
   Future<void> ensureLoaded() async {
     if (state.hasLoaded || state.isLoading) {
@@ -108,6 +112,46 @@ class ProfileCubit extends Cubit<ProfileState> {
             hasLoaded: true,
             errorMessage:
                 refreshResult.isSuccess ? null : refreshResult.message,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> signOut() async {
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+      ),
+    );
+
+    final signOutResult = await _authSessionService.signOut();
+    final sessionResult = await _repository.getCurrentSession();
+
+    sessionResult.fold(
+      (failure) {
+        emit(
+          state.copyWith(
+            session: const AppSession.guest(),
+            isLoading: false,
+            hasLoaded: true,
+            errorMessage: signOutResult.isSuccess
+                ? failure.message
+                : _combineMessages(
+                    primary: signOutResult.message,
+                    fallback: failure.message,
+                  ),
+          ),
+        );
+      },
+      (session) {
+        emit(
+          state.copyWith(
+            session: session,
+            isLoading: false,
+            hasLoaded: true,
+            errorMessage: signOutResult.isSuccess ? null : signOutResult.message,
           ),
         );
       },

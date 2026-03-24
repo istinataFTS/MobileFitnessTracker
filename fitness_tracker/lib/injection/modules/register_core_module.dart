@@ -2,6 +2,8 @@ import 'package:get_it/get_it.dart';
 
 import '../../config/env_config.dart';
 import '../../core/config/app_sync_policy.dart';
+import '../../core/network/default_network_status_service.dart';
+import '../../core/network/network_status_service.dart';
 import '../../core/sync/remote_sync_availability.dart';
 import '../../data/datasources/local/app_metadata_local_datasource.dart';
 import '../../data/datasources/local/database_helper.dart';
@@ -37,9 +39,14 @@ void registerCoreModule(GetIt sl) {
     () => AppSyncPolicy.productionDefault,
   );
 
+  sl.registerLazySingleton<NetworkStatusService>(
+    DefaultNetworkStatusService.new,
+  );
+
   sl.registerLazySingleton(
     () => RemoteSyncAvailability(
       hasRemoteConfiguration: EnvConfig.isSupabaseConfigured,
+      networkStatusService: sl(),
     ),
   );
 

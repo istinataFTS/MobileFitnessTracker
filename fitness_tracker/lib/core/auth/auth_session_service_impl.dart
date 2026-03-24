@@ -91,4 +91,9 @@ class AuthSessionServiceImpl implements AuthSessionService {
       },
     );
   }
+
+  @override
+  Future<SessionSyncActionResult> signOut() {
+    return sessionSyncService.signOut();
+  }
 }

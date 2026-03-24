@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/auth/auth_session_service.dart';
 import '../../../core/session/session_sync_service.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/repositories/app_session_repository.dart';
@@ -41,6 +42,7 @@ class ProfilePage extends StatelessWidget {
       create: (_) => ProfileCubit(
         repository: di.sl<AppSessionRepository>(),
         sessionSyncService: di.sl<SessionSyncService>(),
+        authSessionService: di.sl<AuthSessionService>(),
       ),
       child: const _ProfileView(),
     );
@@ -100,8 +102,7 @@ class _ProfileViewState extends State<_ProfileView> {
                   icon: const Icon(Icons.login),
                   tooltip: 'Sign in',
                   onPressed: () async {
-                    final didSignIn =
-                        await Navigator.of(context).push<bool>(
+                    final didSignIn = await Navigator.of(context).push<bool>(
                       MaterialPageRoute<bool>(
                         builder: (_) => const SignInPage(),
                       ),
@@ -115,6 +116,16 @@ class _ProfileViewState extends State<_ProfileView> {
                       await context.read<ProfileCubit>().loadProfile();
                     }
                   },
+                ),
+              if (state.session.isAuthenticated)
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Sign out',
+                  onPressed: state.isLoading
+                      ? null
+                      : () async {
+                          await context.read<ProfileCubit>().signOut();
+                        },
                 ),
             ],
           ),
