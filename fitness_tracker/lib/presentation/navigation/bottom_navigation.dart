@@ -12,11 +12,10 @@ import '../../features/library/library.dart';
 import '../../features/log/presentation/bloc/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
 import '../../features/profile/profile.dart';
-import '../../features/settings/application/app_settings_cubit.dart';
+import '../../features/settings/presentation/settings_scope.dart';
 import '../../features/targets/targets.dart';
 import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
-/// Bottom navigation wrapper for main app pages
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});
 
@@ -125,18 +124,15 @@ class _BottomNavigationState extends State<BottomNavigation> {
       return const SizedBox.shrink();
     }
 
+    final AppSettings settings = SettingsScope.of(context);
+
     switch (index) {
       case _homeTabIndex:
-        return BlocSelector<AppSettingsCubit, AppSettingsState, AppSettings>(
-          selector: (AppSettingsState state) => state.settings,
-          builder: (BuildContext context, AppSettings settings) {
-            return HomePage(settings: settings);
-          },
-        );
+        return HomePage(settings: settings);
       case _logTabIndex:
         return const LogPage();
       case _historyTabIndex:
-        return const HistoryPage();
+        return HistoryPage(settings: settings);
       case _libraryTabIndex:
         return const LibraryPage();
       case _targetsTabIndex:

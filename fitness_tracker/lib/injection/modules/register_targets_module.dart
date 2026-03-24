@@ -12,7 +12,7 @@ import '../../domain/usecases/targets/add_target.dart';
 import '../../domain/usecases/targets/delete_target.dart';
 import '../../domain/usecases/targets/get_all_targets.dart';
 import '../../domain/usecases/targets/update_target.dart';
-import '../../presentation/pages/targets/bloc/targets_bloc.dart';
+import '../../features/targets/application/targets_bloc.dart';
 
 void registerTargetsModule(GetIt sl) {
   sl.registerFactory(
