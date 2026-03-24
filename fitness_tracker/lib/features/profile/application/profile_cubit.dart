@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/session/session_sync_service.dart';
 import '../../../domain/entities/app_session.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 
@@ -54,10 +55,13 @@ class ProfileState extends Equatable {
 class ProfileCubit extends Cubit<ProfileState> {
   ProfileCubit({
     required AppSessionRepository repository,
+    required SessionSyncService sessionSyncService,
   })  : _repository = repository,
+        _sessionSyncService = sessionSyncService,
         super(ProfileState.initial());
 
   final AppSessionRepository _repository;
+  final SessionSyncService _sessionSyncService;
 
   Future<void> ensureLoaded() async {
     if (state.hasLoaded || state.isLoading) {
@@ -72,7 +76,42 @@ class ProfileCubit extends Cubit<ProfileState> {
   }
 
   Future<void> refreshProfile() async {
-    await _loadProfile();
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+      ),
+    );
+
+    final refreshResult = await _sessionSyncService.runManualRefresh();
+    final sessionResult = await _repository.getCurrentSession();
+
+    sessionResult.fold(
+      (failure) {
+        emit(
+          state.copyWith(
+            session: const AppSession.guest(),
+            isLoading: false,
+            hasLoaded: true,
+            errorMessage: _combineMessages(
+              primary: refreshResult.isSuccess ? null : refreshResult.message,
+              fallback: failure.message,
+            ),
+          ),
+        );
+      },
+      (session) {
+        emit(
+          state.copyWith(
+            session: session,
+            isLoading: false,
+            hasLoaded: true,
+            errorMessage:
+                refreshResult.isSuccess ? null : refreshResult.message,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadProfile() async {
@@ -119,5 +158,16 @@ class ProfileCubit extends Cubit<ProfileState> {
         clearErrorMessage: true,
       ),
     );
+  }
+
+  String _combineMessages({
+    required String? primary,
+    required String fallback,
+  }) {
+    if (primary == null || primary.isEmpty) {
+      return fallback;
+    }
+
+    return '$primary | $fallback';
   }
 }

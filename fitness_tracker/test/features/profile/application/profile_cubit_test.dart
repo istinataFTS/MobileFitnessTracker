@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
@@ -10,13 +11,21 @@ import 'package:mocktail/mocktail.dart';
 
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
+class MockSessionSyncService extends Mock implements SessionSyncService {}
+
 void main() {
   late MockAppSessionRepository repository;
+  late MockSessionSyncService sessionSyncService;
   late ProfileCubit cubit;
 
   setUp(() {
     repository = MockAppSessionRepository();
-    cubit = ProfileCubit(repository: repository);
+    sessionSyncService = MockSessionSyncService();
+
+    cubit = ProfileCubit(
+      repository: repository,
+      sessionSyncService: sessionSyncService,
+    );
   });
 
   tearDown(() async {
@@ -91,16 +100,79 @@ void main() {
     expect(cubit.state.errorMessage, 'session unavailable');
   });
 
-  test('refreshProfile reloads current session', () async {
+  test('refreshProfile runs manual sync and reloads session on success', () async {
+    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.completed,
+        message: 'manual refresh completed successfully',
+      ),
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: const AppUser(
+            id: 'user-1',
+            email: 'marin@test.com',
+            displayName: 'Marin',
+          ),
+          requiresInitialCloudMigration: false,
+          lastCloudSyncAt: DateTime(2026, 3, 24, 10, 15),
+        ),
+      ),
+    );
+
+    await cubit.refreshProfile();
+
+    verify(() => sessionSyncService.runManualRefresh()).called(1);
+    verify(() => repository.getCurrentSession()).called(1);
+    expect(cubit.state.isLoading, isFalse);
+    expect(cubit.state.hasLoaded, isTrue);
+    expect(cubit.state.errorMessage, isNull);
+    expect(cubit.state.session.isAuthenticated, isTrue);
+  });
+
+  test('refreshProfile keeps loaded session and surfaces manual refresh failure', () async {
+    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.failed,
+        message: 'manual refresh failed: session is not authenticated',
+      ),
+    );
+
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => const Right(AppSession.guest()),
     );
 
     await cubit.refreshProfile();
 
+    verify(() => sessionSyncService.runManualRefresh()).called(1);
     verify(() => repository.getCurrentSession()).called(1);
-    expect(cubit.state.hasLoaded, isTrue);
-    expect(cubit.state.isLoading, isFalse);
+    expect(cubit.state.session, const AppSession.guest());
+    expect(cubit.state.errorMessage,
+        'manual refresh failed: session is not authenticated');
+  });
+
+  test('refreshProfile combines manual refresh and session load failures', () async {
+    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.failed,
+        message: 'manual refresh failed: sync orchestration failed',
+      ),
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Left(CacheFailure(message: 'session unavailable')),
+    );
+
+    await cubit.refreshProfile();
+
+    expect(cubit.state.session, const AppSession.guest());
+    expect(
+      cubit.state.errorMessage,
+      'manual refresh failed: sync orchestration failed | session unavailable',
+    );
   });
 
   test('clearError removes current error message', () async {

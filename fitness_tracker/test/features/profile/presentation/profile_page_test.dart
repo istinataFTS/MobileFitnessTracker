@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/config/app_sync_policy.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
@@ -13,11 +14,15 @@ import 'package:mocktail/mocktail.dart';
 
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
+class MockSessionSyncService extends Mock implements SessionSyncService {}
+
 void main() {
   late MockAppSessionRepository repository;
+  late MockSessionSyncService sessionSyncService;
 
   setUp(() async {
     repository = MockAppSessionRepository();
+    sessionSyncService = MockSessionSyncService();
 
     if (!di.sl.isRegistered<AppSessionRepository>()) {
       di.sl.registerLazySingleton<AppSessionRepository>(() => repository);
@@ -26,13 +31,31 @@ void main() {
       di.sl.registerLazySingleton<AppSessionRepository>(() => repository);
     }
 
+    if (!di.sl.isRegistered<SessionSyncService>()) {
+      di.sl.registerLazySingleton<SessionSyncService>(() => sessionSyncService);
+    } else {
+      await di.sl.unregister<SessionSyncService>();
+      di.sl.registerLazySingleton<SessionSyncService>(() => sessionSyncService);
+    }
+
     when(() => repository.syncPolicy)
         .thenReturn(AppSyncPolicy.productionDefault);
+
+    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.completed,
+        message: 'manual refresh completed successfully',
+      ),
+    );
   });
 
   tearDown(() async {
     if (di.sl.isRegistered<AppSessionRepository>()) {
       await di.sl.unregister<AppSessionRepository>();
+    }
+
+    if (di.sl.isRegistered<SessionSyncService>()) {
+      await di.sl.unregister<SessionSyncService>();
     }
   });
 
@@ -188,10 +211,10 @@ void main() {
 
     expect(find.byKey(ProfilePage.titleKey), findsOneWidget);
     expect(find.text('Guest'), findsOneWidget);
-    expect(find.textContaining('Failed to load profile session.'), findsOneWidget);
+    expect(find.text('session unavailable'), findsOneWidget);
   });
 
-  testWidgets('pull to refresh reloads session from refresh list', (
+  testWidgets('pull to refresh runs manual refresh and reloads session', (
     WidgetTester tester,
   ) async {
     when(() => repository.getCurrentSession()).thenAnswer(
@@ -208,6 +231,37 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
+    verify(() => sessionSyncService.runManualRefresh()).called(1);
     verify(() => repository.getCurrentSession()).called(greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('manual refresh failure is shown in snackbar', (
+    WidgetTester tester,
+  ) async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
+      (_) async => const SessionSyncActionResult(
+        status: SessionSyncActionStatus.failed,
+        message: 'manual refresh failed: session is not authenticated',
+      ),
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(ProfilePage.refreshListKey),
+      const Offset(0, 300),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(
+      find.text('manual refresh failed: session is not authenticated'),
+      findsOneWidget,
+    );
   });
 }

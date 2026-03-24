@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/session/session_sync_service.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../../features/history/history.dart';
@@ -38,6 +39,7 @@ class ProfilePage extends StatelessWidget {
     return BlocProvider<ProfileCubit>(
       create: (_) => ProfileCubit(
         repository: di.sl<AppSessionRepository>(),
+        sessionSyncService: di.sl<SessionSyncService>(),
       ),
       child: const _ProfileView(),
     );
@@ -77,9 +79,7 @@ class _ProfileViewState extends State<_ProfileView> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Failed to load profile session. Showing guest shell. $errorMessage',
-            ),
+            content: Text(errorMessage),
           ),
         );
 
