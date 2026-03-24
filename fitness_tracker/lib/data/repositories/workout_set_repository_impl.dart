@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/workout_set.dart';
 import '../../domain/repositories/workout_set_repository.dart';
 import '../datasources/local/workout_set_local_datasource.dart';
@@ -13,6 +14,13 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
   final WorkoutSetLocalDataSource localDataSource;
   final WorkoutSetRemoteDataSource remoteDataSource;
   final WorkoutSetSyncCoordinator syncCoordinator;
+
+  static final LocalRemoteMerge<WorkoutSet> _merge =
+      LocalRemoteMerge<WorkoutSet>(
+    getId: (set) => set.id,
+    getUpdatedAt: (set) => set.updatedAt,
+    getSyncMetadata: (set) => set.syncMetadata,
+  );
 
   const WorkoutSetRepositoryImpl({
     required this.localDataSource,
@@ -48,7 +56,7 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
         case DataSourcePreference.localThenRemote:
           final local = await localDataSource.getSetById(id);
           if (local != null) {
-            return local;
+            return local.syncMetadata.isPendingDelete ? null : local;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -57,25 +65,38 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
 
           final remote = await remoteDataSource.getSetById(id);
           if (remote != null) {
-            await localDataSource.addSet(remote);
+            await localDataSource.upsertSet(remote);
           }
           return remote;
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remote = await remoteDataSource.getSetById(id);
-            if (remote != null) {
-              final existingLocal = await localDataSource.getSetById(id);
-              if (existingLocal == null) {
-                await localDataSource.addSet(remote);
-              } else {
-                await localDataSource.updateSet(remote);
-              }
-              return remote;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getSetById(id);
           }
 
-          return localDataSource.getSetById(id);
+          final local = await localDataSource.getSetById(id);
+          final remote = await remoteDataSource.getSetById(id);
+
+          if (remote == null) {
+            if (local == null || local.syncMetadata.isPendingDelete) {
+              return null;
+            }
+            return local;
+          }
+
+          if (local == null) {
+            await localDataSource.upsertSet(remote);
+            return remote;
+          }
+
+          final merged = _merge.chooseWinner(local: local, remote: remote);
+          await localDataSource.upsertSet(merged);
+
+          if (merged.syncMetadata.isPendingDelete) {
+            return null;
+          }
+
+          return merged;
       }
     });
   }
@@ -161,7 +182,6 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
         if (!remoteDataSource.isConfigured) {
           return const <WorkoutSet>[];
         }
-
         return remoteDataSource.getAllSets();
 
       case DataSourcePreference.localThenRemote:
@@ -172,20 +192,29 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
 
         final remote = await remoteDataSource.getAllSets();
         if (remote.isNotEmpty) {
-          await localDataSource.replaceAll(remote);
+          await localDataSource.mergeRemoteSets(remote);
         }
-        return remote;
+        return await localDataSource.getAllSets();
 
       case DataSourcePreference.remoteThenLocal:
-        if (remoteDataSource.isConfigured) {
-          final remote = await remoteDataSource.getAllSets();
-          if (remote.isNotEmpty) {
-            await localDataSource.replaceAll(remote);
-            return remote;
-          }
+        if (!remoteDataSource.isConfigured) {
+          return localDataSource.getAllSets();
         }
 
-        return localDataSource.getAllSets();
+        final local = await localDataSource.getAllSets();
+        final remote = await remoteDataSource.getAllSets();
+
+        if (remote.isEmpty) {
+          return local;
+        }
+
+        final merged = _merge.mergeLists(
+          localItems: local,
+          remoteItems: remote,
+        );
+
+        await localDataSource.mergeRemoteSets(merged);
+        return await localDataSource.getAllSets();
     }
   }
 }

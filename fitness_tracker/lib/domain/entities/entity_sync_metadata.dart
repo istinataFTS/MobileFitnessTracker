@@ -17,8 +17,12 @@ class EntitySyncMetadata extends Equatable {
 
   bool get isSynced => status == SyncStatus.synced;
 
+  bool get isPendingDelete => status == SyncStatus.pendingDelete;
+
   bool get hasPendingSync =>
-      status == SyncStatus.pendingUpload || status == SyncStatus.pendingUpdate;
+      status == SyncStatus.pendingUpload ||
+      status == SyncStatus.pendingUpdate ||
+      status == SyncStatus.pendingDelete;
 
   EntitySyncMetadata copyWith({
     String? serverId,

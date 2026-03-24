@@ -18,6 +18,12 @@ abstract class WorkoutSetLocalDataSource {
 
   Future<void> updateSet(WorkoutSet set);
 
+  Future<void> upsertSet(WorkoutSet set);
+
+  Future<void> replaceAll(List<WorkoutSet> sets);
+
+  Future<void> mergeRemoteSets(List<WorkoutSet> remoteSets);
+
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -28,7 +34,7 @@ abstract class WorkoutSetLocalDataSource {
 
   Future<void> markAsPendingUpdate(String localId, {String? errorMessage});
 
-  Future<void> replaceAll(List<WorkoutSet> sets);
+  Future<void> markAsPendingDelete(String localId, {String? errorMessage});
 
   Future<void> deleteSet(String id);
 

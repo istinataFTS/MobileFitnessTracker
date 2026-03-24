@@ -111,7 +111,9 @@ class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
       return;
     }
 
-    if (_shouldQueueRemoteDelete(existingLocal)) {
+    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
+
+    if (shouldQueueDelete) {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(existingLocal.id),
@@ -121,9 +123,11 @@ class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
           createdAt: DateTime.now(),
         ),
       );
-    }
 
-    await localDataSource.deleteSet(id);
+      await localDataSource.markAsPendingDelete(existingLocal.id);
+    } else {
+      await localDataSource.deleteSet(id);
+    }
 
     if (!isRemoteSyncEnabled) {
       return;
@@ -141,6 +145,10 @@ class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
     final pendingSets = await localDataSource.getPendingSyncSets();
 
     for (final set in pendingSets) {
+      if (set.syncMetadata.status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
       final remoteSet = await remoteDataSource.upsertSet(set);
       await localDataSource.markAsSynced(
         localId: set.id,
@@ -163,6 +171,7 @@ class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
           serverId: operation.serverEntityId,
         );
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await localDataSource.deleteSet(operation.localEntityId);
       } catch (error) {
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,
