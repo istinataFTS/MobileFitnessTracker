@@ -116,7 +116,9 @@ class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
       return;
     }
 
-    if (_shouldQueueRemoteDelete(existingLocal)) {
+    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
+
+    if (shouldQueueDelete) {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(existingLocal.id),
@@ -126,9 +128,11 @@ class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
           createdAt: DateTime.now(),
         ),
       );
-    }
 
-    await localDataSource.deleteLog(id);
+      await localDataSource.markAsPendingDelete(existingLocal.id);
+    } else {
+      await localDataSource.deleteLog(id);
+    }
 
     if (!isRemoteSyncEnabled) {
       return;
@@ -146,6 +150,10 @@ class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
     final pendingLogs = await localDataSource.getPendingSyncLogs();
 
     for (final log in pendingLogs) {
+      if (log.syncMetadata.status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
       final remoteLog = await remoteDataSource.upsertLog(log);
       await localDataSource.markAsSynced(
         localId: log.id,
@@ -168,6 +176,7 @@ class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
           serverId: operation.serverEntityId,
         );
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await localDataSource.deleteLog(operation.localEntityId);
       } catch (error) {
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,

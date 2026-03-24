@@ -7,6 +7,7 @@ import 'package:fitness_tracker/data/models/nutrition_log_model.dart';
 import 'package:fitness_tracker/data/repositories/nutrition_log_repository_impl.dart';
 import 'package:fitness_tracker/data/sync/nutrition_log_sync_coordinator.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
+import 'package:fitness_tracker/domain/repositories/nutrition_log_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -29,9 +30,10 @@ void main() {
 
   NutritionLogModel buildLogModel({
     required String id,
-    required DateTime date,
+    required DateTime loggedAt,
     String? mealId,
     String mealName = 'Chicken Bowl',
+    double? gramsConsumed = 100,
     double protein = 25,
     double carbs = 30,
     double fat = 10,
@@ -41,22 +43,23 @@ void main() {
       id: id,
       mealId: mealId,
       mealName: mealName,
-      servingSizeGrams: 100,
+      gramsConsumed: gramsConsumed,
       proteinGrams: protein,
       carbsGrams: carbs,
       fatGrams: fat,
       calories: calories,
-      date: date,
-      createdAt: date,
-      loggedAt: date,
+      loggedAt: loggedAt,
+      createdAt: loggedAt,
+      updatedAt: loggedAt,
     );
   }
 
   NutritionLog buildLogEntity({
     required String id,
-    required DateTime date,
+    required DateTime loggedAt,
     String? mealId,
     String mealName = 'Chicken Bowl',
+    double? gramsConsumed = 100,
     double protein = 25,
     double carbs = 30,
     double fat = 10,
@@ -66,14 +69,14 @@ void main() {
       id: id,
       mealId: mealId,
       mealName: mealName,
-      servingSizeGrams: 100,
+      gramsConsumed: gramsConsumed,
       proteinGrams: protein,
       carbsGrams: carbs,
       fatGrams: fat,
       calories: calories,
-      date: date,
-      createdAt: date,
-      loggedAt: date,
+      loggedAt: loggedAt,
+      createdAt: loggedAt,
+      updatedAt: loggedAt,
     );
   }
 
@@ -95,7 +98,7 @@ void main() {
   group('NutritionLogRepositoryImpl.getAllLogs', () {
     test('returns local logs for localOnly without touching remote', () async {
       final List<NutritionLogModel> localLogs = <NutritionLogModel>[
-        buildLogModel(id: '1', date: targetDate),
+        buildLogModel(id: '1', loggedAt: targetDate),
       ];
 
       when(() => localDataSource.getAllLogs()).thenAnswer(
@@ -113,8 +116,15 @@ void main() {
 
     test('hydrates local cache from remote for remoteThenLocal', () async {
       final List<NutritionLog> remoteLogs = <NutritionLog>[
-        buildLogEntity(id: '1', date: targetDate),
-        buildLogEntity(id: '2', date: targetDate.add(const Duration(hours: 2))),
+        buildLogEntity(id: '1', loggedAt: targetDate),
+        buildLogEntity(
+          id: '2',
+          loggedAt: targetDate.add(const Duration(hours: 2)),
+          protein: 35,
+          carbs: 20,
+          fat: 15,
+          calories: 355,
+        ),
       ];
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
@@ -140,7 +150,7 @@ void main() {
   group('NutritionLogRepositoryImpl.getLogById', () {
     test('falls back to local when remoteThenLocal returns null', () async {
       final NutritionLogModel localLog =
-          buildLogModel(id: 'log-1', date: targetDate);
+          buildLogModel(id: 'log-1', loggedAt: targetDate);
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
       when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
@@ -165,12 +175,12 @@ void main() {
     test('updates existing local log when remoteThenLocal returns remote value', () async {
       final NutritionLog remoteLog = buildLogEntity(
         id: 'log-1',
-        date: targetDate,
+        loggedAt: targetDate,
         calories: 420,
       );
       final NutritionLogModel existingLocal = buildLogModel(
         id: 'log-1',
-        date: targetDate,
+        loggedAt: targetDate,
         calories: 310,
       );
 
@@ -233,7 +243,7 @@ void main() {
       final List<NutritionLog> remoteLogs = <NutritionLog>[
         buildLogEntity(
           id: '1',
-          date: targetDate,
+          loggedAt: targetDate,
           protein: 25,
           carbs: 40,
           fat: 10,
@@ -241,7 +251,7 @@ void main() {
         ),
         buildLogEntity(
           id: '2',
-          date: targetDate.add(const Duration(hours: 3)),
+          loggedAt: targetDate.add(const Duration(hours: 3)),
           protein: 35,
           carbs: 20,
           fat: 15,
@@ -280,8 +290,11 @@ void main() {
   group('NutritionLogRepositoryImpl deletes and writes', () {
     test('deleteLogsByDate delegates each matching log deletion to sync coordinator', () async {
       final List<NutritionLogModel> dateLogs = <NutritionLogModel>[
-        buildLogModel(id: 'log-1', date: targetDate),
-        buildLogModel(id: 'log-2', date: targetDate.add(const Duration(hours: 2))),
+        buildLogModel(id: 'log-1', loggedAt: targetDate),
+        buildLogModel(
+          id: 'log-2',
+          loggedAt: targetDate.add(const Duration(hours: 2)),
+        ),
       ];
 
       when(() => localDataSource.getLogsByDate(targetDate)).thenAnswer(
@@ -301,7 +314,7 @@ void main() {
     });
 
     test('addLog delegates to sync coordinator', () async {
-      final NutritionLog log = buildLogEntity(id: 'log-1', date: targetDate);
+      final NutritionLog log = buildLogEntity(id: 'log-1', loggedAt: targetDate);
 
       when(() => syncCoordinator.persistAddedLog(log)).thenAnswer(
         (_) async {},
@@ -316,7 +329,7 @@ void main() {
     test('updateLog delegates to sync coordinator', () async {
       final NutritionLog log = buildLogEntity(
         id: 'log-1',
-        date: targetDate,
+        loggedAt: targetDate,
         calories: 420,
       );
 

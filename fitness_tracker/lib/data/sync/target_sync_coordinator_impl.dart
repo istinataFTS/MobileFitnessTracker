@@ -112,7 +112,9 @@ class TargetSyncCoordinatorImpl implements TargetSyncCoordinator {
       return;
     }
 
-    if (_shouldQueueRemoteDelete(existingLocal)) {
+    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
+
+    if (shouldQueueDelete) {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(existingLocal.id),
@@ -122,9 +124,11 @@ class TargetSyncCoordinatorImpl implements TargetSyncCoordinator {
           createdAt: DateTime.now(),
         ),
       );
-    }
 
-    await localDataSource.deleteTarget(id);
+      await localDataSource.markAsPendingDelete(existingLocal.id);
+    } else {
+      await localDataSource.deleteTarget(id);
+    }
 
     if (!isRemoteSyncEnabled) {
       return;
@@ -142,6 +146,10 @@ class TargetSyncCoordinatorImpl implements TargetSyncCoordinator {
     final pendingTargets = await localDataSource.getPendingSyncTargets();
 
     for (final target in pendingTargets) {
+      if (target.syncMetadata.status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
       final remoteTarget = await remoteDataSource.upsertTarget(target);
       await localDataSource.markAsSynced(
         localId: target.id,
@@ -164,6 +172,7 @@ class TargetSyncCoordinatorImpl implements TargetSyncCoordinator {
           serverId: operation.serverEntityId,
         );
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await localDataSource.deleteTarget(operation.localEntityId);
       } catch (error) {
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,

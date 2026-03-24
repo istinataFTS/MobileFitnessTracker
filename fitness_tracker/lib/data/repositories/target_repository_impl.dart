@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/target.dart';
 import '../../domain/repositories/target_repository.dart';
 import '../datasources/local/target_local_datasource.dart';
@@ -14,6 +15,12 @@ class TargetRepositoryImpl implements TargetRepository {
   final TargetLocalDataSource localDataSource;
   final TargetRemoteDataSource remoteDataSource;
   final TargetSyncCoordinator syncCoordinator;
+
+  static final LocalRemoteMerge<Target> _merge = LocalRemoteMerge<Target>(
+    getId: (target) => target.id,
+    getUpdatedAt: (target) => target.updatedAt,
+    getSyncMetadata: (target) => target.syncMetadata,
+  );
 
   const TargetRepositoryImpl({
     required this.localDataSource,
@@ -44,22 +51,32 @@ class TargetRepositoryImpl implements TargetRepository {
 
           final remoteTargets = await remoteDataSource.getAllTargets();
           if (remoteTargets.isNotEmpty) {
-            await localDataSource.replaceAllTargets(
+            await localDataSource.mergeRemoteTargets(
               remoteTargets.map(TargetModel.fromEntity).toList(),
             );
           }
-          return remoteTargets;
+          return localDataSource.getAllTargets();
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteTargets = await remoteDataSource.getAllTargets();
-            if (remoteTargets.isNotEmpty) {
-              await localDataSource.replaceAllTargets(
-                remoteTargets.map(TargetModel.fromEntity).toList(),
-              );
-              return remoteTargets;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getAllTargets();
           }
+
+          final localTargets = await localDataSource.getAllTargets();
+          final remoteTargets = await remoteDataSource.getAllTargets();
+
+          if (remoteTargets.isEmpty) {
+            return localTargets;
+          }
+
+          final merged = _merge.mergeLists(
+            localItems: localTargets,
+            remoteItems: remoteTargets,
+          );
+
+          await localDataSource.mergeRemoteTargets(
+            merged.map(TargetModel.fromEntity).toList(),
+          );
 
           return localDataSource.getAllTargets();
       }
@@ -85,7 +102,7 @@ class TargetRepositoryImpl implements TargetRepository {
         case DataSourcePreference.localThenRemote:
           final localTarget = await localDataSource.getTargetById(id);
           if (localTarget != null) {
-            return localTarget;
+            return localTarget.syncMetadata.isPendingDelete ? null : localTarget;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -94,31 +111,41 @@ class TargetRepositoryImpl implements TargetRepository {
 
           final remoteTarget = await remoteDataSource.getTargetById(id);
           if (remoteTarget != null) {
-            await localDataSource.insertTarget(
+            await localDataSource.upsertTarget(
               TargetModel.fromEntity(remoteTarget),
             );
           }
           return remoteTarget;
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteTarget = await remoteDataSource.getTargetById(id);
-            if (remoteTarget != null) {
-              final existingLocal = await localDataSource.getTargetById(id);
-              if (existingLocal == null) {
-                await localDataSource.insertTarget(
-                  TargetModel.fromEntity(remoteTarget),
-                );
-              } else {
-                await localDataSource.updateTarget(
-                  TargetModel.fromEntity(remoteTarget),
-                );
-              }
-              return remoteTarget;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getTargetById(id);
           }
 
-          return localDataSource.getTargetById(id);
+          final localTarget = await localDataSource.getTargetById(id);
+          final remoteTarget = await remoteDataSource.getTargetById(id);
+
+          if (remoteTarget == null) {
+            if (localTarget == null || localTarget.syncMetadata.isPendingDelete) {
+              return null;
+            }
+            return localTarget;
+          }
+
+          if (localTarget == null) {
+            await localDataSource.upsertTarget(
+              TargetModel.fromEntity(remoteTarget),
+            );
+            return remoteTarget;
+          }
+
+          final merged = _merge.chooseWinner(
+            local: localTarget,
+            remote: remoteTarget,
+          );
+
+          await localDataSource.upsertTarget(TargetModel.fromEntity(merged));
+          return merged.syncMetadata.isPendingDelete ? null : merged;
       }
     });
   }
@@ -131,80 +158,31 @@ class TargetRepositoryImpl implements TargetRepository {
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) {
     return RepositoryGuard.run(() async {
-      switch (sourcePreference) {
-        case DataSourcePreference.localOnly:
-          return localDataSource.getTargetByTypeAndCategory(
-            type,
-            categoryKey,
-            period,
-          );
-
-        case DataSourcePreference.remoteOnly:
-          if (!remoteDataSource.isConfigured) {
-            return null;
-          }
-          return remoteDataSource.getTargetByTypeAndCategory(
-            type,
-            categoryKey,
-            period,
-          );
-
-        case DataSourcePreference.localThenRemote:
-          final localTarget = await localDataSource.getTargetByTypeAndCategory(
-            type,
-            categoryKey,
-            period,
-          );
-          if (localTarget != null) {
-            return localTarget;
-          }
-
-          if (!remoteDataSource.isConfigured) {
-            return null;
-          }
-
-          final remoteTarget = await remoteDataSource.getTargetByTypeAndCategory(
-            type,
-            categoryKey,
-            period,
-          );
-          if (remoteTarget != null) {
-            await localDataSource.insertTarget(
-              TargetModel.fromEntity(remoteTarget),
-            );
-          }
-          return remoteTarget;
-
-        case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteTarget = await remoteDataSource.getTargetByTypeAndCategory(
-              type,
-              categoryKey,
-              period,
-            );
-            if (remoteTarget != null) {
-              final existingLocal = await localDataSource.getTargetById(
-                remoteTarget.id,
-              );
-              if (existingLocal == null) {
-                await localDataSource.insertTarget(
-                  TargetModel.fromEntity(remoteTarget),
-                );
-              } else {
-                await localDataSource.updateTarget(
-                  TargetModel.fromEntity(remoteTarget),
-                );
-              }
-              return remoteTarget;
-            }
-          }
-
-          return localDataSource.getTargetByTypeAndCategory(
-            type,
-            categoryKey,
-            period,
-          );
+      if (sourcePreference == DataSourcePreference.localOnly ||
+          !remoteDataSource.isConfigured) {
+        return localDataSource.getTargetByTypeAndCategory(
+          type,
+          categoryKey,
+          period,
+        );
       }
+
+      final targets = await getAllTargets(sourcePreference: sourcePreference);
+      return targets.fold(
+        (_) => null,
+        (items) {
+          try {
+            return items.firstWhere(
+              (target) =>
+                  target.type == type &&
+                  target.categoryKey == categoryKey &&
+                  target.period == period,
+            );
+          } catch (_) {
+            return null;
+          }
+        },
+      );
     });
   }
 

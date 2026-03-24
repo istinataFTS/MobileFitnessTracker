@@ -116,7 +116,9 @@ class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
       return;
     }
 
-    if (_shouldQueueRemoteDelete(existingLocal)) {
+    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
+
+    if (shouldQueueDelete) {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(existingLocal.id),
@@ -126,9 +128,11 @@ class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
           createdAt: DateTime.now(),
         ),
       );
-    }
 
-    await localDataSource.deleteExercise(id);
+      await localDataSource.markAsPendingDelete(existingLocal.id);
+    } else {
+      await localDataSource.deleteExercise(id);
+    }
 
     if (!isRemoteSyncEnabled) {
       return;
@@ -146,6 +150,10 @@ class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
     final pendingExercises = await localDataSource.getPendingSyncExercises();
 
     for (final exercise in pendingExercises) {
+      if (exercise.syncMetadata.status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
       final remoteExercise = await remoteDataSource.upsertExercise(exercise);
       await localDataSource.markAsSynced(
         localId: exercise.id,
@@ -168,6 +176,7 @@ class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
           serverId: operation.serverEntityId,
         );
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await localDataSource.deleteExercise(operation.localEntityId);
       } catch (error) {
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,

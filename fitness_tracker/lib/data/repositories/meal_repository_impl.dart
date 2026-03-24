@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/meal.dart';
 import '../../domain/repositories/meal_repository.dart';
 import '../datasources/local/meal_local_datasource.dart';
@@ -14,6 +15,12 @@ class MealRepositoryImpl implements MealRepository {
   final MealLocalDataSource localDataSource;
   final MealRemoteDataSource remoteDataSource;
   final MealSyncCoordinator syncCoordinator;
+
+  static final LocalRemoteMerge<Meal> _merge = LocalRemoteMerge<Meal>(
+    getId: (meal) => meal.id,
+    getUpdatedAt: (meal) => meal.updatedAt,
+    getSyncMetadata: (meal) => meal.syncMetadata,
+  );
 
   const MealRepositoryImpl({
     required this.localDataSource,
@@ -44,22 +51,33 @@ class MealRepositoryImpl implements MealRepository {
 
           final remoteMeals = await remoteDataSource.getAllMeals();
           if (remoteMeals.isNotEmpty) {
-            await localDataSource.replaceAllMeals(
+            await localDataSource.mergeRemoteMeals(
               remoteMeals.map(MealModel.fromEntity).toList(),
             );
           }
-          return remoteMeals;
+          return localDataSource.getAllMeals();
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteMeals = await remoteDataSource.getAllMeals();
-            if (remoteMeals.isNotEmpty) {
-              await localDataSource.replaceAllMeals(
-                remoteMeals.map(MealModel.fromEntity).toList(),
-              );
-              return remoteMeals;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getAllMeals();
           }
+
+          final localMeals = await localDataSource.getAllMeals();
+          final remoteMeals = await remoteDataSource.getAllMeals();
+
+          if (remoteMeals.isEmpty) {
+            return localMeals;
+          }
+
+          final merged = _merge.mergeLists(
+            localItems: localMeals,
+            remoteItems: remoteMeals,
+          );
+
+          await localDataSource.mergeRemoteMeals(
+            merged.map(MealModel.fromEntity).toList(),
+          );
+
           return localDataSource.getAllMeals();
       }
     });
@@ -84,7 +102,7 @@ class MealRepositoryImpl implements MealRepository {
         case DataSourcePreference.localThenRemote:
           final localMeal = await localDataSource.getMealById(id);
           if (localMeal != null) {
-            return localMeal;
+            return localMeal.syncMetadata.isPendingDelete ? null : localMeal;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -93,28 +111,37 @@ class MealRepositoryImpl implements MealRepository {
 
           final remoteMeal = await remoteDataSource.getMealById(id);
           if (remoteMeal != null) {
-            await localDataSource.insertMeal(MealModel.fromEntity(remoteMeal));
+            await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
           }
           return remoteMeal;
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteMeal = await remoteDataSource.getMealById(id);
-            if (remoteMeal != null) {
-              final existingLocal = await localDataSource.getMealById(id);
-              if (existingLocal == null) {
-                await localDataSource.insertMeal(
-                  MealModel.fromEntity(remoteMeal),
-                );
-              } else {
-                await localDataSource.updateMeal(
-                  MealModel.fromEntity(remoteMeal),
-                );
-              }
-              return remoteMeal;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getMealById(id);
           }
-          return localDataSource.getMealById(id);
+
+          final localMeal = await localDataSource.getMealById(id);
+          final remoteMeal = await remoteDataSource.getMealById(id);
+
+          if (remoteMeal == null) {
+            if (localMeal == null || localMeal.syncMetadata.isPendingDelete) {
+              return null;
+            }
+            return localMeal;
+          }
+
+          if (localMeal == null) {
+            await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
+            return remoteMeal;
+          }
+
+          final merged = _merge.chooseWinner(
+            local: localMeal,
+            remote: remoteMeal,
+          );
+
+          await localDataSource.upsertMeal(MealModel.fromEntity(merged));
+          return merged.syncMetadata.isPendingDelete ? null : merged;
       }
     });
   }
@@ -138,7 +165,7 @@ class MealRepositoryImpl implements MealRepository {
         case DataSourcePreference.localThenRemote:
           final localMeal = await localDataSource.getMealByName(name);
           if (localMeal != null) {
-            return localMeal;
+            return localMeal.syncMetadata.isPendingDelete ? null : localMeal;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -147,30 +174,37 @@ class MealRepositoryImpl implements MealRepository {
 
           final remoteMeal = await remoteDataSource.getMealByName(name);
           if (remoteMeal != null) {
-            await localDataSource.insertMeal(MealModel.fromEntity(remoteMeal));
+            await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
           }
           return remoteMeal;
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteMeal = await remoteDataSource.getMealByName(name);
-            if (remoteMeal != null) {
-              final existingLocal = await localDataSource.getMealById(
-                remoteMeal.id,
-              );
-              if (existingLocal == null) {
-                await localDataSource.insertMeal(
-                  MealModel.fromEntity(remoteMeal),
-                );
-              } else {
-                await localDataSource.updateMeal(
-                  MealModel.fromEntity(remoteMeal),
-                );
-              }
-              return remoteMeal;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getMealByName(name);
           }
-          return localDataSource.getMealByName(name);
+
+          final localMeal = await localDataSource.getMealByName(name);
+          final remoteMeal = await remoteDataSource.getMealByName(name);
+
+          if (remoteMeal == null) {
+            if (localMeal == null || localMeal.syncMetadata.isPendingDelete) {
+              return null;
+            }
+            return localMeal;
+          }
+
+          if (localMeal == null) {
+            await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
+            return remoteMeal;
+          }
+
+          final merged = _merge.chooseWinner(
+            local: localMeal,
+            remote: remoteMeal,
+          );
+
+          await localDataSource.upsertMeal(MealModel.fromEntity(merged));
+          return merged.syncMetadata.isPendingDelete ? null : merged;
       }
     });
   }
@@ -181,32 +215,20 @@ class MealRepositoryImpl implements MealRepository {
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) {
     return RepositoryGuard.run(() async {
-      switch (sourcePreference) {
-        case DataSourcePreference.localOnly:
-          return localDataSource.searchMealsByName(query);
-
-        case DataSourcePreference.remoteOnly:
-          if (!remoteDataSource.isConfigured) {
-            return const <Meal>[];
-          }
-          return remoteDataSource.searchMealsByName(query);
-
-        case DataSourcePreference.localThenRemote:
-          final localMeals = await localDataSource.searchMealsByName(query);
-          if (localMeals.isNotEmpty || !remoteDataSource.isConfigured) {
-            return localMeals;
-          }
-          return remoteDataSource.searchMealsByName(query);
-
-        case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteMeals = await remoteDataSource.searchMealsByName(query);
-            if (remoteMeals.isNotEmpty) {
-              return remoteMeals;
-            }
-          }
-          return localDataSource.searchMealsByName(query);
+      if (sourcePreference == DataSourcePreference.localOnly ||
+          !remoteDataSource.isConfigured) {
+        return localDataSource.searchMealsByName(query);
       }
+
+      final meals = await getAllMeals(sourcePreference: sourcePreference);
+      return meals.fold(
+        (_) => const <Meal>[],
+        (items) => items
+            .where(
+              (meal) => meal.name.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList(),
+      );
     });
   }
 

@@ -19,6 +19,10 @@ abstract class MealLocalDataSource {
 
   Future<void> updateMeal(MealModel meal);
 
+  Future<void> upsertMeal(MealModel meal);
+
+  Future<void> mergeRemoteMeals(List<MealModel> meals);
+
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -31,6 +35,11 @@ abstract class MealLocalDataSource {
   });
 
   Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  });
+
+  Future<void> markAsPendingDelete(
     String localId, {
     String? errorMessage,
   });

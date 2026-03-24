@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/nutrition_log.dart';
 import '../../domain/repositories/nutrition_log_repository.dart';
 import '../datasources/local/nutrition_log_local_datasource.dart';
@@ -14,6 +15,13 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
   final NutritionLogLocalDataSource localDataSource;
   final NutritionLogRemoteDataSource remoteDataSource;
   final NutritionLogSyncCoordinator syncCoordinator;
+
+  static final LocalRemoteMerge<NutritionLog> _merge =
+      LocalRemoteMerge<NutritionLog>(
+    getId: (log) => log.id,
+    getUpdatedAt: (log) => log.updatedAt,
+    getSyncMetadata: (log) => log.syncMetadata,
+  );
 
   const NutritionLogRepositoryImpl({
     required this.localDataSource,
@@ -44,22 +52,33 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
 
           final remoteLogs = await remoteDataSource.getAllLogs();
           if (remoteLogs.isNotEmpty) {
-            await localDataSource.replaceAllLogs(
+            await localDataSource.mergeRemoteLogs(
               remoteLogs.map(NutritionLogModel.fromEntity).toList(),
             );
           }
-          return remoteLogs;
+          return localDataSource.getAllLogs();
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteLogs = await remoteDataSource.getAllLogs();
-            if (remoteLogs.isNotEmpty) {
-              await localDataSource.replaceAllLogs(
-                remoteLogs.map(NutritionLogModel.fromEntity).toList(),
-              );
-              return remoteLogs;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getAllLogs();
           }
+
+          final localLogs = await localDataSource.getAllLogs();
+          final remoteLogs = await remoteDataSource.getAllLogs();
+
+          if (remoteLogs.isEmpty) {
+            return localLogs;
+          }
+
+          final merged = _merge.mergeLists(
+            localItems: localLogs,
+            remoteItems: remoteLogs,
+          );
+
+          await localDataSource.mergeRemoteLogs(
+            merged.map(NutritionLogModel.fromEntity).toList(),
+          );
+
           return localDataSource.getAllLogs();
       }
     });
@@ -84,7 +103,7 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
         case DataSourcePreference.localThenRemote:
           final localLog = await localDataSource.getLogById(id);
           if (localLog != null) {
-            return localLog;
+            return localLog.syncMetadata.isPendingDelete ? null : localLog;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -93,30 +112,44 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
 
           final remoteLog = await remoteDataSource.getLogById(id);
           if (remoteLog != null) {
-            await localDataSource.insertLog(
+            await localDataSource.upsertLog(
               NutritionLogModel.fromEntity(remoteLog),
             );
           }
           return remoteLog;
 
         case DataSourcePreference.remoteThenLocal:
-          if (remoteDataSource.isConfigured) {
-            final remoteLog = await remoteDataSource.getLogById(id);
-            if (remoteLog != null) {
-              final existingLocal = await localDataSource.getLogById(id);
-              if (existingLocal == null) {
-                await localDataSource.insertLog(
-                  NutritionLogModel.fromEntity(remoteLog),
-                );
-              } else {
-                await localDataSource.updateLog(
-                  NutritionLogModel.fromEntity(remoteLog),
-                );
-              }
-              return remoteLog;
-            }
+          if (!remoteDataSource.isConfigured) {
+            return localDataSource.getLogById(id);
           }
-          return localDataSource.getLogById(id);
+
+          final localLog = await localDataSource.getLogById(id);
+          final remoteLog = await remoteDataSource.getLogById(id);
+
+          if (remoteLog == null) {
+            if (localLog == null || localLog.syncMetadata.isPendingDelete) {
+              return null;
+            }
+            return localLog;
+          }
+
+          if (localLog == null) {
+            await localDataSource.upsertLog(
+              NutritionLogModel.fromEntity(remoteLog),
+            );
+            return remoteLog;
+          }
+
+          final merged = _merge.chooseWinner(
+            local: localLog,
+            remote: remoteLog,
+          );
+
+          await localDataSource.upsertLog(
+            NutritionLogModel.fromEntity(merged),
+          );
+
+          return merged.syncMetadata.isPendingDelete ? null : merged;
       }
     });
   }
@@ -131,7 +164,17 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
           !remoteDataSource.isConfigured) {
         return localDataSource.getLogsByDate(date);
       }
-      return remoteDataSource.getLogsByDate(date);
+
+      final logs = await getAllLogs(sourcePreference: sourcePreference);
+      return logs.fold(
+        (_) => const <NutritionLog>[],
+        (items) => items.where((log) {
+          final logged = log.loggedAt;
+          return logged.year == date.year &&
+              logged.month == date.month &&
+              logged.day == date.day;
+        }).toList(),
+      );
     });
   }
 
@@ -154,7 +197,15 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
           !remoteDataSource.isConfigured) {
         return localDataSource.getLogsByDateRange(startDate, endDate);
       }
-      return remoteDataSource.getLogsByDateRange(startDate, endDate);
+
+      final logs = await getAllLogs(sourcePreference: sourcePreference);
+      return logs.fold(
+        (_) => const <NutritionLog>[],
+        (items) => items.where((log) {
+          return !log.loggedAt.isBefore(startDate) &&
+              !log.loggedAt.isAfter(endDate);
+        }).toList(),
+      );
     });
   }
 
@@ -168,7 +219,12 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
           !remoteDataSource.isConfigured) {
         return localDataSource.getLogsByMealId(mealId);
       }
-      return remoteDataSource.getLogsByMealId(mealId);
+
+      final logs = await getAllLogs(sourcePreference: sourcePreference);
+      return logs.fold(
+        (_) => const <NutritionLog>[],
+        (items) => items.where((log) => log.mealId == mealId).toList(),
+      );
     });
   }
 
@@ -176,13 +232,10 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
   Future<Either<Failure, List<NutritionLog>>> getTodayLogs({
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) {
-    return RepositoryGuard.run(() async {
-      if (sourcePreference == DataSourcePreference.localOnly ||
-          !remoteDataSource.isConfigured) {
-        return localDataSource.getTodayLogs();
-      }
-      return remoteDataSource.getLogsByDate(DateTime.now());
-    });
+    return getLogsByDate(
+      DateTime.now(),
+      sourcePreference: sourcePreference,
+    );
   }
 
   @override
@@ -199,7 +252,16 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
       final startDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
 
-      return remoteDataSource.getLogsByDateRange(startDate, now);
+      return getLogsByDateRange(
+        startDate,
+        now,
+        sourcePreference: sourcePreference,
+      ).then(
+        (value) => value.fold(
+          (failure) => throw Exception(failure.message),
+          (logs) => logs,
+        ),
+      );
     });
   }
 
@@ -213,8 +275,11 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
         return localDataSource.getMealLogs();
       }
 
-      final logs = await remoteDataSource.getAllLogs();
-      return logs.where((log) => log.isMealLog).toList();
+      final logs = await getAllLogs(sourcePreference: sourcePreference);
+      return logs.fold(
+        (_) => const <NutritionLog>[],
+        (items) => items.where((log) => log.isMealLog).toList(),
+      );
     });
   }
 
@@ -228,8 +293,11 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
         return localDataSource.getDirectMacroLogs();
       }
 
-      final logs = await remoteDataSource.getAllLogs();
-      return logs.where((log) => log.isDirectMacroLog).toList();
+      final logs = await getAllLogs(sourcePreference: sourcePreference);
+      return logs.fold(
+        (_) => const <NutritionLog>[],
+        (items) => items.where((log) => log.isDirectMacroLog).toList(),
+      );
     });
   }
 
@@ -299,7 +367,17 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
                   DataSourcePreference.localOnly ||
               !remoteDataSource.isConfigured
           ? await localDataSource.getDailyMacros(date)
-          : _aggregateDailyMacros(await remoteDataSource.getLogsByDate(date));
+          : _aggregateDailyMacros(
+              await getLogsByDate(
+                date,
+                sourcePreference: sourcePreference,
+              ).then(
+                (value) => value.fold(
+                  (_) => const <NutritionLog>[],
+                  (logs) => logs,
+                ),
+              ),
+            );
 
       return DailyMacros(
         totalCarbs: result['totalCarbs'] ?? 0.0,

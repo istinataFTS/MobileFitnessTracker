@@ -2,6 +2,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
+import '../../../core/enums/sync_status.dart';
+import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/entities/target.dart';
 import '../../models/target_model.dart';
 import 'database_helper.dart';
@@ -17,6 +19,8 @@ abstract class TargetLocalDataSource {
   Future<List<TargetModel>> getPendingSyncTargets();
   Future<void> insertTarget(TargetModel target);
   Future<void> updateTarget(TargetModel target);
+  Future<void> upsertTarget(TargetModel target);
+  Future<void> mergeRemoteTargets(List<TargetModel> targets);
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -24,6 +28,7 @@ abstract class TargetLocalDataSource {
   });
   Future<void> markAsPendingUpload(String localId, {String? errorMessage});
   Future<void> markAsPendingUpdate(String localId, {String? errorMessage});
+  Future<void> markAsPendingDelete(String localId, {String? errorMessage});
   Future<void> replaceAllTargets(List<TargetModel> targets);
   Future<void> deleteTarget(String id);
   Future<void> clearAllTargets();
@@ -31,6 +36,13 @@ abstract class TargetLocalDataSource {
 
 class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   final DatabaseHelper databaseHelper;
+
+  static final LocalRemoteMerge<TargetModel> _merge =
+      LocalRemoteMerge<TargetModel>(
+    getId: (target) => target.id,
+    getUpdatedAt: (target) => target.updatedAt,
+    getSyncMetadata: (target) => target.syncMetadata,
+  );
 
   const TargetLocalDataSourceImpl({
     required this.databaseHelper,
@@ -42,6 +54,9 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.targets,
+        where:
+            '${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?',
+        whereArgs: const ['pendingDelete'],
         orderBy: '''
           ${DatabaseTables.targetType} ASC,
           ${DatabaseTables.targetPeriod} ASC,
@@ -61,8 +76,9 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.targets,
-        where: '${DatabaseTables.targetId} = ?',
-        whereArgs: [id],
+        where:
+            '${DatabaseTables.targetId} = ? AND (${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)',
+        whereArgs: [id, 'pendingDelete'],
         limit: 1,
       );
 
@@ -89,9 +105,10 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
         where: '''
           ${DatabaseTables.targetType} = ? AND
           ${DatabaseTables.targetCategoryKey} = ? AND
-          ${DatabaseTables.targetPeriod} = ?
+          ${DatabaseTables.targetPeriod} = ? AND
+          (${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)
         ''',
-        whereArgs: [typeValue, categoryKey, periodValue],
+        whereArgs: [typeValue, categoryKey, periodValue, 'pendingDelete'],
         limit: 1,
       );
 
@@ -150,6 +167,51 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   }
 
   @override
+  Future<void> upsertTarget(TargetModel target) async {
+    final existing = await getTargetById(target.id);
+    if (existing == null) {
+      await insertTarget(target);
+      return;
+    }
+
+    await updateTarget(target);
+  }
+
+  @override
+  Future<void> mergeRemoteTargets(List<TargetModel> targets) async {
+    try {
+      final local = await getAllTargets();
+      final merged = _merge.mergeLists(
+        localItems: local,
+        remoteItems: targets,
+      );
+
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(
+          DatabaseTables.targets,
+          where:
+              '${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?',
+          whereArgs: const ['pendingDelete'],
+        );
+
+        final batch = txn.batch();
+        for (final target in merged) {
+          batch.insert(
+            DatabaseTables.targets,
+            target.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to merge remote targets: $e');
+    }
+  }
+
+  @override
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -161,7 +223,7 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
         DatabaseTables.targets,
         <String, Object?>{
           DatabaseTables.targetServerId: serverId,
-          DatabaseTables.targetSyncStatus: 'synced',
+          DatabaseTables.targetSyncStatus: SyncStatus.synced.name,
           DatabaseTables.targetLastSyncedAt: syncedAt.toIso8601String(),
           DatabaseTables.targetLastSyncError: null,
         },
@@ -183,7 +245,7 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       await db.update(
         DatabaseTables.targets,
         <String, Object?>{
-          DatabaseTables.targetSyncStatus: 'pendingUpload',
+          DatabaseTables.targetSyncStatus: SyncStatus.pendingUpload.name,
           DatabaseTables.targetLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.targetId} = ?',
@@ -206,7 +268,7 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       await db.update(
         DatabaseTables.targets,
         <String, Object?>{
-          DatabaseTables.targetSyncStatus: 'pendingUpdate',
+          DatabaseTables.targetSyncStatus: SyncStatus.pendingUpdate.name,
           DatabaseTables.targetLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.targetId} = ?',
@@ -215,6 +277,29 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
     } catch (e) {
       throw CacheDatabaseException(
         'Failed to mark target as pending update: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> markAsPendingDelete(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.targets,
+        <String, Object?>{
+          DatabaseTables.targetSyncStatus: SyncStatus.pendingDelete.name,
+          DatabaseTables.targetLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.targetId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark target as pending delete: $e',
       );
     }
   }

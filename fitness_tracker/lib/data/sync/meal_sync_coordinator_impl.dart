@@ -118,7 +118,9 @@ class MealSyncCoordinatorImpl implements MealSyncCoordinator {
       return;
     }
 
-    if (_shouldQueueRemoteDelete(existingLocal)) {
+    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
+
+    if (shouldQueueDelete) {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(existingLocal.id),
@@ -128,9 +130,11 @@ class MealSyncCoordinatorImpl implements MealSyncCoordinator {
           createdAt: DateTime.now(),
         ),
       );
-    }
 
-    await localDataSource.deleteMeal(id);
+      await localDataSource.markAsPendingDelete(existingLocal.id);
+    } else {
+      await localDataSource.deleteMeal(id);
+    }
 
     if (!isRemoteSyncEnabled) {
       return;
@@ -148,6 +152,10 @@ class MealSyncCoordinatorImpl implements MealSyncCoordinator {
     final pendingMeals = await localDataSource.getPendingSyncMeals();
 
     for (final meal in pendingMeals) {
+      if (meal.syncMetadata.status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
       final remoteMeal = await remoteDataSource.upsertMeal(meal);
       await localDataSource.markAsSynced(
         localId: meal.id,
@@ -170,6 +178,7 @@ class MealSyncCoordinatorImpl implements MealSyncCoordinator {
           serverId: operation.serverEntityId,
         );
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await localDataSource.deleteMeal(operation.localEntityId);
       } catch (error) {
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,

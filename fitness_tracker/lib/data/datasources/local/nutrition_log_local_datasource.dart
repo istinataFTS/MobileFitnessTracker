@@ -28,6 +28,10 @@ abstract class NutritionLogLocalDataSource {
 
   Future<void> updateLog(NutritionLogModel log);
 
+  Future<void> upsertLog(NutritionLogModel log);
+
+  Future<void> mergeRemoteLogs(List<NutritionLogModel> logs);
+
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -40,6 +44,11 @@ abstract class NutritionLogLocalDataSource {
   });
 
   Future<void> markAsPendingUpdate(
+    String localId, {
+    String? errorMessage,
+  });
+
+  Future<void> markAsPendingDelete(
     String localId, {
     String? errorMessage,
   });
