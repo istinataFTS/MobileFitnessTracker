@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/session/session_sync_service.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/repositories/app_session_repository.dart';
+import '../../../features/auth/presentation/sign_in_page.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
 import '../../../features/settings/presentation/settings_scope.dart';
@@ -93,6 +94,29 @@ class _ProfileViewState extends State<_ProfileView> {
           appBar: AppBar(
             title: const Text('Profile'),
             automaticallyImplyLeading: false,
+            actions: [
+              if (!state.session.isAuthenticated)
+                IconButton(
+                  icon: const Icon(Icons.login),
+                  tooltip: 'Sign in',
+                  onPressed: () async {
+                    final didSignIn =
+                        await Navigator.of(context).push<bool>(
+                      MaterialPageRoute<bool>(
+                        builder: (_) => const SignInPage(),
+                      ),
+                    );
+
+                    if (!mounted) {
+                      return;
+                    }
+
+                    if (didSignIn == true) {
+                      await context.read<ProfileCubit>().loadProfile();
+                    }
+                  },
+                ),
+            ],
           ),
           body: ProfileContent(
             viewData: viewData,
