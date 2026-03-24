@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:get_it/get_it.dart';
 
+import '../core/auth/auth_session_service.dart';
+import '../core/auth/auth_session_service_impl.dart';
 import '../core/session/session_sync_service.dart';
 import '../core/session/session_sync_service_impl.dart';
 import '../core/sync/sync_feature.dart';
@@ -95,6 +97,13 @@ void _registerAppComposition(GetIt sl) {
     () => SessionSyncServiceImpl(
       appSessionRepository: sl(),
       syncOrchestrator: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton<AuthSessionService>(
+    () => AuthSessionServiceImpl(
+      authRemoteDataSource: sl(),
+      sessionSyncService: sl(),
     ),
   );
 
