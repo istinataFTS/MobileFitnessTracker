@@ -4,6 +4,7 @@ import '../../core/config/app_sync_policy.dart';
 import '../../core/errors/failures.dart';
 import '../entities/app_session.dart';
 import '../entities/app_user.dart';
+import '../entities/initial_cloud_migration_state.dart';
 
 abstract class AppSessionRepository {
   Future<Either<Failure, AppSession>> getCurrentSession();
@@ -16,6 +17,15 @@ abstract class AppSessionRepository {
   });
 
   Future<Either<Failure, void>> completeInitialCloudMigration();
+
+  Future<Either<Failure, InitialCloudMigrationState?>>
+      getInitialCloudMigrationState();
+
+  Future<Either<Failure, void>> saveInitialCloudMigrationState(
+    InitialCloudMigrationState state,
+  );
+
+  Future<Either<Failure, void>> clearInitialCloudMigrationState();
 
   Future<Either<Failure, void>> recordSuccessfulCloudSync(DateTime syncedAt);
 
