@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:get_it/get_it.dart';
 
+import '../core/session/session_sync_service.dart';
+import '../core/session/session_sync_service_impl.dart';
 import '../core/sync/sync_feature.dart';
 import '../core/sync/sync_orchestrator.dart';
 import '../core/sync/sync_orchestrator_impl.dart';
@@ -86,6 +88,13 @@ void _registerAppComposition(GetIt sl) {
       syncPolicy: sl(),
       remoteSyncAvailability: sl(),
       features: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton<SessionSyncService>(
+    () => SessionSyncServiceImpl(
+      appSessionRepository: sl(),
+      syncOrchestrator: sl(),
     ),
   );
 
