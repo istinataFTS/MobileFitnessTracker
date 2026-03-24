@@ -2,7 +2,15 @@ import 'dart:async';
 
 import 'package:get_it/get_it.dart';
 
+import '../core/sync/sync_feature.dart';
+import '../core/sync/sync_orchestrator.dart';
+import '../core/sync/sync_orchestrator_impl.dart';
 import '../data/datasources/local/database_helper.dart';
+import '../data/sync/exercise_sync_coordinator.dart';
+import '../data/sync/meal_sync_coordinator.dart';
+import '../data/sync/nutrition_log_sync_coordinator.dart';
+import '../data/sync/target_sync_coordinator.dart';
+import '../data/sync/workout_set_sync_coordinator.dart';
 import '../features/home/application/home_bloc.dart';
 import '../features/home/application/usecases/load_home_dashboard_data.dart';
 import 'modules/register_core_module.dart';
@@ -46,6 +54,41 @@ Future<void> resetDependencies() {
 }
 
 void _registerAppComposition(GetIt sl) {
+  sl.registerLazySingleton<List<SyncFeature>>(
+    () => <SyncFeature>[
+      SyncFeature(
+        name: 'targets',
+        syncPendingChanges: sl<TargetSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
+        name: 'workout_sets',
+        syncPendingChanges: sl<WorkoutSetSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
+        name: 'exercises',
+        syncPendingChanges: sl<ExerciseSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
+        name: 'meals',
+        syncPendingChanges: sl<MealSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
+        name: 'nutrition_logs',
+        syncPendingChanges:
+            sl<NutritionLogSyncCoordinator>().syncPendingChanges,
+      ),
+    ],
+  );
+
+  sl.registerLazySingleton<SyncOrchestrator>(
+    () => SyncOrchestratorImpl(
+      appSessionRepository: sl(),
+      syncPolicy: sl(),
+      remoteSyncAvailability: sl(),
+      features: sl(),
+    ),
+  );
+
   sl.registerLazySingleton(
     () => LoadHomeDashboardData(
       getAllTargets: sl(),

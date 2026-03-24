@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/env_config.dart';
+import '../../core/enums/sync_trigger.dart';
 import '../../core/logging/app_logger.dart';
+import '../../core/sync/sync_orchestrator.dart';
 import '../../core/utils/app_lifecycle_manager.dart';
 import '../../core/utils/performance_monitor.dart';
 import '../../injection/injection_container.dart' as di;
@@ -32,7 +36,9 @@ class AppBootstrapper {
       _initializeLifecycle();
       await _initializeRemoteBackend();
       await _initializeDependencies();
+      _registerSyncLifecycleHooks();
       await _seedDefaultDataIfNeeded();
+      await _runInitialSync();
       await _runDiagnosticsIfNeeded();
       _configureSystemUi();
 
@@ -129,6 +135,14 @@ class AppBootstrapper {
     }
   }
 
+  void _registerSyncLifecycleHooks() {
+    final SyncOrchestrator syncOrchestrator = di.sl<SyncOrchestrator>();
+
+    AppLifecycleManager().addResumeCallback(() {
+      unawaited(syncOrchestrator.run(SyncTrigger.appResume));
+    });
+  }
+
   Future<void> _seedDefaultDataIfNeeded() async {
     if (kIsWeb) {
       AppLogger.info(
@@ -157,6 +171,24 @@ class AppBootstrapper {
         category: 'bootstrap',
       );
     }
+  }
+
+  Future<void> _runInitialSync() async {
+    if (kIsWeb) {
+      AppLogger.info(
+        'Skipping initial sync orchestration on web',
+        category: 'bootstrap',
+      );
+      return;
+    }
+
+    final SyncOrchestrator syncOrchestrator = di.sl<SyncOrchestrator>();
+    final result = await syncOrchestrator.run(SyncTrigger.appLaunch);
+
+    AppLogger.info(
+      'Initial sync orchestration finished with status ${result.status.name}: ${result.message}',
+      category: 'sync',
+    );
   }
 
   Future<void> _runDiagnosticsIfNeeded() async {

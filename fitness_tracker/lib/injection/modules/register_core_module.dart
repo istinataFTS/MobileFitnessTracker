@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../config/env_config.dart';
 import '../../core/config/app_sync_policy.dart';
+import '../../core/sync/remote_sync_availability.dart';
 import '../../data/datasources/local/app_metadata_local_datasource.dart';
 import '../../data/datasources/local/database_helper.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
@@ -34,6 +35,12 @@ void registerCoreModule(GetIt sl) {
 
   sl.registerLazySingleton<AppSyncPolicy>(
     () => AppSyncPolicy.productionDefault,
+  );
+
+  sl.registerLazySingleton(
+    () => RemoteSyncAvailability(
+      hasRemoteConfiguration: EnvConfig.isSupabaseConfigured,
+    ),
   );
 
   sl.registerLazySingleton<AppSessionRepository>(
