@@ -1,11 +1,13 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/enums/data_source_preference.dart';
+import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/nutrition_log_remote_datasource.dart';
 import 'package:fitness_tracker/data/models/nutrition_log_model.dart';
 import 'package:fitness_tracker/data/repositories/nutrition_log_repository_impl.dart';
 import 'package:fitness_tracker/data/sync/nutrition_log_sync_coordinator.dart';
+import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/repositories/nutrition_log_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +40,8 @@ void main() {
     double carbs = 30,
     double fat = 10,
     double calories = 310,
+    DateTime? updatedAt,
+    EntitySyncMetadata syncMetadata = const EntitySyncMetadata(),
   }) {
     return NutritionLogModel(
       id: id,
@@ -50,7 +54,8 @@ void main() {
       calories: calories,
       loggedAt: loggedAt,
       createdAt: loggedAt,
-      updatedAt: loggedAt,
+      updatedAt: updatedAt ?? loggedAt,
+      syncMetadata: syncMetadata,
     );
   }
 
@@ -64,6 +69,8 @@ void main() {
     double carbs = 30,
     double fat = 10,
     double calories = 310,
+    DateTime? updatedAt,
+    EntitySyncMetadata syncMetadata = const EntitySyncMetadata(),
   }) {
     return NutritionLog(
       id: id,
@@ -76,7 +83,8 @@ void main() {
       calories: calories,
       loggedAt: loggedAt,
       createdAt: loggedAt,
-      updatedAt: loggedAt,
+      updatedAt: updatedAt ?? loggedAt,
+      syncMetadata: syncMetadata,
     );
   }
 
@@ -111,28 +119,57 @@ void main() {
       expect(result, Right<Failure, List<NutritionLog>>(localLogs));
       verify(() => localDataSource.getAllLogs()).called(1);
       verifyNever(() => remoteDataSource.getAllLogs());
-      verifyNever(() => localDataSource.replaceAllLogs(any()));
+      verifyNever(() => localDataSource.mergeRemoteLogs(any()));
     });
 
-    test('hydrates local cache from remote for remoteThenLocal', () async {
-      final List<NutritionLog> remoteLogs = <NutritionLog>[
-        buildLogEntity(id: '1', loggedAt: targetDate),
-        buildLogEntity(
-          id: '2',
-          loggedAt: targetDate.add(const Duration(hours: 2)),
-          protein: 35,
-          carbs: 20,
-          fat: 15,
-          calories: 355,
+    test('remoteThenLocal merges cache instead of replaceAll and preserves '
+        'pending local update', () async {
+      final NutritionLogModel localPendingLog = buildLogModel(
+        id: '1',
+        loggedAt: targetDate,
+        calories: 330,
+        updatedAt: targetDate.add(const Duration(minutes: 30)),
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.pendingUpdate,
         ),
+      );
+
+      final NutritionLog remoteLog = buildLogEntity(
+        id: '1',
+        loggedAt: targetDate,
+        calories: 500,
+        updatedAt: targetDate.add(const Duration(hours: 1)),
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      final NutritionLog remoteOnlyLog = buildLogEntity(
+        id: '2',
+        loggedAt: targetDate.add(const Duration(hours: 2)),
+        calories: 420,
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      final List<NutritionLogModel> mergedLogs = <NutritionLogModel>[
+        localPendingLog,
+        NutritionLogModel.fromEntity(remoteOnlyLog),
       ];
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => remoteDataSource.getAllLogs()).thenAnswer(
-        (_) async => remoteLogs,
+      when(() => localDataSource.getAllLogs()).thenAnswer(
+        (_) async => <NutritionLogModel>[localPendingLog],
       );
-      when(() => localDataSource.replaceAllLogs(any())).thenAnswer(
+      when(() => remoteDataSource.getAllLogs()).thenAnswer(
+        (_) async => <NutritionLog>[remoteLog, remoteOnlyLog],
+      );
+      when(() => localDataSource.mergeRemoteLogs(any())).thenAnswer(
         (_) async {},
+      );
+      when(() => localDataSource.getAllLogs()).thenAnswer(
+        (_) async => mergedLogs,
       );
 
       final Either<Failure, List<NutritionLog>> result =
@@ -140,10 +177,10 @@ void main() {
         sourcePreference: DataSourcePreference.remoteThenLocal,
       );
 
-      expect(result, Right<Failure, List<NutritionLog>>(remoteLogs));
+      expect(result, Right<Failure, List<NutritionLog>>(mergedLogs));
       verify(() => remoteDataSource.getAllLogs()).called(1);
-      verify(() => localDataSource.replaceAllLogs(any())).called(1);
-      verifyNever(() => localDataSource.getAllLogs());
+      verify(() => localDataSource.mergeRemoteLogs(any())).called(1);
+      verifyNever(() => localDataSource.replaceAllLogs(any()));
     });
   });
 
@@ -153,11 +190,11 @@ void main() {
           buildLogModel(id: 'log-1', loggedAt: targetDate);
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
-        (_) async => null,
-      );
       when(() => localDataSource.getLogById('log-1')).thenAnswer(
         (_) async => localLog,
+      );
+      when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => null,
       );
 
       final Either<Failure, NutritionLog?> result = await repository.getLogById(
@@ -168,30 +205,48 @@ void main() {
       expect(result, Right<Failure, NutritionLog?>(localLog));
       verify(() => remoteDataSource.getLogById('log-1')).called(1);
       verify(() => localDataSource.getLogById('log-1')).called(1);
-      verifyNever(() => localDataSource.insertLog(any()));
-      verifyNever(() => localDataSource.updateLog(any()));
+      verifyNever(() => localDataSource.upsertLog(any()));
     });
 
-    test('updates existing local log when remoteThenLocal returns remote value', () async {
+    test('returns null for pending delete local record in localThenRemote',
+        () async {
+      final NutritionLogModel pendingDeleteLog = buildLogModel(
+        id: 'log-1',
+        loggedAt: targetDate,
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.pendingDelete,
+        ),
+      );
+
+      when(() => localDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => pendingDeleteLog,
+      );
+
+      final Either<Failure, NutritionLog?> result = await repository.getLogById(
+        'log-1',
+        sourcePreference: DataSourcePreference.localThenRemote,
+      );
+
+      expect(result, const Right<Failure, NutritionLog?>(null));
+      verifyNever(() => remoteDataSource.getLogById(any()));
+    });
+
+    test('updates missing local cache via upsert when remoteThenLocal finds '
+        'remote value', () async {
       final NutritionLog remoteLog = buildLogEntity(
         id: 'log-1',
         loggedAt: targetDate,
         calories: 420,
       );
-      final NutritionLogModel existingLocal = buildLogModel(
-        id: 'log-1',
-        loggedAt: targetDate,
-        calories: 310,
-      );
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => null,
+      );
       when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
         (_) async => remoteLog,
       );
-      when(() => localDataSource.getLogById('log-1')).thenAnswer(
-        (_) async => existingLocal,
-      );
-      when(() => localDataSource.updateLog(any())).thenAnswer((_) async {});
+      when(() => localDataSource.upsertLog(any())).thenAnswer((_) async {});
 
       final Either<Failure, NutritionLog?> result = await repository.getLogById(
         'log-1',
@@ -199,13 +254,55 @@ void main() {
       );
 
       expect(result, Right<Failure, NutritionLog?>(remoteLog));
-      verify(() => localDataSource.updateLog(any())).called(1);
-      verifyNever(() => localDataSource.insertLog(any()));
+      verify(() => localDataSource.upsertLog(any())).called(1);
+    });
+
+    test('preserves pending local update during remoteThenLocal merge',
+        () async {
+      final NutritionLogModel localPendingLog = buildLogModel(
+        id: 'log-1',
+        loggedAt: targetDate,
+        calories: 330,
+        updatedAt: targetDate.add(const Duration(minutes: 30)),
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.pendingUpdate,
+        ),
+      );
+
+      final NutritionLog remoteLog = buildLogEntity(
+        id: 'log-1',
+        loggedAt: targetDate,
+        calories: 500,
+        updatedAt: targetDate.add(const Duration(hours: 1)),
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => localPendingLog,
+      );
+      when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => remoteLog,
+      );
+      when(() => localDataSource.upsertLog(localPendingLog)).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, NutritionLog?> result = await repository.getLogById(
+        'log-1',
+        sourcePreference: DataSourcePreference.remoteThenLocal,
+      );
+
+      expect(result, Right<Failure, NutritionLog?>(localPendingLog));
+      verify(() => localDataSource.upsertLog(localPendingLog)).called(1);
     });
   });
 
   group('NutritionLogRepositoryImpl.getDailyMacros', () {
-    test('returns local datasource macros when remote is not configured', () async {
+    test('returns local datasource macros when remote is not configured',
+        () async {
       when(() => remoteDataSource.isConfigured).thenReturn(false);
       when(() => localDataSource.getDailyMacros(targetDate)).thenAnswer(
         (_) async => <String, double>{
@@ -239,8 +336,8 @@ void main() {
       verifyNever(() => remoteDataSource.getLogsByDate(any()));
     });
 
-    test('aggregates remote logs into daily macros when remote is configured', () async {
-      final List<NutritionLog> remoteLogs = <NutritionLog>[
+    test('aggregates logs into daily macros via repository path', () async {
+      final List<NutritionLog> mergedLogs = <NutritionLog>[
         buildLogEntity(
           id: '1',
           loggedAt: targetDate,
@@ -260,8 +357,17 @@ void main() {
       ];
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => remoteDataSource.getLogsByDate(targetDate)).thenAnswer(
-        (_) async => remoteLogs,
+      when(() => localDataSource.getAllLogs()).thenAnswer(
+        (_) async => const <NutritionLogModel>[],
+      );
+      when(() => remoteDataSource.getAllLogs()).thenAnswer(
+        (_) async => mergedLogs,
+      );
+      when(() => localDataSource.mergeRemoteLogs(any())).thenAnswer(
+        (_) async {},
+      );
+      when(() => localDataSource.getAllLogs()).thenAnswer(
+        (_) async => mergedLogs.map(NutritionLogModel.fromEntity).toList(),
       );
 
       final Either<Failure, DailyMacros> result =
@@ -281,14 +387,12 @@ void main() {
           expect(macros.date, targetDate);
         },
       );
-
-      verify(() => remoteDataSource.getLogsByDate(targetDate)).called(1);
-      verifyNever(() => localDataSource.getDailyMacros(any()));
     });
   });
 
   group('NutritionLogRepositoryImpl deletes and writes', () {
-    test('deleteLogsByDate delegates each matching log deletion to sync coordinator', () async {
+    test('deleteLogsByDate delegates each matching log deletion to sync '
+        'coordinator', () async {
       final List<NutritionLogModel> dateLogs = <NutritionLogModel>[
         buildLogModel(id: 'log-1', loggedAt: targetDate),
         buildLogModel(

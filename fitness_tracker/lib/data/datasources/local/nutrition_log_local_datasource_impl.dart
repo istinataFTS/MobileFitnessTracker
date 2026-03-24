@@ -2,12 +2,21 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
+import '../../../core/enums/sync_status.dart';
+import '../../../core/sync/local_remote_merge.dart';
 import '../../models/nutrition_log_model.dart';
 import 'database_helper.dart';
 import 'nutrition_log_local_datasource.dart';
 
 class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   final DatabaseHelper databaseHelper;
+
+  static final LocalRemoteMerge<NutritionLogModel> _merge =
+      LocalRemoteMerge<NutritionLogModel>(
+    getId: (log) => log.id,
+    getUpdatedAt: (log) => log.updatedAt,
+    getSyncMetadata: (log) => log.syncMetadata,
+  );
 
   const NutritionLogLocalDataSourceImpl({
     required this.databaseHelper,
@@ -19,6 +28,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
+        where:
+            '${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?',
+        whereArgs: const ['pendingDelete'],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -33,8 +45,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogId} = ?',
-        whereArgs: [id],
+        where:
+            '${DatabaseTables.nutritionLogId} = ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+        whereArgs: [id, 'pendingDelete'],
         limit: 1,
       );
 
@@ -58,10 +71,11 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
         whereArgs: [
           startOfDay.toIso8601String(),
           endOfDay.toIso8601String(),
+          'pendingDelete',
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
@@ -85,10 +99,11 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
         whereArgs: [
           start.toIso8601String(),
           end.toIso8601String(),
+          'pendingDelete',
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
@@ -105,8 +120,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogMealId} = ?',
-        whereArgs: [mealId],
+        where:
+            '${DatabaseTables.nutritionLogMealId} = ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+        whereArgs: [mealId, 'pendingDelete'],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -144,7 +160,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogMealId} IS NOT NULL',
+        where:
+            '${DatabaseTables.nutritionLogMealId} IS NOT NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+        whereArgs: const ['pendingDelete'],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -159,7 +177,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
-        where: '${DatabaseTables.nutritionLogMealId} IS NULL',
+        where:
+            '${DatabaseTables.nutritionLogMealId} IS NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+        whereArgs: const ['pendingDelete'],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -215,6 +235,51 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   }
 
   @override
+  Future<void> upsertLog(NutritionLogModel log) async {
+    final existing = await getLogById(log.id);
+    if (existing == null) {
+      await insertLog(log);
+      return;
+    }
+
+    await updateLog(log);
+  }
+
+  @override
+  Future<void> mergeRemoteLogs(List<NutritionLogModel> logs) async {
+    try {
+      final localLogs = await getAllLogs();
+      final merged = _merge.mergeLists(
+        localItems: localLogs,
+        remoteItems: logs,
+      );
+
+      final db = await databaseHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(
+          DatabaseTables.nutritionLogs,
+          where:
+              '${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?',
+          whereArgs: const ['pendingDelete'],
+        );
+
+        final batch = txn.batch();
+        for (final log in merged) {
+          batch.insert(
+            DatabaseTables.nutritionLogs,
+            log.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await batch.commit(noResult: true);
+      });
+    } catch (e) {
+      throw CacheDatabaseException('Failed to merge remote nutrition logs: $e');
+    }
+  }
+
+  @override
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -226,7 +291,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         DatabaseTables.nutritionLogs,
         <String, Object?>{
           DatabaseTables.nutritionLogServerId: serverId,
-          DatabaseTables.nutritionLogSyncStatus: 'synced',
+          DatabaseTables.nutritionLogSyncStatus: SyncStatus.synced.name,
           DatabaseTables.nutritionLogLastSyncedAt: syncedAt.toIso8601String(),
           DatabaseTables.nutritionLogLastSyncError: null,
         },
@@ -248,7 +313,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       await db.update(
         DatabaseTables.nutritionLogs,
         <String, Object?>{
-          DatabaseTables.nutritionLogSyncStatus: 'pendingUpload',
+          DatabaseTables.nutritionLogSyncStatus: SyncStatus.pendingUpload.name,
           DatabaseTables.nutritionLogLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.nutritionLogId} = ?',
@@ -271,7 +336,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       await db.update(
         DatabaseTables.nutritionLogs,
         <String, Object?>{
-          DatabaseTables.nutritionLogSyncStatus: 'pendingUpdate',
+          DatabaseTables.nutritionLogSyncStatus: SyncStatus.pendingUpdate.name,
           DatabaseTables.nutritionLogLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.nutritionLogId} = ?',
@@ -280,6 +345,29 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
     } catch (e) {
       throw CacheDatabaseException(
         'Failed to mark nutrition log as pending update: $e',
+      );
+    }
+  }
+
+  @override
+  Future<void> markAsPendingDelete(
+    String localId, {
+    String? errorMessage,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.update(
+        DatabaseTables.nutritionLogs,
+        <String, Object?>{
+          DatabaseTables.nutritionLogSyncStatus: SyncStatus.pendingDelete.name,
+          DatabaseTables.nutritionLogLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.nutritionLogId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to mark nutrition log as pending delete: $e',
       );
     }
   }
@@ -383,9 +471,11 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         FROM ${DatabaseTables.nutritionLogs}
         WHERE ${DatabaseTables.nutritionLogDate} >= ?
           AND ${DatabaseTables.nutritionLogDate} <= ?
+          AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)
       ''', [
         startOfDay.toIso8601String(),
         endOfDay.toIso8601String(),
+        'pendingDelete',
       ]);
 
       if (result.isEmpty) {
