@@ -1,72 +1,66 @@
 import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
-import '../../domain/entities/pending_sync_delete.dart';
 import '../../domain/entities/workout_set.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/local/workout_set_local_datasource.dart';
 import '../datasources/remote/workout_set_remote_datasource.dart';
+import 'base_entity_sync_coordinator.dart';
 import 'workout_set_sync_coordinator.dart';
 
-class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
+class WorkoutSetSyncCoordinatorImpl
+    extends BaseEntitySyncCoordinator<WorkoutSet>
+    implements WorkoutSetSyncCoordinator {
   final WorkoutSetLocalDataSource localDataSource;
   final WorkoutSetRemoteDataSource remoteDataSource;
-  final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
 
   const WorkoutSetSyncCoordinatorImpl({
     required this.localDataSource,
     required this.remoteDataSource,
-    required this.pendingSyncDeleteLocalDataSource,
+    required super.pendingSyncDeleteLocalDataSource,
   });
 
   @override
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  Future<void> persistAddedSet(WorkoutSet set) async {
-    final now = DateTime.now();
+  SyncEntityType get entityType => SyncEntityType.workoutSet;
 
-    final localSet = set.copyWith(
+  @override
+  String get deleteOperationPrefix => 'workout_set';
+
+  @override
+  String getEntityId(WorkoutSet entity) => entity.id;
+
+  @override
+  EntitySyncMetadata getSyncMetadata(WorkoutSet entity) => entity.syncMetadata;
+
+  @override
+  WorkoutSet buildAddedLocalEntity(WorkoutSet entity, DateTime now) {
+    return entity.copyWith(
       updatedAt: now,
-      syncMetadata: set.syncMetadata.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
         status: isRemoteSyncEnabled
             ? SyncStatus.pendingUpload
             : SyncStatus.localOnly,
         clearLastSyncError: true,
       ),
     );
-
-    await localDataSource.addSet(localSet);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteSet = await remoteDataSource.upsertSet(localSet);
-      await localDataSource.markAsSynced(
-        localId: localSet.id,
-        serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      await localDataSource.markAsPendingUpload(
-        localSet.id,
-        errorMessage: error.toString(),
-      );
-    }
   }
 
   @override
-  Future<void> persistUpdatedSet(WorkoutSet set) async {
-    final existingLocal = await localDataSource.getSetById(set.id);
+  WorkoutSet buildUpdatedLocalEntity({
+    required WorkoutSet entity,
+    required WorkoutSet? existingLocal,
+    required DateTime now,
+  }) {
     final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
 
-    final localSet = set.copyWith(
-      updatedAt: DateTime.now(),
+    return entity.copyWith(
+      updatedAt: now,
       syncMetadata: EntitySyncMetadata(
         serverId:
-            existingLocal?.syncMetadata.serverId ?? set.syncMetadata.serverId,
+            existingLocal?.syncMetadata.serverId ?? entity.syncMetadata.serverId,
         status: isRemoteSyncEnabled
             ? (wasPreviouslySynced
                 ? SyncStatus.pendingUpdate
@@ -75,121 +69,101 @@ class WorkoutSetSyncCoordinatorImpl implements WorkoutSetSyncCoordinator {
         lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
       ),
     );
-
-    await localDataSource.updateSet(localSet);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteSet = await remoteDataSource.upsertSet(localSet);
-      await localDataSource.markAsSynced(
-        localId: localSet.id,
-        serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      if (wasPreviouslySynced) {
-        await localDataSource.markAsPendingUpdate(
-          localSet.id,
-          errorMessage: error.toString(),
-        );
-      } else {
-        await localDataSource.markAsPendingUpload(
-          localSet.id,
-          errorMessage: error.toString(),
-        );
-      }
-    }
   }
 
   @override
-  Future<void> persistDeletedSet(String id) async {
-    final existingLocal = await localDataSource.getSetById(id);
-    if (existingLocal == null) {
-      return;
-    }
-
-    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
-
-    if (shouldQueueDelete) {
-      await pendingSyncDeleteLocalDataSource.enqueue(
-        PendingSyncDelete(
-          id: _buildDeleteOperationId(existingLocal.id),
-          entityType: SyncEntityType.workoutSet,
-          localEntityId: existingLocal.id,
-          serverEntityId: existingLocal.syncMetadata.serverId,
-          createdAt: DateTime.now(),
-        ),
-      );
-
-      await localDataSource.markAsPendingDelete(existingLocal.id);
-    } else {
-      await localDataSource.deleteSet(id);
-    }
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    await _flushPendingDeletes();
+  Future<void> insertLocal(WorkoutSet entity) {
+    return localDataSource.addSet(entity);
   }
 
   @override
-  Future<void> syncPendingChanges() async {
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    final pendingSets = await localDataSource.getPendingSyncSets();
-
-    for (final set in pendingSets) {
-      if (set.syncMetadata.status == SyncStatus.pendingDelete) {
-        continue;
-      }
-
-      final remoteSet = await remoteDataSource.upsertSet(set);
-      await localDataSource.markAsSynced(
-        localId: set.id,
-        serverId: remoteSet.syncMetadata.serverId ?? remoteSet.id,
-        syncedAt: DateTime.now(),
-      );
-    }
-
-    await _flushPendingDeletes();
+  Future<void> updateLocal(WorkoutSet entity) {
+    return localDataSource.updateSet(entity);
   }
 
-  Future<void> _flushPendingDeletes() async {
-    final operations = await pendingSyncDeleteLocalDataSource
-        .getPendingByEntityType(SyncEntityType.workoutSet);
-
-    for (final operation in operations) {
-      try {
-        await remoteDataSource.deleteSet(
-          localId: operation.localEntityId,
-          serverId: operation.serverEntityId,
-        );
-        await pendingSyncDeleteLocalDataSource.remove(operation.id);
-        await localDataSource.deleteSet(operation.localEntityId);
-      } catch (error) {
-        await pendingSyncDeleteLocalDataSource.markAttempted(
-          operation.id,
-          attemptedAt: DateTime.now(),
-          errorMessage: error.toString(),
-        );
-      }
-    }
+  @override
+  Future<WorkoutSet?> getLocalById(String id) {
+    return localDataSource.getSetById(id);
   }
 
-  bool _shouldQueueRemoteDelete(WorkoutSet set) {
-    return set.syncMetadata.serverId != null ||
-        set.syncMetadata.isSynced ||
-        set.syncMetadata.hasPendingSync;
+  @override
+  Future<void> deleteLocal(String id) {
+    return localDataSource.deleteSet(id);
   }
 
-  String _buildDeleteOperationId(String localEntityId) {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    return 'workout_set_delete_${localEntityId}_$timestamp';
+  @override
+  Future<List<WorkoutSet>> getPendingSyncEntities() {
+    return localDataSource.getPendingSyncSets();
+  }
+
+  @override
+  Future<WorkoutSet> upsertRemote(WorkoutSet entity) {
+    return remoteDataSource.upsertSet(entity);
+  }
+
+  @override
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  }) {
+    return remoteDataSource.deleteSet(
+      localId: localId,
+      serverId: serverId,
+    );
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) {
+    return localDataSource.markAsSynced(
+      localId: localId,
+      serverId: serverId,
+      syncedAt: syncedAt,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpload(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpdate(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingDelete(String localId) {
+    return localDataSource.markAsPendingDelete(localId);
+  }
+
+  @override
+  Future<void> persistAddedSet(WorkoutSet set) {
+    return persistAdded(set);
+  }
+
+  @override
+  Future<void> persistUpdatedSet(WorkoutSet set) {
+    return persistUpdated(set);
+  }
+
+  @override
+  Future<void> persistDeletedSet(String id) {
+    return persistDeleted(id);
   }
 }

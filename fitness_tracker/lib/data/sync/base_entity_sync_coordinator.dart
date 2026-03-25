@@ -1,0 +1,224 @@
+import '../../core/enums/sync_entity_type.dart';
+import '../../core/enums/sync_status.dart';
+import '../../domain/entities/entity_sync_metadata.dart';
+import '../../domain/entities/pending_sync_delete.dart';
+import '../datasources/local/pending_sync_delete_local_datasource.dart';
+
+abstract class BaseEntitySyncCoordinator<T> {
+  final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
+
+  const BaseEntitySyncCoordinator({
+    required this.pendingSyncDeleteLocalDataSource,
+  });
+
+  bool get isRemoteSyncEnabled;
+
+  SyncEntityType get entityType;
+
+  String get deleteOperationPrefix;
+
+  String getEntityId(T entity);
+
+  EntitySyncMetadata getSyncMetadata(T entity);
+
+  T buildAddedLocalEntity(T entity, DateTime now);
+
+  T buildUpdatedLocalEntity({
+    required T entity,
+    required T? existingLocal,
+    required DateTime now,
+  });
+
+  Future<void> insertLocal(T entity);
+
+  Future<void> updateLocal(T entity);
+
+  Future<T?> getLocalById(String id);
+
+  Future<void> deleteLocal(String id);
+
+  Future<List<T>> getPendingSyncEntities();
+
+  Future<T> upsertRemote(T entity);
+
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  });
+
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  });
+
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  });
+
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  });
+
+  Future<void> markAsPendingDelete(String localId);
+
+  Future<void> persistAdded(T entity) async {
+    final localEntity = buildAddedLocalEntity(entity, DateTime.now());
+
+    await insertLocal(localEntity);
+
+    if (!isRemoteSyncEnabled) {
+      return;
+    }
+
+    try {
+      final remoteEntity = await upsertRemote(localEntity);
+      final remoteMetadata = getSyncMetadata(remoteEntity);
+
+      await markAsSynced(
+        localId: getEntityId(localEntity),
+        serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
+        syncedAt: DateTime.now(),
+      );
+    } catch (error) {
+      await markAsPendingUpload(
+        getEntityId(localEntity),
+        errorMessage: error.toString(),
+      );
+    }
+  }
+
+  Future<void> persistUpdated(T entity) async {
+    final existingLocal = await getLocalById(getEntityId(entity));
+    final wasPreviouslySynced = existingLocal != null
+        ? getSyncMetadata(existingLocal).isSynced
+        : false;
+
+    final localEntity = buildUpdatedLocalEntity(
+      entity: entity,
+      existingLocal: existingLocal,
+      now: DateTime.now(),
+    );
+
+    await updateLocal(localEntity);
+
+    if (!isRemoteSyncEnabled) {
+      return;
+    }
+
+    try {
+      final remoteEntity = await upsertRemote(localEntity);
+      final remoteMetadata = getSyncMetadata(remoteEntity);
+
+      await markAsSynced(
+        localId: getEntityId(localEntity),
+        serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
+        syncedAt: DateTime.now(),
+      );
+    } catch (error) {
+      if (wasPreviouslySynced) {
+        await markAsPendingUpdate(
+          getEntityId(localEntity),
+          errorMessage: error.toString(),
+        );
+      } else {
+        await markAsPendingUpload(
+          getEntityId(localEntity),
+          errorMessage: error.toString(),
+        );
+      }
+    }
+  }
+
+  Future<void> persistDeleted(String id) async {
+    final existingLocal = await getLocalById(id);
+    if (existingLocal == null) {
+      return;
+    }
+
+    if (_shouldQueueRemoteDelete(existingLocal)) {
+      await pendingSyncDeleteLocalDataSource.enqueue(
+        PendingSyncDelete(
+          id: _buildDeleteOperationId(id),
+          entityType: entityType,
+          localEntityId: id,
+          serverEntityId: getSyncMetadata(existingLocal).serverId,
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      await markAsPendingDelete(id);
+    } else {
+      await deleteLocal(id);
+    }
+
+    if (!isRemoteSyncEnabled) {
+      return;
+    }
+
+    await flushPendingDeletes();
+  }
+
+  Future<void> syncPendingChanges() async {
+    if (!isRemoteSyncEnabled) {
+      return;
+    }
+
+    final pendingEntities = await getPendingSyncEntities();
+
+    for (final entity in pendingEntities) {
+      if (getSyncMetadata(entity).status == SyncStatus.pendingDelete) {
+        continue;
+      }
+
+      final remoteEntity = await upsertRemote(entity);
+      final remoteMetadata = getSyncMetadata(remoteEntity);
+
+      await markAsSynced(
+        localId: getEntityId(entity),
+        serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
+        syncedAt: DateTime.now(),
+      );
+    }
+
+    await flushPendingDeletes();
+  }
+
+  Future<void> flushPendingDeletes() async {
+    final operations = await pendingSyncDeleteLocalDataSource
+        .getPendingByEntityType(entityType);
+
+    for (final operation in operations) {
+      try {
+        await deleteRemote(
+          localId: operation.localEntityId,
+          serverId: operation.serverEntityId,
+        );
+
+        await pendingSyncDeleteLocalDataSource.remove(operation.id);
+        await deleteLocal(operation.localEntityId);
+      } catch (error) {
+        await pendingSyncDeleteLocalDataSource.markAttempted(
+          operation.id,
+          attemptedAt: DateTime.now(),
+          errorMessage: error.toString(),
+        );
+      }
+    }
+  }
+
+  bool _shouldQueueRemoteDelete(T entity) {
+    final metadata = getSyncMetadata(entity);
+
+    return metadata.serverId != null ||
+        metadata.isSynced ||
+        metadata.hasPendingSync;
+  }
+
+  String _buildDeleteOperationId(String localEntityId) {
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    return '${deleteOperationPrefix}_delete_${localEntityId}_$timestamp';
+  }
+}

@@ -2,74 +2,67 @@ import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/nutrition_log.dart';
-import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/nutrition_log_local_datasource.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/nutrition_log_remote_datasource.dart';
 import '../models/nutrition_log_model.dart';
+import 'base_entity_sync_coordinator.dart';
 import 'nutrition_log_sync_coordinator.dart';
 
-class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
+class NutritionLogSyncCoordinatorImpl
+    extends BaseEntitySyncCoordinator<NutritionLog>
+    implements NutritionLogSyncCoordinator {
   final NutritionLogLocalDataSource localDataSource;
   final NutritionLogRemoteDataSource remoteDataSource;
-  final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
 
   const NutritionLogSyncCoordinatorImpl({
     required this.localDataSource,
     required this.remoteDataSource,
-    required this.pendingSyncDeleteLocalDataSource,
+    required super.pendingSyncDeleteLocalDataSource,
   });
 
   @override
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  Future<void> persistAddedLog(NutritionLog log) async {
-    final now = DateTime.now();
+  SyncEntityType get entityType => SyncEntityType.nutritionLog;
 
-    final localLog = log.copyWith(
+  @override
+  String get deleteOperationPrefix => 'nutrition_log';
+
+  @override
+  String getEntityId(NutritionLog entity) => entity.id;
+
+  @override
+  EntitySyncMetadata getSyncMetadata(NutritionLog entity) =>
+      entity.syncMetadata;
+
+  @override
+  NutritionLog buildAddedLocalEntity(NutritionLog entity, DateTime now) {
+    return entity.copyWith(
       updatedAt: now,
-      syncMetadata: log.syncMetadata.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
         status: isRemoteSyncEnabled
             ? SyncStatus.pendingUpload
             : SyncStatus.localOnly,
         clearLastSyncError: true,
       ),
     );
-
-    final model = NutritionLogModel.fromEntity(localLog);
-    model.validate();
-    await localDataSource.insertLog(model);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteLog = await remoteDataSource.upsertLog(localLog);
-      await localDataSource.markAsSynced(
-        localId: localLog.id,
-        serverId: remoteLog.syncMetadata.serverId ?? remoteLog.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      await localDataSource.markAsPendingUpload(
-        localLog.id,
-        errorMessage: error.toString(),
-      );
-    }
   }
 
   @override
-  Future<void> persistUpdatedLog(NutritionLog log) async {
-    final existingLocal = await localDataSource.getLogById(log.id);
+  NutritionLog buildUpdatedLocalEntity({
+    required NutritionLog entity,
+    required NutritionLog? existingLocal,
+    required DateTime now,
+  }) {
     final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
 
-    final localLog = log.copyWith(
-      updatedAt: DateTime.now(),
+    return entity.copyWith(
+      updatedAt: now,
       syncMetadata: EntitySyncMetadata(
         serverId:
-            existingLocal?.syncMetadata.serverId ?? log.syncMetadata.serverId,
+            existingLocal?.syncMetadata.serverId ?? entity.syncMetadata.serverId,
         status: isRemoteSyncEnabled
             ? (wasPreviouslySynced
                 ? SyncStatus.pendingUpdate
@@ -78,123 +71,105 @@ class NutritionLogSyncCoordinatorImpl implements NutritionLogSyncCoordinator {
         lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
       ),
     );
+  }
 
-    final model = NutritionLogModel.fromEntity(localLog);
+  @override
+  Future<void> insertLocal(NutritionLog entity) {
+    final model = NutritionLogModel.fromEntity(entity);
     model.validate();
-    await localDataSource.updateLog(model);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteLog = await remoteDataSource.upsertLog(localLog);
-      await localDataSource.markAsSynced(
-        localId: localLog.id,
-        serverId: remoteLog.syncMetadata.serverId ?? remoteLog.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      if (wasPreviouslySynced) {
-        await localDataSource.markAsPendingUpdate(
-          localLog.id,
-          errorMessage: error.toString(),
-        );
-      } else {
-        await localDataSource.markAsPendingUpload(
-          localLog.id,
-          errorMessage: error.toString(),
-        );
-      }
-    }
+    return localDataSource.insertLog(model);
   }
 
   @override
-  Future<void> persistDeletedLog(String id) async {
-    final existingLocal = await localDataSource.getLogById(id);
-    if (existingLocal == null) {
-      return;
-    }
-
-    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
-
-    if (shouldQueueDelete) {
-      await pendingSyncDeleteLocalDataSource.enqueue(
-        PendingSyncDelete(
-          id: _buildDeleteOperationId(existingLocal.id),
-          entityType: SyncEntityType.nutritionLog,
-          localEntityId: existingLocal.id,
-          serverEntityId: existingLocal.syncMetadata.serverId,
-          createdAt: DateTime.now(),
-        ),
-      );
-
-      await localDataSource.markAsPendingDelete(existingLocal.id);
-    } else {
-      await localDataSource.deleteLog(id);
-    }
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    await _flushPendingDeletes();
+  Future<void> updateLocal(NutritionLog entity) {
+    final model = NutritionLogModel.fromEntity(entity);
+    model.validate();
+    return localDataSource.updateLog(model);
   }
 
   @override
-  Future<void> syncPendingChanges() async {
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    final pendingLogs = await localDataSource.getPendingSyncLogs();
-
-    for (final log in pendingLogs) {
-      if (log.syncMetadata.status == SyncStatus.pendingDelete) {
-        continue;
-      }
-
-      final remoteLog = await remoteDataSource.upsertLog(log);
-      await localDataSource.markAsSynced(
-        localId: log.id,
-        serverId: remoteLog.syncMetadata.serverId ?? remoteLog.id,
-        syncedAt: DateTime.now(),
-      );
-    }
-
-    await _flushPendingDeletes();
+  Future<NutritionLog?> getLocalById(String id) {
+    return localDataSource.getLogById(id);
   }
 
-  Future<void> _flushPendingDeletes() async {
-    final operations = await pendingSyncDeleteLocalDataSource
-        .getPendingByEntityType(SyncEntityType.nutritionLog);
-
-    for (final operation in operations) {
-      try {
-        await remoteDataSource.deleteLog(
-          localId: operation.localEntityId,
-          serverId: operation.serverEntityId,
-        );
-        await pendingSyncDeleteLocalDataSource.remove(operation.id);
-        await localDataSource.deleteLog(operation.localEntityId);
-      } catch (error) {
-        await pendingSyncDeleteLocalDataSource.markAttempted(
-          operation.id,
-          attemptedAt: DateTime.now(),
-          errorMessage: error.toString(),
-        );
-      }
-    }
+  @override
+  Future<void> deleteLocal(String id) {
+    return localDataSource.deleteLog(id);
   }
 
-  bool _shouldQueueRemoteDelete(NutritionLog log) {
-    return log.syncMetadata.serverId != null ||
-        log.syncMetadata.isSynced ||
-        log.syncMetadata.hasPendingSync;
+  @override
+  Future<List<NutritionLog>> getPendingSyncEntities() {
+    return localDataSource.getPendingSyncLogs();
   }
 
-  String _buildDeleteOperationId(String localEntityId) {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    return 'nutrition_log_delete_${localEntityId}_$timestamp';
+  @override
+  Future<NutritionLog> upsertRemote(NutritionLog entity) {
+    return remoteDataSource.upsertLog(entity);
+  }
+
+  @override
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  }) {
+    return remoteDataSource.deleteLog(
+      localId: localId,
+      serverId: serverId,
+    );
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) {
+    return localDataSource.markAsSynced(
+      localId: localId,
+      serverId: serverId,
+      syncedAt: syncedAt,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpload(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpdate(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingDelete(String localId) {
+    return localDataSource.markAsPendingDelete(localId);
+  }
+
+  @override
+  Future<void> persistAddedLog(NutritionLog log) {
+    return persistAdded(log);
+  }
+
+  @override
+  Future<void> persistUpdatedLog(NutritionLog log) {
+    return persistUpdated(log);
+  }
+
+  @override
+  Future<void> persistDeletedLog(String id) {
+    return persistDeleted(id);
   }
 }

@@ -2,75 +2,65 @@ import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/meal.dart';
-import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/meal_local_datasource.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/meal_remote_datasource.dart';
 import '../models/meal_model.dart';
+import 'base_entity_sync_coordinator.dart';
 import 'meal_sync_coordinator.dart';
 
-class MealSyncCoordinatorImpl implements MealSyncCoordinator {
+class MealSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Meal>
+    implements MealSyncCoordinator {
   final MealLocalDataSource localDataSource;
   final MealRemoteDataSource remoteDataSource;
-  final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
 
   const MealSyncCoordinatorImpl({
     required this.localDataSource,
     required this.remoteDataSource,
-    required this.pendingSyncDeleteLocalDataSource,
+    required super.pendingSyncDeleteLocalDataSource,
   });
 
   @override
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  Future<void> persistAddedMeal(Meal meal) async {
-    final now = DateTime.now();
+  SyncEntityType get entityType => SyncEntityType.meal;
 
-    final localMeal = meal.copyWith(
+  @override
+  String get deleteOperationPrefix => 'meal';
+
+  @override
+  String getEntityId(Meal entity) => entity.id;
+
+  @override
+  EntitySyncMetadata getSyncMetadata(Meal entity) => entity.syncMetadata;
+
+  @override
+  Meal buildAddedLocalEntity(Meal entity, DateTime now) {
+    return entity.copyWith(
       updatedAt: now,
-      syncMetadata: meal.syncMetadata.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
         status: isRemoteSyncEnabled
             ? SyncStatus.pendingUpload
             : SyncStatus.localOnly,
         clearLastSyncError: true,
       ),
     );
-
-    final model = MealModel.fromEntity(localMeal);
-    model.validateMacros();
-    model.validateAndLogCalories();
-    await localDataSource.insertMeal(model);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteMeal = await remoteDataSource.upsertMeal(localMeal);
-      await localDataSource.markAsSynced(
-        localId: localMeal.id,
-        serverId: remoteMeal.syncMetadata.serverId ?? remoteMeal.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      await localDataSource.markAsPendingUpload(
-        localMeal.id,
-        errorMessage: error.toString(),
-      );
-    }
   }
 
   @override
-  Future<void> persistUpdatedMeal(Meal meal) async {
-    final existingLocal = await localDataSource.getMealById(meal.id);
+  Meal buildUpdatedLocalEntity({
+    required Meal entity,
+    required Meal? existingLocal,
+    required DateTime now,
+  }) {
     final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
 
-    final localMeal = meal.copyWith(
-      updatedAt: DateTime.now(),
+    return entity.copyWith(
+      updatedAt: now,
       syncMetadata: EntitySyncMetadata(
-        serverId: existingLocal?.syncMetadata.serverId ??
-            meal.syncMetadata.serverId,
+        serverId:
+            existingLocal?.syncMetadata.serverId ?? entity.syncMetadata.serverId,
         status: isRemoteSyncEnabled
             ? (wasPreviouslySynced
                 ? SyncStatus.pendingUpdate
@@ -79,124 +69,107 @@ class MealSyncCoordinatorImpl implements MealSyncCoordinator {
         lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
       ),
     );
+  }
 
-    final model = MealModel.fromEntity(localMeal);
+  @override
+  Future<void> insertLocal(Meal entity) {
+    final model = MealModel.fromEntity(entity);
     model.validateMacros();
     model.validateAndLogCalories();
-    await localDataSource.updateMeal(model);
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteMeal = await remoteDataSource.upsertMeal(localMeal);
-      await localDataSource.markAsSynced(
-        localId: localMeal.id,
-        serverId: remoteMeal.syncMetadata.serverId ?? remoteMeal.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      if (wasPreviouslySynced) {
-        await localDataSource.markAsPendingUpdate(
-          localMeal.id,
-          errorMessage: error.toString(),
-        );
-      } else {
-        await localDataSource.markAsPendingUpload(
-          localMeal.id,
-          errorMessage: error.toString(),
-        );
-      }
-    }
+    return localDataSource.insertMeal(model);
   }
 
   @override
-  Future<void> persistDeletedMeal(String id) async {
-    final existingLocal = await localDataSource.getMealById(id);
-    if (existingLocal == null) {
-      return;
-    }
-
-    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
-
-    if (shouldQueueDelete) {
-      await pendingSyncDeleteLocalDataSource.enqueue(
-        PendingSyncDelete(
-          id: _buildDeleteOperationId(existingLocal.id),
-          entityType: SyncEntityType.meal,
-          localEntityId: existingLocal.id,
-          serverEntityId: existingLocal.syncMetadata.serverId,
-          createdAt: DateTime.now(),
-        ),
-      );
-
-      await localDataSource.markAsPendingDelete(existingLocal.id);
-    } else {
-      await localDataSource.deleteMeal(id);
-    }
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    await _flushPendingDeletes();
+  Future<void> updateLocal(Meal entity) {
+    final model = MealModel.fromEntity(entity);
+    model.validateMacros();
+    model.validateAndLogCalories();
+    return localDataSource.updateMeal(model);
   }
 
   @override
-  Future<void> syncPendingChanges() async {
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    final pendingMeals = await localDataSource.getPendingSyncMeals();
-
-    for (final meal in pendingMeals) {
-      if (meal.syncMetadata.status == SyncStatus.pendingDelete) {
-        continue;
-      }
-
-      final remoteMeal = await remoteDataSource.upsertMeal(meal);
-      await localDataSource.markAsSynced(
-        localId: meal.id,
-        serverId: remoteMeal.syncMetadata.serverId ?? remoteMeal.id,
-        syncedAt: DateTime.now(),
-      );
-    }
-
-    await _flushPendingDeletes();
+  Future<Meal?> getLocalById(String id) {
+    return localDataSource.getMealById(id);
   }
 
-  Future<void> _flushPendingDeletes() async {
-    final operations = await pendingSyncDeleteLocalDataSource
-        .getPendingByEntityType(SyncEntityType.meal);
-
-    for (final operation in operations) {
-      try {
-        await remoteDataSource.deleteMeal(
-          localId: operation.localEntityId,
-          serverId: operation.serverEntityId,
-        );
-        await pendingSyncDeleteLocalDataSource.remove(operation.id);
-        await localDataSource.deleteMeal(operation.localEntityId);
-      } catch (error) {
-        await pendingSyncDeleteLocalDataSource.markAttempted(
-          operation.id,
-          attemptedAt: DateTime.now(),
-          errorMessage: error.toString(),
-        );
-      }
-    }
+  @override
+  Future<void> deleteLocal(String id) {
+    return localDataSource.deleteMeal(id);
   }
 
-  bool _shouldQueueRemoteDelete(Meal meal) {
-    return meal.syncMetadata.serverId != null ||
-        meal.syncMetadata.isSynced ||
-        meal.syncMetadata.hasPendingSync;
+  @override
+  Future<List<Meal>> getPendingSyncEntities() {
+    return localDataSource.getPendingSyncMeals();
   }
 
-  String _buildDeleteOperationId(String localEntityId) {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    return 'meal_delete_${localEntityId}_$timestamp';
+  @override
+  Future<Meal> upsertRemote(Meal entity) {
+    return remoteDataSource.upsertMeal(entity);
+  }
+
+  @override
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  }) {
+    return remoteDataSource.deleteMeal(
+      localId: localId,
+      serverId: serverId,
+    );
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) {
+    return localDataSource.markAsSynced(
+      localId: localId,
+      serverId: serverId,
+      syncedAt: syncedAt,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpload(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpdate(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingDelete(String localId) {
+    return localDataSource.markAsPendingDelete(localId);
+  }
+
+  @override
+  Future<void> persistAddedMeal(Meal meal) {
+    return persistAdded(meal);
+  }
+
+  @override
+  Future<void> persistUpdatedMeal(Meal meal) {
+    return persistUpdated(meal);
+  }
+
+  @override
+  Future<void> persistDeletedMeal(String id) {
+    return persistDeleted(id);
   }
 }

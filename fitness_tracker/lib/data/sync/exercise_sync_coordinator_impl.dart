@@ -2,74 +2,65 @@ import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/exercise.dart';
-import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/exercise_local_datasource.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/exercise_remote_datasource.dart';
 import '../models/exercise_model.dart';
+import 'base_entity_sync_coordinator.dart';
 import 'exercise_sync_coordinator.dart';
 
-class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
+class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
+    implements ExerciseSyncCoordinator {
   final ExerciseLocalDataSource localDataSource;
   final ExerciseRemoteDataSource remoteDataSource;
-  final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
 
   const ExerciseSyncCoordinatorImpl({
     required this.localDataSource,
     required this.remoteDataSource,
-    required this.pendingSyncDeleteLocalDataSource,
+    required super.pendingSyncDeleteLocalDataSource,
   });
 
   @override
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  Future<void> persistAddedExercise(Exercise exercise) async {
-    final now = DateTime.now();
+  SyncEntityType get entityType => SyncEntityType.exercise;
 
-    final localExercise = exercise.copyWith(
+  @override
+  String get deleteOperationPrefix => 'exercise';
+
+  @override
+  String getEntityId(Exercise entity) => entity.id;
+
+  @override
+  EntitySyncMetadata getSyncMetadata(Exercise entity) => entity.syncMetadata;
+
+  @override
+  Exercise buildAddedLocalEntity(Exercise entity, DateTime now) {
+    return entity.copyWith(
       updatedAt: now,
-      syncMetadata: exercise.syncMetadata.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
         status: isRemoteSyncEnabled
             ? SyncStatus.pendingUpload
             : SyncStatus.localOnly,
         clearLastSyncError: true,
       ),
     );
-
-    await localDataSource.insertExercise(
-      ExerciseModel.fromEntity(localExercise),
-    );
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteExercise = await remoteDataSource.upsertExercise(localExercise);
-      await localDataSource.markAsSynced(
-        localId: localExercise.id,
-        serverId: remoteExercise.syncMetadata.serverId ?? remoteExercise.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      await localDataSource.markAsPendingUpload(
-        localExercise.id,
-        errorMessage: error.toString(),
-      );
-    }
   }
 
   @override
-  Future<void> persistUpdatedExercise(Exercise exercise) async {
-    final existingLocal = await localDataSource.getExerciseById(exercise.id);
+  Exercise buildUpdatedLocalEntity({
+    required Exercise entity,
+    required Exercise? existingLocal,
+    required DateTime now,
+  }) {
     final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
 
-    final localExercise = exercise.copyWith(
-      updatedAt: DateTime.now(),
+    return entity.copyWith(
+      updatedAt: now,
       syncMetadata: EntitySyncMetadata(
-        serverId: existingLocal?.syncMetadata.serverId ??
-            exercise.syncMetadata.serverId,
+        serverId:
+            existingLocal?.syncMetadata.serverId ?? entity.syncMetadata.serverId,
         status: isRemoteSyncEnabled
             ? (wasPreviouslySynced
                 ? SyncStatus.pendingUpdate
@@ -78,123 +69,105 @@ class ExerciseSyncCoordinatorImpl implements ExerciseSyncCoordinator {
         lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
       ),
     );
+  }
 
-    await localDataSource.updateExercise(
-      ExerciseModel.fromEntity(localExercise),
+  @override
+  Future<void> insertLocal(Exercise entity) {
+    return localDataSource.insertExercise(
+      ExerciseModel.fromEntity(entity),
     );
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    try {
-      final remoteExercise = await remoteDataSource.upsertExercise(localExercise);
-      await localDataSource.markAsSynced(
-        localId: localExercise.id,
-        serverId: remoteExercise.syncMetadata.serverId ?? remoteExercise.id,
-        syncedAt: DateTime.now(),
-      );
-    } catch (error) {
-      if (wasPreviouslySynced) {
-        await localDataSource.markAsPendingUpdate(
-          localExercise.id,
-          errorMessage: error.toString(),
-        );
-      } else {
-        await localDataSource.markAsPendingUpload(
-          localExercise.id,
-          errorMessage: error.toString(),
-        );
-      }
-    }
   }
 
   @override
-  Future<void> persistDeletedExercise(String id) async {
-    final existingLocal = await localDataSource.getExerciseById(id);
-    if (existingLocal == null) {
-      return;
-    }
-
-    final shouldQueueDelete = _shouldQueueRemoteDelete(existingLocal);
-
-    if (shouldQueueDelete) {
-      await pendingSyncDeleteLocalDataSource.enqueue(
-        PendingSyncDelete(
-          id: _buildDeleteOperationId(existingLocal.id),
-          entityType: SyncEntityType.exercise,
-          localEntityId: existingLocal.id,
-          serverEntityId: existingLocal.syncMetadata.serverId,
-          createdAt: DateTime.now(),
-        ),
-      );
-
-      await localDataSource.markAsPendingDelete(existingLocal.id);
-    } else {
-      await localDataSource.deleteExercise(id);
-    }
-
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    await _flushPendingDeletes();
+  Future<void> updateLocal(Exercise entity) {
+    return localDataSource.updateExercise(
+      ExerciseModel.fromEntity(entity),
+    );
   }
 
   @override
-  Future<void> syncPendingChanges() async {
-    if (!isRemoteSyncEnabled) {
-      return;
-    }
-
-    final pendingExercises = await localDataSource.getPendingSyncExercises();
-
-    for (final exercise in pendingExercises) {
-      if (exercise.syncMetadata.status == SyncStatus.pendingDelete) {
-        continue;
-      }
-
-      final remoteExercise = await remoteDataSource.upsertExercise(exercise);
-      await localDataSource.markAsSynced(
-        localId: exercise.id,
-        serverId: remoteExercise.syncMetadata.serverId ?? remoteExercise.id,
-        syncedAt: DateTime.now(),
-      );
-    }
-
-    await _flushPendingDeletes();
+  Future<Exercise?> getLocalById(String id) {
+    return localDataSource.getExerciseById(id);
   }
 
-  Future<void> _flushPendingDeletes() async {
-    final operations = await pendingSyncDeleteLocalDataSource
-        .getPendingByEntityType(SyncEntityType.exercise);
-
-    for (final operation in operations) {
-      try {
-        await remoteDataSource.deleteExercise(
-          localId: operation.localEntityId,
-          serverId: operation.serverEntityId,
-        );
-        await pendingSyncDeleteLocalDataSource.remove(operation.id);
-        await localDataSource.deleteExercise(operation.localEntityId);
-      } catch (error) {
-        await pendingSyncDeleteLocalDataSource.markAttempted(
-          operation.id,
-          attemptedAt: DateTime.now(),
-          errorMessage: error.toString(),
-        );
-      }
-    }
+  @override
+  Future<void> deleteLocal(String id) {
+    return localDataSource.deleteExercise(id);
   }
 
-  bool _shouldQueueRemoteDelete(Exercise exercise) {
-    return exercise.syncMetadata.serverId != null ||
-        exercise.syncMetadata.isSynced ||
-        exercise.syncMetadata.hasPendingSync;
+  @override
+  Future<List<Exercise>> getPendingSyncEntities() {
+    return localDataSource.getPendingSyncExercises();
   }
 
-  String _buildDeleteOperationId(String localEntityId) {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    return 'exercise_delete_${localEntityId}_$timestamp';
+  @override
+  Future<Exercise> upsertRemote(Exercise entity) {
+    return remoteDataSource.upsertExercise(entity);
+  }
+
+  @override
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  }) {
+    return remoteDataSource.deleteExercise(
+      localId: localId,
+      serverId: serverId,
+    );
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) {
+    return localDataSource.markAsSynced(
+      localId: localId,
+      serverId: serverId,
+      syncedAt: syncedAt,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpload(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  }) {
+    return localDataSource.markAsPendingUpdate(
+      localId,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  Future<void> markAsPendingDelete(String localId) {
+    return localDataSource.markAsPendingDelete(localId);
+  }
+
+  @override
+  Future<void> persistAddedExercise(Exercise exercise) {
+    return persistAdded(exercise);
+  }
+
+  @override
+  Future<void> persistUpdatedExercise(Exercise exercise) {
+    return persistUpdated(exercise);
+  }
+
+  @override
+  Future<void> persistDeletedExercise(String id) {
+    return persistDeleted(id);
   }
 }
