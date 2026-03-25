@@ -4,6 +4,7 @@ import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/network/network_status_service.dart';
+import 'package:fitness_tracker/core/sync/initial_cloud_migration_coordinator.dart';
 import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
@@ -18,9 +19,13 @@ class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 class MockNetworkStatusService extends Mock implements NetworkStatusService {}
 
+class MockInitialCloudMigrationCoordinator extends Mock
+    implements InitialCloudMigrationCoordinator {}
+
 void main() {
   late MockAppSessionRepository repository;
   late MockNetworkStatusService networkStatusService;
+  late MockInitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
   late SyncOrchestrator orchestrator;
   late List<String> executionLog;
 
@@ -40,6 +45,7 @@ void main() {
   setUp(() {
     repository = MockAppSessionRepository();
     networkStatusService = MockNetworkStatusService();
+    initialCloudMigrationCoordinator = MockInitialCloudMigrationCoordinator();
     executionLog = <String>[];
 
     when(() => repository.syncPolicy)
@@ -51,6 +57,13 @@ void main() {
     when(() => networkStatusService.isNetworkAvailable())
         .thenAnswer((_) async => true);
 
+    when(() => initialCloudMigrationCoordinator.runIfRequired()).thenAnswer(
+      (_) async => const InitialCloudMigrationResult(
+        status: InitialCloudMigrationStatus.completed,
+        message: 'initial cloud migration completed successfully',
+      ),
+    );
+
     orchestrator = SyncOrchestratorImpl(
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
@@ -58,6 +71,7 @@ void main() {
         hasRemoteConfiguration: true,
         networkStatusService: networkStatusService,
       ),
+      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
       features: <SyncFeature>[
         SyncFeature(
           name: 'targets',
@@ -98,6 +112,7 @@ void main() {
     expect(result.status, SyncRunStatus.completed);
     expect(executionLog, <String>['targets', 'workout_sets']);
     verify(() => repository.recordSuccessfulCloudSync(any())).called(1);
+    verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
   });
 
   test('fails when session lookup fails', () async {
@@ -121,6 +136,7 @@ void main() {
         hasRemoteConfiguration: true,
         networkStatusService: networkStatusService,
       ),
+      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
       features: <SyncFeature>[
         SyncFeature(
           name: 'targets',
@@ -148,6 +164,7 @@ void main() {
     expect(result.featureResults.first.isSuccess, isTrue);
     expect(result.featureResults.last.isSuccess, isFalse);
     verifyNever(() => repository.recordSuccessfulCloudSync(any()));
+    verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
   });
 
   test('skips app resume while initial migration is pending', () async {
@@ -162,9 +179,11 @@ void main() {
     expect(result.status, SyncRunStatus.skipped);
     expect(result.message, 'initial cloud migration is pending');
     expect(executionLog, isEmpty);
+    verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
   });
 
-  test('allows initial sign-in trigger while migration is pending', () async {
+  test('runs initial migration on initial sign-in while migration is pending',
+      () async {
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => Right(
         authenticatedSession(requiresInitialCloudMigration: true),
@@ -174,8 +193,31 @@ void main() {
     final result = await orchestrator.run(SyncTrigger.initialSignIn);
 
     expect(result.status, SyncRunStatus.completed);
-    expect(executionLog, <String>['targets', 'workout_sets']);
+    expect(result.message, 'initial cloud migration completed successfully');
+    expect(executionLog, isEmpty);
+    verify(() => initialCloudMigrationCoordinator.runIfRequired()).called(1);
     verify(() => repository.recordSuccessfulCloudSync(any())).called(1);
+  });
+
+  test('fails when initial migration fails during initial sign-in', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(
+        authenticatedSession(requiresInitialCloudMigration: true),
+      ),
+    );
+    when(() => initialCloudMigrationCoordinator.runIfRequired()).thenAnswer(
+      (_) async => const InitialCloudMigrationResult(
+        status: InitialCloudMigrationStatus.failed,
+        message: 'step nutrition_logs failed',
+      ),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.initialSignIn);
+
+    expect(result.status, SyncRunStatus.failed);
+    expect(result.message, 'step nutrition_logs failed');
+    expect(executionLog, isEmpty);
+    verifyNever(() => repository.recordSuccessfulCloudSync(any()));
   });
 
   test('skips when network is unavailable', () async {
@@ -191,5 +233,6 @@ void main() {
     expect(result.message, 'network unavailable');
     expect(executionLog, isEmpty);
     verifyNever(() => repository.recordSuccessfulCloudSync(any()));
+    verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
   });
 }

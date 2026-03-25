@@ -124,6 +124,7 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       syncPolicy: sl(),
       remoteSyncAvailability: sl(),
+      initialCloudMigrationCoordinator: sl(),
       features: sl(),
     ),
   );
@@ -133,7 +134,6 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
-      initialCloudMigrationCoordinator: sl(),
     ),
   );
 

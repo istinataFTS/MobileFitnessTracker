@@ -1,7 +1,6 @@
 import '../../core/logging/app_logger.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../enums/sync_trigger.dart';
-import '../sync/initial_cloud_migration_coordinator.dart';
 import '../sync/sync_orchestrator.dart';
 import 'session_sync_service.dart';
 import '../../domain/entities/app_user.dart';
@@ -11,13 +10,11 @@ class SessionSyncServiceImpl implements SessionSyncService {
   final AppSessionRepository appSessionRepository;
   final AuthRemoteDataSource authRemoteDataSource;
   final SyncOrchestrator syncOrchestrator;
-  final InitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
 
   const SessionSyncServiceImpl({
     required this.appSessionRepository,
     required this.authRemoteDataSource,
     required this.syncOrchestrator,
-    required this.initialCloudMigrationCoordinator,
   });
 
   @override
@@ -52,62 +49,6 @@ class SessionSyncServiceImpl implements SessionSyncService {
           'Authenticated session persisted; starting authenticated session synchronization',
           category: 'session',
         );
-
-        if (requiresInitialCloudMigration) {
-          final migrationResult =
-              await initialCloudMigrationCoordinator.runIfRequired();
-
-          switch (migrationResult.status) {
-            case InitialCloudMigrationStatus.completed:
-              AppLogger.info(
-                'Initial cloud migration completed for user ${user.id}',
-                category: 'session',
-              );
-
-              return const SessionSyncActionResult(
-                status: SessionSyncActionStatus.completed,
-                message:
-                    'authenticated session established and initial migration completed',
-              );
-
-            case InitialCloudMigrationStatus.skipped:
-              AppLogger.warning(
-                'Initial cloud migration was skipped after authenticated session establishment: ${migrationResult.message}',
-                category: 'session',
-              );
-
-              return SessionSyncActionResult(
-                status: SessionSyncActionStatus.skipped,
-                message:
-                    'authenticated session established but initial migration was skipped: ${migrationResult.message}',
-              );
-
-            case InitialCloudMigrationStatus.inProgress:
-              AppLogger.warning(
-                'Initial cloud migration returned in-progress state after authenticated session establishment',
-                category: 'session',
-              );
-
-              return SessionSyncActionResult(
-                status: SessionSyncActionStatus.skipped,
-                message:
-                    'authenticated session established but initial migration is still in progress',
-              );
-
-            case InitialCloudMigrationStatus.failed:
-              AppLogger.error(
-                'Initial cloud migration failed after authenticated session establishment',
-                category: 'session',
-                error: migrationResult.message,
-              );
-
-              return SessionSyncActionResult(
-                status: SessionSyncActionStatus.failed,
-                message:
-                    'initial migration failed after session establishment: ${migrationResult.message}',
-              );
-          }
-        }
 
         final syncResult = await syncOrchestrator.run(
           SyncTrigger.initialSignIn,
