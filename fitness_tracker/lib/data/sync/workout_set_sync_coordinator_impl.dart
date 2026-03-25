@@ -1,5 +1,4 @@
 import '../../core/enums/sync_entity_type.dart';
-import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/workout_set.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
@@ -43,12 +42,7 @@ class WorkoutSetSyncCoordinatorImpl
   WorkoutSet buildAddedLocalEntity(WorkoutSet entity, DateTime now) {
     return entity.copyWith(
       updatedAt: now,
-      syncMetadata: entity.syncMetadata.copyWith(
-        status: isRemoteSyncEnabled
-            ? SyncStatus.pendingUpload
-            : SyncStatus.localOnly,
-        clearLastSyncError: true,
-      ),
+      syncMetadata: buildAddedSyncMetadata(entity.syncMetadata),
     );
   }
 
@@ -58,19 +52,11 @@ class WorkoutSetSyncCoordinatorImpl
     required WorkoutSet? existingLocal,
     required DateTime now,
   }) {
-    final wasPreviouslySynced = existingLocal?.syncMetadata.isSynced ?? false;
-
     return entity.copyWith(
       updatedAt: now,
-      syncMetadata: EntitySyncMetadata(
-        serverId:
-            existingLocal?.syncMetadata.serverId ?? entity.syncMetadata.serverId,
-        status: isRemoteSyncEnabled
-            ? (wasPreviouslySynced
-                ? SyncStatus.pendingUpdate
-                : SyncStatus.pendingUpload)
-            : SyncStatus.localOnly,
-        lastSyncedAt: existingLocal?.syncMetadata.lastSyncedAt,
+      syncMetadata: buildUpdatedSyncMetadata(
+        incomingMetadata: entity.syncMetadata,
+        existingLocalMetadata: existingLocal?.syncMetadata,
       ),
     );
   }

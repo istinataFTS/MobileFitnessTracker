@@ -63,6 +63,34 @@ abstract class BaseEntitySyncCoordinator<T> {
 
   Future<void> markAsPendingDelete(String localId);
 
+  EntitySyncMetadata buildAddedSyncMetadata(
+    EntitySyncMetadata currentMetadata,
+  ) {
+    return currentMetadata.copyWith(
+      status: isRemoteSyncEnabled
+          ? SyncStatus.pendingUpload
+          : SyncStatus.localOnly,
+      clearLastSyncError: true,
+    );
+  }
+
+  EntitySyncMetadata buildUpdatedSyncMetadata({
+    required EntitySyncMetadata incomingMetadata,
+    required EntitySyncMetadata? existingLocalMetadata,
+  }) {
+    final wasPreviouslySynced = existingLocalMetadata?.isSynced ?? false;
+
+    return EntitySyncMetadata(
+      serverId: existingLocalMetadata?.serverId ?? incomingMetadata.serverId,
+      status: isRemoteSyncEnabled
+          ? (wasPreviouslySynced
+              ? SyncStatus.pendingUpdate
+              : SyncStatus.pendingUpload)
+          : SyncStatus.localOnly,
+      lastSyncedAt: existingLocalMetadata?.lastSyncedAt,
+    );
+  }
+
   Future<void> persistAdded(T entity) async {
     final localEntity = buildAddedLocalEntity(entity, DateTime.now());
 
