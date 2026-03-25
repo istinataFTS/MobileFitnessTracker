@@ -2,6 +2,7 @@ import 'package:fitness_tracker/core/enums/sync_entity_type.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/pending_sync_delete_local_datasource.dart';
 import 'package:fitness_tracker/data/sync/base_entity_sync_coordinator.dart';
+import 'package:fitness_tracker/data/sync/entity_sync_batch_failure.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/pending_sync_delete.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -250,7 +251,7 @@ void main() {
   });
 
   test(
-    'syncPendingChanges continues after entity upsert failure, flushes deletes, and throws at end',
+    'syncPendingChanges continues after entity upsert failure, flushes deletes, and throws structured failure at end',
     () async {
       coordinator = TestEntitySyncCoordinator(
         pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
@@ -287,14 +288,25 @@ void main() {
         ),
       );
 
-      expect(
-        () => coordinator.syncPendingChanges(),
+      await expectLater(
+        coordinator.syncPendingChanges(),
         throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('failed to sync 1 test_entity pending entry'),
-          ),
+          isA<EntitySyncBatchFailure>()
+              .having(
+                (error) => error.failedUpsertEntityIds,
+                'failedUpsertEntityIds',
+                <String>['entity-1'],
+              )
+              .having(
+                (error) => error.failedDeleteEntityIds,
+                'failedDeleteEntityIds',
+                isEmpty,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('failed to upsert 1 test_entity entry (entity-1)'),
+              ),
         ),
       );
 
@@ -322,17 +334,76 @@ void main() {
       ),
     );
 
-    expect(
-      () => coordinator.syncPendingChanges(),
-      throwsA(isA<StateError>()),
+    await expectLater(
+      coordinator.syncPendingChanges(),
+      throwsA(
+        isA<EntitySyncBatchFailure>().having(
+          (error) => error.failedUpsertEntityIds,
+          'failedUpsertEntityIds',
+          <String>['entity-1'],
+        ),
+      ),
     );
 
     expect(coordinator.pendingUpdateIds, <String>['entity-1']);
-    expect(coordinator.localStore['entity-1']!.syncMetadata.status,
-        SyncStatus.pendingUpdate);
+    expect(
+      coordinator.localStore['entity-1']!.syncMetadata.status,
+      SyncStatus.pendingUpdate,
+    );
     expect(
       coordinator.localStore['entity-1']!.syncMetadata.lastSyncError,
       contains('remote upsert failed for entity-1'),
     );
+  });
+
+  test('syncPendingChanges throws when pending deletes fail', () async {
+    coordinator = TestEntitySyncCoordinator(
+      pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
+      remoteDeleteFailures: const <String>{'entity-3'},
+    );
+
+    coordinator.localStore['entity-3'] = const TestSyncEntity(
+      id: 'entity-3',
+      syncMetadata: EntitySyncMetadata(
+        status: SyncStatus.pendingDelete,
+        serverId: 'server-entity-3',
+      ),
+    );
+
+    await pendingDeleteDataSource.enqueue(
+      PendingSyncDelete(
+        id: 'delete-1',
+        entityType: SyncEntityType.target,
+        localEntityId: 'entity-3',
+        serverEntityId: 'server-entity-3',
+        createdAt: DateTime(2026, 3, 25),
+      ),
+    );
+
+    await expectLater(
+      coordinator.syncPendingChanges(),
+      throwsA(
+        isA<EntitySyncBatchFailure>()
+            .having(
+              (error) => error.failedUpsertEntityIds,
+              'failedUpsertEntityIds',
+              isEmpty,
+            )
+            .having(
+              (error) => error.failedDeleteEntityIds,
+              'failedDeleteEntityIds',
+              <String>['entity-3'],
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('failed to delete 1 test_entity entry (entity-3)'),
+            ),
+      ),
+    );
+
+    expect(coordinator.remoteDeleteCalls, <String>['entity-3']);
+    expect(pendingDeleteDataSource.attemptedIds, <String>['delete-1']);
+    expect(coordinator.localStore.containsKey('entity-3'), isTrue);
   });
 }

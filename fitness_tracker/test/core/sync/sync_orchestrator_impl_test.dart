@@ -9,6 +9,7 @@ import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator_impl.dart';
+import 'package:fitness_tracker/data/sync/entity_sync_batch_failure.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
@@ -165,6 +166,47 @@ void main() {
     expect(result.featureResults.last.isSuccess, isFalse);
     verifyNever(() => repository.recordSuccessfulCloudSync(any()));
     verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
+  });
+
+  test('preserves structured sync batch failure message for feature result',
+      () async {
+    orchestrator = SyncOrchestratorImpl(
+      appSessionRepository: repository,
+      syncPolicy: AppSyncPolicy.productionDefault,
+      remoteSyncAvailability: RemoteSyncAvailability(
+        hasRemoteConfiguration: true,
+        networkStatusService: networkStatusService,
+      ),
+      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
+      features: <SyncFeature>[
+        SyncFeature(
+          name: 'targets',
+          syncPendingChanges: () async {
+            throw const EntitySyncBatchFailure(
+              entityLabel: 'target',
+              failedUpsertEntityIds: <String>['target-1'],
+              failedDeleteEntityIds: <String>['target-7'],
+            );
+          },
+        ),
+      ],
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.status, SyncRunStatus.failed);
+    expect(result.featureResults, hasLength(1));
+    expect(result.featureResults.single.isSuccess, isFalse);
+    expect(
+      result.featureResults.single.errorMessage,
+      'failed to upsert 1 target entry (target-1); '
+      'failed to delete 1 target entry (target-7)',
+    );
+    verifyNever(() => repository.recordSuccessfulCloudSync(any()));
   });
 
   test('skips app resume while initial migration is pending', () async {

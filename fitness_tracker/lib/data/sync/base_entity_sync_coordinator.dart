@@ -3,6 +3,7 @@ import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
+import 'entity_sync_batch_failure.dart';
 
 abstract class BaseEntitySyncCoordinator<T> {
   final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
@@ -167,7 +168,7 @@ abstract class BaseEntitySyncCoordinator<T> {
     }
 
     final pendingEntities = await getPendingSyncEntities();
-    final List<String> failedEntityIds = <String>[];
+    final List<String> failedUpsertEntityIds = <String>[];
 
     for (final entity in pendingEntities) {
       if (getSyncMetadata(entity).status == SyncStatus.pendingDelete) {
@@ -184,7 +185,7 @@ abstract class BaseEntitySyncCoordinator<T> {
           syncedAt: DateTime.now(),
         );
       } catch (error) {
-        failedEntityIds.add(getEntityId(entity));
+        failedUpsertEntityIds.add(getEntityId(entity));
 
         await _markEntitySyncFailure(
           entity,
@@ -193,19 +194,21 @@ abstract class BaseEntitySyncCoordinator<T> {
       }
     }
 
-    await flushPendingDeletes();
+    final List<String> failedDeleteEntityIds = await flushPendingDeletes();
 
-    if (failedEntityIds.isNotEmpty) {
-      throw StateError(
-        'failed to sync ${failedEntityIds.length} '
-        '$deleteOperationPrefix pending entr${failedEntityIds.length == 1 ? 'y' : 'ies'}',
+    if (failedUpsertEntityIds.isNotEmpty || failedDeleteEntityIds.isNotEmpty) {
+      throw EntitySyncBatchFailure(
+        entityLabel: deleteOperationPrefix,
+        failedUpsertEntityIds: failedUpsertEntityIds,
+        failedDeleteEntityIds: failedDeleteEntityIds,
       );
     }
   }
 
-  Future<void> flushPendingDeletes() async {
+  Future<List<String>> flushPendingDeletes() async {
     final operations = await pendingSyncDeleteLocalDataSource
         .getPendingByEntityType(entityType);
+    final List<String> failedDeleteEntityIds = <String>[];
 
     for (final operation in operations) {
       try {
@@ -217,6 +220,8 @@ abstract class BaseEntitySyncCoordinator<T> {
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
         await deleteLocal(operation.localEntityId);
       } catch (error) {
+        failedDeleteEntityIds.add(operation.localEntityId);
+
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,
           attemptedAt: DateTime.now(),
@@ -224,6 +229,8 @@ abstract class BaseEntitySyncCoordinator<T> {
         );
       }
     }
+
+    return failedDeleteEntityIds;
   }
 
   Future<void> _markEntitySyncFailure(

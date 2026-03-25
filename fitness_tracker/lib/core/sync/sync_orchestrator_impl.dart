@@ -2,6 +2,7 @@ import '../../core/config/app_sync_policy.dart';
 import '../../core/enums/sync_trigger.dart';
 import '../../core/logging/app_logger.dart';
 import '../../domain/repositories/app_session_repository.dart';
+import '../../data/sync/entity_sync_batch_failure.dart';
 import 'initial_cloud_migration_coordinator.dart';
 import 'remote_sync_availability.dart';
 import 'sync_feature.dart';
@@ -137,10 +138,12 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
           category: 'sync',
         );
       } catch (error, stackTrace) {
+        final errorMessage = _resolveFeatureErrorMessage(error);
+
         featureResults.add(
           SyncFeatureRunResult.failure(
             featureName: feature.name,
-            errorMessage: error.toString(),
+            errorMessage: errorMessage,
           ),
         );
 
@@ -174,6 +177,14 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
       message: 'sync orchestration completed successfully',
       featureResults: featureResults,
     );
+  }
+
+  String _resolveFeatureErrorMessage(Object error) {
+    if (error is EntitySyncBatchFailure) {
+      return error.message;
+    }
+
+    return error.toString();
   }
 
   Future<void> _recordSuccessfulCloudSync() async {
