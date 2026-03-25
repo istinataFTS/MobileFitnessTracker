@@ -167,23 +167,40 @@ abstract class BaseEntitySyncCoordinator<T> {
     }
 
     final pendingEntities = await getPendingSyncEntities();
+    final List<String> failedEntityIds = <String>[];
 
     for (final entity in pendingEntities) {
       if (getSyncMetadata(entity).status == SyncStatus.pendingDelete) {
         continue;
       }
 
-      final remoteEntity = await upsertRemote(entity);
-      final remoteMetadata = getSyncMetadata(remoteEntity);
+      try {
+        final remoteEntity = await upsertRemote(entity);
+        final remoteMetadata = getSyncMetadata(remoteEntity);
 
-      await markAsSynced(
-        localId: getEntityId(entity),
-        serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
-        syncedAt: DateTime.now(),
-      );
+        await markAsSynced(
+          localId: getEntityId(entity),
+          serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
+          syncedAt: DateTime.now(),
+        );
+      } catch (error) {
+        failedEntityIds.add(getEntityId(entity));
+
+        await _markEntitySyncFailure(
+          entity,
+          errorMessage: error.toString(),
+        );
+      }
     }
 
     await flushPendingDeletes();
+
+    if (failedEntityIds.isNotEmpty) {
+      throw StateError(
+        'failed to sync ${failedEntityIds.length} '
+        '$deleteOperationPrefix pending entr${failedEntityIds.length == 1 ? 'y' : 'ies'}',
+      );
+    }
   }
 
   Future<void> flushPendingDeletes() async {
@@ -207,6 +224,27 @@ abstract class BaseEntitySyncCoordinator<T> {
         );
       }
     }
+  }
+
+  Future<void> _markEntitySyncFailure(
+    T entity, {
+    required String errorMessage,
+  }) async {
+    final localId = getEntityId(entity);
+    final status = getSyncMetadata(entity).status;
+
+    if (status == SyncStatus.pendingUpdate) {
+      await markAsPendingUpdate(
+        localId,
+        errorMessage: errorMessage,
+      );
+      return;
+    }
+
+    await markAsPendingUpload(
+      localId,
+      errorMessage: errorMessage,
+    );
   }
 
   bool _shouldQueueRemoteDelete(T entity) {

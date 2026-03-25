@@ -1,0 +1,338 @@
+import 'package:fitness_tracker/core/enums/sync_entity_type.dart';
+import 'package:fitness_tracker/core/enums/sync_status.dart';
+import 'package:fitness_tracker/data/datasources/local/pending_sync_delete_local_datasource.dart';
+import 'package:fitness_tracker/data/sync/base_entity_sync_coordinator.dart';
+import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
+import 'package:fitness_tracker/domain/entities/pending_sync_delete.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+class TestSyncEntity {
+  final String id;
+  final EntitySyncMetadata syncMetadata;
+
+  const TestSyncEntity({
+    required this.id,
+    required this.syncMetadata,
+  });
+
+  TestSyncEntity copyWith({
+    String? id,
+    EntitySyncMetadata? syncMetadata,
+  }) {
+    return TestSyncEntity(
+      id: id ?? this.id,
+      syncMetadata: syncMetadata ?? this.syncMetadata,
+    );
+  }
+}
+
+class InMemoryPendingSyncDeleteLocalDataSource
+    implements PendingSyncDeleteLocalDataSource {
+  final List<PendingSyncDelete> operations = <PendingSyncDelete>[];
+  final List<String> removedIds = <String>[];
+  final List<String> attemptedIds = <String>[];
+
+  @override
+  Future<void> enqueue(PendingSyncDelete operation) async {
+    operations.add(operation);
+  }
+
+  @override
+  Future<List<PendingSyncDelete>> getPendingByEntityType(
+    SyncEntityType entityType,
+  ) async {
+    return operations
+        .where((operation) => operation.entityType == entityType)
+        .toList();
+  }
+
+  @override
+  Future<void> markAttempted(
+    String operationId, {
+    required DateTime attemptedAt,
+    String? errorMessage,
+  }) async {
+    attemptedIds.add(operationId);
+  }
+
+  @override
+  Future<void> remove(String operationId) async {
+    removedIds.add(operationId);
+    operations.removeWhere((operation) => operation.id == operationId);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    operations.clear();
+    removedIds.clear();
+    attemptedIds.clear();
+  }
+}
+
+class TestEntitySyncCoordinator extends BaseEntitySyncCoordinator<TestSyncEntity> {
+  final Map<String, TestSyncEntity> localStore = <String, TestSyncEntity>{};
+  final Set<String> remoteUpsertFailures;
+  final Set<String> remoteDeleteFailures;
+  final List<String> remoteUpsertCalls = <String>[];
+  final List<String> remoteDeleteCalls = <String>[];
+  final List<String> syncedIds = <String>[];
+  final List<String> pendingUploadIds = <String>[];
+  final List<String> pendingUpdateIds = <String>[];
+  final List<String> pendingDeleteIds = <String>[];
+
+  TestEntitySyncCoordinator({
+    required super.pendingSyncDeleteLocalDataSource,
+    this.remoteUpsertFailures = const <String>{},
+    this.remoteDeleteFailures = const <String>{},
+  });
+
+  @override
+  bool get isRemoteSyncEnabled => true;
+
+  @override
+  SyncEntityType get entityType => SyncEntityType.target;
+
+  @override
+  String get deleteOperationPrefix => 'test_entity';
+
+  @override
+  String getEntityId(TestSyncEntity entity) => entity.id;
+
+  @override
+  EntitySyncMetadata getSyncMetadata(TestSyncEntity entity) => entity.syncMetadata;
+
+  @override
+  TestSyncEntity buildAddedLocalEntity(TestSyncEntity entity, DateTime now) {
+    return entity.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+    );
+  }
+
+  @override
+  TestSyncEntity buildUpdatedLocalEntity({
+    required TestSyncEntity entity,
+    required TestSyncEntity? existingLocal,
+    required DateTime now,
+  }) {
+    return entity;
+  }
+
+  @override
+  Future<void> insertLocal(TestSyncEntity entity) async {
+    localStore[entity.id] = entity;
+  }
+
+  @override
+  Future<void> updateLocal(TestSyncEntity entity) async {
+    localStore[entity.id] = entity;
+  }
+
+  @override
+  Future<TestSyncEntity?> getLocalById(String id) async {
+    return localStore[id];
+  }
+
+  @override
+  Future<void> deleteLocal(String id) async {
+    localStore.remove(id);
+  }
+
+  @override
+  Future<List<TestSyncEntity>> getPendingSyncEntities() async {
+    return localStore.values.toList();
+  }
+
+  @override
+  Future<TestSyncEntity> upsertRemote(TestSyncEntity entity) async {
+    remoteUpsertCalls.add(entity.id);
+
+    if (remoteUpsertFailures.contains(entity.id)) {
+      throw StateError('remote upsert failed for ${entity.id}');
+    }
+
+    return entity.copyWith(
+      syncMetadata: entity.syncMetadata.copyWith(
+        serverId: 'server-${entity.id}',
+        status: SyncStatus.synced,
+        clearLastSyncError: true,
+      ),
+    );
+  }
+
+  @override
+  Future<void> deleteRemote({
+    required String localId,
+    required String? serverId,
+  }) async {
+    remoteDeleteCalls.add(localId);
+
+    if (remoteDeleteFailures.contains(localId)) {
+      throw StateError('remote delete failed for $localId');
+    }
+  }
+
+  @override
+  Future<void> markAsSynced({
+    required String localId,
+    required String serverId,
+    required DateTime syncedAt,
+  }) async {
+    syncedIds.add(localId);
+
+    final existing = localStore[localId]!;
+    localStore[localId] = existing.copyWith(
+      syncMetadata: existing.syncMetadata.copyWith(
+        serverId: serverId,
+        status: SyncStatus.synced,
+        lastSyncedAt: syncedAt,
+        clearLastSyncError: true,
+      ),
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpload(
+    String localId, {
+    required String errorMessage,
+  }) async {
+    pendingUploadIds.add(localId);
+
+    final existing = localStore[localId]!;
+    localStore[localId] = existing.copyWith(
+      syncMetadata: existing.syncMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        lastSyncError: errorMessage,
+      ),
+    );
+  }
+
+  @override
+  Future<void> markAsPendingUpdate(
+    String localId, {
+    required String errorMessage,
+  }) async {
+    pendingUpdateIds.add(localId);
+
+    final existing = localStore[localId]!;
+    localStore[localId] = existing.copyWith(
+      syncMetadata: existing.syncMetadata.copyWith(
+        status: SyncStatus.pendingUpdate,
+        lastSyncError: errorMessage,
+      ),
+    );
+  }
+
+  @override
+  Future<void> markAsPendingDelete(String localId) async {
+    pendingDeleteIds.add(localId);
+
+    final existing = localStore[localId]!;
+    localStore[localId] = existing.copyWith(
+      syncMetadata: existing.syncMetadata.copyWith(
+        status: SyncStatus.pendingDelete,
+      ),
+    );
+  }
+}
+
+void main() {
+  late InMemoryPendingSyncDeleteLocalDataSource pendingDeleteDataSource;
+  late TestEntitySyncCoordinator coordinator;
+
+  setUp(() {
+    pendingDeleteDataSource = InMemoryPendingSyncDeleteLocalDataSource();
+    coordinator = TestEntitySyncCoordinator(
+      pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
+    );
+  });
+
+  test(
+    'syncPendingChanges continues after entity upsert failure, flushes deletes, and throws at end',
+    () async {
+      coordinator = TestEntitySyncCoordinator(
+        pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
+        remoteUpsertFailures: const <String>{'entity-1'},
+      );
+
+      coordinator.localStore['entity-1'] = const TestSyncEntity(
+        id: 'entity-1',
+        syncMetadata: EntitySyncMetadata(
+          status: SyncStatus.pendingUpload,
+        ),
+      );
+      coordinator.localStore['entity-2'] = const TestSyncEntity(
+        id: 'entity-2',
+        syncMetadata: EntitySyncMetadata(
+          status: SyncStatus.pendingUpdate,
+        ),
+      );
+      coordinator.localStore['entity-3'] = const TestSyncEntity(
+        id: 'entity-3',
+        syncMetadata: EntitySyncMetadata(
+          status: SyncStatus.pendingDelete,
+          serverId: 'server-entity-3',
+        ),
+      );
+
+      await pendingDeleteDataSource.enqueue(
+        PendingSyncDelete(
+          id: 'delete-1',
+          entityType: SyncEntityType.target,
+          localEntityId: 'entity-3',
+          serverEntityId: 'server-entity-3',
+          createdAt: DateTime(2026, 3, 25),
+        ),
+      );
+
+      expect(
+        () => coordinator.syncPendingChanges(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('failed to sync 1 test_entity pending entry'),
+          ),
+        ),
+      );
+
+      expect(coordinator.remoteUpsertCalls, <String>['entity-1', 'entity-2']);
+      expect(coordinator.syncedIds, <String>['entity-2']);
+      expect(coordinator.pendingUploadIds, <String>['entity-1']);
+      expect(coordinator.remoteDeleteCalls, <String>['entity-3']);
+      expect(pendingDeleteDataSource.removedIds, <String>['delete-1']);
+      expect(coordinator.localStore.containsKey('entity-3'), isFalse);
+    },
+  );
+
+  test('syncPendingChanges preserves pending update status on retry failure',
+      () async {
+    coordinator = TestEntitySyncCoordinator(
+      pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
+      remoteUpsertFailures: const <String>{'entity-1'},
+    );
+
+    coordinator.localStore['entity-1'] = const TestSyncEntity(
+      id: 'entity-1',
+      syncMetadata: EntitySyncMetadata(
+        status: SyncStatus.pendingUpdate,
+        serverId: 'server-entity-1',
+      ),
+    );
+
+    expect(
+      () => coordinator.syncPendingChanges(),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(coordinator.pendingUpdateIds, <String>['entity-1']);
+    expect(coordinator.localStore['entity-1']!.syncMetadata.status,
+        SyncStatus.pendingUpdate);
+    expect(
+      coordinator.localStore['entity-1']!.syncMetadata.lastSyncError,
+      contains('remote upsert failed for entity-1'),
+    );
+  });
+}
