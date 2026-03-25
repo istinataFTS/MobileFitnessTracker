@@ -6,6 +6,7 @@ import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/network/network_status_service.dart';
 import 'package:fitness_tracker/core/sync/initial_cloud_migration_coordinator.dart';
 import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
+import 'package:fitness_tracker/core/sync/remote_sync_runtime_policy.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator_impl.dart';
@@ -29,6 +30,12 @@ void main() {
   late MockInitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
   late SyncOrchestrator orchestrator;
   late List<String> executionLog;
+
+  const runtimePolicy = RemoteSyncRuntimePolicy(
+    isSupabaseEnabled: true,
+    supabaseUrl: 'https://example.supabase.co',
+    supabaseAnonKey: 'anon-key',
+  );
 
   AppSession authenticatedSession({
     bool requiresInitialCloudMigration = false,
@@ -69,7 +76,7 @@ void main() {
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
       remoteSyncAvailability: RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
+        runtimePolicy: runtimePolicy,
         networkStatusService: networkStatusService,
       ),
       initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
@@ -134,7 +141,7 @@ void main() {
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
       remoteSyncAvailability: RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
+        runtimePolicy: runtimePolicy,
         networkStatusService: networkStatusService,
       ),
       initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
@@ -174,7 +181,7 @@ void main() {
       appSessionRepository: repository,
       syncPolicy: AppSyncPolicy.productionDefault,
       remoteSyncAvailability: RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
+        runtimePolicy: runtimePolicy,
         networkStatusService: networkStatusService,
       ),
       initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,

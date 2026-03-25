@@ -2,6 +2,7 @@ import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/network/network_status_service.dart';
 import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
+import 'package:fitness_tracker/core/sync/remote_sync_runtime_policy.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,134 +11,153 @@ import 'package:mocktail/mocktail.dart';
 class MockNetworkStatusService extends Mock implements NetworkStatusService {}
 
 void main() {
-  group('RemoteSyncAvailability', () {
-    late MockNetworkStatusService networkStatusService;
+  late MockNetworkStatusService networkStatusService;
 
-    const authenticatedSession = AppSession(
+  AppSession authenticatedSession({
+    bool requiresInitialCloudMigration = false,
+  }) {
+    return AppSession(
       authMode: AuthMode.authenticated,
-      user: AppUser(
+      user: const AppUser(
         id: 'user-1',
         email: 'user@test.com',
       ),
+      requiresInitialCloudMigration: requiresInitialCloudMigration,
     );
+  }
 
-    const migrationPendingSession = AppSession(
-      authMode: AuthMode.authenticated,
-      user: AppUser(
-        id: 'user-1',
-        email: 'user@test.com',
+  setUp(() {
+    networkStatusService = MockNetworkStatusService();
+
+    when(() => networkStatusService.isNetworkAvailable())
+        .thenAnswer((_) async => true);
+  });
+
+  test('denies when remote sync runtime policy is not configured', () async {
+    const availability = RemoteSyncAvailability(
+      runtimePolicy: RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: false,
+        supabaseUrl: '',
+        supabaseAnonKey: '',
       ),
-      requiresInitialCloudMigration: true,
+      networkStatusService: MockNetworkStatusService(),
     );
 
-    setUp(() {
-      networkStatusService = MockNetworkStatusService();
-    });
+    final result = await availability.evaluate(
+      session: authenticatedSession(),
+      trigger: SyncTrigger.appLaunch,
+    );
 
-    test('denies sync when remote backend is not configured', () async {
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: false,
-        networkStatusService: networkStatusService,
-      );
+    expect(result.isAllowed, isFalse);
+    expect(result.reason, 'remote backend not configured');
+  });
 
-      final decision = await availability.evaluate(
-        session: authenticatedSession,
-        trigger: SyncTrigger.appLaunch,
-      );
+  test('denies when network is unavailable', () async {
+    when(() => networkStatusService.isNetworkAvailable())
+        .thenAnswer((_) async => false);
 
-      expect(decision.isAllowed, isFalse);
-      expect(decision.reason, 'remote backend not configured');
-      verifyNever(() => networkStatusService.isNetworkAvailable());
-    });
+    final availability = RemoteSyncAvailability(
+      runtimePolicy: const RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      ),
+      networkStatusService: networkStatusService,
+    );
 
-    test('denies sync for guest session', () async {
-      when(() => networkStatusService.isNetworkAvailable())
-          .thenAnswer((_) async => true);
+    final result = await availability.evaluate(
+      session: authenticatedSession(),
+      trigger: SyncTrigger.appLaunch,
+    );
 
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
-        networkStatusService: networkStatusService,
-      );
+    expect(result.isAllowed, isFalse);
+    expect(result.reason, 'network unavailable');
+  });
 
-      final decision = await availability.evaluate(
-        session: const AppSession.guest(),
-        trigger: SyncTrigger.appLaunch,
-      );
+  test('denies when session is not authenticated', () async {
+    final availability = RemoteSyncAvailability(
+      runtimePolicy: const RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      ),
+      networkStatusService: networkStatusService,
+    );
 
-      expect(decision.isAllowed, isFalse);
-      expect(decision.reason, 'session is not authenticated');
-    });
+    final result = await availability.evaluate(
+      session: const AppSession.guest(),
+      trigger: SyncTrigger.appLaunch,
+    );
 
-    test('denies normal sync while initial migration is pending', () async {
-      when(() => networkStatusService.isNetworkAvailable())
-          .thenAnswer((_) async => true);
+    expect(result.isAllowed, isFalse);
+    expect(result.reason, 'session is not authenticated');
+  });
 
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
-        networkStatusService: networkStatusService,
-      );
+  test('denies non-initial-sign-in triggers while migration is pending',
+      () async {
+    final availability = RemoteSyncAvailability(
+      runtimePolicy: const RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      ),
+      networkStatusService: networkStatusService,
+    );
 
-      final decision = await availability.evaluate(
-        session: migrationPendingSession,
-        trigger: SyncTrigger.appResume,
-      );
+    final result = await availability.evaluate(
+      session: authenticatedSession(requiresInitialCloudMigration: true),
+      trigger: SyncTrigger.appResume,
+    );
 
-      expect(decision.isAllowed, isFalse);
-      expect(decision.reason, 'initial cloud migration is pending');
-    });
+    expect(result.isAllowed, isFalse);
+    expect(result.reason, 'initial cloud migration is pending');
+  });
 
-    test('allows initial sign-in sync while migration is pending', () async {
-      when(() => networkStatusService.isNetworkAvailable())
-          .thenAnswer((_) async => true);
+  test('allows initial sign-in while migration is pending', () async {
+    final availability = RemoteSyncAvailability(
+      runtimePolicy: const RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      ),
+      networkStatusService: networkStatusService,
+    );
 
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
-        networkStatusService: networkStatusService,
-      );
+    final result = await availability.evaluate(
+      session: authenticatedSession(requiresInitialCloudMigration: true),
+      trigger: SyncTrigger.initialSignIn,
+    );
 
-      final decision = await availability.evaluate(
-        session: migrationPendingSession,
-        trigger: SyncTrigger.initialSignIn,
-      );
+    expect(result.isAllowed, isTrue);
+    expect(result.reason, 'remote sync allowed');
+  });
 
-      expect(decision.isAllowed, isTrue);
-    });
+  test('runtime policy reports configured only when all required values exist',
+      () {
+    const disabledPolicy = RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: false,
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseAnonKey: 'anon-key',
+    );
+    const missingUrlPolicy = RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: true,
+      supabaseUrl: '',
+      supabaseAnonKey: 'anon-key',
+    );
+    const missingKeyPolicy = RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: true,
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseAnonKey: '',
+    );
+    const validPolicy = RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: true,
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseAnonKey: 'anon-key',
+    );
 
-    test('denies sync when network is unavailable', () async {
-      when(() => networkStatusService.isNetworkAvailable())
-          .thenAnswer((_) async => false);
-
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
-        networkStatusService: networkStatusService,
-      );
-
-      final decision = await availability.evaluate(
-        session: authenticatedSession,
-        trigger: SyncTrigger.appLaunch,
-      );
-
-      expect(decision.isAllowed, isFalse);
-      expect(decision.reason, 'network unavailable');
-    });
-
-    test('allows authenticated sync when prerequisites are satisfied',
-        () async {
-      when(() => networkStatusService.isNetworkAvailable())
-          .thenAnswer((_) async => true);
-
-      final availability = RemoteSyncAvailability(
-        hasRemoteConfiguration: true,
-        networkStatusService: networkStatusService,
-      );
-
-      final decision = await availability.evaluate(
-        session: authenticatedSession,
-        trigger: SyncTrigger.appLaunch,
-      );
-
-      expect(decision.isAllowed, isTrue);
-      expect(decision.reason, 'remote sync allowed');
-    });
+    expect(disabledPolicy.isRemoteSyncConfigured, isFalse);
+    expect(missingUrlPolicy.isRemoteSyncConfigured, isFalse);
+    expect(missingKeyPolicy.isRemoteSyncConfigured, isFalse);
+    expect(validPolicy.isRemoteSyncConfigured, isTrue);
   });
 }

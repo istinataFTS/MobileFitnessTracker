@@ -5,6 +5,7 @@ import '../../core/config/app_sync_policy.dart';
 import '../../core/network/default_network_status_service.dart';
 import '../../core/network/network_status_service.dart';
 import '../../core/sync/remote_sync_availability.dart';
+import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/app_metadata_local_datasource.dart';
 import '../../data/datasources/local/database_helper.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
@@ -23,14 +24,22 @@ void registerCoreModule(GetIt sl) {
     () => AppMetadataLocalDataSourceImpl(databaseHelper: sl()),
   );
 
+  sl.registerLazySingleton(
+    () => const RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: EnvConfig.enableSupabase,
+      supabaseUrl: EnvConfig.supabaseUrl,
+      supabaseAnonKey: EnvConfig.supabaseAnonKey,
+    ),
+  );
+
   sl.registerLazySingleton<SupabaseClientProvider>(
     () => SupabaseClientProvider(
-      isConfigured: EnvConfig.isSupabaseConfigured,
+      isConfigured: sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured,
     ),
   );
 
   sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => EnvConfig.isSupabaseConfigured
+    () => sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured
         ? SupabaseAuthRemoteDataSource(clientProvider: sl())
         : const NoopAuthRemoteDataSource(),
   );
@@ -45,7 +54,7 @@ void registerCoreModule(GetIt sl) {
 
   sl.registerLazySingleton(
     () => RemoteSyncAvailability(
-      hasRemoteConfiguration: EnvConfig.isSupabaseConfigured,
+      runtimePolicy: sl(),
       networkStatusService: sl(),
     ),
   );
