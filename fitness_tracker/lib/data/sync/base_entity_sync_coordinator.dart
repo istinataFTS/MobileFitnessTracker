@@ -1,9 +1,9 @@
-import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import 'entity_sync_batch_failure.dart';
+import 'entity_sync_descriptor.dart';
 
 abstract class BaseEntitySyncCoordinator<T> {
   final PendingSyncDeleteLocalDataSource pendingSyncDeleteLocalDataSource;
@@ -14,9 +14,7 @@ abstract class BaseEntitySyncCoordinator<T> {
 
   bool get isRemoteSyncEnabled;
 
-  SyncEntityType get entityType;
-
-  String get deleteOperationPrefix;
+  EntitySyncDescriptor get descriptor;
 
   String getEntityId(T entity);
 
@@ -143,7 +141,7 @@ abstract class BaseEntitySyncCoordinator<T> {
       await pendingSyncDeleteLocalDataSource.enqueue(
         PendingSyncDelete(
           id: _buildDeleteOperationId(id),
-          entityType: entityType,
+          entityType: descriptor.entityType,
           localEntityId: id,
           serverEntityId: getSyncMetadata(existingLocal).serverId,
           createdAt: DateTime.now(),
@@ -198,7 +196,7 @@ abstract class BaseEntitySyncCoordinator<T> {
 
     if (failedUpsertEntityIds.isNotEmpty || failedDeleteEntityIds.isNotEmpty) {
       throw EntitySyncBatchFailure(
-        entityLabel: deleteOperationPrefix,
+        entityLabel: descriptor.entityLabel,
         failedUpsertEntityIds: failedUpsertEntityIds,
         failedDeleteEntityIds: failedDeleteEntityIds,
       );
@@ -207,7 +205,7 @@ abstract class BaseEntitySyncCoordinator<T> {
 
   Future<List<String>> flushPendingDeletes() async {
     final operations = await pendingSyncDeleteLocalDataSource
-        .getPendingByEntityType(entityType);
+        .getPendingByEntityType(descriptor.entityType);
     final List<String> failedDeleteEntityIds = <String>[];
 
     for (final operation in operations) {
@@ -264,6 +262,6 @@ abstract class BaseEntitySyncCoordinator<T> {
 
   String _buildDeleteOperationId(String localEntityId) {
     final timestamp = DateTime.now().microsecondsSinceEpoch;
-    return '${deleteOperationPrefix}_delete_${localEntityId}_$timestamp';
+    return '${descriptor.operationKey}_delete_${localEntityId}_$timestamp';
   }
 }

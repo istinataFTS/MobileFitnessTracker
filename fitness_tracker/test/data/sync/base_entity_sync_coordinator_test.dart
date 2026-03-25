@@ -3,6 +3,7 @@ import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/pending_sync_delete_local_datasource.dart';
 import 'package:fitness_tracker/data/sync/base_entity_sync_coordinator.dart';
 import 'package:fitness_tracker/data/sync/entity_sync_batch_failure.dart';
+import 'package:fitness_tracker/data/sync/entity_sync_descriptor.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/pending_sync_delete.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +72,12 @@ class InMemoryPendingSyncDeleteLocalDataSource
 }
 
 class TestEntitySyncCoordinator extends BaseEntitySyncCoordinator<TestSyncEntity> {
+  static const EntitySyncDescriptor _descriptor = EntitySyncDescriptor(
+    entityType: SyncEntityType.target,
+    operationKey: 'test_entity',
+    entityLabel: 'test entity',
+  );
+
   final Map<String, TestSyncEntity> localStore = <String, TestSyncEntity>{};
   final Set<String> remoteUpsertFailures;
   final Set<String> remoteDeleteFailures;
@@ -91,10 +98,7 @@ class TestEntitySyncCoordinator extends BaseEntitySyncCoordinator<TestSyncEntity
   bool get isRemoteSyncEnabled => true;
 
   @override
-  SyncEntityType get entityType => SyncEntityType.target;
-
-  @override
-  String get deleteOperationPrefix => 'test_entity';
+  EntitySyncDescriptor get descriptor => _descriptor;
 
   @override
   String getEntityId(TestSyncEntity entity) => entity.id;
@@ -305,7 +309,7 @@ void main() {
               .having(
                 (error) => error.message,
                 'message',
-                contains('failed to upsert 1 test_entity entry (entity-1)'),
+                contains('failed to upsert 1 test entity entry (entity-1)'),
               ),
         ),
       );
@@ -397,7 +401,7 @@ void main() {
             .having(
               (error) => error.message,
               'message',
-              contains('failed to delete 1 test_entity entry (entity-3)'),
+              contains('failed to delete 1 test entity entry (entity-3)'),
             ),
       ),
     );

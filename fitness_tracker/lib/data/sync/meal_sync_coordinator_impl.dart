@@ -7,10 +7,17 @@ import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/meal_remote_datasource.dart';
 import '../models/meal_model.dart';
 import 'base_entity_sync_coordinator.dart';
+import 'entity_sync_descriptor.dart';
 import 'meal_sync_coordinator.dart';
 
 class MealSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Meal>
     implements MealSyncCoordinator {
+  static const EntitySyncDescriptor _descriptor = EntitySyncDescriptor(
+    entityType: SyncEntityType.meal,
+    operationKey: 'meal',
+    entityLabel: 'meal',
+  );
+
   final MealLocalDataSource localDataSource;
   final MealRemoteDataSource remoteDataSource;
 
@@ -24,10 +31,7 @@ class MealSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Meal>
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  SyncEntityType get entityType => SyncEntityType.meal;
-
-  @override
-  String get deleteOperationPrefix => 'meal';
+  EntitySyncDescriptor get descriptor => _descriptor;
 
   @override
   String getEntityId(Meal entity) => entity.id;

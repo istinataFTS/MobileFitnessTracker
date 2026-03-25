@@ -1,4 +1,3 @@
-import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/target.dart';
@@ -7,10 +6,17 @@ import '../datasources/local/target_local_datasource.dart';
 import '../datasources/remote/target_remote_datasource.dart';
 import '../models/target_model.dart';
 import 'base_entity_sync_coordinator.dart';
+import 'entity_sync_descriptor.dart';
 import 'target_sync_coordinator.dart';
 
 class TargetSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Target>
     implements TargetSyncCoordinator {
+  static const EntitySyncDescriptor _descriptor = EntitySyncDescriptor(
+    entityType: SyncEntityType.target,
+    operationKey: 'target',
+    entityLabel: 'target',
+  );
+
   final TargetLocalDataSource localDataSource;
   final TargetRemoteDataSource remoteDataSource;
 
@@ -24,10 +30,7 @@ class TargetSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Target>
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  SyncEntityType get entityType => SyncEntityType.target;
-
-  @override
-  String get deleteOperationPrefix => 'target';
+  EntitySyncDescriptor get descriptor => _descriptor;
 
   @override
   String getEntityId(Target entity) => entity.id;

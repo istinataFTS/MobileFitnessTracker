@@ -7,10 +7,17 @@ import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/exercise_remote_datasource.dart';
 import '../models/exercise_model.dart';
 import 'base_entity_sync_coordinator.dart';
+import 'entity_sync_descriptor.dart';
 import 'exercise_sync_coordinator.dart';
 
 class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
     implements ExerciseSyncCoordinator {
+  static const EntitySyncDescriptor _descriptor = EntitySyncDescriptor(
+    entityType: SyncEntityType.exercise,
+    operationKey: 'exercise',
+    entityLabel: 'exercise',
+  );
+
   final ExerciseLocalDataSource localDataSource;
   final ExerciseRemoteDataSource remoteDataSource;
 
@@ -24,10 +31,7 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  SyncEntityType get entityType => SyncEntityType.exercise;
-
-  @override
-  String get deleteOperationPrefix => 'exercise';
+  EntitySyncDescriptor get descriptor => _descriptor;
 
   @override
   String getEntityId(Exercise entity) => entity.id;

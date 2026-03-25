@@ -7,11 +7,18 @@ import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/nutrition_log_remote_datasource.dart';
 import '../models/nutrition_log_model.dart';
 import 'base_entity_sync_coordinator.dart';
+import 'entity_sync_descriptor.dart';
 import 'nutrition_log_sync_coordinator.dart';
 
 class NutritionLogSyncCoordinatorImpl
     extends BaseEntitySyncCoordinator<NutritionLog>
     implements NutritionLogSyncCoordinator {
+  static const EntitySyncDescriptor _descriptor = EntitySyncDescriptor(
+    entityType: SyncEntityType.nutritionLog,
+    operationKey: 'nutrition_log',
+    entityLabel: 'nutrition log',
+  );
+
   final NutritionLogLocalDataSource localDataSource;
   final NutritionLogRemoteDataSource remoteDataSource;
 
@@ -25,10 +32,7 @@ class NutritionLogSyncCoordinatorImpl
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
-  SyncEntityType get entityType => SyncEntityType.nutritionLog;
-
-  @override
-  String get deleteOperationPrefix => 'nutrition_log';
+  EntitySyncDescriptor get descriptor => _descriptor;
 
   @override
   String getEntityId(NutritionLog entity) => entity.id;
