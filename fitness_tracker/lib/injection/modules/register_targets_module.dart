@@ -24,9 +24,19 @@ void registerTargetsModule(GetIt sl) {
     ),
   );
 
+  sl.registerLazySingleton(
+    () => AddTarget(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => GetAllTargets(sl()));
-  sl.registerLazySingleton(() => AddTarget(sl()));
-  sl.registerLazySingleton(() => UpdateTarget(sl()));
+  sl.registerLazySingleton(
+    () => UpdateTarget(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => DeleteTarget(sl()));
 
   sl.registerLazySingleton<TargetRepository>(
