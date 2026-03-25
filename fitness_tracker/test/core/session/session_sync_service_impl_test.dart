@@ -4,6 +4,7 @@ import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/core/session/session_sync_service_impl.dart';
+import 'package:fitness_tracker/core/sync/initial_cloud_migration_coordinator.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
@@ -18,10 +19,14 @@ class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
 
 class MockAuthRemoteDataSource extends Mock implements AuthRemoteDataSource {}
 
+class MockInitialCloudMigrationCoordinator extends Mock
+    implements InitialCloudMigrationCoordinator {}
+
 void main() {
   late MockAppSessionRepository repository;
   late MockSyncOrchestrator syncOrchestrator;
   late MockAuthRemoteDataSource authRemoteDataSource;
+  late MockInitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
   late SessionSyncService service;
 
   const user = AppUser(
@@ -41,6 +46,7 @@ void main() {
     repository = MockAppSessionRepository();
     syncOrchestrator = MockSyncOrchestrator();
     authRemoteDataSource = MockAuthRemoteDataSource();
+    initialCloudMigrationCoordinator = MockInitialCloudMigrationCoordinator();
 
     when(() => repository.syncPolicy)
         .thenReturn(AppSyncPolicy.productionDefault);
@@ -49,41 +55,47 @@ void main() {
       appSessionRepository: repository,
       authRemoteDataSource: authRemoteDataSource,
       syncOrchestrator: syncOrchestrator,
+      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
     );
   });
 
-  test('persists session, runs initial sign-in sync, and completes migration', () async {
-    when(
-      () => repository.startAuthenticatedSession(
-        any(),
-        requiresInitialCloudMigration:
-            any(named: 'requiresInitialCloudMigration'),
-      ),
-    ).thenAnswer((_) async => const Right(null));
+  test(
+    'persists session and runs initial cloud migration when migration is required',
+    () async {
+      when(
+        () => repository.startAuthenticatedSession(
+          any(),
+          requiresInitialCloudMigration:
+              any(named: 'requiresInitialCloudMigration'),
+        ),
+      ).thenAnswer((_) async => const Right(null));
 
-    when(() => syncOrchestrator.run(SyncTrigger.initialSignIn))
-        .thenAnswer((_) async => completedSyncResult);
+      when(() => initialCloudMigrationCoordinator.runIfRequired()).thenAnswer(
+        (_) async => const InitialCloudMigrationResult(
+          status: InitialCloudMigrationStatus.completed,
+          message: 'migration complete',
+        ),
+      );
 
-    when(() => repository.completeInitialCloudMigration())
-        .thenAnswer((_) async => const Right(null));
+      final result = await service.establishAuthenticatedSession(user);
 
-    final result = await service.establishAuthenticatedSession(user);
+      expect(result.isSuccess, isTrue);
+      expect(
+        result.message,
+        'authenticated session established and initial migration completed',
+      );
 
-    expect(result.isSuccess, isTrue);
-    expect(
-      result.message,
-      'authenticated session established and initial migration completed',
-    );
-
-    verify(
-      () => repository.startAuthenticatedSession(
-        user,
-        requiresInitialCloudMigration: true,
-      ),
-    ).called(1);
-    verify(() => syncOrchestrator.run(SyncTrigger.initialSignIn)).called(1);
-    verify(() => repository.completeInitialCloudMigration()).called(1);
-  });
+      verify(
+        () => repository.startAuthenticatedSession(
+          user,
+          requiresInitialCloudMigration: true,
+        ),
+      ).called(1);
+      verify(() => initialCloudMigrationCoordinator.runIfRequired()).called(1);
+      verifyNever(() => syncOrchestrator.run(any()));
+      verifyNever(() => repository.completeInitialCloudMigration());
+    },
+  );
 
   test('fails when authenticated session cannot be persisted', () async {
     when(
@@ -105,10 +117,11 @@ void main() {
     );
 
     verifyNever(() => syncOrchestrator.run(any()));
+    verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
     verifyNever(() => repository.completeInitialCloudMigration());
   });
 
-  test('fails when initial sign-in sync fails', () async {
+  test('fails when initial cloud migration fails', () async {
     when(
       () => repository.startAuthenticatedSession(
         any(),
@@ -117,37 +130,11 @@ void main() {
       ),
     ).thenAnswer((_) async => const Right(null));
 
-    when(() => syncOrchestrator.run(SyncTrigger.initialSignIn)).thenAnswer(
-      (_) async => const SyncRunResult(
-        status: SyncRunStatus.failed,
-        trigger: SyncTrigger.initialSignIn,
-        message: 'sync failed',
-        featureResults: <SyncFeatureRunResult>[],
+    when(() => initialCloudMigrationCoordinator.runIfRequired()).thenAnswer(
+      (_) async => const InitialCloudMigrationResult(
+        status: InitialCloudMigrationStatus.failed,
+        message: 'step upload failed',
       ),
-    );
-
-    final result = await service.establishAuthenticatedSession(user);
-
-    expect(result.isFailure, isTrue);
-    expect(result.message, 'initial sign-in sync failed: sync failed');
-
-    verifyNever(() => repository.completeInitialCloudMigration());
-  });
-
-  test('fails when migration finalization fails after successful sync', () async {
-    when(
-      () => repository.startAuthenticatedSession(
-        any(),
-        requiresInitialCloudMigration:
-            any(named: 'requiresInitialCloudMigration'),
-      ),
-    ).thenAnswer((_) async => const Right(null));
-
-    when(() => syncOrchestrator.run(SyncTrigger.initialSignIn))
-        .thenAnswer((_) async => completedSyncResult);
-
-    when(() => repository.completeInitialCloudMigration()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'metadata write failed')),
     );
 
     final result = await service.establishAuthenticatedSession(user);
@@ -155,8 +142,38 @@ void main() {
     expect(result.isFailure, isTrue);
     expect(
       result.message,
-      'initial sign-in sync completed but migration finalization failed: metadata write failed',
+      'initial migration failed after session establishment: step upload failed',
     );
+
+    verifyNever(() => syncOrchestrator.run(any()));
+    verifyNever(() => repository.completeInitialCloudMigration());
+  });
+
+  test('skips when initial cloud migration is skipped', () async {
+    when(
+      () => repository.startAuthenticatedSession(
+        any(),
+        requiresInitialCloudMigration:
+            any(named: 'requiresInitialCloudMigration'),
+      ),
+    ).thenAnswer((_) async => const Right(null));
+
+    when(() => initialCloudMigrationCoordinator.runIfRequired()).thenAnswer(
+      (_) async => const InitialCloudMigrationResult(
+        status: InitialCloudMigrationStatus.skipped,
+        message: 'initial cloud migration already completed',
+      ),
+    );
+
+    final result = await service.establishAuthenticatedSession(user);
+
+    expect(result.isSkipped, isTrue);
+    expect(
+      result.message,
+      'authenticated session established but initial migration was skipped: initial cloud migration already completed',
+    );
+
+    verifyNever(() => syncOrchestrator.run(any()));
   });
 
   test('manual refresh delegates to manual refresh sync trigger', () async {
@@ -177,24 +194,27 @@ void main() {
     verify(() => syncOrchestrator.run(SyncTrigger.manualRefresh)).called(1);
   });
 
-  test('manual refresh returns skipped result when orchestration is skipped', () async {
-    when(() => syncOrchestrator.run(SyncTrigger.manualRefresh)).thenAnswer(
-      (_) async => const SyncRunResult(
-        status: SyncRunStatus.skipped,
-        trigger: SyncTrigger.manualRefresh,
-        message: 'session is not authenticated',
-        featureResults: <SyncFeatureRunResult>[],
-      ),
-    );
+  test(
+    'manual refresh returns skipped result when orchestration is skipped',
+    () async {
+      when(() => syncOrchestrator.run(SyncTrigger.manualRefresh)).thenAnswer(
+        (_) async => const SyncRunResult(
+          status: SyncRunStatus.skipped,
+          trigger: SyncTrigger.manualRefresh,
+          message: 'session is not authenticated',
+          featureResults: <SyncFeatureRunResult>[],
+        ),
+      );
 
-    final result = await service.runManualRefresh();
+      final result = await service.runManualRefresh();
 
-    expect(result.isSkipped, isTrue);
-    expect(
-      result.message,
-      'manual refresh skipped: session is not authenticated',
-    );
-  });
+      expect(result.isSkipped, isTrue);
+      expect(
+        result.message,
+        'manual refresh skipped: session is not authenticated',
+      );
+    },
+  );
 
   test('signOut signs out remotely and clears local session', () async {
     when(() => authRemoteDataSource.signOut())

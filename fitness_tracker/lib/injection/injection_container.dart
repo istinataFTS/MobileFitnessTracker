@@ -6,6 +6,9 @@ import '../core/auth/auth_session_service.dart';
 import '../core/auth/auth_session_service_impl.dart';
 import '../core/session/session_sync_service.dart';
 import '../core/session/session_sync_service_impl.dart';
+import '../core/sync/initial_cloud_migration_coordinator.dart';
+import '../core/sync/initial_cloud_migration_coordinator_impl.dart';
+import '../core/sync/initial_cloud_migration_step.dart';
 import '../core/sync/sync_feature.dart';
 import '../core/sync/sync_orchestrator.dart';
 import '../core/sync/sync_orchestrator_impl.dart';
@@ -58,6 +61,38 @@ Future<void> resetDependencies() {
 }
 
 void _registerAppComposition(GetIt sl) {
+  sl.registerLazySingleton<List<InitialCloudMigrationStep>>(
+    () => <InitialCloudMigrationStep>[
+      InitialCloudMigrationStep(
+        key: 'targets',
+        run: (_) => sl<TargetSyncCoordinator>().syncPendingChanges(),
+      ),
+      InitialCloudMigrationStep(
+        key: 'workout_sets',
+        run: (_) => sl<WorkoutSetSyncCoordinator>().syncPendingChanges(),
+      ),
+      InitialCloudMigrationStep(
+        key: 'exercises',
+        run: (_) => sl<ExerciseSyncCoordinator>().syncPendingChanges(),
+      ),
+      InitialCloudMigrationStep(
+        key: 'meals',
+        run: (_) => sl<MealSyncCoordinator>().syncPendingChanges(),
+      ),
+      InitialCloudMigrationStep(
+        key: 'nutrition_logs',
+        run: (_) => sl<NutritionLogSyncCoordinator>().syncPendingChanges(),
+      ),
+    ],
+  );
+
+  sl.registerLazySingleton<InitialCloudMigrationCoordinator>(
+    () => InitialCloudMigrationCoordinatorImpl(
+      appSessionRepository: sl(),
+      steps: sl(),
+    ),
+  );
+
   sl.registerLazySingleton<List<SyncFeature>>(
     () => <SyncFeature>[
       SyncFeature(
@@ -98,6 +133,7 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
+      initialCloudMigrationCoordinator: sl(),
     ),
   );
 
