@@ -68,19 +68,15 @@ void main() {
   group('WorkoutSetRepositoryImpl.getAllSets', () {
     test('returns local sets for localOnly', () async {
       final List<WorkoutSet> localSets = <WorkoutSet>[
-        buildWorkoutSet(
-          id: 'set-1',
-          exerciseId: 'bench',
-          date: baseDate,
-        ),
+        buildWorkoutSet(id: 'set-1', exerciseId: 'bench', date: baseDate),
       ];
 
-      when(() => localDataSource.getAllSets()).thenAnswer(
-        (_) async => localSets,
-      );
+      when(
+        () => localDataSource.getAllSets(),
+      ).thenAnswer((_) async => localSets);
 
-      final Either<Failure, List<WorkoutSet>> result =
-          await repository.getAllSets();
+      final Either<Failure, List<WorkoutSet>> result = await repository
+          .getAllSets();
 
       expect(result, Right<Failure, List<WorkoutSet>>(localSets));
       verify(() => localDataSource.getAllSets()).called(1);
@@ -88,126 +84,187 @@ void main() {
       verifyNever(() => localDataSource.mergeRemoteSets(any()));
     });
 
-    test('merges remote cache for remoteThenLocal instead of replaceAll',
-        () async {
-      final List<WorkoutSet> localSets = <WorkoutSet>[
-        buildWorkoutSet(
+    test(
+      'merges remote cache for remoteThenLocal instead of replaceAll',
+      () async {
+        final List<WorkoutSet> localSets = <WorkoutSet>[
+          buildWorkoutSet(
+            id: 'set-1',
+            exerciseId: 'bench',
+            date: baseDate,
+            weight: 90,
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.pendingUpdate,
+            ),
+          ),
+        ];
+
+        final List<WorkoutSet> remoteSets = <WorkoutSet>[
+          buildWorkoutSet(
+            id: 'set-1',
+            exerciseId: 'bench',
+            date: baseDate,
+            weight: 100,
+            syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+          ),
+          buildWorkoutSet(
+            id: 'set-2',
+            exerciseId: 'squat',
+            date: baseDate.add(const Duration(days: 1)),
+            syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+          ),
+        ];
+
+        final List<WorkoutSet> mergedSets = <WorkoutSet>[
+          localSets.first,
+          remoteSets.last,
+        ];
+
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+        when(
+          () => localDataSource.getAllSets(),
+        ).thenAnswer((_) async => localSets);
+        when(
+          () => remoteDataSource.getAllSets(),
+        ).thenAnswer((_) async => remoteSets);
+        when(
+          () => localDataSource.mergeRemoteSets(any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => localDataSource.getAllSets(),
+        ).thenAnswer((_) async => mergedSets);
+
+        final Either<Failure, List<WorkoutSet>> result = await repository
+            .getAllSets(sourcePreference: DataSourcePreference.remoteThenLocal);
+
+        expect(result, Right<Failure, List<WorkoutSet>>(mergedSets));
+        verify(() => remoteDataSource.getAllSets()).called(1);
+        verify(() => localDataSource.mergeRemoteSets(any())).called(1);
+      },
+    );
+  });
+
+  group('WorkoutSetRepositoryImpl.getSetById', () {
+    test(
+      'returns null without remote lookup when local cache is empty',
+      () async {
+        when(
+          () => localDataSource.getSetById('set-1'),
+        ).thenAnswer((_) async => null);
+
+        final Either<Failure, WorkoutSet?> result = await repository.getSetById(
+          'set-1',
+          sourcePreference: DataSourcePreference.localThenRemote,
+        );
+
+        expect(result, const Right<Failure, WorkoutSet?>(null));
+        verifyNever(() => remoteDataSource.getSetById(any()));
+      },
+    );
+
+    test(
+      'preserves pending local update over remote in remoteThenLocal',
+      () async {
+        final WorkoutSet localSet = buildWorkoutSet(
           id: 'set-1',
           exerciseId: 'bench',
           date: baseDate,
-          weight: 90,
+          weight: 80,
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.pendingUpdate,
           ),
-        ),
-      ];
+        );
 
-      final List<WorkoutSet> remoteSets = <WorkoutSet>[
-        buildWorkoutSet(
+        final WorkoutSet remoteSet = buildWorkoutSet(
           id: 'set-1',
           exerciseId: 'bench',
           date: baseDate,
           weight: 100,
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
-        ),
-        buildWorkoutSet(
-          id: 'set-2',
-          exerciseId: 'squat',
-          date: baseDate.add(const Duration(days: 1)),
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
-        ),
-      ];
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      final List<WorkoutSet> mergedSets = <WorkoutSet>[
-        localSets.first,
-        remoteSets.last,
-      ];
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+        when(
+          () => localDataSource.getSetById('set-1'),
+        ).thenAnswer((_) async => localSet);
+        when(
+          () => remoteDataSource.getSetById('set-1'),
+        ).thenAnswer((_) async => remoteSet);
+        when(
+          () => localDataSource.upsertSet(localSet),
+        ).thenAnswer((_) async {});
 
-      when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => localDataSource.getAllSets()).thenAnswer((_) async => localSets);
-      when(() => remoteDataSource.getAllSets()).thenAnswer((_) async => remoteSets);
-      when(() => localDataSource.mergeRemoteSets(any())).thenAnswer((_) async {});
-      when(() => localDataSource.getAllSets()).thenAnswer((_) async => mergedSets);
+        final Either<Failure, WorkoutSet?> result = await repository.getSetById(
+          'set-1',
+          sourcePreference: DataSourcePreference.remoteThenLocal,
+        );
 
-      final Either<Failure, List<WorkoutSet>> result =
-          await repository.getAllSets(
-        sourcePreference: DataSourcePreference.remoteThenLocal,
-      );
+        expect(result, Right<Failure, WorkoutSet?>(localSet));
+        verify(() => localDataSource.upsertSet(localSet)).called(1);
+      },
+    );
 
-      expect(result, Right<Failure, List<WorkoutSet>>(mergedSets));
-      verify(() => remoteDataSource.getAllSets()).called(1);
-      verify(() => localDataSource.mergeRemoteSets(any())).called(1);
-    });
-  });
-
-  group('WorkoutSetRepositoryImpl.getSetById', () {
-    test('returns null for pending delete local record in localThenRemote',
-        () async {
-      final WorkoutSet pendingDeleteLocal = buildWorkoutSet(
+    test('returns local cache snapshot after localThenRemote upsert', () async {
+      final WorkoutSet remoteSet = buildWorkoutSet(
         id: 'set-1',
         exerciseId: 'bench',
         date: baseDate,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
-      when(() => localDataSource.getSetById('set-1')).thenAnswer(
-        (_) async => pendingDeleteLocal,
-      );
+      int localReadCount = 0;
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getSetById('set-1')).thenAnswer((_) async {
+        localReadCount += 1;
+        return localReadCount == 1 ? null : remoteSet;
+      });
+      when(
+        () => remoteDataSource.getSetById('set-1'),
+      ).thenAnswer((_) async => remoteSet);
+      when(() => localDataSource.upsertSet(remoteSet)).thenAnswer((_) async {});
 
       final Either<Failure, WorkoutSet?> result = await repository.getSetById(
         'set-1',
         sourcePreference: DataSourcePreference.localThenRemote,
       );
 
-      expect(result, const Right<Failure, WorkoutSet?>(null));
-      verifyNever(() => remoteDataSource.getSetById(any()));
+      expect(result, Right<Failure, WorkoutSet?>(remoteSet));
+      verify(() => localDataSource.getSetById('set-1')).called(2);
+      verify(() => localDataSource.upsertSet(remoteSet)).called(1);
     });
 
-    test('preserves pending local update over remote in remoteThenLocal',
-        () async {
-      final WorkoutSet localSet = buildWorkoutSet(
-        id: 'set-1',
-        exerciseId: 'bench',
-        date: baseDate,
-        weight: 80,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingUpdate,
-        ),
-      );
+    test(
+      'returns null when hidden pending delete remains after remote refresh',
+      () async {
+        final WorkoutSet remoteSet = buildWorkoutSet(
+          id: 'set-1',
+          exerciseId: 'bench',
+          date: baseDate,
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      final WorkoutSet remoteSet = buildWorkoutSet(
-        id: 'set-1',
-        exerciseId: 'bench',
-        date: baseDate,
-        weight: 100,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+        when(
+          () => localDataSource.getSetById('set-1'),
+        ).thenAnswer((_) async => null);
+        when(
+          () => remoteDataSource.getSetById('set-1'),
+        ).thenAnswer((_) async => remoteSet);
+        when(
+          () => localDataSource.upsertSet(remoteSet),
+        ).thenAnswer((_) async {});
 
-      when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => localDataSource.getSetById('set-1')).thenAnswer(
-        (_) async => localSet,
-      );
-      when(() => remoteDataSource.getSetById('set-1')).thenAnswer(
-        (_) async => remoteSet,
-      );
-      when(() => localDataSource.upsertSet(localSet)).thenAnswer((_) async {});
+        final Either<Failure, WorkoutSet?> result = await repository.getSetById(
+          'set-1',
+          sourcePreference: DataSourcePreference.remoteThenLocal,
+        );
 
-      final Either<Failure, WorkoutSet?> result = await repository.getSetById(
-        'set-1',
-        sourcePreference: DataSourcePreference.remoteThenLocal,
-      );
-
-      expect(result, Right<Failure, WorkoutSet?>(localSet));
-      verify(() => localDataSource.upsertSet(localSet)).called(1);
-    });
+        expect(result, const Right<Failure, WorkoutSet?>(null));
+        verify(() => localDataSource.getSetById('set-1')).called(2);
+        verify(() => localDataSource.upsertSet(remoteSet)).called(1);
+      },
+    );
   });
 
   group('WorkoutSetRepositoryImpl writes', () {
@@ -218,9 +275,7 @@ void main() {
         date: baseDate,
       );
 
-      when(() => syncCoordinator.persistAddedSet(set)).thenAnswer(
-        (_) async {},
-      );
+      when(() => syncCoordinator.persistAddedSet(set)).thenAnswer((_) async {});
 
       final Either<Failure, void> result = await repository.addSet(set);
 
@@ -235,9 +290,9 @@ void main() {
         date: baseDate,
       );
 
-      when(() => syncCoordinator.persistUpdatedSet(set)).thenAnswer(
-        (_) async {},
-      );
+      when(
+        () => syncCoordinator.persistUpdatedSet(set),
+      ).thenAnswer((_) async {});
 
       final Either<Failure, void> result = await repository.updateSet(set);
 
@@ -246,9 +301,9 @@ void main() {
     });
 
     test('deleteSet delegates to sync coordinator', () async {
-      when(() => syncCoordinator.persistDeletedSet('set-1')).thenAnswer(
-        (_) async {},
-      );
+      when(
+        () => syncCoordinator.persistDeletedSet('set-1'),
+      ).thenAnswer((_) async {});
 
       final Either<Failure, void> result = await repository.deleteSet('set-1');
 

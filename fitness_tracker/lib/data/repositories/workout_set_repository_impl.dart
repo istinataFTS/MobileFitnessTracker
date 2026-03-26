@@ -17,10 +17,10 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
 
   static final LocalRemoteMerge<WorkoutSet> _merge =
       LocalRemoteMerge<WorkoutSet>(
-    getId: (set) => set.id,
-    getUpdatedAt: (set) => set.updatedAt,
-    getSyncMetadata: (set) => set.syncMetadata,
-  );
+        getId: (set) => set.id,
+        getUpdatedAt: (set) => set.updatedAt,
+        getSyncMetadata: (set) => set.syncMetadata,
+      );
 
   const WorkoutSetRepositoryImpl({
     required this.localDataSource,
@@ -56,7 +56,7 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
         case DataSourcePreference.localThenRemote:
           final local = await localDataSource.getSetById(id);
           if (local != null) {
-            return local.syncMetadata.isPendingDelete ? null : local;
+            return local;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -67,7 +67,7 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
           if (remote != null) {
             await localDataSource.upsertSet(remote);
           }
-          return remote;
+          return localDataSource.getSetById(id);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -78,25 +78,17 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
           final remote = await remoteDataSource.getSetById(id);
 
           if (remote == null) {
-            if (local == null || local.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return local;
           }
 
           if (local == null) {
             await localDataSource.upsertSet(remote);
-            return remote;
+            return localDataSource.getSetById(id);
           }
 
           final merged = _merge.chooseWinner(local: local, remote: remote);
           await localDataSource.upsertSet(merged);
-
-          if (merged.syncMetadata.isPendingDelete) {
-            return null;
-          }
-
-          return merged;
+          return localDataSource.getSetById(id);
       }
     });
   }

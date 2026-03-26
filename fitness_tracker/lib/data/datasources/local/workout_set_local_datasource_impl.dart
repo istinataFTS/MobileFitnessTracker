@@ -1,28 +1,30 @@
+import 'package:sqflite/sqflite.dart';
+
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
-import '../../models/workout_set_model.dart';
+import '../../../core/enums/sync_status.dart';
+import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/entities/workout_set.dart';
+import '../../models/workout_set_model.dart';
 import 'database_helper.dart';
 import 'workout_set_local_datasource.dart';
 
 class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  WorkoutSetLocalDataSourceImpl({
-    required this.databaseHelper,
-  });
+  static final LocalRemoteMerge<WorkoutSet> _merge =
+      LocalRemoteMerge<WorkoutSet>(
+        getId: (set) => set.id,
+        getUpdatedAt: (set) => set.updatedAt,
+        getSyncMetadata: (set) => set.syncMetadata,
+      );
+
+  const WorkoutSetLocalDataSourceImpl({required this.databaseHelper});
 
   @override
   Future<List<WorkoutSet>> getAllSets() async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.workoutSets,
-        orderBy:
-            '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
-      );
-
-      return maps.map(WorkoutSetModel.fromMap).toList();
+      return await _getVisibleSets();
     } catch (e) {
       throw CacheDatabaseException('Failed to get all sets: $e');
     }
@@ -31,19 +33,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   @override
   Future<WorkoutSet?> getSetById(String id) async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setId} = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        return null;
-      }
-
-      return WorkoutSetModel.fromMap(maps.first);
+      return await _getVisibleSetById(id);
     } catch (e) {
       throw CacheDatabaseException('Failed to get set by ID: $e');
     }
@@ -55,8 +45,12 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setExerciseId} = ?',
-        whereArgs: [exerciseId],
+        where:
+            '''
+          ${DatabaseTables.setExerciseId} = ? AND
+          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+        ''',
+        whereArgs: [exerciseId, SyncStatus.pendingDelete.name],
         orderBy:
             '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
       );
@@ -76,10 +70,16 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.workoutSets,
-        where: '${DatabaseTables.setDate} >= ? AND ${DatabaseTables.setDate} <= ?',
+        where:
+            '''
+          ${DatabaseTables.setDate} >= ? AND
+          ${DatabaseTables.setDate} <= ? AND
+          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+        ''',
         whereArgs: [
           startDate.toIso8601String(),
           endDate.toIso8601String(),
+          SyncStatus.pendingDelete.name,
         ],
         orderBy:
             '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
@@ -99,7 +99,10 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
         DatabaseTables.workoutSets,
         where:
             '${DatabaseTables.setSyncStatus} = ? OR ${DatabaseTables.setSyncStatus} = ?',
-        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        whereArgs: [
+          SyncStatus.pendingUpload.name,
+          SyncStatus.pendingUpdate.name,
+        ],
         orderBy: '${DatabaseTables.setUpdatedAt} ASC',
       );
 
@@ -118,6 +121,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       await db.insert(
         DatabaseTables.workoutSets,
         model.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to add set: $e');
@@ -142,6 +146,22 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   @override
+  Future<void> upsertSet(WorkoutSet set) async {
+    final existing = await _getStoredSetById(set.id);
+    if (existing == null) {
+      await addSet(set);
+      return;
+    }
+
+    if (existing.syncMetadata.isPendingDelete &&
+        !set.syncMetadata.isPendingDelete) {
+      return;
+    }
+
+    await updateSet(set);
+  }
+
+  @override
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -154,7 +174,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
         DatabaseTables.workoutSets,
         <String, Object?>{
           DatabaseTables.setServerId: serverId,
-          DatabaseTables.setSyncStatus: 'synced',
+          DatabaseTables.setSyncStatus: SyncStatus.synced.name,
           DatabaseTables.setLastSyncedAt: syncedAt.toIso8601String(),
           DatabaseTables.setLastSyncError: null,
         },
@@ -177,7 +197,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       await db.update(
         DatabaseTables.workoutSets,
         <String, Object?>{
-          DatabaseTables.setSyncStatus: 'pendingUpload',
+          DatabaseTables.setSyncStatus: SyncStatus.pendingUpload.name,
           DatabaseTables.setLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.setId} = ?',
@@ -199,7 +219,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       await db.update(
         DatabaseTables.workoutSets,
         <String, Object?>{
-          DatabaseTables.setSyncStatus: 'pendingUpdate',
+          DatabaseTables.setSyncStatus: SyncStatus.pendingUpdate.name,
           DatabaseTables.setLastSyncError: errorMessage,
         },
         where: '${DatabaseTables.setId} = ?',
@@ -211,20 +231,56 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   @override
-  Future<void> replaceAll(List<WorkoutSet> sets) async {
+  Future<void> markAsPendingDelete(
+    String localId, {
+    String? errorMessage,
+  }) async {
     try {
       final db = await databaseHelper.database;
 
-      await db.transaction((txn) async {
-        await txn.delete(DatabaseTables.workoutSets);
+      await db.update(
+        DatabaseTables.workoutSets,
+        <String, Object?>{
+          DatabaseTables.setSyncStatus: SyncStatus.pendingDelete.name,
+          DatabaseTables.setLastSyncError: errorMessage,
+        },
+        where: '${DatabaseTables.setId} = ?',
+        whereArgs: [localId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException('Failed to mark set as pending delete: $e');
+    }
+  }
 
-        final batch = txn.batch();
-        for (final set in sets) {
-          final model = WorkoutSetModel.fromEntity(set);
-          batch.insert(DatabaseTables.workoutSets, model.toMap());
+  @override
+  Future<void> mergeRemoteSets(List<WorkoutSet> remoteSets) async {
+    try {
+      final storedLocalSets = await _getStoredSets();
+      final mergedVisibleSets = _merge.mergeLists(
+        localItems: storedLocalSets,
+        remoteItems: remoteSets,
+      );
+
+      final Map<String, WorkoutSet> mergedById = <String, WorkoutSet>{
+        for (final set in mergedVisibleSets) set.id: set,
+      };
+
+      for (final localSet in storedLocalSets) {
+        if (localSet.syncMetadata.isPendingDelete) {
+          mergedById.putIfAbsent(localSet.id, () => localSet);
         }
-        await batch.commit(noResult: true);
-      });
+      }
+
+      await _replaceStoredSets(mergedById.values.toList());
+    } catch (e) {
+      throw CacheDatabaseException('Failed to merge workout sets: $e');
+    }
+  }
+
+  @override
+  Future<void> replaceAll(List<WorkoutSet> sets) async {
+    try {
+      await _replaceStoredSets(sets);
     } catch (e) {
       throw CacheDatabaseException('Failed to replace workout sets: $e');
     }
@@ -253,5 +309,85 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
     } catch (e) {
       throw CacheDatabaseException('Failed to clear all sets: $e');
     }
+  }
+
+  Future<List<WorkoutSet>> _getVisibleSets() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.workoutSets,
+      where:
+          '${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+      orderBy:
+          '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
+    );
+
+    return maps.map(WorkoutSetModel.fromMap).toList();
+  }
+
+  Future<WorkoutSet?> _getVisibleSetById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.workoutSets,
+      where:
+          '''
+        ${DatabaseTables.setId} = ? AND
+        (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+      ''',
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return WorkoutSetModel.fromMap(maps.first);
+  }
+
+  Future<List<WorkoutSet>> _getStoredSets() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.workoutSets,
+      orderBy:
+          '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
+    );
+
+    return maps.map(WorkoutSetModel.fromMap).toList();
+  }
+
+  Future<WorkoutSet?> _getStoredSetById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.workoutSets,
+      where: '${DatabaseTables.setId} = ?',
+      whereArgs: <Object?>[id],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return WorkoutSetModel.fromMap(maps.first);
+  }
+
+  Future<void> _replaceStoredSets(List<WorkoutSet> sets) async {
+    final db = await databaseHelper.database;
+
+    await db.transaction((txn) async {
+      await txn.delete(DatabaseTables.workoutSets);
+
+      final batch = txn.batch();
+      for (final set in sets) {
+        final model = WorkoutSetModel.fromEntity(set);
+        batch.insert(
+          DatabaseTables.workoutSets,
+          model.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 }

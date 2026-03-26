@@ -27,6 +27,18 @@ void main() {
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
+  setUpAll(() {
+    registerFallbackValue(
+      PendingSyncDelete(
+        id: 'fallback-delete',
+        entityType: SyncEntityType.workoutSet,
+        localEntityId: 'fallback-local-id',
+        serverEntityId: 'fallback-server-id',
+        createdAt: DateTime(2026, 3, 22, 10, 0),
+      ),
+    );
+  });
+
   WorkoutSet buildWorkoutSet({
     required String id,
     SyncStatus status = SyncStatus.synced,
@@ -41,10 +53,7 @@ void main() {
       date: baseDate,
       createdAt: baseDate,
       updatedAt: baseDate,
-      syncMetadata: EntitySyncMetadata(
-        status: status,
-        serverId: serverId,
-      ),
+      syncMetadata: EntitySyncMetadata(status: status, serverId: serverId),
     );
   }
 
@@ -60,52 +69,55 @@ void main() {
     );
   });
 
-  test('delete marks synced row as pending delete before remote delete', () async {
-    final existing = buildWorkoutSet(id: 'set-1');
+  test(
+    'delete marks synced row as pending delete before remote delete',
+    () async {
+      final existing = buildWorkoutSet(id: 'set-1');
 
-    when(() => remoteDataSource.isConfigured).thenReturn(true);
-    when(() => localDataSource.getSetById('set-1')).thenAnswer(
-      (_) async => existing,
-    );
-    when(() => pendingDeleteDataSource.enqueue(any())).thenAnswer((_) async {});
-    when(() => localDataSource.markAsPendingDelete('set-1')).thenAnswer(
-      (_) async {},
-    );
-    when(
-      () => pendingDeleteDataSource.getPendingByEntityType(
-        SyncEntityType.workoutSet,
-      ),
-    ).thenAnswer(
-      (_) async => <PendingSyncDelete>[
-        PendingSyncDelete(
-          id: 'delete-1',
-          entityType: SyncEntityType.workoutSet,
-          localEntityId: 'set-1',
-          serverEntityId: 'server-1',
-          createdAt: DateTime.now(),
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(
+        () => localDataSource.getSetById('set-1'),
+      ).thenAnswer((_) async => existing);
+      when(
+        () => pendingDeleteDataSource.enqueue(any()),
+      ).thenAnswer((_) async {});
+      when(
+        () => localDataSource.markAsPendingDelete('set-1'),
+      ).thenAnswer((_) async {});
+      when(
+        () => pendingDeleteDataSource.getPendingByEntityType(
+          SyncEntityType.workoutSet,
         ),
-      ],
-    );
-    when(
-      () => remoteDataSource.deleteSet(
-        localId: 'set-1',
-        serverId: 'server-1',
-      ),
-    ).thenAnswer((_) async {});
-    when(() => pendingDeleteDataSource.remove('delete-1')).thenAnswer(
-      (_) async {},
-    );
-    when(() => localDataSource.deleteSet('set-1')).thenAnswer((_) async {});
+      ).thenAnswer(
+        (_) async => <PendingSyncDelete>[
+          PendingSyncDelete(
+            id: 'delete-1',
+            entityType: SyncEntityType.workoutSet,
+            localEntityId: 'set-1',
+            serverEntityId: 'server-1',
+            createdAt: DateTime.now(),
+          ),
+        ],
+      );
+      when(
+        () =>
+            remoteDataSource.deleteSet(localId: 'set-1', serverId: 'server-1'),
+      ).thenAnswer((_) async {});
+      when(
+        () => pendingDeleteDataSource.remove('delete-1'),
+      ).thenAnswer((_) async {});
+      when(() => localDataSource.deleteSet('set-1')).thenAnswer((_) async {});
 
-    await coordinator.persistDeletedSet('set-1');
+      await coordinator.persistDeletedSet('set-1');
 
-    verify(() => localDataSource.markAsPendingDelete('set-1')).called(1);
-    verify(() => remoteDataSource.deleteSet(
-          localId: 'set-1',
-          serverId: 'server-1',
-        )).called(1);
-    verify(() => localDataSource.deleteSet('set-1')).called(1);
-  });
+      verify(() => localDataSource.markAsPendingDelete('set-1')).called(1);
+      verify(
+        () =>
+            remoteDataSource.deleteSet(localId: 'set-1', serverId: 'server-1'),
+      ).called(1);
+      verify(() => localDataSource.deleteSet('set-1')).called(1);
+    },
+  );
 
   test('delete removes purely local row immediately', () async {
     final existing = buildWorkoutSet(
@@ -115,9 +127,9 @@ void main() {
     );
 
     when(() => remoteDataSource.isConfigured).thenReturn(false);
-    when(() => localDataSource.getSetById('set-1')).thenAnswer(
-      (_) async => existing,
-    );
+    when(
+      () => localDataSource.getSetById('set-1'),
+    ).thenAnswer((_) async => existing);
     when(() => localDataSource.deleteSet('set-1')).thenAnswer((_) async {});
 
     await coordinator.persistDeletedSet('set-1');
