@@ -11,16 +11,13 @@ import 'meal_local_datasource.dart';
 class MealLocalDataSourceImpl implements MealLocalDataSource {
   final DatabaseHelper databaseHelper;
 
-  static final LocalRemoteMerge<MealModel> _merge =
-      LocalRemoteMerge<MealModel>(
-        getId: (meal) => meal.id,
-        getUpdatedAt: (meal) => meal.updatedAt,
-        getSyncMetadata: (meal) => meal.syncMetadata,
-      );
+  static final LocalRemoteMerge<MealModel> _merge = LocalRemoteMerge<MealModel>(
+    getId: (meal) => meal.id,
+    getUpdatedAt: (meal) => meal.updatedAt,
+    getSyncMetadata: (meal) => meal.syncMetadata,
+  );
 
-  const MealLocalDataSourceImpl({
-    required this.databaseHelper,
-  });
+  const MealLocalDataSourceImpl({required this.databaseHelper});
 
   @override
   Future<List<MealModel>> getAllMeals() async {
@@ -170,9 +167,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   @override
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  }) async {
+  Future<void> prepareForInitialCloudMigration({required String userId}) async {
     try {
       final storedMeals = await _getStoredMeals();
       final preparedMeals = storedMeals
@@ -430,19 +425,25 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
     String userId,
   ) {
     final ownerUserId = meal.ownerUserId;
-    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return meal;
     }
 
     final currentMetadata = meal.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
-          status: SyncStatus.pendingUpload,
-          clearLastSyncError: true,
-        ),
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+      SyncStatus.syncError => currentMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpload => currentMetadata.copyWith(
-          clearLastSyncError: true,
-        ),
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpdate ||
       SyncStatus.synced ||
       SyncStatus.pendingDelete => currentMetadata,
@@ -450,8 +451,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
 
     return MealModel.fromEntity(
       meal.copyWith(
-        ownerUserId:
-            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
         syncMetadata: updatedMetadata,
       ),
     );

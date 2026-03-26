@@ -20,76 +20,77 @@ class AuthSessionServiceImpl implements AuthSessionService {
   }) async {
     final normalizedEmail = email.trim();
 
-    final signInResult = await authRemoteDataSource.signInWithEmail(
-      email: normalizedEmail,
-      password: password,
-    );
+    try {
+      final AppUser user = await authRemoteDataSource.signInWithEmail(
+        email: normalizedEmail,
+        password: password,
+      );
 
-    return await signInResult.fold(
-      (failure) async {
+      AppLogger.info(
+        'Remote sign-in succeeded for user ${user.id}; establishing authenticated session',
+        category: 'auth',
+      );
+
+      final sessionResult =
+          await sessionSyncService.establishAuthenticatedSession(user);
+
+      if (sessionResult.isFailure) {
+        AppLogger.error(
+          'Authenticated session establishment failed after remote sign-in',
+          category: 'auth',
+          error: sessionResult.message,
+        );
+
+        return AuthSessionActionResult(
+          status: AuthSessionActionStatus.failed,
+          message:
+              'sign-in succeeded but session initialization failed: ${sessionResult.message}',
+          user: user,
+          sessionResult: sessionResult,
+        );
+      }
+
+      if (sessionResult.isSkipped) {
         AppLogger.warning(
-          'Remote sign-in failed for $normalizedEmail: ${failure.message}',
+          'Authenticated session establishment was skipped after remote sign-in: ${sessionResult.message}',
           category: 'auth',
         );
 
         return AuthSessionActionResult(
           status: AuthSessionActionStatus.failed,
-          message: 'sign-in failed: ${failure.message}',
-        );
-      },
-      (AppUser user) async {
-        AppLogger.info(
-          'Remote sign-in succeeded for user ${user.id}; establishing authenticated session',
-          category: 'auth',
-        );
-
-        final sessionResult =
-            await sessionSyncService.establishAuthenticatedSession(user);
-
-        if (sessionResult.isFailure) {
-          AppLogger.error(
-            'Authenticated session establishment failed after remote sign-in',
-            category: 'auth',
-            error: sessionResult.message,
-          );
-
-          return AuthSessionActionResult(
-            status: AuthSessionActionStatus.failed,
-            message:
-                'sign-in succeeded but session initialization failed: ${sessionResult.message}',
-            user: user,
-            sessionResult: sessionResult,
-          );
-        }
-
-        if (sessionResult.isSkipped) {
-          AppLogger.warning(
-            'Authenticated session establishment was skipped after remote sign-in: ${sessionResult.message}',
-            category: 'auth',
-          );
-
-          return AuthSessionActionResult(
-            status: AuthSessionActionStatus.failed,
-            message:
-                'sign-in succeeded but session initialization was skipped: ${sessionResult.message}',
-            user: user,
-            sessionResult: sessionResult,
-          );
-        }
-
-        AppLogger.info(
-          'Authenticated session established successfully for ${user.id}',
-          category: 'auth',
-        );
-
-        return AuthSessionActionResult(
-          status: AuthSessionActionStatus.completed,
-          message: 'sign-in completed successfully',
+          message:
+              'sign-in succeeded but session initialization was skipped: ${sessionResult.message}',
           user: user,
           sessionResult: sessionResult,
         );
-      },
-    );
+      }
+
+      AppLogger.info(
+        'Authenticated session established successfully for ${user.id}',
+        category: 'auth',
+      );
+
+      return AuthSessionActionResult(
+        status: AuthSessionActionStatus.completed,
+        message: 'sign-in completed successfully',
+        user: user,
+        sessionResult: sessionResult,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'Remote sign-in failed for $normalizedEmail: $error',
+        category: 'auth',
+      );
+      AppLogger.debug(
+        'Remote sign-in stack trace: $stackTrace',
+        category: 'auth',
+      );
+
+      return AuthSessionActionResult(
+        status: AuthSessionActionStatus.failed,
+        message: 'sign-in failed: $error',
+      );
+    }
   }
 
   @override

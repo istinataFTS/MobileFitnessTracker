@@ -11,13 +11,14 @@ import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../../library/application/exercise_bloc.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 import '../helpers/history_nutrition_summary_builder.dart';
 import 'edit_nutrition_log_dialog.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
+
 
 class HistoryDayContent extends StatefulWidget {
   final DateTime? selectedDate;
@@ -409,10 +410,12 @@ class _WorkoutSetCard extends StatelessWidget {
         child: EditSetDialog(
           workoutSet: set,
           exercise: exercise,
+          weightUnit: weightUnit,
         ),
       ),
     );
   }
+
 
   void _confirmDelete(
     BuildContext context,

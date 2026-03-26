@@ -376,6 +376,28 @@ void main() {
       expect(set.syncMetadata.lastSyncError, isNull);
     });
 
+    test('recovers guest syncError rows into pendingUpload', () async {
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-1',
+          exerciseId: 'bench',
+          date: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
+            lastSyncError: 'offline',
+          ),
+        ).copyWith(clearOwnerUserId: true),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final set = await dataSource.getSetById('set-1');
+      expect(set, isNotNull);
+      expect(set!.ownerUserId, 'user-1');
+      expect(set.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(set.syncMetadata.lastSyncError, isNull);
+    });
+
     test('preserves pendingDelete and different-user ownership', () async {
       await dataSource.addSet(
         buildSet(
@@ -411,7 +433,10 @@ void main() {
       );
       expect(pendingDelete[DatabaseTables.ownerUserId], 'user-1');
       expect(otherUser[DatabaseTables.ownerUserId], 'another-user');
-      expect(otherUser[DatabaseTables.setSyncStatus], SyncStatus.localOnly.name);
+      expect(
+        otherUser[DatabaseTables.setSyncStatus],
+        SyncStatus.localOnly.name,
+      );
     });
   });
 }

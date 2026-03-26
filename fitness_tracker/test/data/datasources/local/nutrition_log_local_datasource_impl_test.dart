@@ -89,7 +89,9 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
-    dataSource = NutritionLogLocalDataSourceImpl(databaseHelper: databaseHelper);
+    dataSource = NutritionLogLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+    );
   });
 
   tearDown(() async {
@@ -102,9 +104,7 @@ void main() {
         buildLog(
           id: 'log-1',
           loggedAt: baseDate,
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
       await dataSource.insertLog(
@@ -139,12 +139,7 @@ void main() {
     });
 
     test('getLogsByDate excludes pendingDelete rows', () async {
-      await dataSource.insertLog(
-        buildLog(
-          id: 'log-1',
-          loggedAt: baseDate,
-        ),
-      );
+      await dataSource.insertLog(buildLog(id: 'log-1', loggedAt: baseDate));
       await dataSource.insertLog(
         buildLog(
           id: 'log-2',
@@ -162,11 +157,7 @@ void main() {
 
     test('getMealLogs excludes pendingDelete rows', () async {
       await dataSource.insertLog(
-        buildLog(
-          id: 'log-1',
-          loggedAt: baseDate,
-          mealId: 'meal-1',
-        ),
+        buildLog(id: 'log-1', loggedAt: baseDate, mealId: 'meal-1'),
       );
       await dataSource.insertLog(
         buildLog(
@@ -236,9 +227,7 @@ void main() {
         loggedAt: baseDate,
         calories: 500,
         updatedAt: baseDate.add(const Duration(hours: 1)),
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
       await dataSource.insertLog(localPendingLog);
@@ -263,9 +252,7 @@ void main() {
       final remoteLog = buildLog(
         id: 'log-2',
         loggedAt: baseDate.add(const Duration(hours: 1)),
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
       await dataSource.insertLog(localPendingLog);
@@ -280,47 +267,43 @@ void main() {
       );
     });
 
-    test('keeps pendingDelete row hidden even if remote still has it', () async {
-      final localPendingDelete = buildLog(
-        id: 'log-1',
-        loggedAt: baseDate,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
+    test(
+      'keeps pendingDelete row hidden even if remote still has it',
+      () async {
+        final localPendingDelete = buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        );
 
-      final remoteLog = buildLog(
-        id: 'log-1',
-        loggedAt: baseDate,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteLog = buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertLog(localPendingDelete);
+        await dataSource.insertLog(localPendingDelete);
 
-      await dataSource.mergeRemoteLogs(<NutritionLogModel>[remoteLog]);
+        await dataSource.mergeRemoteLogs(<NutritionLogModel>[remoteLog]);
 
-      final visibleLogs = await dataSource.getAllLogs();
-      expect(visibleLogs, isEmpty);
+        final visibleLogs = await dataSource.getAllLogs();
+        expect(visibleLogs, isEmpty);
 
-      final rawRows = await database.query(DatabaseTables.nutritionLogs);
-      expect(rawRows, hasLength(1));
-      expect(
-        rawRows.first[DatabaseTables.nutritionLogSyncStatus],
-        SyncStatus.pendingDelete.name,
-      );
-    });
+        final rawRows = await database.query(DatabaseTables.nutritionLogs);
+        expect(rawRows, hasLength(1));
+        expect(
+          rawRows.first[DatabaseTables.nutritionLogSyncStatus],
+          SyncStatus.pendingDelete.name,
+        );
+      },
+    );
   });
 
   group('NutritionLogLocalDataSourceImpl state transitions', () {
     test('markAsPendingDelete updates sync status and error', () async {
-      await dataSource.insertLog(
-        buildLog(
-          id: 'log-1',
-          loggedAt: baseDate,
-        ),
-      );
+      await dataSource.insertLog(buildLog(id: 'log-1', loggedAt: baseDate));
 
       await dataSource.markAsPendingDelete(
         'log-1',
@@ -344,11 +327,7 @@ void main() {
     });
 
     test('upsertLog inserts when missing and updates when present', () async {
-      final inserted = buildLog(
-        id: 'log-1',
-        loggedAt: baseDate,
-        calories: 310,
-      );
+      final inserted = buildLog(id: 'log-1', loggedAt: baseDate, calories: 310);
 
       await dataSource.upsertLog(inserted);
 
@@ -382,9 +361,7 @@ void main() {
           id: 'log-1',
           loggedAt: baseDate,
           calories: 450,
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
 
@@ -413,6 +390,28 @@ void main() {
           ownerUserId: null,
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final log = await dataSource.getLogById('log-1');
+      expect(log, isNotNull);
+      expect(log!.ownerUserId, 'user-1');
+      expect(log.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(log.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('recovers guest syncError log into pendingUpload', () async {
+      await dataSource.insertLog(
+        buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
             lastSyncError: 'offline',
           ),
         ),

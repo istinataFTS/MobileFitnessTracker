@@ -9,12 +9,13 @@ import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../../library/application/exercise_bloc.dart';
 import '../../../settings/presentation/settings_scope.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
 import 'edit_set_dialog.dart';
 import 'history_log_bottom_sheets.dart';
+
 
 class DayDetailsBottomSheet extends StatelessWidget {
   const DayDetailsBottomSheet({

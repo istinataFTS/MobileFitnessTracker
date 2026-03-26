@@ -162,9 +162,7 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   @override
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  }) async {
+  Future<void> prepareForInitialCloudMigration({required String userId}) async {
     try {
       final storedSets = await _getStoredSets();
       final preparedSets = storedSets
@@ -414,19 +412,25 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
     String userId,
   ) {
     final ownerUserId = set.ownerUserId;
-    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return set;
     }
 
     final currentMetadata = set.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
-          status: SyncStatus.pendingUpload,
-          clearLastSyncError: true,
-        ),
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+      SyncStatus.syncError => currentMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpload => currentMetadata.copyWith(
-          clearLastSyncError: true,
-        ),
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpdate ||
       SyncStatus.synced ||
       SyncStatus.pendingDelete => currentMetadata,

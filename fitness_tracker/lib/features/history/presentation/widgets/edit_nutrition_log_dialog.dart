@@ -6,9 +6,10 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
-import '../../../../presentation/pages/meals/bloc/meal_bloc.dart';
+import '../../../library/application/meal_bloc.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_event.dart';
+
 
 class EditNutritionLogDialog extends StatefulWidget {
   final NutritionLog log;

@@ -11,7 +11,7 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
-import '../../../../presentation/pages/meals/bloc/meal_bloc.dart';
+import '../../../library/application/meal_bloc.dart';
 import '../../../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 class LogMealTab extends StatefulWidget {
@@ -123,6 +123,16 @@ class _LogMealTabState extends State<LogMealTab> {
   Widget _buildMealSelector(BuildContext context) {
     return BlocBuilder<MealBloc, MealState>(
       builder: (context, state) {
+        if (state is MealInitial || state is MealLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppTheme.primaryOrange),
+          );
+        }
+
+        if (state is MealError) {
+          return _buildMealErrorState(context);
+        }
+
         final allMeals = state is MealsLoaded ? state.meals : <Meal>[];
 
         if (allMeals.isEmpty) {
@@ -132,18 +142,21 @@ class _LogMealTabState extends State<LogMealTab> {
         final filteredMeals = _searchQuery.isEmpty
             ? allMeals
             : allMeals
-                .where((meal) =>
-                    meal.name.toLowerCase().contains(_searchQuery.toLowerCase()))
-                .toList();
+                  .where(
+                    (meal) => meal.name.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ),
+                  )
+                  .toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               AppStrings.selectMeal,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -180,6 +193,37 @@ class _LogMealTabState extends State<LogMealTab> {
     );
   }
 
+  Widget _buildMealErrorState(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.borderDark),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+          const SizedBox(height: 12),
+          Text(
+            AppStrings.errorLoadingMeals,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              context.read<MealBloc>().add(LoadMealsEvent());
+            },
+            child: const Text(AppStrings.retry),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyMealsState(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -198,17 +242,17 @@ class _LogMealTabState extends State<LogMealTab> {
           const SizedBox(height: 12),
           Text(
             AppStrings.noMealsInLibrary,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             AppStrings.createMealsInLibrary,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textMedium,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
             textAlign: TextAlign.center,
           ),
         ],
@@ -226,17 +270,13 @@ class _LogMealTabState extends State<LogMealTab> {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.search_off,
-            size: 48,
-            color: AppTheme.textDim,
-          ),
+          const Icon(Icons.search_off, size: 48, color: AppTheme.textDim),
           const SizedBox(height: 12),
           Text(
             'No meals found',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textMedium,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
           ),
         ],
       ),
@@ -279,9 +319,9 @@ class _LogMealTabState extends State<LogMealTab> {
                     child: Text(
                       meal.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? AppTheme.primaryOrange : null,
-                          ),
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? AppTheme.primaryOrange : null,
+                      ),
                     ),
                   ),
                   if (isSelected)
@@ -294,9 +334,9 @@ class _LogMealTabState extends State<LogMealTab> {
               const SizedBox(height: 8),
               Text(
                 '${AppStrings.per100g}: ${meal.servingSizeGrams}g',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textDim,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textDim),
               ),
               const SizedBox(height: 12),
               Row(
@@ -349,10 +389,7 @@ class _LogMealTabState extends State<LogMealTab> {
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textDim,
-            fontSize: 11,
-          ),
+          style: const TextStyle(color: AppTheme.textDim, fontSize: 11),
         ),
       ],
     );
@@ -364,9 +401,9 @@ class _LogMealTabState extends State<LogMealTab> {
       children: [
         Text(
           AppStrings.amountGrams,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -392,9 +429,9 @@ class _LogMealTabState extends State<LogMealTab> {
       children: [
         Text(
           'Log Date',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         InkWell(
@@ -429,10 +466,7 @@ class _LogMealTabState extends State<LogMealTab> {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppTheme.textDim,
-                ),
+                const Icon(Icons.arrow_drop_down, color: AppTheme.textDim),
               ],
             ),
           ),
@@ -464,9 +498,7 @@ class _LogMealTabState extends State<LogMealTab> {
       decoration: BoxDecoration(
         color: AppTheme.primaryOrange.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.primaryOrange.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppTheme.primaryOrange.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,9 +514,9 @@ class _LogMealTabState extends State<LogMealTab> {
               Text(
                 'Nutrition for ${grams}g',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppTheme.primaryOrange,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: AppTheme.primaryOrange,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -537,10 +569,7 @@ class _LogMealTabState extends State<LogMealTab> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textMedium,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppTheme.textMedium, fontSize: 12),
         ),
       ],
     );
@@ -548,7 +577,8 @@ class _LogMealTabState extends State<LogMealTab> {
 
   Widget _buildLogButton(NutritionLogState state) {
     final isLoading = state is NutritionLogLoading;
-    final canLog = _selectedMeal != null &&
+    final canLog =
+        _selectedMeal != null &&
         _gramsController.text.isNotEmpty &&
         (int.tryParse(_gramsController.text) ?? 0) > 0;
 
@@ -556,9 +586,7 @@ class _LogMealTabState extends State<LogMealTab> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surfaceDark,
-        border: Border(
-          top: BorderSide(color: AppTheme.borderDark, width: 1),
-        ),
+        border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
       ),
       child: SafeArea(
         child: SizedBox(
@@ -579,10 +607,7 @@ class _LogMealTabState extends State<LogMealTab> {
                   )
                 : const Text(
                     AppStrings.logMealButton,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
           ),
         ),

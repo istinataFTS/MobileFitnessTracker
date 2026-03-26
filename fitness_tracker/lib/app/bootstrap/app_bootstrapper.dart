@@ -12,6 +12,7 @@ import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../core/sync/sync_orchestrator.dart';
 import '../../core/utils/app_lifecycle_manager.dart';
 import '../../core/utils/performance_monitor.dart';
+import '../../demo/web_demo_runtime.dart';
 import '../../injection/injection_container.dart' as di;
 import 'app_data_seeder.dart';
 import 'app_debug_diagnostics_runner.dart';
@@ -128,7 +129,9 @@ class AppBootstrapper {
     AppLogger.info('Initializing dependencies', category: 'bootstrap');
     await PerformanceMonitor.trackAsync<void>(
       _dependencyInitTimerName,
-      () => di.init(),
+      () => di.init(
+        registerOverrides: kIsWeb ? registerWebDemoOverrides : null,
+      ),
       slowThresholdMs: 300,
       category: 'bootstrap',
     );

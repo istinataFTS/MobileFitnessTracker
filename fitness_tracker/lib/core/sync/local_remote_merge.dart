@@ -9,7 +9,7 @@ typedef EntitySyncMetadataGetter<T> = EntitySyncMetadata Function(T entity);
 class LocalRemoteMerge<T> {
   final EntitySyncResolver<T> _resolver;
 
-  const LocalRemoteMerge({
+  LocalRemoteMerge({
     required EntityIdGetter<T> getId,
     required EntityUpdatedAtGetter<T> getUpdatedAt,
     required EntitySyncMetadataGetter<T> getSyncMetadata,

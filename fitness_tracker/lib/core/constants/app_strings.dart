@@ -185,6 +185,7 @@ class AppStrings {
   static const String selectMeal = 'Select Meal';
   static const String searchMeals = 'Search meals...';
   static const String noMealsInLibrary = 'No meals in your library';
+  static const String errorLoadingMeals = 'Error loading meals';
   static const String createMealsInLibrary =
       'Create meals in the Library tab first';
   static const String per100g = 'per 100g';
@@ -320,15 +321,13 @@ class AppStrings {
   static const String settingsWeekStartDay = 'Week Start Day';
   static const String settingsWeekStartDayValue = 'Monday';
   static const String settingsBackupRestore = 'Backup & Restore';
-  static const String settingsBackupRestoreDesc =
-      'Export or import your data';
+  static const String settingsBackupRestoreDesc = 'Export or import your data';
   static const String settingsAppVersion = 'App Version';
   static const String settingsTermsPrivacy = 'Terms & Privacy';
   static const String settingsReportBug = 'Report a Bug';
   static const String settingsUnavailableSubtitle =
       'Not connected in this version';
-  static const String signOutUnavailableSubtitle =
-      'Authentication not enabled';
+  static const String signOutUnavailableSubtitle = 'Authentication not enabled';
   static const String noProfileStatsYet = 'Profile stats are static for now';
 
   // ==================== Muscle Groups ====================
@@ -390,7 +389,8 @@ class AppStrings {
   static const String frontView = 'Front';
   static const String backView = 'Back';
   static const String noMuscleData = 'No muscle stimulus data yet';
-  static const String startWorkingOut = 'Start working out to see your progress';
+  static const String startWorkingOut =
+      'Start working out to see your progress';
 
   // ==================== Muscle Summary ====================
   static const String loadingMuscleSummary = 'Loading muscle summary...';

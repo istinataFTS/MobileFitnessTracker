@@ -165,9 +165,7 @@ void main() {
         categoryKey: 'chest',
         targetValue: 18,
         updatedAt: baseDate.add(const Duration(hours: 2)),
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
       await dataSource.insertTarget(localPendingTarget);
@@ -180,74 +178,78 @@ void main() {
       expect(targets.first.syncMetadata.status, SyncStatus.pendingUpdate);
     });
 
-    test('adds remote-only rows while preserving local pending upload',
-        () async {
-      final localPendingTarget = buildTarget(
-        id: 'target-1',
-        categoryKey: 'chest',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingUpload,
-        ),
-      );
+    test(
+      'adds remote-only rows while preserving local pending upload',
+      () async {
+        final localPendingTarget = buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingUpload,
+          ),
+        );
 
-      final remoteTarget = buildTarget(
-        id: 'target-2',
-        categoryKey: 'protein',
-        type: TargetType.macro,
-        period: TargetPeriod.daily,
-        targetValue: 180,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteTarget = buildTarget(
+          id: 'target-2',
+          categoryKey: 'protein',
+          type: TargetType.macro,
+          period: TargetPeriod.daily,
+          targetValue: 180,
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertTarget(localPendingTarget);
+        await dataSource.insertTarget(localPendingTarget);
 
-      await dataSource.mergeRemoteTargets(<TargetModel>[remoteTarget]);
+        await dataSource.mergeRemoteTargets(<TargetModel>[remoteTarget]);
 
-      final targets = await dataSource.getAllTargets();
-      expect(targets.map((target) => target.id).toSet(), <String>{
-        'target-1',
-        'target-2',
-      });
-      expect(
-        targets.firstWhere((target) => target.id == 'target-1').syncMetadata.status,
-        SyncStatus.pendingUpload,
-      );
-    });
+        final targets = await dataSource.getAllTargets();
+        expect(targets.map((target) => target.id).toSet(), <String>{
+          'target-1',
+          'target-2',
+        });
+        expect(
+          targets
+              .firstWhere((target) => target.id == 'target-1')
+              .syncMetadata
+              .status,
+          SyncStatus.pendingUpload,
+        );
+      },
+    );
 
-    test('keeps pendingDelete row hidden even if remote still has it', () async {
-      final localPendingDelete = buildTarget(
-        id: 'target-1',
-        categoryKey: 'chest',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
+    test(
+      'keeps pendingDelete row hidden even if remote still has it',
+      () async {
+        final localPendingDelete = buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        );
 
-      final remoteTarget = buildTarget(
-        id: 'target-1',
-        categoryKey: 'chest',
-        targetValue: 20,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteTarget = buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          targetValue: 20,
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertTarget(localPendingDelete);
+        await dataSource.insertTarget(localPendingDelete);
 
-      await dataSource.mergeRemoteTargets(<TargetModel>[remoteTarget]);
+        await dataSource.mergeRemoteTargets(<TargetModel>[remoteTarget]);
 
-      final visibleTargets = await dataSource.getAllTargets();
-      expect(visibleTargets, isEmpty);
+        final visibleTargets = await dataSource.getAllTargets();
+        expect(visibleTargets, isEmpty);
 
-      final rawRows = await database.query(DatabaseTables.targets);
-      expect(rawRows, hasLength(1));
-      expect(
-        rawRows.first[DatabaseTables.targetSyncStatus],
-        SyncStatus.pendingDelete.name,
-      );
-    });
+        final rawRows = await database.query(DatabaseTables.targets);
+        expect(rawRows, hasLength(1));
+        expect(
+          rawRows.first[DatabaseTables.targetSyncStatus],
+          SyncStatus.pendingDelete.name,
+        );
+      },
+    );
   });
 
   group('TargetLocalDataSourceImpl state transitions', () {
@@ -271,30 +273,33 @@ void main() {
         rawRows.single[DatabaseTables.targetSyncStatus],
         SyncStatus.pendingDelete.name,
       );
-      expect(rawRows.single[DatabaseTables.targetLastSyncError], 'delete queued');
+      expect(
+        rawRows.single[DatabaseTables.targetLastSyncError],
+        'delete queued',
+      );
     });
 
-    test('upsertTarget inserts when missing and updates when present', () async {
-      final inserted = buildTarget(
-        id: 'target-1',
-        categoryKey: 'chest',
-      );
+    test(
+      'upsertTarget inserts when missing and updates when present',
+      () async {
+        final inserted = buildTarget(id: 'target-1', categoryKey: 'chest');
 
-      await dataSource.upsertTarget(inserted);
+        await dataSource.upsertTarget(inserted);
 
-      final updated = buildTarget(
-        id: 'target-1',
-        categoryKey: 'chest',
-        targetValue: 16,
-        updatedAt: baseDate.add(const Duration(hours: 2)),
-      );
+        final updated = buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          targetValue: 16,
+          updatedAt: baseDate.add(const Duration(hours: 2)),
+        );
 
-      await dataSource.upsertTarget(updated);
+        await dataSource.upsertTarget(updated);
 
-      final target = await dataSource.getTargetById('target-1');
-      expect(target, isNotNull);
-      expect(target!.targetValue, 16);
-    });
+        final target = await dataSource.getTargetById('target-1');
+        expect(target, isNotNull);
+        expect(target!.targetValue, 16);
+      },
+    );
 
     test('upsertTarget does not revive a pendingDelete row', () async {
       await dataSource.insertTarget(
@@ -312,9 +317,7 @@ void main() {
           id: 'target-1',
           categoryKey: 'chest',
           targetValue: 18,
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
 
@@ -343,6 +346,28 @@ void main() {
           ownerUserId: null,
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final target = await dataSource.getTargetById('target-1');
+      expect(target, isNotNull);
+      expect(target!.ownerUserId, 'user-1');
+      expect(target.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(target.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('recovers guest syncError target into pendingUpload', () async {
+      await dataSource.insertTarget(
+        buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
             lastSyncError: 'offline',
           ),
         ),

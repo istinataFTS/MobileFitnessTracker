@@ -1,9 +1,12 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/app/app.dart';
 import 'package:fitness_tracker/core/constants/app_strings.dart';
+import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
+import 'package:fitness_tracker/features/library/application/exercise_bloc.dart';
 import 'package:fitness_tracker/features/log/log.dart';
-import 'package:fitness_tracker/presentation/pages/exercises/bloc/exercise_bloc.dart';
+import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
+import 'package:fitness_tracker/features/settings/presentation/settings_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +17,9 @@ class MockWorkoutBloc extends MockBloc<WorkoutEvent, WorkoutState>
 
 class MockExerciseBloc extends MockBloc<ExerciseEvent, ExerciseState>
     implements ExerciseBloc {}
+
+class MockAppSettingsCubit extends MockCubit<AppSettingsState>
+    implements AppSettingsCubit {}
 
 class FakeWorkoutEvent extends Fake implements WorkoutEvent {}
 
@@ -26,6 +32,7 @@ class FakeExerciseState extends Fake implements ExerciseState {}
 void main() {
   late MockWorkoutBloc workoutBloc;
   late MockExerciseBloc exerciseBloc;
+  late MockAppSettingsCubit appSettingsCubit;
 
   final exercises = [
     Exercise(
@@ -52,11 +59,21 @@ void main() {
   setUp(() {
     workoutBloc = MockWorkoutBloc();
     exerciseBloc = MockExerciseBloc();
+    appSettingsCubit = MockAppSettingsCubit();
 
-    when(() => workoutBloc.effects)
-        .thenAnswer((_) => const Stream<WorkoutUiEffect>.empty());
+    when(
+      () => workoutBloc.effects,
+    ).thenAnswer((_) => const Stream<WorkoutUiEffect>.empty());
     when(() => workoutBloc.add(any())).thenReturn(null);
     when(() => exerciseBloc.add(any())).thenReturn(null);
+    when(
+      () => appSettingsCubit.state,
+    ).thenReturn(AppSettingsState.initial().copyWith(hasLoaded: true));
+    whenListen(
+      appSettingsCubit,
+      const Stream<AppSettingsState>.empty(),
+      initialState: AppSettingsState.initial().copyWith(hasLoaded: true),
+    );
 
     when(() => workoutBloc.state).thenReturn(WorkoutInitial());
     whenListen(
@@ -87,37 +104,34 @@ void main() {
     return AppShell(
       home: MultiBlocProvider(
         providers: [
+          BlocProvider<AppSettingsCubit>.value(value: appSettingsCubit),
           BlocProvider<WorkoutBloc>.value(value: workoutBloc),
           BlocProvider<ExerciseBloc>.value(value: exerciseBloc),
         ],
-        child: const Scaffold(
-          body: LogExerciseTab(),
-        ),
+        child: const SettingsScope(child: Scaffold(body: LogExerciseTab())),
       ),
     );
   }
 
   group('LogExerciseTab', () {
     testWidgets('shows loading state while exercises load', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(exerciseState: ExerciseLoading()),
-      );
+      await tester.pumpWidget(buildSubject(exerciseState: ExerciseLoading()));
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('shows empty state when no exercises exist', (tester) async {
       await tester.pumpWidget(
-        buildSubject(
-          exerciseState: const ExercisesLoaded([]),
-        ),
+        buildSubject(exerciseState: const ExercisesLoaded([])),
       );
 
       expect(find.text(AppStrings.noExercisesAvailable), findsOneWidget);
       expect(find.text(AppStrings.createExercisesFirst), findsOneWidget);
     });
 
-    testWidgets('shows retry state when exercises fail to load', (tester) async {
+    testWidgets('shows retry state when exercises fail to load', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildSubject(
           exerciseState: const ExerciseError('Failed to load exercises'),
@@ -135,9 +149,7 @@ void main() {
 
     testWidgets('submits selected exercise, reps, and weight', (tester) async {
       await tester.pumpWidget(
-        buildSubject(
-          exerciseState: ExercisesLoaded(exercises),
-        ),
+        buildSubject(exerciseState: ExercisesLoaded(exercises)),
       );
       await tester.pumpAndSettle();
 
@@ -166,12 +178,11 @@ void main() {
       ).called(1);
     });
 
-    testWidgets('shows muscle group info after exercise selection',
-        (tester) async {
+    testWidgets('shows muscle group info after exercise selection', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        buildSubject(
-          exerciseState: ExercisesLoaded(exercises),
-        ),
+        buildSubject(exerciseState: ExercisesLoaded(exercises)),
       );
       await tester.pumpAndSettle();
 

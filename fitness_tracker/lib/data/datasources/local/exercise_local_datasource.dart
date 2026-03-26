@@ -16,9 +16,7 @@ abstract class ExerciseLocalDataSource {
   Future<void> insertExercise(ExerciseModel exercise);
   Future<void> updateExercise(ExerciseModel exercise);
   Future<void> upsertExercise(ExerciseModel exercise);
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  });
+  Future<void> prepareForInitialCloudMigration({required String userId});
   Future<void> mergeRemoteExercises(List<ExerciseModel> exercises);
   Future<void> markAsSynced({
     required String localId,
@@ -43,9 +41,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         getSyncMetadata: (exercise) => exercise.syncMetadata,
       );
 
-  const ExerciseLocalDataSourceImpl({
-    required this.databaseHelper,
-  });
+  const ExerciseLocalDataSourceImpl({required this.databaseHelper});
 
   @override
   Future<List<ExerciseModel>> getAllExercises() async {
@@ -176,9 +172,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   }
 
   @override
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  }) async {
+  Future<void> prepareForInitialCloudMigration({required String userId}) async {
     try {
       final storedExercises = await _getStoredExercises();
       final preparedExercises = storedExercises
@@ -427,19 +421,25 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     String userId,
   ) {
     final ownerUserId = exercise.ownerUserId;
-    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return exercise;
     }
 
     final currentMetadata = exercise.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
-          status: SyncStatus.pendingUpload,
-          clearLastSyncError: true,
-        ),
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+      SyncStatus.syncError => currentMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpload => currentMetadata.copyWith(
-          clearLastSyncError: true,
-        ),
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpdate ||
       SyncStatus.synced ||
       SyncStatus.pendingDelete => currentMetadata,
@@ -447,8 +447,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
 
     return ExerciseModel.fromEntity(
       exercise.copyWith(
-        ownerUserId:
-            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
         syncMetadata: updatedMetadata,
       ),
     );

@@ -18,9 +18,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         getSyncMetadata: (log) => log.syncMetadata,
       );
 
-  const NutritionLogLocalDataSourceImpl({
-    required this.databaseHelper,
-  });
+  const NutritionLogLocalDataSourceImpl({required this.databaseHelper});
 
   @override
   Future<List<NutritionLogModel>> getAllLogs() async {
@@ -73,7 +71,14 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
     try {
       final db = await databaseHelper.database;
       final start = DateTime(startDate.year, startDate.month, startDate.day);
-      final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+      final end = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
 
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
@@ -124,7 +129,11 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
     try {
       final now = DateTime.now();
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final startDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+      final startDate = DateTime(
+        weekStart.year,
+        weekStart.month,
+        weekStart.day,
+      );
       final endDate = DateTime.now();
 
       return getLogsByDateRange(startDate, endDate);
@@ -233,9 +242,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   }
 
   @override
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  }) async {
+  Future<void> prepareForInitialCloudMigration({required String userId}) async {
     try {
       final storedLogs = await _getStoredLogs();
       final preparedLogs = storedLogs
@@ -261,8 +268,8 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
 
       final Map<String, NutritionLogModel> mergedById =
           <String, NutritionLogModel>{
-        for (final log in mergedVisibleLogs) log.id: log,
-      };
+            for (final log in mergedVisibleLogs) log.id: log,
+          };
 
       for (final localLog in storedLocalLogs) {
         if (localLog.syncMetadata.isPendingDelete) {
@@ -296,7 +303,9 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         whereArgs: [localId],
       );
     } catch (e) {
-      throw CacheDatabaseException('Failed to mark nutrition log as synced: $e');
+      throw CacheDatabaseException(
+        'Failed to mark nutrition log as synced: $e',
+      );
     }
   }
 
@@ -403,10 +412,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         DatabaseTables.nutritionLogs,
         where:
             '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ?',
-        whereArgs: [
-          startOfDay.toIso8601String(),
-          endOfDay.toIso8601String(),
-        ],
+        whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to delete logs by date: $e');
@@ -444,7 +450,8 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
-      final result = await db.rawQuery('''
+      final result = await db.rawQuery(
+        '''
         SELECT
           COALESCE(SUM(${DatabaseTables.nutritionLogCarbs}), 0) as totalCarbs,
           COALESCE(SUM(${DatabaseTables.nutritionLogProtein}), 0) as totalProtein,
@@ -455,11 +462,13 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         WHERE ${DatabaseTables.nutritionLogDate} >= ?
           AND ${DatabaseTables.nutritionLogDate} <= ?
           AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)
-      ''', [
-        startOfDay.toIso8601String(),
-        endOfDay.toIso8601String(),
-        SyncStatus.pendingDelete.name,
-      ]);
+      ''',
+        [
+          startOfDay.toIso8601String(),
+          endOfDay.toIso8601String(),
+          SyncStatus.pendingDelete.name,
+        ],
+      );
 
       if (result.isEmpty) {
         return {
@@ -561,19 +570,25 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
     String userId,
   ) {
     final ownerUserId = log.ownerUserId;
-    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return log;
     }
 
     final currentMetadata = log.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
-          status: SyncStatus.pendingUpload,
-          clearLastSyncError: true,
-        ),
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+      SyncStatus.syncError => currentMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpload => currentMetadata.copyWith(
-          clearLastSyncError: true,
-        ),
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpdate ||
       SyncStatus.synced ||
       SyncStatus.pendingDelete => currentMetadata,
@@ -581,8 +596,7 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
 
     return NutritionLogModel.fromEntity(
       log.copyWith(
-        ownerUserId:
-            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
         syncMetadata: updatedMetadata,
       ),
     );

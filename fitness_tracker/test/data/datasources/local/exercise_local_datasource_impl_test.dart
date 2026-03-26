@@ -174,9 +174,7 @@ void main() {
         id: 'exercise-1',
         name: 'Bench Press Remote',
         updatedAt: baseDate.add(const Duration(hours: 2)),
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
       await dataSource.insertExercise(localPendingExercise);
@@ -189,74 +187,75 @@ void main() {
       expect(exercises.first.syncMetadata.status, SyncStatus.pendingUpdate);
     });
 
-    test('adds remote-only rows while preserving local pending upload',
-        () async {
-      final localPendingExercise = buildExercise(
-        id: 'exercise-1',
-        name: 'Bench Press',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingUpload,
-        ),
-      );
+    test(
+      'adds remote-only rows while preserving local pending upload',
+      () async {
+        final localPendingExercise = buildExercise(
+          id: 'exercise-1',
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingUpload,
+          ),
+        );
 
-      final remoteExercise = buildExercise(
-        id: 'exercise-2',
-        name: 'Squat',
-        muscleGroups: const <String>['quads', 'glutes'],
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteExercise = buildExercise(
+          id: 'exercise-2',
+          name: 'Squat',
+          muscleGroups: const <String>['quads', 'glutes'],
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertExercise(localPendingExercise);
+        await dataSource.insertExercise(localPendingExercise);
 
-      await dataSource.mergeRemoteExercises(<ExerciseModel>[remoteExercise]);
+        await dataSource.mergeRemoteExercises(<ExerciseModel>[remoteExercise]);
 
-      final exercises = await dataSource.getAllExercises();
-      expect(exercises.map((exercise) => exercise.id).toSet(), <String>{
-        'exercise-1',
-        'exercise-2',
-      });
-      expect(
-        exercises
-            .firstWhere((exercise) => exercise.id == 'exercise-1')
-            .syncMetadata
-            .status,
-        SyncStatus.pendingUpload,
-      );
-    });
+        final exercises = await dataSource.getAllExercises();
+        expect(exercises.map((exercise) => exercise.id).toSet(), <String>{
+          'exercise-1',
+          'exercise-2',
+        });
+        expect(
+          exercises
+              .firstWhere((exercise) => exercise.id == 'exercise-1')
+              .syncMetadata
+              .status,
+          SyncStatus.pendingUpload,
+        );
+      },
+    );
 
-    test('keeps pendingDelete row hidden even if remote still has it', () async {
-      final localPendingDelete = buildExercise(
-        id: 'exercise-1',
-        name: 'Bench Press',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
+    test(
+      'keeps pendingDelete row hidden even if remote still has it',
+      () async {
+        final localPendingDelete = buildExercise(
+          id: 'exercise-1',
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        );
 
-      final remoteExercise = buildExercise(
-        id: 'exercise-1',
-        name: 'Bench Press Remote',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteExercise = buildExercise(
+          id: 'exercise-1',
+          name: 'Bench Press Remote',
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertExercise(localPendingDelete);
+        await dataSource.insertExercise(localPendingDelete);
 
-      await dataSource.mergeRemoteExercises(<ExerciseModel>[remoteExercise]);
+        await dataSource.mergeRemoteExercises(<ExerciseModel>[remoteExercise]);
 
-      final visibleExercises = await dataSource.getAllExercises();
-      expect(visibleExercises, isEmpty);
+        final visibleExercises = await dataSource.getAllExercises();
+        expect(visibleExercises, isEmpty);
 
-      final rawRows = await database.query(DatabaseTables.exercises);
-      expect(rawRows, hasLength(1));
-      expect(
-        rawRows.first[DatabaseTables.exerciseSyncStatus],
-        SyncStatus.pendingDelete.name,
-      );
-    });
+        final rawRows = await database.query(DatabaseTables.exercises);
+        expect(rawRows, hasLength(1));
+        expect(
+          rawRows.first[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingDelete.name,
+        );
+      },
+    );
   });
 
   group('ExerciseLocalDataSourceImpl state transitions', () {
@@ -286,27 +285,26 @@ void main() {
       );
     });
 
-    test('upsertExercise inserts when missing and updates when present',
-        () async {
-      final inserted = buildExercise(
-        id: 'exercise-1',
-        name: 'Bench Press',
-      );
+    test(
+      'upsertExercise inserts when missing and updates when present',
+      () async {
+        final inserted = buildExercise(id: 'exercise-1', name: 'Bench Press');
 
-      await dataSource.upsertExercise(inserted);
+        await dataSource.upsertExercise(inserted);
 
-      final updated = buildExercise(
-        id: 'exercise-1',
-        name: 'Bench Press Updated',
-        updatedAt: baseDate.add(const Duration(hours: 2)),
-      );
+        final updated = buildExercise(
+          id: 'exercise-1',
+          name: 'Bench Press Updated',
+          updatedAt: baseDate.add(const Duration(hours: 2)),
+        );
 
-      await dataSource.upsertExercise(updated);
+        await dataSource.upsertExercise(updated);
 
-      final exercise = await dataSource.getExerciseById('exercise-1');
-      expect(exercise, isNotNull);
-      expect(exercise!.name, 'Bench Press Updated');
-    });
+        final exercise = await dataSource.getExerciseById('exercise-1');
+        expect(exercise, isNotNull);
+        expect(exercise!.name, 'Bench Press Updated');
+      },
+    );
 
     test('upsertExercise does not revive a pendingDelete row', () async {
       await dataSource.insertExercise(
@@ -323,9 +321,7 @@ void main() {
         buildExercise(
           id: 'exercise-1',
           name: 'Bench Press Remote',
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
 
@@ -354,6 +350,28 @@ void main() {
           name: 'Bench Press',
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final exercise = await dataSource.getExerciseById('exercise-1');
+      expect(exercise, isNotNull);
+      expect(exercise!.ownerUserId, 'user-1');
+      expect(exercise.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(exercise.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('recovers guest syncError exercise into pendingUpload', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
             lastSyncError: 'offline',
           ),
         ),

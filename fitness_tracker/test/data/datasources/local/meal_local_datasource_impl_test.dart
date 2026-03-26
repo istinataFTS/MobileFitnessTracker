@@ -91,9 +91,7 @@ void main() {
         buildMeal(
           id: 'meal-1',
           name: 'Visible Meal',
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
       await dataSource.insertMeal(
@@ -145,10 +143,7 @@ void main() {
 
     test('getMealsCount excludes pendingDelete rows', () async {
       await dataSource.insertMeal(
-        buildMeal(
-          id: 'meal-1',
-          name: 'Visible Meal',
-        ),
+        buildMeal(id: 'meal-1', name: 'Visible Meal'),
       );
       await dataSource.insertMeal(
         buildMeal(
@@ -181,9 +176,7 @@ void main() {
         id: 'meal-1',
         name: 'Remote Meal',
         updatedAt: baseDate.add(const Duration(hours: 2)),
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
+        syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
       );
 
       await dataSource.insertMeal(localPendingMeal);
@@ -196,78 +189,73 @@ void main() {
       expect(meals.first.syncMetadata.status, SyncStatus.pendingUpdate);
     });
 
-    test('adds remote-only rows while preserving local pending changes',
-        () async {
-      final localPendingMeal = buildMeal(
-        id: 'meal-1',
-        name: 'Local Pending Meal',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingUpload,
-        ),
-      );
+    test(
+      'adds remote-only rows while preserving local pending changes',
+      () async {
+        final localPendingMeal = buildMeal(
+          id: 'meal-1',
+          name: 'Local Pending Meal',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingUpload,
+          ),
+        );
 
-      final remoteMeal = buildMeal(
-        id: 'meal-2',
-        name: 'Remote Meal',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteMeal = buildMeal(
+          id: 'meal-2',
+          name: 'Remote Meal',
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertMeal(localPendingMeal);
+        await dataSource.insertMeal(localPendingMeal);
 
-      await dataSource.mergeRemoteMeals(<MealModel>[remoteMeal]);
+        await dataSource.mergeRemoteMeals(<MealModel>[remoteMeal]);
 
-      final meals = await dataSource.getAllMeals();
-      expect(meals.map((m) => m.id).toSet(), <String>{'meal-1', 'meal-2'});
-      expect(
-        meals.firstWhere((m) => m.id == 'meal-1').syncMetadata.status,
-        SyncStatus.pendingUpload,
-      );
-    });
+        final meals = await dataSource.getAllMeals();
+        expect(meals.map((m) => m.id).toSet(), <String>{'meal-1', 'meal-2'});
+        expect(
+          meals.firstWhere((m) => m.id == 'meal-1').syncMetadata.status,
+          SyncStatus.pendingUpload,
+        );
+      },
+    );
 
-    test('keeps pendingDelete row hidden even if remote still contains entity',
-        () async {
-      final localPendingDelete = buildMeal(
-        id: 'meal-1',
-        name: 'Deleted Locally',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
+    test(
+      'keeps pendingDelete row hidden even if remote still contains entity',
+      () async {
+        final localPendingDelete = buildMeal(
+          id: 'meal-1',
+          name: 'Deleted Locally',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        );
 
-      final remoteMeal = buildMeal(
-        id: 'meal-1',
-        name: 'Remote Still Exists',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.synced,
-        ),
-      );
+        final remoteMeal = buildMeal(
+          id: 'meal-1',
+          name: 'Remote Still Exists',
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+        );
 
-      await dataSource.insertMeal(localPendingDelete);
+        await dataSource.insertMeal(localPendingDelete);
 
-      await dataSource.mergeRemoteMeals(<MealModel>[remoteMeal]);
+        await dataSource.mergeRemoteMeals(<MealModel>[remoteMeal]);
 
-      final meals = await dataSource.getAllMeals();
-      expect(meals, isEmpty);
+        final meals = await dataSource.getAllMeals();
+        expect(meals, isEmpty);
 
-      final rawRows = await database.query(DatabaseTables.meals);
-      expect(rawRows, hasLength(1));
-      expect(
-        rawRows.first[DatabaseTables.mealSyncStatus],
-        SyncStatus.pendingDelete.name,
-      );
-    });
+        final rawRows = await database.query(DatabaseTables.meals);
+        expect(rawRows, hasLength(1));
+        expect(
+          rawRows.first[DatabaseTables.mealSyncStatus],
+          SyncStatus.pendingDelete.name,
+        );
+      },
+    );
   });
 
   group('MealLocalDataSourceImpl state transitions', () {
     test('markAsPendingDelete updates sync status and error', () async {
-      await dataSource.insertMeal(
-        buildMeal(
-          id: 'meal-1',
-          name: 'Meal',
-        ),
-      );
+      await dataSource.insertMeal(buildMeal(id: 'meal-1', name: 'Meal'));
 
       await dataSource.markAsPendingDelete(
         'meal-1',
@@ -288,10 +276,7 @@ void main() {
     });
 
     test('upsertMeal inserts when missing and updates when present', () async {
-      final inserted = buildMeal(
-        id: 'meal-1',
-        name: 'Original Meal',
-      );
+      final inserted = buildMeal(id: 'meal-1', name: 'Original Meal');
 
       await dataSource.upsertMeal(inserted);
 
@@ -323,9 +308,7 @@ void main() {
         buildMeal(
           id: 'meal-1',
           name: 'Remote Meal',
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.synced,
-          ),
+          syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
         ),
       );
 
@@ -354,6 +337,28 @@ void main() {
           ownerUserId: null,
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final meal = await dataSource.getMealById('meal-1');
+      expect(meal, isNotNull);
+      expect(meal!.ownerUserId, 'user-1');
+      expect(meal.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(meal.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('recovers guest syncError meal into pendingUpload', () async {
+      await dataSource.insertMeal(
+        buildMeal(
+          id: 'meal-1',
+          name: 'Guest Meal',
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
             lastSyncError: 'offline',
           ),
         ),

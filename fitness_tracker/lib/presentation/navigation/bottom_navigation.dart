@@ -67,6 +67,8 @@ class _BottomNavigationState extends State<BottomNavigation> {
         _ensureNutritionLogDataLoaded();
         break;
       case _historyTabIndex:
+        _ensureExerciseDataLoaded();
+        _ensureMealDataLoaded();
         break;
       case _libraryTabIndex:
         _ensureExerciseDataLoaded();
@@ -105,9 +107,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
     }
 
     _didRequestNutritionLogData = true;
-    context.read<NutritionLogBloc>().add(
-          LoadDailyLogsEvent(DateTime.now()),
-        );
+    context.read<NutritionLogBloc>().add(LoadDailyLogsEvent(DateTime.now()));
   }
 
   void _ensureTargetsDataLoaded() {
@@ -149,19 +149,11 @@ class _BottomNavigationState extends State<BottomNavigation> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: List<Widget>.generate(
-          _tabCount,
-          _buildPageForIndex,
-        ),
+        children: List<Widget>.generate(_tabCount, _buildPageForIndex),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: AppTheme.borderDark,
-              width: 1,
-            ),
-          ),
+          border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,

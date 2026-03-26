@@ -14,7 +14,7 @@ import '../../../../core/utils/weight_unit_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../presentation/pages/exercises/bloc/exercise_bloc.dart';
+import '../../../library/application/exercise_bloc.dart';
 import '../../../settings/presentation/settings_scope.dart';
 import '../bloc/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
@@ -121,11 +121,10 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       builder: (BuildContext context, WorkoutState workoutState) {
         return BlocBuilder<ExerciseBloc, ExerciseState>(
           builder: (BuildContext context, ExerciseState exerciseState) {
-            if (exerciseState is ExerciseLoading) {
+            if (exerciseState is ExerciseInitial ||
+                exerciseState is ExerciseLoading) {
               return const Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.primaryOrange,
-                ),
+                child: CircularProgressIndicator(color: AppTheme.primaryOrange),
               );
             }
 
@@ -133,10 +132,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               return _buildErrorState(context);
             }
 
-            final List<Exercise> exercises =
-                exerciseState is ExercisesLoaded
-                    ? exerciseState.exercises
-                    : <Exercise>[];
+            final List<Exercise> exercises = exerciseState is ExercisesLoaded
+                ? exerciseState.exercises
+                : <Exercise>[];
 
             if (exercises.isEmpty) {
               return _buildEmptyExercisesState(context);
@@ -166,10 +164,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                   const SizedBox(height: 20),
                   _buildMuscleGroupInfo(),
                   const SizedBox(height: 28),
-                  _buildLogButton(
-                    workoutState,
-                    weightUnit,
-                  ),
+                  _buildLogButton(workoutState, weightUnit),
                 ],
               ),
             );
@@ -186,17 +181,13 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppTheme.errorRed,
-            ),
+            const Icon(Icons.error_outline, size: 64, color: AppTheme.errorRed),
             const SizedBox(height: 16),
             Text(
               AppStrings.errorLoadingExercises,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -218,9 +209,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       children: <Widget>[
         Text(
           AppStrings.exercise,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         InkWell(
@@ -255,10 +246,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppTheme.textDim,
-                ),
+                const Icon(Icons.arrow_drop_down, color: AppTheme.textDim),
               ],
             ),
           ),
@@ -282,17 +270,17 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
             const SizedBox(height: 16),
             Text(
               AppStrings.noExercisesAvailable,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               AppStrings.createExercisesFirst,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textMedium,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
               textAlign: TextAlign.center,
             ),
           ],
@@ -307,9 +295,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       children: <Widget>[
         Text(
           AppStrings.reps,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -334,9 +322,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       children: <Widget>[
         Text(
           AppStrings.weight,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -348,8 +336,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
           decoration: InputDecoration(
             hintText: '0.0',
             labelText: WeightUnitUtils.inputLabel(weightUnit),
-            helperText:
-                'Stored internally in kg for future sync compatibility',
+            helperText: 'Stored internally in kg for future sync compatibility',
             prefixIcon: const Icon(Icons.fitness_center),
             suffixText: WeightUnitUtils.unitLabel(weightUnit),
           ),
@@ -364,9 +351,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       children: <Widget>[
         Text(
           AppStrings.workoutDate,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         InkWell(
@@ -401,10 +388,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppTheme.textDim,
-                ),
+                const Icon(Icons.arrow_drop_down, color: AppTheme.textDim),
               ],
             ),
           ),
@@ -423,9 +407,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       decoration: BoxDecoration(
         color: AppTheme.primaryOrange.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.primaryOrange.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppTheme.primaryOrange.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,9 +423,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               Text(
                 AppStrings.setWillCountToward,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.primaryOrange,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: AppTheme.primaryOrange,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -477,12 +459,10 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     );
   }
 
-  Widget _buildLogButton(
-    WorkoutState state,
-    WeightUnit weightUnit,
-  ) {
+  Widget _buildLogButton(WorkoutState state, WeightUnit weightUnit) {
     final bool isLoading = state is WorkoutLoading;
-    final bool canLog = _selectedExercise != null &&
+    final bool canLog =
+        _selectedExercise != null &&
         _repsController.text.isNotEmpty &&
         _weightController.text.isNotEmpty;
 
@@ -527,10 +507,8 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                       Expanded(
                         child: Text(
                           AppStrings.selectExercise,
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                       IconButton(
@@ -552,21 +530,21 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                       return ListTile(
                         title: Text(
                           exercise.name,
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
                         ),
                         subtitle: Text(
                           exercise.muscleGroups
-                              .map((String mg) => MuscleGroups.getDisplayName(mg))
+                              .map(
+                                (String mg) => MuscleGroups.getDisplayName(mg),
+                              )
                               .join(', '),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textMedium,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textMedium),
                         ),
                         trailing: isSelected
                             ? const Icon(
@@ -636,10 +614,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
       id: _uuid.v4(),
       exerciseId: _selectedExercise!.id,
       reps: reps,
-      weight: WeightUnitUtils.toStoredKilograms(
-        enteredWeight,
-        weightUnit,
-      ),
+      weight: WeightUnitUtils.toStoredKilograms(enteredWeight, weightUnit),
       intensity: _selectedIntensity,
       date: _selectedDate,
       createdAt: DateTime.now(),

@@ -107,48 +107,45 @@ class SessionSyncServiceImpl implements SessionSyncService {
 
   @override
   Future<SessionSyncActionResult> signOut() async {
-    final signOutResult = await authRemoteDataSource.signOut();
+    try {
+      await authRemoteDataSource.signOut();
+    } catch (error) {
+      AppLogger.warning(
+        'Remote sign-out failed: $error',
+        category: 'session',
+      );
 
-    return await signOutResult.fold(
+      return SessionSyncActionResult(
+        status: SessionSyncActionStatus.failed,
+        message: 'sign-out failed: $error',
+      );
+    }
+
+    final clearSessionResult = await appSessionRepository.clearSession();
+
+    return await clearSessionResult.fold(
       (failure) async {
-        AppLogger.warning(
-          'Remote sign-out failed: ${failure.message}',
+        AppLogger.error(
+          'Remote sign-out succeeded but local session clear failed',
           category: 'session',
+          error: failure,
         );
 
         return SessionSyncActionResult(
           status: SessionSyncActionStatus.failed,
-          message: 'sign-out failed: ${failure.message}',
+          message:
+              'sign-out succeeded remotely but local session reset failed: ${failure.message}',
         );
       },
       (_) async {
-        final clearSessionResult = await appSessionRepository.clearSession();
+        AppLogger.info(
+          'Session signed out and local session reset completed',
+          category: 'session',
+        );
 
-        return await clearSessionResult.fold(
-          (failure) async {
-            AppLogger.error(
-              'Remote sign-out succeeded but local session clear failed',
-              category: 'session',
-              error: failure,
-            );
-
-            return SessionSyncActionResult(
-              status: SessionSyncActionStatus.failed,
-              message:
-                  'sign-out succeeded remotely but local session reset failed: ${failure.message}',
-            );
-          },
-          (_) async {
-            AppLogger.info(
-              'Session signed out and local session reset completed',
-              category: 'session',
-            );
-
-            return const SessionSyncActionResult(
-              status: SessionSyncActionStatus.completed,
-              message: 'sign-out completed successfully',
-            );
-          },
+        return const SessionSyncActionResult(
+          status: SessionSyncActionStatus.completed,
+          message: 'sign-out completed successfully',
         );
       },
     );

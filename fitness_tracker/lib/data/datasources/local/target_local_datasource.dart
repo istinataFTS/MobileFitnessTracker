@@ -20,9 +20,7 @@ abstract class TargetLocalDataSource {
   Future<void> insertTarget(TargetModel target);
   Future<void> updateTarget(TargetModel target);
   Future<void> upsertTarget(TargetModel target);
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  });
+  Future<void> prepareForInitialCloudMigration({required String userId});
   Future<void> mergeRemoteTargets(List<TargetModel> targets);
   Future<void> markAsSynced({
     required String localId,
@@ -47,9 +45,7 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
         getSyncMetadata: (target) => target.syncMetadata,
       );
 
-  const TargetLocalDataSourceImpl({
-    required this.databaseHelper,
-  });
+  const TargetLocalDataSourceImpl({required this.databaseHelper});
 
   @override
   Future<List<TargetModel>> getAllTargets() async {
@@ -82,7 +78,8 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
 
       final maps = await db.query(
         DatabaseTables.targets,
-        where: '''
+        where:
+            '''
           ${DatabaseTables.targetType} = ? AND
           ${DatabaseTables.targetCategoryKey} = ? AND
           ${DatabaseTables.targetPeriod} = ? AND
@@ -174,13 +171,13 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   }
 
   @override
-  Future<void> prepareForInitialCloudMigration({
-    required String userId,
-  }) async {
+  Future<void> prepareForInitialCloudMigration({required String userId}) async {
     try {
       final storedTargets = await _getStoredTargets();
       final preparedTargets = storedTargets
-          .map((target) => _prepareTargetForInitialCloudMigration(target, userId))
+          .map(
+            (target) => _prepareTargetForInitialCloudMigration(target, userId),
+          )
           .toList();
 
       await _replaceStoredTargets(preparedTargets);
@@ -349,7 +346,8 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       where:
           '${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?',
       whereArgs: <Object?>[SyncStatus.pendingDelete.name],
-      orderBy: '''
+      orderBy:
+          '''
         ${DatabaseTables.targetType} ASC,
         ${DatabaseTables.targetPeriod} ASC,
         ${DatabaseTables.targetCreatedAt} DESC
@@ -380,7 +378,8 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.targets,
-      orderBy: '''
+      orderBy:
+          '''
         ${DatabaseTables.targetType} ASC,
         ${DatabaseTables.targetPeriod} ASC,
         ${DatabaseTables.targetCreatedAt} DESC
@@ -429,19 +428,25 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
     String userId,
   ) {
     final ownerUserId = target.ownerUserId;
-    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return target;
     }
 
     final currentMetadata = target.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
-          status: SyncStatus.pendingUpload,
-          clearLastSyncError: true,
-        ),
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
+      SyncStatus.syncError => currentMetadata.copyWith(
+        status: SyncStatus.pendingUpload,
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpload => currentMetadata.copyWith(
-          clearLastSyncError: true,
-        ),
+        clearLastSyncError: true,
+      ),
       SyncStatus.pendingUpdate ||
       SyncStatus.synced ||
       SyncStatus.pendingDelete => currentMetadata,
@@ -449,8 +454,7 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
 
     return TargetModel.fromEntity(
       target.copyWith(
-        ownerUserId:
-            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
         syncMetadata: updatedMetadata,
       ),
     );
