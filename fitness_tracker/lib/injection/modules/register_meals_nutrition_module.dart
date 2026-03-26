@@ -1,6 +1,6 @@
 import 'package:get_it/get_it.dart';
 
-import '../../config/env_config.dart';
+import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/meal_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource_impl.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
@@ -169,13 +169,13 @@ void registerMealsNutritionModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<MealRemoteDataSource>(
-    () => EnvConfig.isSupabaseConfigured
+    () => sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured
         ? SupabaseMealRemoteDataSource(clientProvider: sl())
         : const NoopMealRemoteDataSource(),
   );
 
   sl.registerLazySingleton<NutritionLogRemoteDataSource>(
-    () => EnvConfig.isSupabaseConfigured
+    () => sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured
         ? SupabaseNutritionLogRemoteDataSource(clientProvider: sl())
         : const NoopNutritionLogRemoteDataSource(),
   );

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/env_config.dart';
 import '../../core/enums/sync_trigger.dart';
 import '../../core/logging/app_logger.dart';
+import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../core/sync/sync_orchestrator.dart';
 import '../../core/utils/app_lifecycle_manager.dart';
 import '../../core/utils/performance_monitor.dart';
@@ -88,9 +89,15 @@ class AppBootstrapper {
       return;
     }
 
-    if (!EnvConfig.isSupabaseConfigured) {
+    const runtimePolicy = RemoteSyncRuntimePolicy(
+      isSupabaseEnabled: EnvConfig.enableSupabase,
+      supabaseUrl: EnvConfig.supabaseUrl,
+      supabaseAnonKey: EnvConfig.supabaseAnonKey,
+    );
+
+    if (!runtimePolicy.isRemoteSyncConfigured) {
       AppLogger.info(
-        'Supabase is disabled or not configured; continuing without remote backend',
+        'Remote sync runtime policy is not configured; continuing without remote backend',
         category: 'bootstrap',
       );
       return;
