@@ -18,10 +18,10 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
 
   static final LocalRemoteMerge<NutritionLog> _merge =
       LocalRemoteMerge<NutritionLog>(
-    getId: (log) => log.id,
-    getUpdatedAt: (log) => log.updatedAt,
-    getSyncMetadata: (log) => log.syncMetadata,
-  );
+        getId: (log) => log.id,
+        getUpdatedAt: (log) => log.updatedAt,
+        getSyncMetadata: (log) => log.syncMetadata,
+      );
 
   const NutritionLogRepositoryImpl({
     required this.localDataSource,
@@ -103,7 +103,7 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
         case DataSourcePreference.localThenRemote:
           final localLog = await localDataSource.getLogById(id);
           if (localLog != null) {
-            return localLog.syncMetadata.isPendingDelete ? null : localLog;
+            return localLog;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -116,7 +116,7 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
               NutritionLogModel.fromEntity(remoteLog),
             );
           }
-          return remoteLog;
+          return localDataSource.getLogById(id);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -127,9 +127,6 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
           final remoteLog = await remoteDataSource.getLogById(id);
 
           if (remoteLog == null) {
-            if (localLog == null || localLog.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localLog;
           }
 
@@ -137,7 +134,7 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
             await localDataSource.upsertLog(
               NutritionLogModel.fromEntity(remoteLog),
             );
-            return remoteLog;
+            return localDataSource.getLogById(id);
           }
 
           final merged = _merge.chooseWinner(
@@ -149,7 +146,7 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
             NutritionLogModel.fromEntity(merged),
           );
 
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getLogById(id);
       }
     });
   }

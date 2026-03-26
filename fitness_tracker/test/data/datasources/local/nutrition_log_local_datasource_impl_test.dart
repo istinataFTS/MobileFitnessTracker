@@ -331,10 +331,14 @@ void main() {
         whereArgs: <Object?>['log-1'],
       );
 
-      expect(rawRows.single[DatabaseTables.nutritionLogSyncStatus],
-          SyncStatus.pendingDelete.name);
-      expect(rawRows.single[DatabaseTables.nutritionLogLastSyncError],
-          'delete queued');
+      expect(
+        rawRows.single[DatabaseTables.nutritionLogSyncStatus],
+        SyncStatus.pendingDelete.name,
+      );
+      expect(
+        rawRows.single[DatabaseTables.nutritionLogLastSyncError],
+        'delete queued',
+      );
     });
 
     test('upsertLog inserts when missing and updates when present', () async {
@@ -358,6 +362,43 @@ void main() {
       final log = await dataSource.getLogById('log-1');
       expect(log, isNotNull);
       expect(log!.calories, 420);
+    });
+
+    test('upsertLog does not revive a pendingDelete row', () async {
+      await dataSource.insertLog(
+        buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        ),
+      );
+
+      await dataSource.upsertLog(
+        buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          calories: 450,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+          ),
+        ),
+      );
+
+      final visibleLog = await dataSource.getLogById('log-1');
+      expect(visibleLog, isNull);
+
+      final rawRows = await database.query(
+        DatabaseTables.nutritionLogs,
+        where: '${DatabaseTables.nutritionLogId} = ?',
+        whereArgs: <Object?>['log-1'],
+      );
+      expect(rawRows, hasLength(1));
+      expect(
+        rawRows.single[DatabaseTables.nutritionLogSyncStatus],
+        SyncStatus.pendingDelete.name,
+      );
     });
   });
 }

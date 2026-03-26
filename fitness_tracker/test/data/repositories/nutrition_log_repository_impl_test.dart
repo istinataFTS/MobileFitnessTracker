@@ -208,41 +208,26 @@ void main() {
       verifyNever(() => localDataSource.upsertLog(any()));
     });
 
-    test('returns null for pending delete local record in localThenRemote',
-        () async {
-      final NutritionLogModel pendingDeleteLog = buildLogModel(
-        id: 'log-1',
-        loggedAt: targetDate,
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
-
-      when(() => localDataSource.getLogById('log-1')).thenAnswer(
-        (_) async => pendingDeleteLog,
-      );
-
-      final Either<Failure, NutritionLog?> result = await repository.getLogById(
-        'log-1',
-        sourcePreference: DataSourcePreference.localThenRemote,
-      );
-
-      expect(result, const Right<Failure, NutritionLog?>(null));
-      verifyNever(() => remoteDataSource.getLogById(any()));
-    });
-
-    test('updates missing local cache via upsert when remoteThenLocal finds '
-        'remote value', () async {
+    test('returns local cache snapshot after localThenRemote upsert', () async {
       final NutritionLog remoteLog = buildLogEntity(
         id: 'log-1',
         loggedAt: targetDate,
         calories: 420,
       );
 
-      when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => localDataSource.getLogById('log-1')).thenAnswer(
-        (_) async => null,
+      final NutritionLogModel cachedLog = buildLogModel(
+        id: 'log-1',
+        loggedAt: targetDate,
+        calories: 420,
       );
+
+      int localReadCount = 0;
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getLogById('log-1')).thenAnswer((_) async {
+        localReadCount += 1;
+        return localReadCount == 1 ? null : cachedLog;
+      });
       when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
         (_) async => remoteLog,
       );
@@ -250,10 +235,11 @@ void main() {
 
       final Either<Failure, NutritionLog?> result = await repository.getLogById(
         'log-1',
-        sourcePreference: DataSourcePreference.remoteThenLocal,
+        sourcePreference: DataSourcePreference.localThenRemote,
       );
 
-      expect(result, Right<Failure, NutritionLog?>(remoteLog));
+      expect(result, Right<Failure, NutritionLog?>(cachedLog));
+      verify(() => localDataSource.getLogById('log-1')).called(2);
       verify(() => localDataSource.upsertLog(any())).called(1);
     });
 
@@ -297,6 +283,33 @@ void main() {
 
       expect(result, Right<Failure, NutritionLog?>(localPendingLog));
       verify(() => localDataSource.upsertLog(localPendingLog)).called(1);
+    });
+
+    test('returns null when hidden pending delete remains after remote refresh',
+        () async {
+      final NutritionLog remoteLog = buildLogEntity(
+        id: 'log-1',
+        loggedAt: targetDate,
+        calories: 420,
+      );
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => null,
+      );
+      when(() => remoteDataSource.getLogById('log-1')).thenAnswer(
+        (_) async => remoteLog,
+      );
+      when(() => localDataSource.upsertLog(any())).thenAnswer((_) async {});
+
+      final Either<Failure, NutritionLog?> result = await repository.getLogById(
+        'log-1',
+        sourcePreference: DataSourcePreference.remoteThenLocal,
+      );
+
+      expect(result, const Right<Failure, NutritionLog?>(null));
+      verify(() => localDataSource.getLogById('log-1')).called(2);
+      verify(() => localDataSource.upsertLog(any())).called(1);
     });
   });
 
