@@ -18,10 +18,10 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
 
   static final LocalRemoteMerge<Exercise> _merge =
       LocalRemoteMerge<Exercise>(
-    getId: (exercise) => exercise.id,
-    getUpdatedAt: (exercise) => exercise.updatedAt,
-    getSyncMetadata: (exercise) => exercise.syncMetadata,
-  );
+        getId: (exercise) => exercise.id,
+        getUpdatedAt: (exercise) => exercise.updatedAt,
+        getSyncMetadata: (exercise) => exercise.syncMetadata,
+      );
 
   const ExerciseRepositoryImpl({
     required this.localDataSource,
@@ -103,9 +103,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
         case DataSourcePreference.localThenRemote:
           final localExercise = await localDataSource.getExerciseById(id);
           if (localExercise != null) {
-            return localExercise.syncMetadata.isPendingDelete
-                ? null
-                : localExercise;
+            return localExercise;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -118,7 +116,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
               ExerciseModel.fromEntity(remoteExercise),
             );
           }
-          return remoteExercise;
+          return localDataSource.getExerciseById(id);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -129,10 +127,6 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
           final remoteExercise = await remoteDataSource.getExerciseById(id);
 
           if (remoteExercise == null) {
-            if (localExercise == null ||
-                localExercise.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localExercise;
           }
 
@@ -140,7 +134,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
             await localDataSource.upsertExercise(
               ExerciseModel.fromEntity(remoteExercise),
             );
-            return remoteExercise;
+            return localDataSource.getExerciseById(id);
           }
 
           final merged = _merge.chooseWinner(
@@ -152,7 +146,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
             ExerciseModel.fromEntity(merged),
           );
 
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getExerciseById(id);
       }
     });
   }
@@ -176,9 +170,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
         case DataSourcePreference.localThenRemote:
           final localExercise = await localDataSource.getExerciseByName(name);
           if (localExercise != null) {
-            return localExercise.syncMetadata.isPendingDelete
-                ? null
-                : localExercise;
+            return localExercise;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -191,7 +183,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
               ExerciseModel.fromEntity(remoteExercise),
             );
           }
-          return remoteExercise;
+          return localDataSource.getExerciseByName(name);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -202,10 +194,6 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
           final remoteExercise = await remoteDataSource.getExerciseByName(name);
 
           if (remoteExercise == null) {
-            if (localExercise == null ||
-                localExercise.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localExercise;
           }
 
@@ -213,7 +201,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
             await localDataSource.upsertExercise(
               ExerciseModel.fromEntity(remoteExercise),
             );
-            return remoteExercise;
+            return localDataSource.getExerciseByName(name);
           }
 
           final merged = _merge.chooseWinner(
@@ -225,7 +213,7 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
             ExerciseModel.fromEntity(merged),
           );
 
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getExerciseByName(name);
       }
     });
   }

@@ -1,151 +1,390 @@
 import 'package:dartz/dartz.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-
-import 'package:fitness_tracker/core/errors/exceptions.dart';
+import 'package:fitness_tracker/core/enums/data_source_preference.dart';
+import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource.dart';
+import 'package:fitness_tracker/data/datasources/remote/exercise_remote_datasource.dart';
 import 'package:fitness_tracker/data/models/exercise_model.dart';
 import 'package:fitness_tracker/data/repositories/exercise_repository_impl.dart';
+import 'package:fitness_tracker/data/sync/exercise_sync_coordinator.dart';
+import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockExerciseLocalDataSource extends Mock
     implements ExerciseLocalDataSource {}
 
-class FakeExerciseModel extends Fake implements ExerciseModel {}
+class MockExerciseRemoteDataSource extends Mock
+    implements ExerciseRemoteDataSource {}
+
+class MockExerciseSyncCoordinator extends Mock
+    implements ExerciseSyncCoordinator {}
 
 void main() {
-  late ExerciseRepositoryImpl repository;
   late MockExerciseLocalDataSource localDataSource;
+  late MockExerciseRemoteDataSource remoteDataSource;
+  late MockExerciseSyncCoordinator syncCoordinator;
+  late ExerciseRepositoryImpl repository;
 
-  final testExercise = Exercise(
-    id: 'exercise-1',
-    name: 'Bench Press',
-    muscleGroups: ['mid-chest', 'front-delts', 'triceps'],
-    createdAt: DateTime(2025, 1, 1),
-  );
+  final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
-  final testExerciseModel = ExerciseModel(
-    id: 'exercise-1',
-    name: 'Bench Press',
-    muscleGroups: ['mid-chest', 'front-delts', 'triceps'],
-    createdAt: DateTime(2025, 1, 1),
-  );
+  Exercise buildExercise({
+    required String id,
+    required String name,
+    List<String> muscleGroups = const <String>['chest', 'triceps'],
+    EntitySyncMetadata syncMetadata = const EntitySyncMetadata(),
+  }) {
+    return Exercise(
+      id: id,
+      name: name,
+      muscleGroups: muscleGroups,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      syncMetadata: syncMetadata,
+    );
+  }
 
-  setUpAll(() {
-    registerFallbackValue(FakeExerciseModel());
-  });
+  ExerciseModel buildExerciseModel({
+    required String id,
+    required String name,
+    List<String> muscleGroups = const <String>['chest', 'triceps'],
+    EntitySyncMetadata syncMetadata = const EntitySyncMetadata(),
+  }) {
+    return ExerciseModel(
+      id: id,
+      name: name,
+      muscleGroups: muscleGroups,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      syncMetadata: syncMetadata,
+    );
+  }
 
   setUp(() {
     localDataSource = MockExerciseLocalDataSource();
+    remoteDataSource = MockExerciseRemoteDataSource();
+    syncCoordinator = MockExerciseSyncCoordinator();
+
     repository = ExerciseRepositoryImpl(
       localDataSource: localDataSource,
+      remoteDataSource: remoteDataSource,
+      syncCoordinator: syncCoordinator,
     );
+
+    when(() => remoteDataSource.isConfigured).thenReturn(false);
+    when(() => syncCoordinator.isRemoteSyncEnabled).thenReturn(false);
   });
 
-  group('getAllExercises', () {
-    test('returns exercises when datasource succeeds', () async {
-      when(() => localDataSource.getAllExercises())
-          .thenAnswer((_) async => [testExerciseModel]);
+  group('ExerciseRepositoryImpl.getAllExercises', () {
+    test('returns local exercises for localOnly', () async {
+      final List<ExerciseModel> localExercises = <ExerciseModel>[
+        buildExerciseModel(id: 'exercise-1', name: 'Bench Press'),
+      ];
 
-      final result = await repository.getAllExercises();
+      when(() => localDataSource.getAllExercises()).thenAnswer(
+        (_) async => localExercises,
+      );
 
-      expect(result, Right([testExerciseModel]));
+      final Either<Failure, List<Exercise>> result =
+          await repository.getAllExercises();
+
+      expect(result, Right<Failure, List<Exercise>>(localExercises));
       verify(() => localDataSource.getAllExercises()).called(1);
-      verifyNoMoreInteractions(localDataSource);
+      verifyNever(() => remoteDataSource.getAllExercises());
+      verifyNever(() => localDataSource.mergeRemoteExercises(any()));
     });
 
-    test('returns DatabaseFailure when datasource throws CacheDatabaseException',
+    test('merges remote cache for remoteThenLocal instead of replaceAll',
         () async {
-      when(() => localDataSource.getAllExercises()).thenThrow(
-        const CacheDatabaseException('Failed to load exercises'),
-      );
-
-      final result = await repository.getAllExercises();
-
-      expect(result.isLeft(), isTrue);
-      result.fold(
-        (failure) {
-          expect(failure, isA<DatabaseFailure>());
-          expect(failure.message, 'Failed to load exercises');
-        },
-        (_) => fail('Expected a failure result'),
-      );
-      verify(() => localDataSource.getAllExercises()).called(1);
-    });
-  });
-
-  group('addExercise', () {
-    test('converts entity to model and inserts it', () async {
-      when(() => localDataSource.insertExercise(any()))
-          .thenAnswer((_) async {});
-
-      final result = await repository.addExercise(testExercise);
-
-      expect(result, const Right(null));
-      verify(
-        () => localDataSource.insertExercise(
-          ExerciseModel(
-            id: 'exercise-1',
-            name: 'Bench Press',
-            muscleGroups: ['mid-chest', 'front-delts', 'triceps'],
-            createdAt: DateTime(2025, 1, 1),
+      final List<ExerciseModel> localExercises = <ExerciseModel>[
+        buildExerciseModel(
+          id: 'exercise-1',
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingUpdate,
           ),
         ),
-      ).called(1);
-      verifyNoMoreInteractions(localDataSource);
-    });
+      ];
 
-    test('returns DatabaseFailure when insert throws CacheDatabaseException',
-        () async {
-      when(() => localDataSource.insertExercise(any())).thenThrow(
-        const CacheDatabaseException('Insert failed'),
+      final List<Exercise> remoteExercises = <Exercise>[
+        buildExercise(
+          id: 'exercise-1',
+          name: 'Bench Press Remote',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+          ),
+        ),
+        buildExercise(
+          id: 'exercise-2',
+          name: 'Squat',
+          muscleGroups: const <String>['quads', 'glutes'],
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+          ),
+        ),
+      ];
+
+      final List<ExerciseModel> mergedExercises = <ExerciseModel>[
+        localExercises.first,
+        buildExerciseModel(
+          id: 'exercise-2',
+          name: 'Squat',
+          muscleGroups: const <String>['quads', 'glutes'],
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+          ),
+        ),
+      ];
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getAllExercises()).thenAnswer(
+        (_) async => localExercises,
+      );
+      when(() => remoteDataSource.getAllExercises()).thenAnswer(
+        (_) async => remoteExercises,
+      );
+      when(() => localDataSource.mergeRemoteExercises(any())).thenAnswer(
+        (_) async {},
+      );
+      when(() => localDataSource.getAllExercises()).thenAnswer(
+        (_) async => mergedExercises,
       );
 
-      final result = await repository.addExercise(testExercise);
-
-      expect(result.isLeft(), isTrue);
-      result.fold(
-        (failure) {
-          expect(failure, isA<DatabaseFailure>());
-          expect(failure.message, 'Insert failed');
-        },
-        (_) => fail('Expected a failure result'),
+      final Either<Failure, List<Exercise>> result =
+          await repository.getAllExercises(
+        sourcePreference: DataSourcePreference.remoteThenLocal,
       );
-      verify(() => localDataSource.insertExercise(any())).called(1);
+
+      expect(result, Right<Failure, List<Exercise>>(mergedExercises));
+      verify(() => remoteDataSource.getAllExercises()).called(1);
+      verify(() => localDataSource.mergeRemoteExercises(any())).called(1);
     });
   });
 
-  group('deleteExercise', () {
-    test('delegates delete to datasource', () async {
-      when(() => localDataSource.deleteExercise('exercise-1'))
-          .thenAnswer((_) async {});
+  group('ExerciseRepositoryImpl.getExerciseById', () {
+    test('returns null without remote lookup when local cache is empty',
+        () async {
+      when(() => localDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => null,
+      );
 
-      final result = await repository.deleteExercise('exercise-1');
+      final Either<Failure, Exercise?> result = await repository.getExerciseById(
+        'exercise-1',
+        sourcePreference: DataSourcePreference.localThenRemote,
+      );
 
-      expect(result, const Right(null));
-      verify(() => localDataSource.deleteExercise('exercise-1')).called(1);
-      verifyNoMoreInteractions(localDataSource);
+      expect(result, const Right<Failure, Exercise?>(null));
+      verifyNever(() => remoteDataSource.getExerciseById(any()));
     });
 
-    test('returns UnexpectedFailure for unknown errors', () async {
-      when(() => localDataSource.deleteExercise('exercise-1'))
-          .thenThrow(StateError('unexpected delete issue'));
-
-      final result = await repository.deleteExercise('exercise-1');
-
-      expect(result.isLeft(), isTrue);
-      result.fold(
-        (failure) {
-          expect(failure, isA<UnexpectedFailure>());
-          expect(
-            failure.message,
-            'Unexpected error: Bad state: unexpected delete issue',
-          );
-        },
-        (_) => fail('Expected a failure result'),
+    test('preserves pending local update over remote in remoteThenLocal',
+        () async {
+      final ExerciseModel localExercise = buildExerciseModel(
+        id: 'exercise-1',
+        name: 'Bench Press Local',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.pendingUpdate,
+        ),
       );
-      verify(() => localDataSource.deleteExercise('exercise-1')).called(1);
+
+      final Exercise remoteExercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press Remote',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => localExercise,
+      );
+      when(() => remoteDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => remoteExercise,
+      );
+      when(() => localDataSource.upsertExercise(localExercise)).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, Exercise?> result = await repository.getExerciseById(
+        'exercise-1',
+        sourcePreference: DataSourcePreference.remoteThenLocal,
+      );
+
+      expect(result, Right<Failure, Exercise?>(localExercise));
+      verify(() => localDataSource.upsertExercise(localExercise)).called(1);
+    });
+
+    test('returns local cache snapshot after localThenRemote upsert', () async {
+      final Exercise remoteExercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      final ExerciseModel cachedExercise = buildExerciseModel(
+        id: 'exercise-1',
+        name: 'Bench Press',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      int localReadCount = 0;
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async {
+          localReadCount += 1;
+          return localReadCount == 1 ? null : cachedExercise;
+        },
+      );
+      when(() => remoteDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => remoteExercise,
+      );
+      when(() => localDataSource.upsertExercise(any())).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, Exercise?> result = await repository.getExerciseById(
+        'exercise-1',
+        sourcePreference: DataSourcePreference.localThenRemote,
+      );
+
+      expect(result, Right<Failure, Exercise?>(cachedExercise));
+      verify(() => localDataSource.getExerciseById('exercise-1')).called(2);
+      verify(() => localDataSource.upsertExercise(any())).called(1);
+    });
+
+    test('returns null when hidden pending delete remains after remote refresh',
+        () async {
+      final Exercise remoteExercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => null,
+      );
+      when(() => remoteDataSource.getExerciseById('exercise-1')).thenAnswer(
+        (_) async => remoteExercise,
+      );
+      when(() => localDataSource.upsertExercise(any())).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, Exercise?> result = await repository.getExerciseById(
+        'exercise-1',
+        sourcePreference: DataSourcePreference.remoteThenLocal,
+      );
+
+      expect(result, const Right<Failure, Exercise?>(null));
+      verify(() => localDataSource.getExerciseById('exercise-1')).called(2);
+      verify(() => localDataSource.upsertExercise(any())).called(1);
+    });
+  });
+
+  group('ExerciseRepositoryImpl.getExerciseByName', () {
+    test('returns local cache snapshot after localThenRemote upsert', () async {
+      final Exercise remoteExercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      final ExerciseModel cachedExercise = buildExerciseModel(
+        id: 'exercise-1',
+        name: 'Bench Press',
+        syncMetadata: const EntitySyncMetadata(
+          status: SyncStatus.synced,
+        ),
+      );
+
+      int localReadCount = 0;
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getExerciseByName('Bench Press')).thenAnswer(
+        (_) async {
+          localReadCount += 1;
+          return localReadCount == 1 ? null : cachedExercise;
+        },
+      );
+      when(() => remoteDataSource.getExerciseByName('Bench Press')).thenAnswer(
+        (_) async => remoteExercise,
+      );
+      when(() => localDataSource.upsertExercise(any())).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, Exercise?> result =
+          await repository.getExerciseByName(
+        'Bench Press',
+        sourcePreference: DataSourcePreference.localThenRemote,
+      );
+
+      expect(result, Right<Failure, Exercise?>(cachedExercise));
+      verify(() => localDataSource.getExerciseByName('Bench Press')).called(2);
+      verify(() => localDataSource.upsertExercise(any())).called(1);
+    });
+  });
+
+  group('ExerciseRepositoryImpl writes', () {
+    test('addExercise delegates to sync coordinator', () async {
+      final Exercise exercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press',
+      );
+
+      when(() => syncCoordinator.persistAddedExercise(exercise)).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, void> result = await repository.addExercise(
+        exercise,
+      );
+
+      expect(result.isRight(), isTrue);
+      verify(() => syncCoordinator.persistAddedExercise(exercise)).called(1);
+    });
+
+    test('updateExercise delegates to sync coordinator', () async {
+      final Exercise exercise = buildExercise(
+        id: 'exercise-1',
+        name: 'Bench Press',
+      );
+
+      when(() => syncCoordinator.persistUpdatedExercise(exercise)).thenAnswer(
+        (_) async {},
+      );
+
+      final Either<Failure, void> result = await repository.updateExercise(
+        exercise,
+      );
+
+      expect(result.isRight(), isTrue);
+      verify(() => syncCoordinator.persistUpdatedExercise(exercise)).called(1);
+    });
+
+    test('deleteExercise delegates to sync coordinator', () async {
+      when(() => syncCoordinator.persistDeletedExercise('exercise-1'))
+          .thenAnswer((_) async {});
+
+      final Either<Failure, void> result = await repository.deleteExercise(
+        'exercise-1',
+      );
+
+      expect(result.isRight(), isTrue);
+      verify(() => syncCoordinator.persistDeletedExercise('exercise-1'))
+          .called(1);
     });
   });
 }

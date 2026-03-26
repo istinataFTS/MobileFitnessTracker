@@ -35,10 +35,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
 
   static final LocalRemoteMerge<ExerciseModel> _merge =
       LocalRemoteMerge<ExerciseModel>(
-    getId: (exercise) => exercise.id,
-    getUpdatedAt: (exercise) => exercise.updatedAt,
-    getSyncMetadata: (exercise) => exercise.syncMetadata,
-  );
+        getId: (exercise) => exercise.id,
+        getUpdatedAt: (exercise) => exercise.updatedAt,
+        getSyncMetadata: (exercise) => exercise.syncMetadata,
+      );
 
   const ExerciseLocalDataSourceImpl({
     required this.databaseHelper,
@@ -47,15 +47,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<List<ExerciseModel>> getAllExercises() async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.exercises,
-        where:
-            '${DatabaseTables.exerciseSyncStatus} IS NULL OR ${DatabaseTables.exerciseSyncStatus} != ?',
-        whereArgs: const ['pendingDelete'],
-        orderBy: '${DatabaseTables.exerciseName} ASC',
-      );
-      return maps.map(ExerciseModel.fromMap).toList();
+      return await _getVisibleExercises();
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercises: $e');
     }
@@ -64,20 +56,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<ExerciseModel?> getExerciseById(String id) async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.exercises,
-        where:
-            '${DatabaseTables.exerciseId} = ? AND (${DatabaseTables.exerciseSyncStatus} IS NULL OR ${DatabaseTables.exerciseSyncStatus} != ?)',
-        whereArgs: [id, 'pendingDelete'],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        return null;
-      }
-
-      return ExerciseModel.fromMap(maps.first);
+      return await _getVisibleExerciseById(id);
     } catch (e) {
       throw CacheDatabaseException('Failed to get exercise: $e');
     }
@@ -90,8 +69,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       final maps = await db.query(
         DatabaseTables.exercises,
         where:
-            'LOWER(${DatabaseTables.exerciseName}) = LOWER(?) AND (${DatabaseTables.exerciseSyncStatus} IS NULL OR ${DatabaseTables.exerciseSyncStatus} != ?)',
-        whereArgs: [name, 'pendingDelete'],
+            'LOWER(${DatabaseTables.exerciseName}) = LOWER(?) AND '
+            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+            '${DatabaseTables.exerciseSyncStatus} != ?)',
+        whereArgs: [name, SyncStatus.pendingDelete.name],
         limit: 1,
       );
 
@@ -112,8 +93,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       final maps = await db.query(
         DatabaseTables.exercises,
         where:
-            '${DatabaseTables.exerciseMuscleGroups} LIKE ? AND (${DatabaseTables.exerciseSyncStatus} IS NULL OR ${DatabaseTables.exerciseSyncStatus} != ?)',
-        whereArgs: ['%"$muscleGroup"%', 'pendingDelete'],
+            '${DatabaseTables.exerciseMuscleGroups} LIKE ? AND '
+            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+            '${DatabaseTables.exerciseSyncStatus} != ?)',
+        whereArgs: ['%"$muscleGroup"%', SyncStatus.pendingDelete.name],
         orderBy: '${DatabaseTables.exerciseName} ASC',
       );
       return maps.map(ExerciseModel.fromMap).toList();
@@ -129,8 +112,12 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       final maps = await db.query(
         DatabaseTables.exercises,
         where:
-            '${DatabaseTables.exerciseSyncStatus} = ? OR ${DatabaseTables.exerciseSyncStatus} = ?',
-        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+            '${DatabaseTables.exerciseSyncStatus} = ? OR '
+            '${DatabaseTables.exerciseSyncStatus} = ?',
+        whereArgs: [
+          SyncStatus.pendingUpload.name,
+          SyncStatus.pendingUpdate.name,
+        ],
         orderBy: '${DatabaseTables.exerciseUpdatedAt} ASC',
       );
 
@@ -171,9 +158,14 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
 
   @override
   Future<void> upsertExercise(ExerciseModel exercise) async {
-    final existing = await getExerciseById(exercise.id);
+    final existing = await _getStoredExerciseById(exercise.id);
     if (existing == null) {
       await insertExercise(exercise);
+      return;
+    }
+
+    if (existing.syncMetadata.isPendingDelete &&
+        !exercise.syncMetadata.isPendingDelete) {
       return;
     }
 
@@ -183,31 +175,23 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<void> mergeRemoteExercises(List<ExerciseModel> exercises) async {
     try {
-      final local = await getAllExercises();
-      final merged = _merge.mergeLists(
-        localItems: local,
+      final storedLocalExercises = await _getStoredExercises();
+      final mergedVisibleExercises = _merge.mergeLists(
+        localItems: storedLocalExercises,
         remoteItems: exercises,
       );
 
-      final db = await databaseHelper.database;
-      await db.transaction((txn) async {
-        await txn.delete(
-          DatabaseTables.exercises,
-          where:
-              '${DatabaseTables.exerciseSyncStatus} IS NULL OR ${DatabaseTables.exerciseSyncStatus} != ?',
-          whereArgs: const ['pendingDelete'],
-        );
+      final Map<String, ExerciseModel> mergedById = <String, ExerciseModel>{
+        for (final exercise in mergedVisibleExercises) exercise.id: exercise,
+      };
 
-        final batch = txn.batch();
-        for (final exercise in merged) {
-          batch.insert(
-            DatabaseTables.exercises,
-            exercise.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+      for (final localExercise in storedLocalExercises) {
+        if (localExercise.syncMetadata.isPendingDelete) {
+          mergedById.putIfAbsent(localExercise.id, () => localExercise);
         }
-        await batch.commit(noResult: true);
-      });
+      }
+
+      await _replaceStoredExercises(mergedById.values.toList());
     } catch (e) {
       throw CacheDatabaseException('Failed to merge remote exercises: $e');
     }
@@ -309,21 +293,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<void> replaceAllExercises(List<ExerciseModel> exercises) async {
     try {
-      final db = await databaseHelper.database;
-
-      await db.transaction((txn) async {
-        await txn.delete(DatabaseTables.exercises);
-
-        final batch = txn.batch();
-        for (final exercise in exercises) {
-          batch.insert(
-            DatabaseTables.exercises,
-            exercise.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        await batch.commit(noResult: true);
-      });
+      await _replaceStoredExercises(exercises);
     } catch (e) {
       throw CacheDatabaseException('Failed to replace all exercises: $e');
     }
@@ -351,5 +321,80 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     } catch (e) {
       throw CacheDatabaseException('Failed to clear exercises: $e');
     }
+  }
+
+  Future<List<ExerciseModel>> _getVisibleExercises() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.exercises,
+      where:
+          '${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+          '${DatabaseTables.exerciseSyncStatus} != ?',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+      orderBy: '${DatabaseTables.exerciseName} ASC',
+    );
+    return maps.map(ExerciseModel.fromMap).toList();
+  }
+
+  Future<ExerciseModel?> _getVisibleExerciseById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.exercises,
+      where:
+          '${DatabaseTables.exerciseId} = ? AND '
+          '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+          '${DatabaseTables.exerciseSyncStatus} != ?)',
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return ExerciseModel.fromMap(maps.first);
+  }
+
+  Future<List<ExerciseModel>> _getStoredExercises() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.exercises,
+      orderBy: '${DatabaseTables.exerciseName} ASC',
+    );
+    return maps.map(ExerciseModel.fromMap).toList();
+  }
+
+  Future<ExerciseModel?> _getStoredExerciseById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.exercises,
+      where: '${DatabaseTables.exerciseId} = ?',
+      whereArgs: <Object?>[id],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return ExerciseModel.fromMap(maps.first);
+  }
+
+  Future<void> _replaceStoredExercises(List<ExerciseModel> exercises) async {
+    final db = await databaseHelper.database;
+
+    await db.transaction((txn) async {
+      await txn.delete(DatabaseTables.exercises);
+
+      final batch = txn.batch();
+      for (final exercise in exercises) {
+        batch.insert(
+          DatabaseTables.exercises,
+          exercise.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 }
