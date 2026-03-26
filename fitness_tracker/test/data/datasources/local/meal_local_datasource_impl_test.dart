@@ -278,8 +278,10 @@ void main() {
         whereArgs: <Object?>['meal-1'],
       );
 
-      expect(rawRows.single[DatabaseTables.mealSyncStatus],
-          SyncStatus.pendingDelete.name);
+      expect(
+        rawRows.single[DatabaseTables.mealSyncStatus],
+        SyncStatus.pendingDelete.name,
+      );
       expect(rawRows.single[DatabaseTables.mealLastSyncError], 'delete queued');
     });
 
@@ -302,6 +304,42 @@ void main() {
       final meal = await dataSource.getMealById('meal-1');
       expect(meal, isNotNull);
       expect(meal!.name, 'Updated Meal');
+    });
+
+    test('upsertMeal does not revive a pendingDelete row', () async {
+      await dataSource.insertMeal(
+        buildMeal(
+          id: 'meal-1',
+          name: 'Deleted Meal',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        ),
+      );
+
+      await dataSource.upsertMeal(
+        buildMeal(
+          id: 'meal-1',
+          name: 'Remote Meal',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+          ),
+        ),
+      );
+
+      final visibleMeal = await dataSource.getMealById('meal-1');
+      expect(visibleMeal, isNull);
+
+      final rawRows = await database.query(
+        DatabaseTables.meals,
+        where: '${DatabaseTables.mealId} = ?',
+        whereArgs: <Object?>['meal-1'],
+      );
+      expect(rawRows, hasLength(1));
+      expect(
+        rawRows.single[DatabaseTables.mealSyncStatus],
+        SyncStatus.pendingDelete.name,
+      );
     });
   });
 }

@@ -13,10 +13,10 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
 
   static final LocalRemoteMerge<MealModel> _merge =
       LocalRemoteMerge<MealModel>(
-    getId: (meal) => meal.id,
-    getUpdatedAt: (meal) => meal.updatedAt,
-    getSyncMetadata: (meal) => meal.syncMetadata,
-  );
+        getId: (meal) => meal.id,
+        getUpdatedAt: (meal) => meal.updatedAt,
+        getSyncMetadata: (meal) => meal.syncMetadata,
+      );
 
   const MealLocalDataSourceImpl({
     required this.databaseHelper,
@@ -25,15 +25,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<List<MealModel>> getAllMeals() async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.meals,
-        where:
-            '${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?',
-        whereArgs: const ['pendingDelete'],
-        orderBy: '${DatabaseTables.mealName} ASC',
-      );
-      return maps.map(MealModel.fromMap).toList();
+      return await _getVisibleMeals();
     } catch (e) {
       throw CacheDatabaseException('Failed to get all meals: $e');
     }
@@ -42,20 +34,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<MealModel?> getMealById(String id) async {
     try {
-      final db = await databaseHelper.database;
-      final maps = await db.query(
-        DatabaseTables.meals,
-        where:
-            '${DatabaseTables.mealId} = ? AND (${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
-        whereArgs: [id, 'pendingDelete'],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        return null;
-      }
-
-      return MealModel.fromMap(maps.first);
+      return await _getVisibleMealById(id);
     } catch (e) {
       throw CacheDatabaseException('Failed to get meal by ID: $e');
     }
@@ -68,8 +47,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       final maps = await db.query(
         DatabaseTables.meals,
         where:
-            'LOWER(${DatabaseTables.mealName}) = LOWER(?) AND (${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
-        whereArgs: [name, 'pendingDelete'],
+            'LOWER(${DatabaseTables.mealName}) = LOWER(?) AND '
+            '(${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
+        whereArgs: [name, SyncStatus.pendingDelete.name],
         limit: 1,
       );
 
@@ -90,8 +70,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       final maps = await db.query(
         DatabaseTables.meals,
         where:
-            'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?) AND (${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
-        whereArgs: ['%$searchTerm%', 'pendingDelete'],
+            'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?) AND '
+            '(${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
+        whereArgs: ['%$searchTerm%', SyncStatus.pendingDelete.name],
         orderBy: DatabaseTables.mealName,
       );
       return maps.map(MealModel.fromMap).toList();
@@ -108,7 +89,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
         DatabaseTables.meals,
         where:
             '${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?',
-        whereArgs: const ['pendingDelete'],
+        whereArgs: [SyncStatus.pendingDelete.name],
         orderBy: '${DatabaseTables.mealCreatedAt} DESC',
         limit: limit,
       );
@@ -131,7 +112,10 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
         DatabaseTables.meals,
         where:
             '${DatabaseTables.mealSyncStatus} = ? OR ${DatabaseTables.mealSyncStatus} = ?',
-        whereArgs: const ['pendingUpload', 'pendingUpdate'],
+        whereArgs: [
+          SyncStatus.pendingUpload.name,
+          SyncStatus.pendingUpdate.name,
+        ],
         orderBy: '${DatabaseTables.mealUpdatedAt} ASC',
       );
       return maps.map(MealModel.fromMap).toList();
@@ -171,9 +155,14 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
 
   @override
   Future<void> upsertMeal(MealModel meal) async {
-    final existing = await getMealById(meal.id);
+    final existing = await _getStoredMealById(meal.id);
     if (existing == null) {
       await insertMeal(meal);
+      return;
+    }
+
+    if (existing.syncMetadata.isPendingDelete &&
+        !meal.syncMetadata.isPendingDelete) {
       return;
     }
 
@@ -183,32 +172,23 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<void> mergeRemoteMeals(List<MealModel> meals) async {
     try {
-      final localMeals = await getAllMeals();
-      final merged = _merge.mergeLists(
-        localItems: localMeals,
+      final storedLocalMeals = await _getStoredMeals();
+      final mergedVisibleMeals = _merge.mergeLists(
+        localItems: storedLocalMeals,
         remoteItems: meals,
       );
 
-      final db = await databaseHelper.database;
+      final Map<String, MealModel> mergedById = <String, MealModel>{
+        for (final meal in mergedVisibleMeals) meal.id: meal,
+      };
 
-      await db.transaction((txn) async {
-        await txn.delete(
-          DatabaseTables.meals,
-          where:
-              '${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?',
-          whereArgs: const ['pendingDelete'],
-        );
-
-        final batch = txn.batch();
-        for (final meal in merged) {
-          batch.insert(
-            DatabaseTables.meals,
-            meal.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+      for (final localMeal in storedLocalMeals) {
+        if (localMeal.syncMetadata.isPendingDelete) {
+          mergedById.putIfAbsent(localMeal.id, () => localMeal);
         }
-        await batch.commit(noResult: true);
-      });
+      }
+
+      await _replaceStoredMeals(mergedById.values.toList());
     } catch (e) {
       throw CacheDatabaseException('Failed to merge remote meals: $e');
     }
@@ -304,21 +284,7 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<void> replaceAllMeals(List<MealModel> meals) async {
     try {
-      final db = await databaseHelper.database;
-
-      await db.transaction((txn) async {
-        await txn.delete(DatabaseTables.meals);
-
-        final batch = txn.batch();
-        for (final meal in meals) {
-          batch.insert(
-            DatabaseTables.meals,
-            meal.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        await batch.commit(noResult: true);
-      });
+      await _replaceStoredMeals(meals);
     } catch (e) {
       throw CacheDatabaseException('Failed to replace all meals: $e');
     }
@@ -359,11 +325,85 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
         WHERE ${DatabaseTables.mealSyncStatus} IS NULL
            OR ${DatabaseTables.mealSyncStatus} != ?
         ''',
-        ['pendingDelete'],
+        [SyncStatus.pendingDelete.name],
       );
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
       throw CacheDatabaseException('Failed to get meals count: $e');
     }
+  }
+
+  Future<List<MealModel>> _getVisibleMeals() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.meals,
+      where:
+          '${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+      orderBy: '${DatabaseTables.mealName} ASC',
+    );
+
+    return maps.map(MealModel.fromMap).toList();
+  }
+
+  Future<MealModel?> _getVisibleMealById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.meals,
+      where:
+          '${DatabaseTables.mealId} = ? AND (${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)',
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return MealModel.fromMap(maps.first);
+  }
+
+  Future<List<MealModel>> _getStoredMeals() async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.meals,
+      orderBy: '${DatabaseTables.mealName} ASC',
+    );
+
+    return maps.map(MealModel.fromMap).toList();
+  }
+
+  Future<MealModel?> _getStoredMealById(String id) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.meals,
+      where: '${DatabaseTables.mealId} = ?',
+      whereArgs: <Object?>[id],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
+    return MealModel.fromMap(maps.first);
+  }
+
+  Future<void> _replaceStoredMeals(List<MealModel> meals) async {
+    final db = await databaseHelper.database;
+
+    await db.transaction((txn) async {
+      await txn.delete(DatabaseTables.meals);
+
+      final batch = txn.batch();
+      for (final meal in meals) {
+        batch.insert(
+          DatabaseTables.meals,
+          meal.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 }

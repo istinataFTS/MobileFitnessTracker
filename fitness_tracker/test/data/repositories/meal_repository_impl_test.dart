@@ -178,9 +178,9 @@ void main() {
       ];
 
       when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => localDataSource.getAllMeals()).thenAnswer((_) async => <MealModel>[
-            localPendingMeal,
-          ]);
+      when(() => localDataSource.getAllMeals()).thenAnswer(
+        (_) async => <MealModel>[localPendingMeal],
+      );
       when(() => remoteDataSource.getAllMeals()).thenAnswer(
         (_) async => <Meal>[remoteMeal, remoteOnlyMeal],
       );
@@ -226,38 +226,20 @@ void main() {
       verifyNever(() => localDataSource.upsertMeal(any()));
     });
 
-    test('returns null when localThenRemote finds pending delete locally',
-        () async {
-      final MealModel pendingDeleteMeal = buildMealModel(
-        id: 'meal-1',
-        name: 'Deleted Meal',
-        syncMetadata: const EntitySyncMetadata(
-          status: SyncStatus.pendingDelete,
-        ),
-      );
-
-      when(() => localDataSource.getMealById('meal-1')).thenAnswer(
-        (_) async => pendingDeleteMeal,
-      );
-
-      final Either<Failure, Meal?> result = await repository.getMealById(
-        'meal-1',
-        sourcePreference: DataSourcePreference.localThenRemote,
-      );
-
-      expect(result, const Right<Failure, Meal?>(null));
-      verifyNever(() => remoteDataSource.getMealById(any()));
-    });
-
-    test('inserts remote meal locally when missing during remoteThenLocal',
-        () async {
+    test('returns local cache snapshot after localThenRemote upsert', () async {
       final Meal remoteMeal =
           buildMealEntity(id: 'meal-1', name: 'Chicken Bowl');
 
+      final MealModel cachedMeal =
+          buildMealModel(id: 'meal-1', name: 'Chicken Bowl');
+
+      int localReadCount = 0;
+
       when(() => remoteDataSource.isConfigured).thenReturn(true);
-      when(() => localDataSource.getMealById('meal-1')).thenAnswer(
-        (_) async => null,
-      );
+      when(() => localDataSource.getMealById('meal-1')).thenAnswer((_) async {
+        localReadCount += 1;
+        return localReadCount == 1 ? null : cachedMeal;
+      });
       when(() => remoteDataSource.getMealById('meal-1')).thenAnswer(
         (_) async => remoteMeal,
       );
@@ -265,10 +247,11 @@ void main() {
 
       final Either<Failure, Meal?> result = await repository.getMealById(
         'meal-1',
-        sourcePreference: DataSourcePreference.remoteThenLocal,
+        sourcePreference: DataSourcePreference.localThenRemote,
       );
 
-      expect(result, Right<Failure, Meal?>(remoteMeal));
+      expect(result, Right<Failure, Meal?>(cachedMeal));
+      verify(() => localDataSource.getMealById('meal-1')).called(2);
       verify(() => localDataSource.upsertMeal(any())).called(1);
     });
 
@@ -310,6 +293,63 @@ void main() {
 
       expect(result, Right<Failure, Meal?>(localPendingMeal));
       verify(() => localDataSource.upsertMeal(localPendingMeal)).called(1);
+    });
+
+    test('returns null when hidden pending delete remains after remote refresh',
+        () async {
+      final Meal remoteMeal =
+          buildMealEntity(id: 'meal-1', name: 'Chicken Bowl');
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getMealById('meal-1')).thenAnswer(
+        (_) async => null,
+      );
+      when(() => remoteDataSource.getMealById('meal-1')).thenAnswer(
+        (_) async => remoteMeal,
+      );
+      when(() => localDataSource.upsertMeal(any())).thenAnswer((_) async {});
+
+      final Either<Failure, Meal?> result = await repository.getMealById(
+        'meal-1',
+        sourcePreference: DataSourcePreference.remoteThenLocal,
+      );
+
+      expect(result, const Right<Failure, Meal?>(null));
+      verify(() => localDataSource.getMealById('meal-1')).called(2);
+      verify(() => localDataSource.upsertMeal(any())).called(1);
+    });
+  });
+
+  group('MealRepositoryImpl.getMealByName', () {
+    test('returns local cache snapshot after localThenRemote upsert', () async {
+      final Meal remoteMeal =
+          buildMealEntity(id: 'meal-1', name: 'Chicken Bowl');
+
+      final MealModel cachedMeal =
+          buildMealModel(id: 'meal-1', name: 'Chicken Bowl');
+
+      int localReadCount = 0;
+
+      when(() => remoteDataSource.isConfigured).thenReturn(true);
+      when(() => localDataSource.getMealByName('Chicken Bowl')).thenAnswer(
+        (_) async {
+          localReadCount += 1;
+          return localReadCount == 1 ? null : cachedMeal;
+        },
+      );
+      when(() => remoteDataSource.getMealByName('Chicken Bowl')).thenAnswer(
+        (_) async => remoteMeal,
+      );
+      when(() => localDataSource.upsertMeal(any())).thenAnswer((_) async {});
+
+      final Either<Failure, Meal?> result = await repository.getMealByName(
+        'Chicken Bowl',
+        sourcePreference: DataSourcePreference.localThenRemote,
+      );
+
+      expect(result, Right<Failure, Meal?>(cachedMeal));
+      verify(() => localDataSource.getMealByName('Chicken Bowl')).called(2);
+      verify(() => localDataSource.upsertMeal(any())).called(1);
     });
   });
 

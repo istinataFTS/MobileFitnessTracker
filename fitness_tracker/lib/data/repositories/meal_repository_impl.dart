@@ -102,7 +102,7 @@ class MealRepositoryImpl implements MealRepository {
         case DataSourcePreference.localThenRemote:
           final localMeal = await localDataSource.getMealById(id);
           if (localMeal != null) {
-            return localMeal.syncMetadata.isPendingDelete ? null : localMeal;
+            return localMeal;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -113,7 +113,7 @@ class MealRepositoryImpl implements MealRepository {
           if (remoteMeal != null) {
             await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
           }
-          return remoteMeal;
+          return localDataSource.getMealById(id);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -124,15 +124,12 @@ class MealRepositoryImpl implements MealRepository {
           final remoteMeal = await remoteDataSource.getMealById(id);
 
           if (remoteMeal == null) {
-            if (localMeal == null || localMeal.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localMeal;
           }
 
           if (localMeal == null) {
             await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
-            return remoteMeal;
+            return localDataSource.getMealById(id);
           }
 
           final merged = _merge.chooseWinner(
@@ -141,7 +138,7 @@ class MealRepositoryImpl implements MealRepository {
           );
 
           await localDataSource.upsertMeal(MealModel.fromEntity(merged));
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getMealById(id);
       }
     });
   }
@@ -165,7 +162,7 @@ class MealRepositoryImpl implements MealRepository {
         case DataSourcePreference.localThenRemote:
           final localMeal = await localDataSource.getMealByName(name);
           if (localMeal != null) {
-            return localMeal.syncMetadata.isPendingDelete ? null : localMeal;
+            return localMeal;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -176,7 +173,7 @@ class MealRepositoryImpl implements MealRepository {
           if (remoteMeal != null) {
             await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
           }
-          return remoteMeal;
+          return localDataSource.getMealByName(name);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -187,15 +184,12 @@ class MealRepositoryImpl implements MealRepository {
           final remoteMeal = await remoteDataSource.getMealByName(name);
 
           if (remoteMeal == null) {
-            if (localMeal == null || localMeal.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localMeal;
           }
 
           if (localMeal == null) {
             await localDataSource.upsertMeal(MealModel.fromEntity(remoteMeal));
-            return remoteMeal;
+            return localDataSource.getMealByName(name);
           }
 
           final merged = _merge.chooseWinner(
@@ -204,7 +198,7 @@ class MealRepositoryImpl implements MealRepository {
           );
 
           await localDataSource.upsertMeal(MealModel.fromEntity(merged));
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getMealByName(name);
       }
     });
   }
