@@ -1,8 +1,10 @@
 import 'package:get_it/get_it.dart';
 
+import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
 import '../../data/datasources/local/target_local_datasource.dart';
 import '../../data/datasources/remote/noop_target_remote_datasource.dart';
+import '../../data/datasources/remote/supabase_target_remote_datasource.dart';
 import '../../data/datasources/remote/target_remote_datasource.dart';
 import '../../data/repositories/target_repository_impl.dart';
 import '../../data/sync/target_sync_coordinator.dart';
@@ -55,7 +57,13 @@ void registerTargetsModule(GetIt sl) {
     ),
   );
 
+  sl.registerLazySingleton<TargetLocalDataSource>(
+    () => TargetLocalDataSourceImpl(databaseHelper: sl()),
+  );
+
   sl.registerLazySingleton<TargetRemoteDataSource>(
-    NoopTargetRemoteDataSource.new,
+    () => sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured
+        ? SupabaseTargetRemoteDataSource(clientProvider: sl())
+        : const NoopTargetRemoteDataSource(),
   );
 }
