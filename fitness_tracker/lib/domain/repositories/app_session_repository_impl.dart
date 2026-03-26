@@ -94,6 +94,9 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
       await localDataSource.delete(_lastCloudSyncAtKey);
       await localDataSource.delete(AppMetadataKeys.currentAuthenticatedUserId);
       await localDataSource.delete(
+        AppMetadataKeys.initialCloudMigrationCompleted,
+      );
+      await localDataSource.delete(
         AppMetadataKeys.initialCloudMigrationCompletedAt,
       );
       await clearInitialCloudMigrationState();
@@ -127,7 +130,14 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
         user.id,
       );
 
-      if (!requiresInitialCloudMigration) {
+      if (requiresInitialCloudMigration) {
+        await localDataSource.delete(
+          AppMetadataKeys.initialCloudMigrationCompleted,
+        );
+        await localDataSource.delete(
+          AppMetadataKeys.initialCloudMigrationCompletedAt,
+        );
+      } else {
         await clearInitialCloudMigrationState();
       }
     });
@@ -194,10 +204,6 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
   @override
   Future<Either<Failure, void>> clearSession() {
     return RepositoryGuard.run(() async {
-      if (authRemoteDataSource.isConfigured) {
-        await authRemoteDataSource.signOut();
-      }
-
       await localDataSource.delete(_authModeKey);
       await localDataSource.delete(_userKey);
       await localDataSource.delete(_requiresInitialMigrationKey);

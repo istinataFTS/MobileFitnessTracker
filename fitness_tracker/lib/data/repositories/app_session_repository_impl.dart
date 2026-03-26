@@ -1,11 +1,13 @@
 import 'package:dartz/dartz.dart';
 
 import '../../core/config/app_sync_policy.dart';
+import '../../core/constants/app_metadata_keys.dart';
 import '../../core/enums/auth_mode.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/app_session.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/initial_cloud_migration_state.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../datasources/local/app_metadata_local_datasource.dart';
 import '../datasources/remote/auth_remote_datasource.dart';
@@ -90,6 +92,14 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
       await localDataSource.delete(_userKey);
       await localDataSource.writeBool(_requiresInitialMigrationKey, false);
       await localDataSource.delete(_lastCloudSyncAtKey);
+      await localDataSource.delete(AppMetadataKeys.currentAuthenticatedUserId);
+      await localDataSource.delete(
+        AppMetadataKeys.initialCloudMigrationCompleted,
+      );
+      await localDataSource.delete(
+        AppMetadataKeys.initialCloudMigrationCompletedAt,
+      );
+      await clearInitialCloudMigrationState();
     });
   }
 
@@ -115,6 +125,21 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
         _requiresInitialMigrationKey,
         requiresInitialCloudMigration,
       );
+      await localDataSource.writeString(
+        AppMetadataKeys.currentAuthenticatedUserId,
+        user.id,
+      );
+
+      if (requiresInitialCloudMigration) {
+        await localDataSource.delete(
+          AppMetadataKeys.initialCloudMigrationCompleted,
+        );
+        await localDataSource.delete(
+          AppMetadataKeys.initialCloudMigrationCompletedAt,
+        );
+      } else {
+        await clearInitialCloudMigrationState();
+      }
     });
   }
 
@@ -122,6 +147,50 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
   Future<Either<Failure, void>> completeInitialCloudMigration() {
     return RepositoryGuard.run(() async {
       await localDataSource.writeBool(_requiresInitialMigrationKey, false);
+      await localDataSource.writeBool(
+        AppMetadataKeys.initialCloudMigrationCompleted,
+        true,
+      );
+      await localDataSource.writeDateTime(
+        AppMetadataKeys.initialCloudMigrationCompletedAt,
+        DateTime.now(),
+      );
+      await clearInitialCloudMigrationState();
+    });
+  }
+
+  @override
+  Future<Either<Failure, InitialCloudMigrationState?>>
+      getInitialCloudMigrationState() {
+    return RepositoryGuard.run(() async {
+      final json = await localDataSource.readJsonObject(
+        AppMetadataKeys.initialCloudMigrationState,
+      );
+
+      if (json == null) {
+        return null;
+      }
+
+      return InitialCloudMigrationState.fromJson(json);
+    });
+  }
+
+  @override
+  Future<Either<Failure, void>> saveInitialCloudMigrationState(
+    InitialCloudMigrationState state,
+  ) {
+    return RepositoryGuard.run(() async {
+      await localDataSource.writeJsonObject(
+        AppMetadataKeys.initialCloudMigrationState,
+        state.toJson(),
+      );
+    });
+  }
+
+  @override
+  Future<Either<Failure, void>> clearInitialCloudMigrationState() {
+    return RepositoryGuard.run(() async {
+      await localDataSource.delete(AppMetadataKeys.initialCloudMigrationState);
     });
   }
 
@@ -135,14 +204,18 @@ class AppSessionRepositoryImpl implements AppSessionRepository {
   @override
   Future<Either<Failure, void>> clearSession() {
     return RepositoryGuard.run(() async {
-      if (authRemoteDataSource.isConfigured) {
-        await authRemoteDataSource.signOut();
-      }
-
       await localDataSource.delete(_authModeKey);
       await localDataSource.delete(_userKey);
       await localDataSource.delete(_requiresInitialMigrationKey);
       await localDataSource.delete(_lastCloudSyncAtKey);
+      await localDataSource.delete(AppMetadataKeys.currentAuthenticatedUserId);
+      await localDataSource.delete(
+        AppMetadataKeys.initialCloudMigrationCompleted,
+      );
+      await localDataSource.delete(
+        AppMetadataKeys.initialCloudMigrationCompletedAt,
+      );
+      await clearInitialCloudMigrationState();
     });
   }
 }
