@@ -20,7 +20,6 @@ import '../../data/sync/nutrition_log_sync_coordinator.dart';
 import '../../data/sync/nutrition_log_sync_coordinator_impl.dart';
 import '../../domain/repositories/meal_repository.dart';
 import '../../domain/repositories/nutrition_log_repository.dart';
-import '../../domain/services/authenticated_data_source_preference_resolver.dart';
 import '../../domain/usecases/meals/add_meal.dart';
 import '../../domain/usecases/meals/delete_meal.dart';
 import '../../domain/usecases/meals/get_all_meals.dart';
@@ -55,12 +54,6 @@ void registerMealsNutritionModule(GetIt sl) {
       updateNutritionLog: sl(),
       deleteNutritionLog: sl(),
       getDailyMacros: sl(),
-    ),
-  );
-
-  sl.registerLazySingleton(
-    () => AuthenticatedDataSourcePreferenceResolver(
-      appSessionRepository: sl(),
     ),
   );
 

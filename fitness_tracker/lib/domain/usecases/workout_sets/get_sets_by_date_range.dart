@@ -5,14 +5,14 @@ import '../../entities/exercise.dart';
 import '../../entities/workout_set.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/workout_set_repository.dart';
-import '../../services/workout_data_source_preference_resolver.dart';
+import '../../services/authenticated_data_source_preference_resolver.dart';
 
 /// Use case for getting workout sets filtered by date range and optionally by muscle group
 /// This encapsulates the business logic for history filtering
 class GetSetsByDateRange {
   final WorkoutSetRepository workoutSetRepository;
   final ExerciseRepository exerciseRepository;
-  final WorkoutDataSourcePreferenceResolver sourcePreferenceResolver;
+  final AuthenticatedDataSourcePreferenceResolver sourcePreferenceResolver;
 
   const GetSetsByDateRange({
     required this.workoutSetRepository,
@@ -49,7 +49,9 @@ class GetSetsByDateRange {
     return setsResult.fold(
       (failure) => Left(failure),
       (sets) async {
-        final exercisesResult = await exerciseRepository.getAllExercises();
+        final exercisesResult = await exerciseRepository.getAllExercises(
+          sourcePreference: sourcePreference,
+        );
 
         return exercisesResult.fold(
           (failure) => Left(failure),

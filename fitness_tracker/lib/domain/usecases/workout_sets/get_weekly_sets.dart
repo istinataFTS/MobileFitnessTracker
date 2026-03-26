@@ -3,11 +3,11 @@ import 'package:dartz/dartz.dart';
 import '../../../core/errors/failures.dart';
 import '../../entities/workout_set.dart';
 import '../../repositories/workout_set_repository.dart';
-import '../../services/workout_data_source_preference_resolver.dart';
+import '../../services/authenticated_data_source_preference_resolver.dart';
 
 class GetWeeklySets {
   final WorkoutSetRepository repository;
-  final WorkoutDataSourcePreferenceResolver sourcePreferenceResolver;
+  final AuthenticatedDataSourcePreferenceResolver sourcePreferenceResolver;
 
   const GetWeeklySets(
     this.repository, {

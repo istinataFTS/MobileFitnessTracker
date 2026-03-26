@@ -16,6 +16,7 @@ import '../../data/repositories/app_session_repository_impl.dart';
 import '../../data/repositories/app_settings_repository_impl.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../domain/repositories/app_settings_repository.dart';
+import '../../domain/services/authenticated_data_source_preference_resolver.dart';
 
 void registerCoreModule(GetIt sl) {
   sl.registerLazySingleton<DatabaseHelper>(DatabaseHelper.new);
@@ -70,6 +71,12 @@ void registerCoreModule(GetIt sl) {
   sl.registerLazySingleton<AppSettingsRepository>(
     () => AppSettingsRepositoryImpl(
       localDataSource: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => AuthenticatedDataSourcePreferenceResolver(
+      appSessionRepository: sl(),
     ),
   );
 }

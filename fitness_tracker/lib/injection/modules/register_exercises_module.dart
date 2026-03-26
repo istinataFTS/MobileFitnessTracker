@@ -31,9 +31,24 @@ void registerExercisesModule(GetIt sl) {
     ),
   );
 
-  sl.registerLazySingleton(() => GetAllExercises(sl()));
-  sl.registerLazySingleton(() => GetExerciseById(sl()));
-  sl.registerLazySingleton(() => GetExercisesForMuscle(sl()));
+  sl.registerLazySingleton(
+    () => GetAllExercises(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetExerciseById(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetExercisesForMuscle(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
   sl.registerLazySingleton(
     () => AddExercise(
       sl(),

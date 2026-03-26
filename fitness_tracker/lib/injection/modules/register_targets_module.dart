@@ -32,7 +32,12 @@ void registerTargetsModule(GetIt sl) {
       appSessionRepository: sl(),
     ),
   );
-  sl.registerLazySingleton(() => GetAllTargets(sl()));
+  sl.registerLazySingleton(
+    () => GetAllTargets(
+      sl(),
+      sourcePreferenceResolver: sl(),
+    ),
+  );
   sl.registerLazySingleton(
     () => UpdateTarget(
       sl(),
