@@ -102,7 +102,7 @@ class TargetRepositoryImpl implements TargetRepository {
         case DataSourcePreference.localThenRemote:
           final localTarget = await localDataSource.getTargetById(id);
           if (localTarget != null) {
-            return localTarget.syncMetadata.isPendingDelete ? null : localTarget;
+            return localTarget;
           }
 
           if (!remoteDataSource.isConfigured) {
@@ -115,7 +115,7 @@ class TargetRepositoryImpl implements TargetRepository {
               TargetModel.fromEntity(remoteTarget),
             );
           }
-          return remoteTarget;
+          return localDataSource.getTargetById(id);
 
         case DataSourcePreference.remoteThenLocal:
           if (!remoteDataSource.isConfigured) {
@@ -126,9 +126,6 @@ class TargetRepositoryImpl implements TargetRepository {
           final remoteTarget = await remoteDataSource.getTargetById(id);
 
           if (remoteTarget == null) {
-            if (localTarget == null || localTarget.syncMetadata.isPendingDelete) {
-              return null;
-            }
             return localTarget;
           }
 
@@ -136,7 +133,7 @@ class TargetRepositoryImpl implements TargetRepository {
             await localDataSource.upsertTarget(
               TargetModel.fromEntity(remoteTarget),
             );
-            return remoteTarget;
+            return localDataSource.getTargetById(id);
           }
 
           final merged = _merge.chooseWinner(
@@ -145,7 +142,7 @@ class TargetRepositoryImpl implements TargetRepository {
           );
 
           await localDataSource.upsertTarget(TargetModel.fromEntity(merged));
-          return merged.syncMetadata.isPendingDelete ? null : merged;
+          return localDataSource.getTargetById(id);
       }
     });
   }
