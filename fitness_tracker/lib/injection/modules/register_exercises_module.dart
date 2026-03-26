@@ -1,9 +1,11 @@
 import 'package:get_it/get_it.dart';
 
+import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/exercise_local_datasource.dart';
 import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
 import '../../data/datasources/remote/exercise_remote_datasource.dart';
 import '../../data/datasources/remote/noop_exercise_remote_datasource.dart';
+import '../../data/datasources/remote/supabase_exercise_remote_datasource.dart';
 import '../../data/repositories/exercise_repository_impl.dart';
 import '../../data/sync/exercise_sync_coordinator.dart';
 import '../../data/sync/exercise_sync_coordinator_impl.dart';
@@ -68,6 +70,8 @@ void registerExercisesModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<ExerciseRemoteDataSource>(
-    NoopExerciseRemoteDataSource.new,
+    () => sl<RemoteSyncRuntimePolicy>().isRemoteSyncConfigured
+        ? SupabaseExerciseRemoteDataSource(clientProvider: sl())
+        : const NoopExerciseRemoteDataSource(),
   );
 }
