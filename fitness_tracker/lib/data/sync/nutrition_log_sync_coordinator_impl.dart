@@ -31,6 +31,11 @@ class NutritionLogSyncCoordinatorImpl
   bool get isRemoteSyncEnabled => remoteDataSource.isConfigured;
 
   @override
+  Future<void> prepareForInitialCloudMigration(String userId) {
+    return localDataSource.prepareForInitialCloudMigration(userId: userId);
+  }
+
+  @override
   EntitySyncDescriptor get descriptor => _descriptor;
 
   @override

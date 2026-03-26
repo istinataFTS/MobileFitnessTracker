@@ -65,23 +65,47 @@ void _registerAppComposition(GetIt sl) {
     () => <InitialCloudMigrationStep>[
       InitialCloudMigrationStep(
         key: 'targets',
-        run: (_) => sl<TargetSyncCoordinator>().syncPendingChanges(),
+        run: (userId) async {
+          await sl<TargetSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<TargetSyncCoordinator>().syncPendingChanges();
+        },
       ),
       InitialCloudMigrationStep(
         key: 'workout_sets',
-        run: (_) => sl<WorkoutSetSyncCoordinator>().syncPendingChanges(),
+        run: (userId) async {
+          await sl<WorkoutSetSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<WorkoutSetSyncCoordinator>().syncPendingChanges();
+        },
       ),
       InitialCloudMigrationStep(
         key: 'exercises',
-        run: (_) => sl<ExerciseSyncCoordinator>().syncPendingChanges(),
+        run: (userId) async {
+          await sl<ExerciseSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<ExerciseSyncCoordinator>().syncPendingChanges();
+        },
       ),
       InitialCloudMigrationStep(
         key: 'meals',
-        run: (_) => sl<MealSyncCoordinator>().syncPendingChanges(),
+        run: (userId) async {
+          await sl<MealSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<MealSyncCoordinator>().syncPendingChanges();
+        },
       ),
       InitialCloudMigrationStep(
         key: 'nutrition_logs',
-        run: (_) => sl<NutritionLogSyncCoordinator>().syncPendingChanges(),
+        run: (userId) async {
+          await sl<NutritionLogSyncCoordinator>()
+              .prepareForInitialCloudMigration(userId);
+          await sl<NutritionLogSyncCoordinator>().syncPendingChanges();
+        },
       ),
     ],
   );

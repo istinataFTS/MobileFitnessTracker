@@ -16,6 +16,9 @@ abstract class ExerciseLocalDataSource {
   Future<void> insertExercise(ExerciseModel exercise);
   Future<void> updateExercise(ExerciseModel exercise);
   Future<void> upsertExercise(ExerciseModel exercise);
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  });
   Future<void> mergeRemoteExercises(List<ExerciseModel> exercises);
   Future<void> markAsSynced({
     required String localId,
@@ -170,6 +173,27 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     }
 
     await updateExercise(exercise);
+  }
+
+  @override
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  }) async {
+    try {
+      final storedExercises = await _getStoredExercises();
+      final preparedExercises = storedExercises
+          .map(
+            (exercise) =>
+                _prepareExerciseForInitialCloudMigration(exercise, userId),
+          )
+          .toList();
+
+      await _replaceStoredExercises(preparedExercises);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to prepare exercises for initial cloud migration: $e',
+      );
+    }
   }
 
   @override
@@ -396,5 +420,37 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  ExerciseModel _prepareExerciseForInitialCloudMigration(
+    ExerciseModel exercise,
+    String userId,
+  ) {
+    final ownerUserId = exercise.ownerUserId;
+    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+      return exercise;
+    }
+
+    final currentMetadata = exercise.syncMetadata;
+    final updatedMetadata = switch (currentMetadata.status) {
+      SyncStatus.localOnly => currentMetadata.copyWith(
+          status: SyncStatus.pendingUpload,
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpload => currentMetadata.copyWith(
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpdate ||
+      SyncStatus.synced ||
+      SyncStatus.pendingDelete => currentMetadata,
+    };
+
+    return ExerciseModel.fromEntity(
+      exercise.copyWith(
+        ownerUserId:
+            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        syncMetadata: updatedMetadata,
+      ),
+    );
   }
 }

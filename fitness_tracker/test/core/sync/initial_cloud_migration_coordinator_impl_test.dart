@@ -163,6 +163,19 @@ void main() {
     );
   });
 
+  test('passes authenticated user id into migration steps', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+    when(() => repository.getInitialCloudMigrationState()).thenAnswer(
+      (_) async => const Right(null),
+    );
+
+    await coordinator.runIfRequired();
+
+    expect(executionLog, everyElement(contains('user-1')));
+  });
+
   test('fails and stores error when a step throws', () async {
     coordinator = InitialCloudMigrationCoordinatorImpl(
       appSessionRepository: repository,

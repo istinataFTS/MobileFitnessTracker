@@ -30,6 +30,10 @@ abstract class NutritionLogLocalDataSource {
 
   Future<void> upsertLog(NutritionLogModel log);
 
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  });
+
   Future<void> mergeRemoteLogs(List<NutritionLogModel> logs);
 
   Future<void> markAsSynced({

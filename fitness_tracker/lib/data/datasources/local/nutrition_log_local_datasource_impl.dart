@@ -233,6 +233,24 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   }
 
   @override
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  }) async {
+    try {
+      final storedLogs = await _getStoredLogs();
+      final preparedLogs = storedLogs
+          .map((log) => _prepareLogForInitialCloudMigration(log, userId))
+          .toList();
+
+      await _replaceStoredLogs(preparedLogs);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to prepare nutrition logs for initial cloud migration: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> mergeRemoteLogs(List<NutritionLogModel> logs) async {
     try {
       final storedLocalLogs = await _getStoredLogs();
@@ -536,5 +554,37 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  NutritionLogModel _prepareLogForInitialCloudMigration(
+    NutritionLogModel log,
+    String userId,
+  ) {
+    final ownerUserId = log.ownerUserId;
+    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+      return log;
+    }
+
+    final currentMetadata = log.syncMetadata;
+    final updatedMetadata = switch (currentMetadata.status) {
+      SyncStatus.localOnly => currentMetadata.copyWith(
+          status: SyncStatus.pendingUpload,
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpload => currentMetadata.copyWith(
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpdate ||
+      SyncStatus.synced ||
+      SyncStatus.pendingDelete => currentMetadata,
+    };
+
+    return NutritionLogModel.fromEntity(
+      log.copyWith(
+        ownerUserId:
+            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        syncMetadata: updatedMetadata,
+      ),
+    );
   }
 }

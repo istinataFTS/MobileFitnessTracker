@@ -20,6 +20,9 @@ abstract class TargetLocalDataSource {
   Future<void> insertTarget(TargetModel target);
   Future<void> updateTarget(TargetModel target);
   Future<void> upsertTarget(TargetModel target);
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  });
   Future<void> mergeRemoteTargets(List<TargetModel> targets);
   Future<void> markAsSynced({
     required String localId,
@@ -168,6 +171,24 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
     }
 
     await updateTarget(target);
+  }
+
+  @override
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  }) async {
+    try {
+      final storedTargets = await _getStoredTargets();
+      final preparedTargets = storedTargets
+          .map((target) => _prepareTargetForInitialCloudMigration(target, userId))
+          .toList();
+
+      await _replaceStoredTargets(preparedTargets);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to prepare targets for initial cloud migration: $e',
+      );
+    }
   }
 
   @override
@@ -401,6 +422,38 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  TargetModel _prepareTargetForInitialCloudMigration(
+    TargetModel target,
+    String userId,
+  ) {
+    final ownerUserId = target.ownerUserId;
+    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+      return target;
+    }
+
+    final currentMetadata = target.syncMetadata;
+    final updatedMetadata = switch (currentMetadata.status) {
+      SyncStatus.localOnly => currentMetadata.copyWith(
+          status: SyncStatus.pendingUpload,
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpload => currentMetadata.copyWith(
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpdate ||
+      SyncStatus.synced ||
+      SyncStatus.pendingDelete => currentMetadata,
+    };
+
+    return TargetModel.fromEntity(
+      target.copyWith(
+        ownerUserId:
+            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        syncMetadata: updatedMetadata,
+      ),
+    );
   }
 
   String _targetTypeToString(TargetType type) {

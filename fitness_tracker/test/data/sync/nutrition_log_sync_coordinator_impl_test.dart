@@ -63,6 +63,19 @@ void main() {
     );
   });
 
+  test('prepareForInitialCloudMigration delegates to local datasource', () async {
+    when(
+      () => localDataSource.prepareForInitialCloudMigration(userId: 'user-1'),
+    ).thenAnswer((_) async {});
+
+    await coordinator.prepareForInitialCloudMigration('user-1');
+
+    verify(
+      () => localDataSource.prepareForInitialCloudMigration(userId: 'user-1'),
+    ).called(1);
+    verifyNever(() => remoteDataSource.upsertLog(any()));
+  });
+
   test('delete marks synced row as pending delete before remote delete',
       () async {
     final NutritionLog existing = buildLog(id: 'log-1');

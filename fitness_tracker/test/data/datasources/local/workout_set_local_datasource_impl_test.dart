@@ -352,4 +352,66 @@ void main() {
       );
     });
   });
+
+  group('WorkoutSetLocalDataSourceImpl prepareForInitialCloudMigration', () {
+    test('claims guest rows and converts localOnly to pendingUpload', () async {
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-1',
+          exerciseId: 'bench',
+          date: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ).copyWith(clearOwnerUserId: true),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final set = await dataSource.getSetById('set-1');
+      expect(set, isNotNull);
+      expect(set!.ownerUserId, 'user-1');
+      expect(set.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(set.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('preserves pendingDelete and different-user ownership', () async {
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-1',
+          exerciseId: 'bench',
+          date: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingDelete,
+          ),
+        ).copyWith(clearOwnerUserId: true),
+      );
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-2',
+          exerciseId: 'squat',
+          date: baseDate,
+        ).copyWith(ownerUserId: 'another-user'),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final rows = await database.query(DatabaseTables.workoutSets);
+      final pendingDelete = rows.firstWhere(
+        (row) => row[DatabaseTables.setId] == 'set-1',
+      );
+      final otherUser = rows.firstWhere(
+        (row) => row[DatabaseTables.setId] == 'set-2',
+      );
+
+      expect(
+        pendingDelete[DatabaseTables.setSyncStatus],
+        SyncStatus.pendingDelete.name,
+      );
+      expect(pendingDelete[DatabaseTables.ownerUserId], 'user-1');
+      expect(otherUser[DatabaseTables.ownerUserId], 'another-user');
+      expect(otherUser[DatabaseTables.setSyncStatus], SyncStatus.localOnly.name);
+    });
+  });
 }

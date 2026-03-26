@@ -170,6 +170,24 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   @override
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  }) async {
+    try {
+      final storedMeals = await _getStoredMeals();
+      final preparedMeals = storedMeals
+          .map((meal) => _prepareMealForInitialCloudMigration(meal, userId))
+          .toList();
+
+      await _replaceStoredMeals(preparedMeals);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to prepare meals for initial cloud migration: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> mergeRemoteMeals(List<MealModel> meals) async {
     try {
       final storedLocalMeals = await _getStoredMeals();
@@ -405,5 +423,37 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  MealModel _prepareMealForInitialCloudMigration(
+    MealModel meal,
+    String userId,
+  ) {
+    final ownerUserId = meal.ownerUserId;
+    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+      return meal;
+    }
+
+    final currentMetadata = meal.syncMetadata;
+    final updatedMetadata = switch (currentMetadata.status) {
+      SyncStatus.localOnly => currentMetadata.copyWith(
+          status: SyncStatus.pendingUpload,
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpload => currentMetadata.copyWith(
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpdate ||
+      SyncStatus.synced ||
+      SyncStatus.pendingDelete => currentMetadata,
+    };
+
+    return MealModel.fromEntity(
+      meal.copyWith(
+        ownerUserId:
+            ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        syncMetadata: updatedMetadata,
+      ),
+    );
   }
 }

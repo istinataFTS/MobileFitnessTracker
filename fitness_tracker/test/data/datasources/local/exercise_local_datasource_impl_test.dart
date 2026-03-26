@@ -344,4 +344,28 @@ void main() {
       );
     });
   });
+
+  group('ExerciseLocalDataSourceImpl prepareForInitialCloudMigration', () {
+    test('claims guest localOnly exercise and queues upload', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final exercise = await dataSource.getExerciseById('exercise-1');
+      expect(exercise, isNotNull);
+      expect(exercise!.ownerUserId, 'user-1');
+      expect(exercise.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(exercise.syncMetadata.lastSyncError, isNull);
+    });
+  });
 }

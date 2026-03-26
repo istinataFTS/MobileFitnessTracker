@@ -23,11 +23,13 @@ void main() {
   MealModel buildMeal({
     required String id,
     required String name,
+    String? ownerUserId = 'user-1',
     DateTime? updatedAt,
     EntitySyncMetadata syncMetadata = const EntitySyncMetadata(),
   }) {
     return MealModel(
       id: id,
+      ownerUserId: ownerUserId,
       name: name,
       servingSizeGrams: 100,
       carbsPer100g: 30,
@@ -340,6 +342,30 @@ void main() {
         rawRows.single[DatabaseTables.mealSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('MealLocalDataSourceImpl prepareForInitialCloudMigration', () {
+    test('claims guest localOnly meal and queues upload', () async {
+      await dataSource.insertMeal(
+        buildMeal(
+          id: 'meal-1',
+          name: 'Guest Meal',
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final meal = await dataSource.getMealById('meal-1');
+      expect(meal, isNotNull);
+      expect(meal!.ownerUserId, 'user-1');
+      expect(meal.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(meal.syncMetadata.lastSyncError, isNull);
     });
   });
 }

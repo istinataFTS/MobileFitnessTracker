@@ -21,6 +21,10 @@ abstract class MealLocalDataSource {
 
   Future<void> upsertMeal(MealModel meal);
 
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  });
+
   Future<void> mergeRemoteMeals(List<MealModel> meals);
 
   Future<void> markAsSynced({

@@ -162,6 +162,24 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   @override
+  Future<void> prepareForInitialCloudMigration({
+    required String userId,
+  }) async {
+    try {
+      final storedSets = await _getStoredSets();
+      final preparedSets = storedSets
+          .map((set) => _prepareSetForInitialCloudMigration(set, userId))
+          .toList();
+
+      await _replaceStoredSets(preparedSets);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to prepare workout sets for initial cloud migration: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> markAsSynced({
     required String localId,
     required String serverId,
@@ -389,5 +407,34 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  WorkoutSet _prepareSetForInitialCloudMigration(
+    WorkoutSet set,
+    String userId,
+  ) {
+    final ownerUserId = set.ownerUserId;
+    if (ownerUserId != null && ownerUserId.isNotEmpty && ownerUserId != userId) {
+      return set;
+    }
+
+    final currentMetadata = set.syncMetadata;
+    final updatedMetadata = switch (currentMetadata.status) {
+      SyncStatus.localOnly => currentMetadata.copyWith(
+          status: SyncStatus.pendingUpload,
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpload => currentMetadata.copyWith(
+          clearLastSyncError: true,
+        ),
+      SyncStatus.pendingUpdate ||
+      SyncStatus.synced ||
+      SyncStatus.pendingDelete => currentMetadata,
+    };
+
+    return set.copyWith(
+      ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+      syncMetadata: updatedMetadata,
+    );
   }
 }

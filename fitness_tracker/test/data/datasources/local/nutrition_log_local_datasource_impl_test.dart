@@ -23,6 +23,7 @@ void main() {
   NutritionLogModel buildLog({
     required String id,
     required DateTime loggedAt,
+    String? ownerUserId = 'user-1',
     String? mealId = 'meal-1',
     String mealName = 'Chicken Bowl',
     double? gramsConsumed = 100,
@@ -35,6 +36,7 @@ void main() {
   }) {
     return NutritionLogModel(
       id: id,
+      ownerUserId: ownerUserId,
       mealId: mealId,
       mealName: mealName,
       gramsConsumed: gramsConsumed,
@@ -399,6 +401,30 @@ void main() {
         rawRows.single[DatabaseTables.nutritionLogSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('NutritionLogLocalDataSourceImpl prepareForInitialCloudMigration', () {
+    test('claims guest localOnly log and queues upload', () async {
+      await dataSource.insertLog(
+        buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final log = await dataSource.getLogById('log-1');
+      expect(log, isNotNull);
+      expect(log!.ownerUserId, 'user-1');
+      expect(log.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(log.syncMetadata.lastSyncError, isNull);
     });
   });
 }

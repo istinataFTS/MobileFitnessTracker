@@ -24,6 +24,7 @@ void main() {
   TargetModel buildTarget({
     required String id,
     required String categoryKey,
+    String? ownerUserId = 'user-1',
     TargetType type = TargetType.muscleSets,
     TargetPeriod period = TargetPeriod.weekly,
     double targetValue = 12,
@@ -32,7 +33,7 @@ void main() {
   }) {
     return TargetModel(
       id: id,
-      ownerUserId: 'user-1',
+      ownerUserId: ownerUserId,
       type: type,
       categoryKey: categoryKey,
       targetValue: targetValue,
@@ -330,6 +331,30 @@ void main() {
         rawRows.single[DatabaseTables.targetSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('TargetLocalDataSourceImpl prepareForInitialCloudMigration', () {
+    test('claims guest localOnly target and queues upload', () async {
+      await dataSource.insertTarget(
+        buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          ownerUserId: null,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+            lastSyncError: 'offline',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final target = await dataSource.getTargetById('target-1');
+      expect(target, isNotNull);
+      expect(target!.ownerUserId, 'user-1');
+      expect(target.syncMetadata.status, SyncStatus.pendingUpload);
+      expect(target.syncMetadata.lastSyncError, isNull);
     });
   });
 }
