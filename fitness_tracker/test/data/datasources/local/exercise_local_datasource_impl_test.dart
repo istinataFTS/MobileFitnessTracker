@@ -22,6 +22,7 @@ void main() {
 
   ExerciseModel buildExercise({
     required String id,
+    String? ownerUserId,
     required String name,
     List<String> muscleGroups = const <String>['chest', 'triceps'],
     DateTime? updatedAt,
@@ -29,6 +30,7 @@ void main() {
   }) {
     return ExerciseModel(
       id: id,
+      ownerUserId: ownerUserId,
       name: name,
       muscleGroups: muscleGroups,
       createdAt: baseDate,
@@ -41,6 +43,7 @@ void main() {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
         ${DatabaseTables.exerciseName} TEXT NOT NULL,
         ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
         ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL,

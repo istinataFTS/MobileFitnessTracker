@@ -32,8 +32,18 @@ void registerExercisesModule(GetIt sl) {
   sl.registerLazySingleton(() => GetAllExercises(sl()));
   sl.registerLazySingleton(() => GetExerciseById(sl()));
   sl.registerLazySingleton(() => GetExercisesForMuscle(sl()));
-  sl.registerLazySingleton(() => AddExercise(sl()));
-  sl.registerLazySingleton(() => UpdateExercise(sl()));
+  sl.registerLazySingleton(
+    () => AddExercise(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => UpdateExercise(
+      sl(),
+      appSessionRepository: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => DeleteExercise(sl()));
   sl.registerLazySingleton(() => SeedExercises(sl()));
 

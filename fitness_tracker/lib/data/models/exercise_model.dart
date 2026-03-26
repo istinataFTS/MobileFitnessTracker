@@ -8,6 +8,7 @@ import '../../domain/entities/exercise.dart';
 class ExerciseModel extends Exercise {
   const ExerciseModel({
     required super.id,
+    super.ownerUserId,
     required super.name,
     required super.muscleGroups,
     required super.createdAt,
@@ -18,6 +19,7 @@ class ExerciseModel extends Exercise {
   factory ExerciseModel.fromEntity(Exercise exercise) {
     return ExerciseModel(
       id: exercise.id,
+      ownerUserId: exercise.ownerUserId,
       name: exercise.name,
       muscleGroups: exercise.muscleGroups,
       createdAt: exercise.createdAt,
@@ -34,6 +36,7 @@ class ExerciseModel extends Exercise {
 
     return ExerciseModel(
       id: map[DatabaseTables.exerciseId] as String,
+      ownerUserId: map[DatabaseTables.ownerUserId] as String?,
       name: map[DatabaseTables.exerciseName] as String,
       muscleGroups: _decodeMuscleGroups(
         map[DatabaseTables.exerciseMuscleGroups] as String,
@@ -57,6 +60,7 @@ class ExerciseModel extends Exercise {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.exerciseId: id,
+      DatabaseTables.ownerUserId: ownerUserId,
       DatabaseTables.exerciseName: name,
       DatabaseTables.exerciseMuscleGroups: _encodeMuscleGroups(muscleGroups),
       DatabaseTables.exerciseCreatedAt: createdAt.toIso8601String(),
@@ -75,6 +79,7 @@ class ExerciseModel extends Exercise {
 
     return ExerciseModel(
       id: json['id'] as String,
+      ownerUserId: json['ownerUserId'] as String?,
       name: json['name'] as String,
       muscleGroups: (json['muscleGroups'] as List).cast<String>(),
       createdAt: createdAt,
@@ -92,6 +97,7 @@ class ExerciseModel extends Exercise {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'name': name,
       'muscleGroups': muscleGroups,
       'createdAt': createdAt.toIso8601String(),
