@@ -22,6 +22,7 @@ import '../domain/entities/meal.dart';
 import '../domain/entities/muscle_factor.dart';
 import '../domain/entities/muscle_stimulus.dart';
 import '../domain/entities/nutrition_log.dart';
+import '../domain/entities/stimulus_calculation_rules.dart';
 import '../domain/entities/target.dart';
 import '../domain/entities/workout_set.dart';
 import '../domain/repositories/app_session_repository.dart';
@@ -446,68 +447,14 @@ class WebDemoStore {
       ),
     ];
 
-    final muscleStimulusRecords = <MuscleStimulus>[
-      MuscleStimulus(
-        id: 'stimulus-1',
-        muscleGroup: 'mid-chest',
-        date: today,
-        dailyStimulus: 7.8,
-        rollingWeeklyLoad: 18.6,
-        lastSetTimestamp: today.add(const Duration(hours: 9, minutes: 10)).millisecondsSinceEpoch,
-        lastSetStimulus: 4.2,
-        createdAt: today,
-        updatedAt: today,
-      ),
-      MuscleStimulus(
-        id: 'stimulus-2',
-        muscleGroup: 'triceps',
-        date: today,
-        dailyStimulus: 4.1,
-        rollingWeeklyLoad: 12.3,
-        lastSetTimestamp: today.add(const Duration(hours: 9, minutes: 10)).millisecondsSinceEpoch,
-        lastSetStimulus: 2.2,
-        createdAt: today,
-        updatedAt: today,
-      ),
-      MuscleStimulus(
-        id: 'stimulus-3',
-        muscleGroup: 'lats',
-        date: yesterday,
-        dailyStimulus: 5.4,
-        rollingWeeklyLoad: 14.7,
-        lastSetTimestamp: yesterday.add(const Duration(hours: 18)).millisecondsSinceEpoch,
-        lastSetStimulus: 2.8,
-        createdAt: yesterday,
-        updatedAt: yesterday,
-      ),
-      MuscleStimulus(
-        id: 'stimulus-4',
-        muscleGroup: 'quads',
-        date: twoDaysAgo,
-        dailyStimulus: 8.0,
-        rollingWeeklyLoad: 16.8,
-        lastSetTimestamp: twoDaysAgo.add(const Duration(hours: 19)).millisecondsSinceEpoch,
-        lastSetStimulus: 4.1,
-        createdAt: twoDaysAgo,
-        updatedAt: twoDaysAgo,
-      ),
-      MuscleStimulus(
-        id: 'stimulus-5',
-        muscleGroup: 'front-delts',
-        date: threeDaysAgo,
-        dailyStimulus: 4.2,
-        rollingWeeklyLoad: 9.6,
-        lastSetTimestamp: threeDaysAgo.add(const Duration(hours: 17)).millisecondsSinceEpoch,
-        lastSetStimulus: 2.3,
-        createdAt: threeDaysAgo,
-        updatedAt: threeDaysAgo,
-      ),
-    ];
+    final muscleStimulusRecords = _buildSeededMuscleStimulusRecords(
+      workoutSets: workoutSets,
+      muscleFactors: muscleFactors,
+      now: now,
+    );
 
     return WebDemoStore(
-      session: const AppSession(
-        authMode: AuthMode.guest,
-      ),
+      session: const AppSession(authMode: AuthMode.guest),
       settings: const AppSettings.defaults(),
       targets: targets,
       workoutSets: workoutSets,
@@ -521,29 +468,37 @@ class WebDemoStore {
 
   void claimGuestData(String userId) {
     targets = targets
-        .map((target) => target.ownerUserId == null
-            ? target.copyWith(ownerUserId: userId)
-            : target)
+        .map(
+          (target) => target.ownerUserId == null
+              ? target.copyWith(ownerUserId: userId)
+              : target,
+        )
         .toList();
     workoutSets = workoutSets
-        .map((set) => set.ownerUserId == null
-            ? set.copyWith(ownerUserId: userId)
-            : set)
+        .map(
+          (set) =>
+              set.ownerUserId == null ? set.copyWith(ownerUserId: userId) : set,
+        )
         .toList();
     exercises = exercises
-        .map((exercise) => exercise.ownerUserId == null
-            ? exercise.copyWith(ownerUserId: userId)
-            : exercise)
+        .map(
+          (exercise) => exercise.ownerUserId == null
+              ? exercise.copyWith(ownerUserId: userId)
+              : exercise,
+        )
         .toList();
     meals = meals
-        .map((meal) => meal.ownerUserId == null
-            ? meal.copyWith(ownerUserId: userId)
-            : meal)
+        .map(
+          (meal) => meal.ownerUserId == null
+              ? meal.copyWith(ownerUserId: userId)
+              : meal,
+        )
         .toList();
     nutritionLogs = nutritionLogs
-        .map((log) => log.ownerUserId == null
-            ? log.copyWith(ownerUserId: userId)
-            : log)
+        .map(
+          (log) =>
+              log.ownerUserId == null ? log.copyWith(ownerUserId: userId) : log,
+        )
         .toList();
   }
 }
@@ -592,7 +547,7 @@ class WebDemoAppSessionRepository implements AppSessionRepository {
 
   @override
   Future<Either<Failure, InitialCloudMigrationState?>>
-      getInitialCloudMigrationState() async {
+  getInitialCloudMigrationState() async {
     return Right(_store.migrationState);
   }
 
@@ -662,7 +617,9 @@ class WebDemoTargetRepository implements TargetRepository {
     String id, {
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) async {
-    return Right(_firstWhereOrNull(_store.targets, (target) => target.id == id));
+    return Right(
+      _firstWhereOrNull(_store.targets, (target) => target.id == id),
+    );
   }
 
   @override
@@ -752,7 +709,9 @@ class WebDemoWorkoutSetRepository implements WorkoutSetRepository {
   }) async {
     return Right(
       _sortedWorkoutSets(
-        _store.workoutSets.where((set) => set.exerciseId == exerciseId).toList(),
+        _store.workoutSets
+            .where((set) => set.exerciseId == exerciseId)
+            .toList(),
       ),
     );
   }
@@ -856,11 +815,8 @@ class WebDemoExerciseRepository implements ExerciseRepository {
   }) async {
     final normalizedGroup = _normalize(muscleGroup);
     final items = _store.exercises.where((exercise) {
-      return exercise.muscleGroups
-          .map(_normalize)
-          .contains(normalizedGroup);
-    }).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+      return exercise.muscleGroups.map(_normalize).contains(normalizedGroup);
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
 
     return Right(items);
   }
@@ -963,8 +919,7 @@ class WebDemoMealRepository implements MealRepository {
     final normalizedQuery = _normalize(query);
     final items = _store.meals.where((meal) {
       return _normalize(meal.name).contains(normalizedQuery);
-    }).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
 
     return Right(items);
   }
@@ -1081,7 +1036,9 @@ class WebDemoNutritionLogRepository implements NutritionLogRepository {
     String id, {
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) async {
-    return Right(_firstWhereOrNull(_store.nutritionLogs, (log) => log.id == id));
+    return Right(
+      _firstWhereOrNull(_store.nutritionLogs, (log) => log.id == id),
+    );
   }
 
   @override
@@ -1126,8 +1083,9 @@ class WebDemoNutritionLogRepository implements NutritionLogRepository {
     String mealId, {
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) async {
-    final items =
-        _store.nutritionLogs.where((log) => log.mealId == mealId).toList();
+    final items = _store.nutritionLogs
+        .where((log) => log.mealId == mealId)
+        .toList();
     return Right(_sortedNutritionLogs(items));
   }
 
@@ -1144,19 +1102,16 @@ class WebDemoNutritionLogRepository implements NutritionLogRepository {
   }) async {
     final today = _startOfDay(DateTime.now());
     final start = today.subtract(const Duration(days: 6));
-    return getLogsByDateRange(
-      start,
-      today,
-      sourcePreference: sourcePreference,
-    );
+    return getLogsByDateRange(start, today, sourcePreference: sourcePreference);
   }
 
   @override
   Future<Either<Failure, List<NutritionLog>>> getMealLogs({
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) async {
-    final items =
-        _store.nutritionLogs.where((log) => log.mealId != null).toList();
+    final items = _store.nutritionLogs
+        .where((log) => log.mealId != null)
+        .toList();
     return Right(_sortedNutritionLogs(items));
   }
 
@@ -1164,8 +1119,9 @@ class WebDemoNutritionLogRepository implements NutritionLogRepository {
   Future<Either<Failure, List<NutritionLog>>> getDirectMacroLogs({
     DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
   }) async {
-    final items =
-        _store.nutritionLogs.where((log) => log.mealId == null).toList();
+    final items = _store.nutritionLogs
+        .where((log) => log.mealId == null)
+        .toList();
     return Right(_sortedNutritionLogs(items));
   }
 
@@ -1265,7 +1221,9 @@ class WebDemoMuscleFactorRepository implements MuscleFactorRepository {
 
   @override
   Future<Either<Failure, MuscleFactor?>> getFactorById(String id) async {
-    return Right(_firstWhereOrNull(_store.muscleFactors, (factor) => factor.id == id));
+    return Right(
+      _firstWhereOrNull(_store.muscleFactors, (factor) => factor.id == id),
+    );
   }
 
   @override
@@ -1315,7 +1273,9 @@ class WebDemoMuscleFactorRepository implements MuscleFactorRepository {
 
   @override
   Future<Either<Failure, void>> updateMuscleFactor(MuscleFactor factor) async {
-    final index = _store.muscleFactors.indexWhere((item) => item.id == factor.id);
+    final index = _store.muscleFactors.indexWhere(
+      (item) => item.id == factor.id,
+    );
     if (index < 0) {
       return const Left(ValidationFailure('Muscle factor not found'));
     }
@@ -1334,7 +1294,9 @@ class WebDemoMuscleFactorRepository implements MuscleFactorRepository {
   Future<Either<Failure, void>> deleteMuscleFactorsByExerciseId(
     String exerciseId,
   ) async {
-    _store.muscleFactors.removeWhere((factor) => factor.exerciseId == exerciseId);
+    _store.muscleFactors.removeWhere(
+      (factor) => factor.exerciseId == exerciseId,
+    );
     return const Right(null);
   }
 
@@ -1379,8 +1341,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
       return item.muscleGroup == muscleGroup &&
           !item.date.isBefore(start) &&
           !item.date.isAfter(end);
-    }).toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    }).toList()..sort((a, b) => a.date.compareTo(b.date));
 
     return Right(items);
   }
@@ -1402,8 +1363,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
     final normalizedDate = _startOfDay(date);
     final items = _store.muscleStimulusRecords.where((item) {
       return _startOfDay(item.date) == normalizedDate;
-    }).toList()
-      ..sort((a, b) => a.muscleGroup.compareTo(b.muscleGroup));
+    }).toList()..sort((a, b) => a.muscleGroup.compareTo(b.muscleGroup));
 
     return Right(items);
   }
@@ -1434,7 +1394,9 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
     int? lastSetTimestamp,
     double? lastSetStimulus,
   }) async {
-    final index = _store.muscleStimulusRecords.indexWhere((item) => item.id == id);
+    final index = _store.muscleStimulusRecords.indexWhere(
+      (item) => item.id == id,
+    );
     if (index < 0) {
       return const Left(ValidationFailure('Muscle stimulus record not found'));
     }
@@ -1557,9 +1519,7 @@ class WebDemoSessionSyncService implements SessionSyncService {
   @override
   Future<SessionSyncActionResult> runManualRefresh() async {
     if (_store.session.isAuthenticated) {
-      _store.session = _store.session.copyWith(
-        lastCloudSyncAt: DateTime.now(),
-      );
+      _store.session = _store.session.copyWith(lastCloudSyncAt: DateTime.now());
     }
 
     return const SessionSyncActionResult(
@@ -1659,10 +1619,7 @@ String _normalize(String value) {
   return value.trim().toLowerCase();
 }
 
-T? _firstWhereOrNull<T>(
-  Iterable<T> items,
-  bool Function(T value) predicate,
-) {
+T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T value) predicate) {
   for (final item in items) {
     if (predicate(item)) {
       return item;
@@ -1693,4 +1650,133 @@ List<NutritionLog> _sortedNutritionLogs(List<NutritionLog> items) {
     return b.createdAt.compareTo(a.createdAt);
   });
   return result;
+}
+
+List<MuscleStimulus> _buildSeededMuscleStimulusRecords({
+  required List<WorkoutSet> workoutSets,
+  required List<MuscleFactor> muscleFactors,
+  required DateTime now,
+}) {
+  if (workoutSets.isEmpty) {
+    return <MuscleStimulus>[];
+  }
+
+  final sortedSets = [...workoutSets]
+    ..sort((a, b) {
+      final dateCompare = a.date.compareTo(b.date);
+      if (dateCompare != 0) {
+        return dateCompare;
+      }
+      return a.createdAt.compareTo(b.createdAt);
+    });
+
+  final factorsByExercise = <String, List<MuscleFactor>>{};
+  for (final factor in muscleFactors) {
+    factorsByExercise.putIfAbsent(factor.exerciseId, () => <MuscleFactor>[]);
+    factorsByExercise[factor.exerciseId]!.add(factor);
+  }
+
+  final dailyStimulusByDate = <DateTime, Map<String, double>>{};
+  final lastSetByDate = <DateTime, Map<String, _SeededStimulusMeta>>{};
+
+  for (final workoutSet in sortedSets) {
+    final day = _startOfDay(workoutSet.date);
+    final dayStimulus = dailyStimulusByDate.putIfAbsent(
+      day,
+      () => <String, double>{},
+    );
+    final dayLastSet = lastSetByDate.putIfAbsent(
+      day,
+      () => <String, _SeededStimulusMeta>{},
+    );
+
+    for (final factor
+        in factorsByExercise[workoutSet.exerciseId] ?? const <MuscleFactor>[]) {
+      final setStimulus = StimulusCalculationRules.calculateSetStimulus(
+        sets: 1,
+        intensity: workoutSet.intensity,
+        exerciseFactor: factor.factor,
+      );
+
+      dayStimulus[factor.muscleGroup] =
+          (dayStimulus[factor.muscleGroup] ?? 0.0) + setStimulus;
+
+      final existingMeta = dayLastSet[factor.muscleGroup];
+      if (existingMeta == null ||
+          workoutSet.date.millisecondsSinceEpoch >= existingMeta.timestamp) {
+        dayLastSet[factor.muscleGroup] = _SeededStimulusMeta(
+          timestamp: workoutSet.date.millisecondsSinceEpoch,
+          stimulus: setStimulus,
+        );
+      }
+    }
+  }
+
+  final earliestDay = _startOfDay(sortedSets.first.date);
+  final latestWorkoutDay = _startOfDay(sortedSets.last.date);
+  final today = _startOfDay(now);
+  final finalDay = latestWorkoutDay.isAfter(today) ? latestWorkoutDay : today;
+
+  final records = <MuscleStimulus>[];
+  final previousRollingLoad = <String, double>{};
+  final latestSetMeta = <String, _SeededStimulusMeta>{};
+  var recordId = 0;
+
+  for (
+    DateTime day = earliestDay;
+    !day.isAfter(finalDay);
+    day = day.add(const Duration(days: 1))
+  ) {
+    final dayStimulus = dailyStimulusByDate[day] ?? const <String, double>{};
+    final dayLastSet =
+        lastSetByDate[day] ?? const <String, _SeededStimulusMeta>{};
+
+    final musclesForDay = <String>{
+      ...previousRollingLoad.keys,
+      ...dayStimulus.keys,
+      ...dayLastSet.keys,
+    };
+
+    for (final muscleGroup in musclesForDay) {
+      final stimulus = dayStimulus[muscleGroup] ?? 0.0;
+      final rollingWeeklyLoad =
+          StimulusCalculationRules.calculateRollingWeeklyLoad(
+            previousWeeklyLoad: previousRollingLoad[muscleGroup] ?? 0.0,
+            dailyStimulus: stimulus,
+          );
+
+      final latestForDay = dayLastSet[muscleGroup];
+      if (latestForDay != null) {
+        latestSetMeta[muscleGroup] = latestForDay;
+      }
+
+      final carriedMeta = latestSetMeta[muscleGroup];
+      recordId += 1;
+
+      records.add(
+        MuscleStimulus(
+          id: 'stimulus-$recordId',
+          muscleGroup: muscleGroup,
+          date: day,
+          dailyStimulus: stimulus,
+          rollingWeeklyLoad: rollingWeeklyLoad,
+          lastSetTimestamp: carriedMeta?.timestamp,
+          lastSetStimulus: carriedMeta?.stimulus,
+          createdAt: day,
+          updatedAt: day,
+        ),
+      );
+
+      previousRollingLoad[muscleGroup] = rollingWeeklyLoad;
+    }
+  }
+
+  return records;
+}
+
+class _SeededStimulusMeta {
+  const _SeededStimulusMeta({required this.timestamp, required this.stimulus});
+
+  final int timestamp;
+  final double stimulus;
 }

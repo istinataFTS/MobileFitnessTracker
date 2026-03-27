@@ -17,6 +17,7 @@ import '../../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../../domain/usecases/exercises/get_exercises_for_muscle.dart';
 import '../../domain/usecases/exercises/seed_exercises.dart';
 import '../../domain/usecases/exercises/update_exercise.dart';
+import '../../domain/usecases/muscle_factors/sync_exercise_muscle_factors.dart';
 import '../../features/library/application/exercise_bloc.dart';
 
 void registerExercisesModule(GetIt sl) {
@@ -32,37 +33,38 @@ void registerExercisesModule(GetIt sl) {
   );
 
   sl.registerLazySingleton(
-    () => GetAllExercises(
-      sl(),
-      sourcePreferenceResolver: sl(),
-    ),
+    () => GetAllExercises(sl(), sourcePreferenceResolver: sl()),
   );
   sl.registerLazySingleton(
-    () => GetExerciseById(
-      sl(),
-      sourcePreferenceResolver: sl(),
-    ),
+    () => GetExerciseById(sl(), sourcePreferenceResolver: sl()),
   );
   sl.registerLazySingleton(
-    () => GetExercisesForMuscle(
-      sl(),
-      sourcePreferenceResolver: sl(),
-    ),
+    () => GetExercisesForMuscle(sl(), sourcePreferenceResolver: sl()),
   );
   sl.registerLazySingleton(
     () => AddExercise(
       sl(),
       appSessionRepository: sl(),
+      syncExerciseMuscleFactors: sl(),
     ),
   );
   sl.registerLazySingleton(
     () => UpdateExercise(
       sl(),
       appSessionRepository: sl(),
+      syncExerciseMuscleFactors: sl(),
+      rebuildMuscleStimulusFromWorkoutHistory: sl(),
     ),
   );
-  sl.registerLazySingleton(() => DeleteExercise(sl()));
+  sl.registerLazySingleton(
+    () => DeleteExercise(
+      sl(),
+      muscleFactorRepository: sl(),
+      rebuildMuscleStimulusFromWorkoutHistory: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => SeedExercises(sl()));
+  sl.registerLazySingleton(() => SyncExerciseMuscleFactors(sl()));
 
   sl.registerLazySingleton<ExerciseRepository>(
     () => ExerciseRepositoryImpl(

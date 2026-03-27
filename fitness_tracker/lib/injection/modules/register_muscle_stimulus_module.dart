@@ -10,15 +10,12 @@ import '../../domain/usecases/muscle_factors/seed_exercise_factors.dart';
 import '../../domain/usecases/muscle_stimulus/apply_daily_decay.dart';
 import '../../domain/usecases/muscle_stimulus/calculate_muscle_stimulus.dart';
 import '../../domain/usecases/muscle_stimulus/get_muscle_visual_data.dart';
+import '../../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import '../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 import '../../features/home/application/muscle_visual_bloc.dart';
 
 void registerMuscleStimulusModule(GetIt sl) {
-  sl.registerFactory(
-    () => MuscleVisualBloc(
-      getMuscleVisualData: sl(),
-    ),
-  );
+  sl.registerFactory(() => MuscleVisualBloc(getMuscleVisualData: sl()));
 
   sl.registerLazySingleton(
     () => SeedExerciseFactors(
@@ -28,14 +25,20 @@ void registerMuscleStimulusModule(GetIt sl) {
   );
 
   sl.registerLazySingleton(
-    () => CalculateMuscleStimulus(
-      muscleFactorRepository: sl(),
-    ),
+    () => CalculateMuscleStimulus(muscleFactorRepository: sl()),
   );
 
   sl.registerLazySingleton(
     () => RecordWorkoutSet(
       muscleFactorRepository: sl(),
+      muscleStimulusRepository: sl(),
+      calculateMuscleStimulus: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => RebuildMuscleStimulusFromWorkoutHistory(
+      workoutSetRepository: sl(),
       muscleStimulusRepository: sl(),
       calculateMuscleStimulus: sl(),
     ),

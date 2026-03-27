@@ -3,12 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../domain/entities/time_period.dart';
 
-enum HomeTone {
-  muted,
-  primary,
-  warning,
-  success,
-}
+enum HomeTone { muted, primary, warning, success }
 
 class HomePageViewData extends Equatable {
   const HomePageViewData({
@@ -29,13 +24,13 @@ class HomePageViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        greeting,
-        weekRangeLabel,
-        nutrition,
-        progress,
-        muscleGroups,
-        showMuscleGroups,
-      ];
+    greeting,
+    weekRangeLabel,
+    nutrition,
+    progress,
+    muscleGroups,
+    showMuscleGroups,
+  ];
 }
 
 class HomeNutritionCardViewData extends Equatable {
@@ -53,11 +48,11 @@ class HomeNutritionCardViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        totalCaloriesLabel,
-        macros,
-        recentEntries,
-        hasEntries,
-      ];
+    totalCaloriesLabel,
+    macros,
+    recentEntries,
+    hasEntries,
+  ];
 }
 
 class HomeMacroProgressViewData extends Equatable {
@@ -79,13 +74,13 @@ class HomeMacroProgressViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        label,
-        progressLabel,
-        trailingLabel,
-        progressValue,
-        hasTarget,
-        isComplete,
-      ];
+    label,
+    progressLabel,
+    trailingLabel,
+    progressValue,
+    hasTarget,
+    isComplete,
+  ];
 }
 
 class HomeRecentNutritionEntryViewData extends Equatable {
@@ -112,6 +107,7 @@ class HomeProgressCardViewData extends Equatable {
     required this.remainingTargetLabel,
     required this.trainedMusclesLabel,
     required this.targetTone,
+    required this.bodyVisual,
     required this.muscleSummary,
     required this.isLoading,
     required this.errorMessage,
@@ -124,23 +120,57 @@ class HomeProgressCardViewData extends Equatable {
   final String remainingTargetLabel;
   final String trainedMusclesLabel;
   final HomeTone targetTone;
+  final HomeBodyVisualViewData bodyVisual;
   final List<HomeMuscleSummaryItemViewData> muscleSummary;
   final bool isLoading;
   final String? errorMessage;
 
   @override
   List<Object?> get props => <Object?>[
-        title,
-        selectedPeriod,
-        selectorEnabled,
-        totalSetsLabel,
-        remainingTargetLabel,
-        trainedMusclesLabel,
-        targetTone,
-        muscleSummary,
-        isLoading,
-        errorMessage,
-      ];
+    title,
+    selectedPeriod,
+    selectorEnabled,
+    totalSetsLabel,
+    remainingTargetLabel,
+    trainedMusclesLabel,
+    targetTone,
+    bodyVisual,
+    muscleSummary,
+    isLoading,
+    errorMessage,
+  ];
+}
+
+class HomeBodyVisualViewData extends Equatable {
+  const HomeBodyVisualViewData({
+    required this.frontLayers,
+    required this.backLayers,
+  });
+
+  final List<HomeBodyOverlayViewData> frontLayers;
+  final List<HomeBodyOverlayViewData> backLayers;
+
+  bool get hasHighlights => frontLayers.isNotEmpty || backLayers.isNotEmpty;
+
+  @override
+  List<Object?> get props => <Object?>[frontLayers, backLayers];
+}
+
+class HomeBodyOverlayViewData extends Equatable {
+  const HomeBodyOverlayViewData({
+    required this.assetPath,
+    required this.color,
+    required this.opacity,
+    required this.label,
+  });
+
+  final String assetPath;
+  final Color color;
+  final double opacity;
+  final String label;
+
+  @override
+  List<Object?> get props => <Object?>[assetPath, color, opacity, label];
 }
 
 class HomeMuscleSummaryItemViewData extends Equatable {
@@ -158,11 +188,11 @@ class HomeMuscleSummaryItemViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        displayName,
-        stimulusLabel,
-        intensityLabel,
-        color,
-      ];
+    displayName,
+    stimulusLabel,
+    intensityLabel,
+    color,
+  ];
 }
 
 class HomeMuscleGroupProgressViewData extends Equatable {
@@ -184,11 +214,11 @@ class HomeMuscleGroupProgressViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        title,
-        progressLabel,
-        percentageLabel,
-        progressValue,
-        isComplete,
-        tone,
-      ];
+    title,
+    progressLabel,
+    percentageLabel,
+    progressValue,
+    isComplete,
+    tone,
+  ];
 }

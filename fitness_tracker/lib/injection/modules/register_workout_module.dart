@@ -30,22 +30,13 @@ void registerWorkoutModule(GetIt sl) {
   );
 
   sl.registerLazySingleton(
-    () => AddWorkoutSet(
-      sl(),
-      appSessionRepository: sl(),
-    ),
+    () => AddWorkoutSet(sl(), appSessionRepository: sl()),
   );
   sl.registerLazySingleton(
-    () => GetAllWorkoutSets(
-      sl(),
-      sourcePreferenceResolver: sl(),
-    ),
+    () => GetAllWorkoutSets(sl(), sourcePreferenceResolver: sl()),
   );
   sl.registerLazySingleton(
-    () => GetWeeklySets(
-      sl(),
-      sourcePreferenceResolver: sl(),
-    ),
+    () => GetWeeklySets(sl(), sourcePreferenceResolver: sl()),
   );
   sl.registerLazySingleton(
     () => GetSetsByDateRange(
@@ -54,11 +45,14 @@ void registerWorkoutModule(GetIt sl) {
       sourcePreferenceResolver: sl(),
     ),
   );
-  sl.registerLazySingleton(() => DeleteWorkoutSet(sl()));
+  sl.registerLazySingleton(
+    () => DeleteWorkoutSet(sl(), rebuildMuscleStimulusFromWorkoutHistory: sl()),
+  );
   sl.registerLazySingleton(
     () => UpdateWorkoutSet(
       sl(),
       appSessionRepository: sl(),
+      rebuildMuscleStimulusFromWorkoutHistory: sl(),
     ),
   );
 

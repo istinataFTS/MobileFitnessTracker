@@ -4,16 +4,20 @@ import '../../../core/errors/failures.dart';
 import '../../entities/workout_set.dart';
 import '../../repositories/app_session_repository.dart';
 import '../../repositories/workout_set_repository.dart';
+import '../muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 
 /// Use case for updating an existing workout set
 /// This allows users to edit past workout logs
 class UpdateWorkoutSet {
   final WorkoutSetRepository repository;
   final AppSessionRepository appSessionRepository;
+  final RebuildMuscleStimulusFromWorkoutHistory
+  rebuildMuscleStimulusFromWorkoutHistory;
 
   const UpdateWorkoutSet(
     this.repository, {
     required this.appSessionRepository,
+    required this.rebuildMuscleStimulusFromWorkoutHistory,
   });
 
   /// Update a workout set
@@ -25,21 +29,23 @@ class UpdateWorkoutSet {
   Future<Either<Failure, void>> call(WorkoutSet set) async {
     final sessionResult = await appSessionRepository.getCurrentSession();
 
-    final preparedSet = sessionResult.fold(
-      (_) => set,
-      (session) {
-        if (!session.isAuthenticated || session.user == null) {
-          return set;
-        }
+    final preparedSet = sessionResult.fold((_) => set, (session) {
+      if (!session.isAuthenticated || session.user == null) {
+        return set;
+      }
 
-        if (set.ownerUserId == session.user!.id) {
-          return set;
-        }
+      if (set.ownerUserId == session.user!.id) {
+        return set;
+      }
 
-        return set.copyWith(ownerUserId: session.user!.id);
-      },
+      return set.copyWith(ownerUserId: session.user!.id);
+    });
+
+    final updateResult = await repository.updateSet(preparedSet);
+
+    return updateResult.fold(
+      (failure) async => Left(failure),
+      (_) async => rebuildMuscleStimulusFromWorkoutHistory(),
     );
-
-    return repository.updateSet(preparedSet);
   }
 }

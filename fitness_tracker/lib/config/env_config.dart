@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 
 import '../core/logging/app_logger.dart';
 
@@ -44,6 +44,14 @@ class EnvConfig {
   );
 
   static bool get enableDevicePreview => kDebugMode && _devicePreviewFlag;
+
+  static const bool _webPhoneFrameFlag = bool.fromEnvironment(
+    'ENABLE_WEB_PHONE_FRAME',
+    defaultValue: true,
+  );
+
+  static bool get enableWebPhoneFrame =>
+      kIsWeb && kDebugMode && _webPhoneFrameFlag;
 
   static const bool enablePerformanceMonitoring = bool.fromEnvironment(
     'ENABLE_PERFORMANCE_MONITORING',
@@ -165,6 +173,10 @@ class EnvConfig {
 
     if (isProduction && enableDevicePreview) {
       issues.add('ENABLE_DEVICE_PREVIEW must be false in production.');
+    }
+
+    if (isProduction && enableWebPhoneFrame) {
+      issues.add('ENABLE_WEB_PHONE_FRAME must be false in production.');
     }
 
     if (enableSupabase &&

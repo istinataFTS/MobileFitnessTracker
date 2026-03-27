@@ -4,10 +4,14 @@ import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
+import 'package:fitness_tracker/domain/entities/muscle_factor.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:fitness_tracker/domain/repositories/exercise_repository.dart';
+import 'package:fitness_tracker/domain/repositories/muscle_factor_repository.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/add_exercise.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/update_exercise.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_factors/sync_exercise_muscle_factors.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -15,112 +19,174 @@ class MockExerciseRepository extends Mock implements ExerciseRepository {}
 
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
+class MockMuscleFactorRepository extends Mock
+    implements MuscleFactorRepository {}
+
+class MockRebuildMuscleStimulusFromWorkoutHistory extends Mock
+    implements RebuildMuscleStimulusFromWorkoutHistory {}
+
 void main() {
   late MockExerciseRepository exerciseRepository;
   late MockAppSessionRepository appSessionRepository;
+  late MockMuscleFactorRepository muscleFactorRepository;
+  late MockRebuildMuscleStimulusFromWorkoutHistory
+  rebuildMuscleStimulusFromWorkoutHistory;
 
   late AddExercise addExercise;
   late UpdateExercise updateExercise;
 
-  const baseExercise = Exercise(
+  final baseExercise = Exercise(
     id: 'exercise-1',
     name: 'Bench Press',
     muscleGroups: <String>['chest', 'triceps'],
     createdAt: DateTime(2026, 3, 26),
   );
 
+  setUpAll(() {
+    registerFallbackValue(
+      Exercise(
+        id: 'fallback-exercise',
+        name: 'Fallback Exercise',
+        muscleGroups: const <String>['mid-chest'],
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    );
+    registerFallbackValue(const <MuscleFactor>[]);
+  });
+
   setUp(() {
     exerciseRepository = MockExerciseRepository();
     appSessionRepository = MockAppSessionRepository();
+    muscleFactorRepository = MockMuscleFactorRepository();
+    rebuildMuscleStimulusFromWorkoutHistory =
+        MockRebuildMuscleStimulusFromWorkoutHistory();
 
     addExercise = AddExercise(
       exerciseRepository,
       appSessionRepository: appSessionRepository,
+      syncExerciseMuscleFactors: SyncExerciseMuscleFactors(
+        muscleFactorRepository,
+      ),
     );
 
     updateExercise = UpdateExercise(
       exerciseRepository,
       appSessionRepository: appSessionRepository,
+      syncExerciseMuscleFactors: SyncExerciseMuscleFactors(
+        muscleFactorRepository,
+      ),
+      rebuildMuscleStimulusFromWorkoutHistory:
+          rebuildMuscleStimulusFromWorkoutHistory,
     );
 
-    when(() => exerciseRepository.addExercise(any()))
-        .thenAnswer((_) async => const Right(null));
-    when(() => exerciseRepository.updateExercise(any()))
-        .thenAnswer((_) async => const Right(null));
+    when(
+      () => exerciseRepository.addExercise(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => exerciseRepository.updateExercise(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => muscleFactorRepository.deleteMuscleFactorsByExerciseId(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => muscleFactorRepository.addMuscleFactorsBatch(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => rebuildMuscleStimulusFromWorkoutHistory(),
+    ).thenAnswer((_) async => const Right(null));
   });
 
-  test('AddExercise attaches authenticated ownerUserId before persisting',
-      () async {
-    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(
-        AppSession(
-          authMode: AuthMode.authenticated,
-          user: AppUser(
-            id: 'user-1',
-            email: 'user@test.com',
+  test(
+    'AddExercise attaches authenticated ownerUserId before persisting',
+    () async {
+      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+        (_) async => const Right(
+          AppSession(
+            authMode: AuthMode.authenticated,
+            user: AppUser(id: 'user-1', email: 'user@test.com'),
           ),
         ),
-      ),
-    );
+      );
 
-    final result = await addExercise(baseExercise);
+      final result = await addExercise(baseExercise);
 
-    expect(result, const Right(null));
+      expect(result, const Right(null));
 
-    verify(
-      () => exerciseRepository.addExercise(
-        baseExercise.copyWith(ownerUserId: 'user-1'),
-      ),
-    ).called(1);
-  });
+      verify(
+        () => exerciseRepository.addExercise(
+          baseExercise.copyWith(ownerUserId: 'user-1'),
+        ),
+      ).called(1);
+      verify(
+        () => muscleFactorRepository.deleteMuscleFactorsByExerciseId(
+          'exercise-1',
+        ),
+      ).called(1);
+      verify(
+        () => muscleFactorRepository.addMuscleFactorsBatch(any()),
+      ).called(1);
+    },
+  );
 
-  test('UpdateExercise attaches authenticated ownerUserId before persisting',
-      () async {
-    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(
-        AppSession(
-          authMode: AuthMode.authenticated,
-          user: AppUser(
-            id: 'user-1',
-            email: 'user@test.com',
+  test(
+    'UpdateExercise attaches authenticated ownerUserId before persisting',
+    () async {
+      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+        (_) async => const Right(
+          AppSession(
+            authMode: AuthMode.authenticated,
+            user: AppUser(id: 'user-1', email: 'user@test.com'),
           ),
         ),
-      ),
-    );
+      );
 
-    final result = await updateExercise(baseExercise);
+      final result = await updateExercise(baseExercise);
 
-    expect(result, const Right(null));
+      expect(result, const Right(null));
 
-    verify(
-      () => exerciseRepository.updateExercise(
-        baseExercise.copyWith(ownerUserId: 'user-1'),
-      ),
-    ).called(1);
-  });
+      verify(
+        () => exerciseRepository.updateExercise(
+          baseExercise.copyWith(ownerUserId: 'user-1'),
+        ),
+      ).called(1);
+      verify(
+        () => muscleFactorRepository.deleteMuscleFactorsByExerciseId(
+          'exercise-1',
+        ),
+      ).called(1);
+      verify(
+        () => muscleFactorRepository.addMuscleFactorsBatch(any()),
+      ).called(1);
+      verify(() => rebuildMuscleStimulusFromWorkoutHistory()).called(1);
+    },
+  );
 
   test('AddExercise leaves exercise unchanged for guest session', () async {
-    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    when(
+      () => appSessionRepository.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     final result = await addExercise(baseExercise);
 
     expect(result, const Right(null));
 
     verify(() => exerciseRepository.addExercise(baseExercise)).called(1);
+    verify(() => muscleFactorRepository.addMuscleFactorsBatch(any())).called(1);
   });
 
-  test('UpdateExercise leaves exercise unchanged when session lookup fails',
-      () async {
-    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
-    );
+  test(
+    'UpdateExercise leaves exercise unchanged when session lookup fails',
+    () async {
+      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+        (_) async => const Left(CacheFailure('session unavailable')),
+      );
 
-    final result = await updateExercise(baseExercise);
+      final result = await updateExercise(baseExercise);
 
-    expect(result, const Right(null));
+      expect(result, const Right(null));
 
-    verify(() => exerciseRepository.updateExercise(baseExercise)).called(1);
-  });
+      verify(() => exerciseRepository.updateExercise(baseExercise)).called(1);
+      verify(() => rebuildMuscleStimulusFromWorkoutHistory()).called(1);
+    },
+  );
 }

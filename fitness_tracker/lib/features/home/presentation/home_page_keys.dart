@@ -6,12 +6,8 @@ class HomePageKeys {
   static const Key pageLoadingIndicatorKey = ValueKey<String>(
     'home_page_loading_indicator',
   );
-  static const Key refreshListKey = ValueKey<String>(
-    'home_refresh_list',
-  );
-  static const Key progressCardKey = ValueKey<String>(
-    'home_progress_card',
-  );
+  static const Key refreshListKey = ValueKey<String>('home_refresh_list');
+  static const Key progressCardKey = ValueKey<String>('home_progress_card');
   static const Key progressLoadingIndicatorKey = ValueKey<String>(
     'home_progress_loading_indicator',
   );
@@ -33,10 +29,9 @@ class HomePageKeys {
   static const Key totalSetsValueKey = ValueKey<String>(
     'home_total_sets_value',
   );
-  static const Key targetValueKey = ValueKey<String>(
-    'home_target_value',
-  );
+  static const Key targetValueKey = ValueKey<String>('home_target_value');
   static const Key trainedMusclesValueKey = ValueKey<String>(
     'home_trained_muscles_value',
   );
+  static const Key bodyVisualKey = ValueKey<String>('home_body_visual');
 }

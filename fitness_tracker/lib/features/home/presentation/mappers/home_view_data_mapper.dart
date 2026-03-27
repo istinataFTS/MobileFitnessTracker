@@ -18,12 +18,59 @@ import '../models/home_view_data.dart';
 class HomeViewDataMapper {
   const HomeViewDataMapper._();
 
+  static const Map<String, List<String>> _frontBodyAssetMap =
+      <String, List<String>>{
+        'front-delts': <String>['assets/images/body/front_delts.png'],
+        'side-delts': <String>[
+          'assets/images/body/front_delts.png',
+          'assets/images/body/front_reardelt.png',
+        ],
+        'upper-traps': <String>[
+          'assets/images/body/front_uppertraps.png',
+          'assets/images/body/front_neck.png',
+        ],
+        'upper-chest': <String>['assets/images/body/front_chest.png'],
+        'mid-chest': <String>['assets/images/body/front_chest.png'],
+        'lower-chest': <String>['assets/images/body/front_chest.png'],
+        'biceps': <String>['assets/images/body/front_biceps.png'],
+        'forearms': <String>['assets/images/body/front_forearms.png'],
+        'abs': <String>['assets/images/body/front_abs.png'],
+        'obliques': <String>['assets/images/body/front_obliques.png'],
+        'lovehandles': <String>['assets/images/body/front_lovehandles.png'],
+        'hipadductors': <String>['assets/images/body/front_hipadductors.png'],
+        'quads': <String>['assets/images/body/front_quads.png'],
+        'calves': <String>['assets/images/body/front_calves.png'],
+      };
+
+  static const Map<String, List<String>> _backBodyAssetMap =
+      <String, List<String>>{
+        'rear-delts': <String>['assets/images/body/back_reardelt.png'],
+        'side-delts': <String>['assets/images/body/back_reardelt.png'],
+        'upper-traps': <String>['assets/images/body/back_uppertraps.png'],
+        'middle-traps': <String>['assets/images/body/back_middletraps.png'],
+        'lower-traps': <String>['assets/images/body/back_lowertraps.png'],
+        'lats': <String>[
+          'assets/images/body/back_lats.png',
+          'assets/images/body/back_smalllats.png',
+        ],
+        'triceps': <String>['assets/images/body/back_triceps.png'],
+        'forearms': <String>['assets/images/body/back_forearms.png'],
+        'lower-back': <String>['assets/images/body/back_lowerback.png'],
+        'glutes': <String>['assets/images/body/back_glutes.png'],
+        'hipadductors': <String>['assets/images/body/back_hipadductors.png'],
+        'quads': <String>['assets/images/body/back_quads.png'],
+        'hamstrings': <String>['assets/images/body/back_hamstring.png'],
+        'calves': <String>['assets/images/body/back_calves.png'],
+      };
+
   static HomePageViewData map({
     required HomeDashboardData homeData,
     required MuscleVisualState muscleVisualState,
     required AppSettings settings,
   }) {
-    final List<Target> trainingTargets = _filterTrainingTargets(homeData.targets);
+    final List<Target> trainingTargets = _filterTrainingTargets(
+      homeData.targets,
+    );
     final List<Target> macroTargets = _filterMacroTargets(homeData.targets);
     final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
 
@@ -139,10 +186,12 @@ class HomeViewDataMapper {
   }) {
     final bool hasTarget = target > 0;
     final bool isComplete = hasTarget && actual >= target;
-    final double progressValue =
-        hasTarget ? (actual / target).clamp(0.0, 1.0) : 0.0;
-    final double remaining =
-        hasTarget ? (target - actual).clamp(0.0, target) : 0.0;
+    final double progressValue = hasTarget
+        ? (actual / target).clamp(0.0, 1.0)
+        : 0.0;
+    final double remaining = hasTarget
+        ? (target - actual).clamp(0.0, target)
+        : 0.0;
 
     return HomeMacroProgressViewData(
       label: label,
@@ -179,12 +228,17 @@ class HomeViewDataMapper {
         selectedPeriod: currentPeriod,
         selectorEnabled: selectorEnabled,
         totalSetsLabel: totalSets.toString(),
-        remainingTargetLabel:
-            totalTarget > 0 ? remainingTarget.toString() : '-',
+        remainingTargetLabel: totalTarget > 0
+            ? remainingTarget.toString()
+            : '-',
         trainedMusclesLabel: '-',
         targetTone: _targetTone(
           remainingTarget,
           showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
+        ),
+        bodyVisual: const HomeBodyVisualViewData(
+          frontLayers: <HomeBodyOverlayViewData>[],
+          backLayers: <HomeBodyOverlayViewData>[],
         ),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: true,
@@ -200,12 +254,16 @@ class HomeViewDataMapper {
         totalSetsLabel: totalSets.toString(),
         remainingTargetLabel:
             totalTarget > 0 && currentPeriod == TimePeriod.week
-                ? remainingTarget.toString()
-                : '-',
+            ? remainingTarget.toString()
+            : '-',
         trainedMusclesLabel: '-',
         targetTone: _targetTone(
           remainingTarget,
           showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
+        ),
+        bodyVisual: const HomeBodyVisualViewData(
+          frontLayers: <HomeBodyOverlayViewData>[],
+          backLayers: <HomeBodyOverlayViewData>[],
         ),
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: false,
@@ -217,15 +275,17 @@ class HomeViewDataMapper {
     final bool showTarget =
         loaded.currentPeriod == TimePeriod.week && totalTarget > 0;
 
-    final List<MuscleVisualData> trained = loaded.muscleData.values
-        .where(
-          (MuscleVisualData item) => item.hasTrained && item.totalStimulus > 0,
-        )
-        .toList()
-      ..sort(
-        (MuscleVisualData a, MuscleVisualData b) =>
-            b.totalStimulus.compareTo(a.totalStimulus),
-      );
+    final List<MuscleVisualData> trained =
+        loaded.muscleData.values
+            .where(
+              (MuscleVisualData item) =>
+                  item.hasTrained && item.totalStimulus > 0,
+            )
+            .toList()
+          ..sort(
+            (MuscleVisualData a, MuscleVisualData b) =>
+                b.totalStimulus.compareTo(a.totalStimulus),
+          );
 
     return HomeProgressCardViewData(
       title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
@@ -235,6 +295,7 @@ class HomeViewDataMapper {
       remainingTargetLabel: showTarget ? remainingTarget.toString() : '-',
       trainedMusclesLabel: loaded.trainedMuscleCount.toString(),
       targetTone: _targetTone(remainingTarget, showTarget: showTarget),
+      bodyVisual: _mapBodyVisual(loaded.muscleData),
       muscleSummary: trained
           .take(6)
           .map(
@@ -251,10 +312,55 @@ class HomeViewDataMapper {
     );
   }
 
-  static HomeTone _targetTone(
-    int remainingTarget, {
-    required bool showTarget,
+  static HomeBodyVisualViewData _mapBodyVisual(
+    Map<String, MuscleVisualData> muscleData,
+  ) {
+    final Map<String, HomeBodyOverlayViewData> frontLayers =
+        <String, HomeBodyOverlayViewData>{};
+    final Map<String, HomeBodyOverlayViewData> backLayers =
+        <String, HomeBodyOverlayViewData>{};
+
+    for (final MuscleVisualData item in muscleData.values) {
+      if (!item.hasTrained || item.overlayOpacity <= 0) {
+        continue;
+      }
+
+      for (final String assetPath
+          in _frontBodyAssetMap[item.muscleGroup] ?? const <String>[]) {
+        _mergeOverlay(frontLayers, assetPath: assetPath, item: item);
+      }
+
+      for (final String assetPath
+          in _backBodyAssetMap[item.muscleGroup] ?? const <String>[]) {
+        _mergeOverlay(backLayers, assetPath: assetPath, item: item);
+      }
+    }
+
+    return HomeBodyVisualViewData(
+      frontLayers: frontLayers.values.toList(growable: false),
+      backLayers: backLayers.values.toList(growable: false),
+    );
+  }
+
+  static void _mergeOverlay(
+    Map<String, HomeBodyOverlayViewData> target, {
+    required String assetPath,
+    required MuscleVisualData item,
   }) {
+    final HomeBodyOverlayViewData candidate = HomeBodyOverlayViewData(
+      assetPath: assetPath,
+      color: item.color,
+      opacity: item.overlayOpacity,
+      label: item.displayName,
+    );
+
+    final HomeBodyOverlayViewData? existing = target[assetPath];
+    if (existing == null || candidate.opacity >= existing.opacity) {
+      target[assetPath] = candidate;
+    }
+  }
+
+  static HomeTone _targetTone(int remainingTarget, {required bool showTarget}) {
     if (!showTarget) {
       return HomeTone.muted;
     }
@@ -280,23 +386,27 @@ class HomeViewDataMapper {
       exercises: exercises,
     );
 
-    return targets.map((Target target) {
-      final int currentSets = breakdown[target.categoryKey] ?? 0;
-      final int targetSets = target.weeklyGoal;
-      final double rawProgress = targetSets > 0 ? currentSets / targetSets : 0;
-      final double progressValue = rawProgress.clamp(0.0, 1.0);
-      final int percentage = (rawProgress * 100).clamp(0, 100).toInt();
-      final bool isComplete = targetSets > 0 && currentSets >= targetSets;
+    return targets
+        .map((Target target) {
+          final int currentSets = breakdown[target.categoryKey] ?? 0;
+          final int targetSets = target.weeklyGoal;
+          final double rawProgress = targetSets > 0
+              ? currentSets / targetSets
+              : 0;
+          final double progressValue = rawProgress.clamp(0.0, 1.0);
+          final int percentage = (rawProgress * 100).clamp(0, 100).toInt();
+          final bool isComplete = targetSets > 0 && currentSets >= targetSets;
 
-      return HomeMuscleGroupProgressViewData(
-        title: MuscleGroups.getDisplayName(target.categoryKey),
-        progressLabel: '$currentSets / $targetSets ${AppStrings.sets}',
-        percentageLabel: '$percentage%',
-        progressValue: progressValue,
-        isComplete: isComplete,
-        tone: isComplete ? HomeTone.success : HomeTone.primary,
-      );
-    }).toList(growable: false);
+          return HomeMuscleGroupProgressViewData(
+            title: MuscleGroups.getDisplayName(target.categoryKey),
+            progressLabel: '$currentSets / $targetSets ${AppStrings.sets}',
+            percentageLabel: '$percentage%',
+            progressValue: progressValue,
+            isComplete: isComplete,
+            tone: isComplete ? HomeTone.success : HomeTone.primary,
+          );
+        })
+        .toList(growable: false);
   }
 
   static Map<String, int> _buildMuscleBreakdown({

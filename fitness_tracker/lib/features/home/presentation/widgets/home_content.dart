@@ -5,6 +5,7 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/time_period.dart';
 import '../home_page_keys.dart';
 import '../models/home_view_data.dart';
+import 'body_visual_widget.dart';
 import 'period_selector_widget.dart';
 
 class HomeContent extends StatelessWidget {
@@ -49,9 +50,7 @@ class HomeContent extends StatelessWidget {
 }
 
 class _GreetingSection extends StatelessWidget {
-  const _GreetingSection({
-    required this.viewData,
-  });
+  const _GreetingSection({required this.viewData});
 
   final HomePageViewData viewData;
 
@@ -62,16 +61,16 @@ class _GreetingSection extends StatelessWidget {
       children: <Widget>[
         Text(
           viewData.greeting,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
           viewData.weekRangeLabel,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppTheme.textMedium,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: AppTheme.textMedium),
         ),
       ],
     );
@@ -79,9 +78,7 @@ class _GreetingSection extends StatelessWidget {
 }
 
 class _NutritionCard extends StatelessWidget {
-  const _NutritionCard({
-    required this.viewData,
-  });
+  const _NutritionCard({required this.viewData});
 
   final HomeNutritionCardViewData viewData;
 
@@ -111,8 +108,8 @@ class _NutritionCard extends StatelessWidget {
                   child: Text(
                     'Today’s Nutrition',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -140,17 +137,17 @@ class _NutritionCard extends StatelessWidget {
                       Text(
                         'Total Calories',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.textMedium,
-                            ),
+                          color: AppTheme.textMedium,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         viewData.totalCaloriesLabel,
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryOrange,
-                                ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryOrange,
+                            ),
                       ),
                     ],
                   ),
@@ -177,18 +174,18 @@ class _NutritionCard extends StatelessWidget {
                 ),
                 child: Text(
                   'No meals or macro entries logged today yet.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textMedium,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
                 ),
               )
             else ...<Widget>[
               Text(
                 'Latest Entries',
                 key: HomePageKeys.latestEntriesSectionKey,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),
               ...viewData.recentEntries.map(
@@ -214,17 +211,13 @@ class _NutritionCard extends StatelessWidget {
                           children: <Widget>[
                             Text(
                               entry.title,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               entry.subtitle,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(color: AppTheme.textMedium),
                             ),
                           ],
@@ -243,16 +236,15 @@ class _NutritionCard extends StatelessWidget {
 }
 
 class _MacroRow extends StatelessWidget {
-  const _MacroRow({
-    required this.item,
-  });
+  const _MacroRow({required this.item});
 
   final HomeMacroProgressViewData item;
 
   @override
   Widget build(BuildContext context) {
-    final Color progressColor =
-        item.isComplete ? AppTheme.successGreen : AppTheme.primaryOrange;
+    final Color progressColor = item.isComplete
+        ? AppTheme.successGreen
+        : AppTheme.primaryOrange;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,26 +254,26 @@ class _MacroRow extends StatelessWidget {
             Expanded(
               child: Text(
                 item.label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             Text(
               item.trailingLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: item.hasTarget ? progressColor : AppTheme.textDim,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: item.hasTarget ? progressColor : AppTheme.textDim,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
         Text(
           item.progressLabel,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textMedium,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
         ),
         const SizedBox(height: 8),
         ClipRRect(
@@ -339,10 +331,8 @@ class _ProgressCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           viewData.title,
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -380,8 +370,8 @@ class _ProgressCard extends StatelessWidget {
                     viewData.errorMessage!,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textMedium,
-                        ),
+                      color: AppTheme.textMedium,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextButton.icon(
@@ -394,6 +384,8 @@ class _ProgressCard extends StatelessWidget {
               )
             else ...<Widget>[
               _ProgressStatsRow(viewData: viewData),
+              const SizedBox(height: 16),
+              BodyVisualWidget(viewData: viewData.bodyVisual),
               const SizedBox(height: 16),
               ...viewData.muscleSummary.map(
                 (HomeMuscleSummaryItemViewData item) => Container(
@@ -418,17 +410,15 @@ class _ProgressCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.displayName,
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                       Text(
                         '${item.stimulusLabel} • ${item.intensityLabel}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textMedium,
-                            ),
+                          color: AppTheme.textMedium,
+                        ),
                       ),
                     ],
                   ),
@@ -443,9 +433,7 @@ class _ProgressCard extends StatelessWidget {
 }
 
 class _ProgressStatsRow extends StatelessWidget {
-  const _ProgressStatsRow({
-    required this.viewData,
-  });
+  const _ProgressStatsRow({required this.viewData});
 
   final HomeProgressCardViewData viewData;
 
@@ -474,17 +462,17 @@ class _ProgressStatsRow extends StatelessWidget {
               value,
               key: valueKey,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textMedium,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textMedium),
             ),
           ],
         ),
@@ -530,9 +518,7 @@ class _ProgressStatsRow extends StatelessWidget {
 }
 
 class _MuscleGroupSection extends StatelessWidget {
-  const _MuscleGroupSection({
-    required this.items,
-  });
+  const _MuscleGroupSection({required this.items});
 
   final List<HomeMuscleGroupProgressViewData> items;
 
@@ -544,9 +530,9 @@ class _MuscleGroupSection extends StatelessWidget {
       children: <Widget>[
         Text(
           AppStrings.muscleGroups,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         ...items.map(
@@ -562,9 +548,7 @@ class _MuscleGroupSection extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -595,13 +579,14 @@ class _MuscleGroupSection extends StatelessWidget {
                       Text(
                         item.progressLabel,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppTheme.textMedium,
-                            ),
+                          color: AppTheme.textMedium,
+                        ),
                       ),
                       const Spacer(),
                       Text(
                         item.percentageLabel,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: item.tone == HomeTone.success
                                   ? AppTheme.successGreen

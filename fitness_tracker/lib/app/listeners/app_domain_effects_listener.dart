@@ -7,13 +7,11 @@ import '../../features/history/history.dart';
 import '../../features/home/application/home_bloc.dart';
 import '../../features/home/application/muscle_visual_bloc.dart';
 import '../../features/log/log.dart';
+import '../../features/targets/application/targets_bloc.dart';
 import '../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 
 class AppDomainEffectsListener extends StatefulWidget {
-  const AppDomainEffectsListener({
-    required this.child,
-    super.key,
-  });
+  const AppDomainEffectsListener({required this.child, super.key});
 
   final Widget child;
 
@@ -25,6 +23,8 @@ class AppDomainEffectsListener extends StatefulWidget {
 class _AppDomainEffectsListenerState extends State<AppDomainEffectsListener> {
   StreamSubscription<WorkoutUiEffect>? _workoutEffectsSub;
   StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
+  StreamSubscription<HistoryUiEffect>? _historyEffectsSub;
+  StreamSubscription<TargetsState>? _targetsStateSub;
 
   @override
   void initState() {
@@ -32,6 +32,8 @@ class _AppDomainEffectsListenerState extends State<AppDomainEffectsListener> {
 
     final WorkoutBloc workoutBloc = context.read<WorkoutBloc>();
     final NutritionLogBloc nutritionLogBloc = context.read<NutritionLogBloc>();
+    final HistoryBloc historyBloc = context.read<HistoryBloc>();
+    final TargetsBloc targetsBloc = context.read<TargetsBloc>();
 
     _workoutEffectsSub = workoutBloc.effects.listen((effect) {
       if (!mounted) {
@@ -56,12 +58,36 @@ class _AppDomainEffectsListenerState extends State<AppDomainEffectsListener> {
         context.read<HistoryBloc>().add(const RefreshCurrentMonthEvent());
       }
     });
+
+    _historyEffectsSub = historyBloc.effects.listen((effect) {
+      if (!mounted) {
+        return;
+      }
+
+      if (effect is HistorySuccessEffect) {
+        context.read<HomeBloc>().add(const RefreshHomeDataEvent());
+        context.read<WorkoutBloc>().add(const RefreshWeeklySetsEvent());
+        context.read<MuscleVisualBloc>().add(const RefreshVisualsEvent());
+      }
+    });
+
+    _targetsStateSub = targetsBloc.stream.listen((TargetsState state) {
+      if (!mounted) {
+        return;
+      }
+
+      if (state is TargetOperationSuccess) {
+        context.read<HomeBloc>().add(const RefreshHomeDataEvent());
+      }
+    });
   }
 
   @override
   void dispose() {
     _workoutEffectsSub?.cancel();
     _nutritionEffectsSub?.cancel();
+    _historyEffectsSub?.cancel();
+    _targetsStateSub?.cancel();
     super.dispose();
   }
 
