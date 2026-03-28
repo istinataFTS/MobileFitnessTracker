@@ -1,5 +1,8 @@
+import '../../data/sync/entity_sync_batch_failure.dart';
 import 'exceptions.dart';
 import 'failures.dart';
+import 'sync_exceptions.dart';
+import 'sync_failures.dart';
 
 class RepositoryErrorMapper {
   const RepositoryErrorMapper._();
@@ -19,6 +22,26 @@ class RepositoryErrorMapper {
 
     if (error is ArgumentError) {
       return ValidationFailure(error.message?.toString() ?? error.toString());
+    }
+
+    if (error is NetworkSyncException) {
+      return NetworkSyncFailure(error.message);
+    }
+
+    if (error is AuthSyncException) {
+      return AuthSyncFailure(error.message);
+    }
+
+    if (error is RemoteSyncException) {
+      return RemoteSyncFailure(error.message);
+    }
+
+    if (error is EntitySyncBatchFailure) {
+      return BatchSyncFailure(
+        message: error.message,
+        failedUpsertEntityIds: error.failedUpsertEntityIds,
+        failedDeleteEntityIds: error.failedDeleteEntityIds,
+      );
     }
 
     return UnexpectedFailure('Unexpected error: $error');

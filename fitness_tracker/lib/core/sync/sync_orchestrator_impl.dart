@@ -1,6 +1,7 @@
-import '../../core/config/app_sync_policy.dart';
-import '../../core/enums/sync_trigger.dart';
-import '../../core/logging/app_logger.dart';
+import '../config/app_sync_policy.dart';
+import '../enums/sync_trigger.dart';
+import '../errors/sync_exceptions.dart';
+import '../logging/app_logger.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../data/sync/entity_sync_batch_failure.dart';
 import 'initial_cloud_migration_coordinator.dart';
@@ -15,7 +16,9 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
   final InitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
   final List<SyncFeature> features;
 
-  const SyncOrchestratorImpl({
+  bool _isSyncing = false;
+
+  SyncOrchestratorImpl({
     required this.appSessionRepository,
     required this.syncPolicy,
     required this.remoteSyncAvailability,
@@ -25,6 +28,19 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
 
   @override
   Future<SyncRunResult> run(SyncTrigger trigger) async {
+    if (_isSyncing) {
+      AppLogger.info(
+        'Sync orchestration skipped for $trigger: sync already in progress',
+        category: 'sync',
+      );
+
+      return SyncRunResult(
+        status: SyncRunStatus.skipped,
+        trigger: trigger,
+        message: 'sync already in progress',
+      );
+    }
+
     if (!syncPolicy.syncTriggers.contains(trigger)) {
       return SyncRunResult(
         status: SyncRunStatus.skipped,
@@ -33,47 +49,53 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
       );
     }
 
-    final sessionResult = await appSessionRepository.getCurrentSession();
+    _isSyncing = true;
 
-    return await sessionResult.fold(
-      (failure) async {
-        AppLogger.warning(
-          'Sync orchestration skipped because session lookup failed: ${failure.message}',
-          category: 'sync',
-        );
+    try {
+      final sessionResult = await appSessionRepository.getCurrentSession();
 
-        return SyncRunResult(
-          status: SyncRunStatus.failed,
-          trigger: trigger,
-          message: 'session lookup failed: ${failure.message}',
-        );
-      },
-      (session) async {
-        final availability = await remoteSyncAvailability.evaluate(
-          session: session,
-          trigger: trigger,
-        );
-
-        if (!availability.isAllowed) {
-          AppLogger.info(
-            'Sync orchestration skipped for $trigger: ${availability.reason}',
+      return await sessionResult.fold(
+        (failure) async {
+          AppLogger.warning(
+            'Sync orchestration skipped because session lookup failed: ${failure.message}',
             category: 'sync',
           );
 
           return SyncRunResult(
-            status: SyncRunStatus.skipped,
+            status: SyncRunStatus.failed,
             trigger: trigger,
-            message: availability.reason,
+            message: 'session lookup failed: ${failure.message}',
           );
-        }
+        },
+        (session) async {
+          final availability = await remoteSyncAvailability.evaluate(
+            session: session,
+            trigger: trigger,
+          );
 
-        if (session.requiresInitialCloudMigration) {
-          return _runInitialMigration(trigger);
-        }
+          if (!availability.isAllowed) {
+            AppLogger.info(
+              'Sync orchestration skipped for $trigger: ${availability.reason}',
+              category: 'sync',
+            );
 
-        return _runFeatureSync(trigger);
-      },
-    );
+            return SyncRunResult(
+              status: SyncRunStatus.skipped,
+              trigger: trigger,
+              message: availability.reason,
+            );
+          }
+
+          if (session.requiresInitialCloudMigration) {
+            return _runInitialMigration(trigger);
+          }
+
+          return _runFeatureSync(trigger);
+        },
+      );
+    } finally {
+      _isSyncing = false;
+    }
   }
 
   Future<SyncRunResult> _runInitialMigration(SyncTrigger trigger) async {
@@ -182,6 +204,18 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
   String _resolveFeatureErrorMessage(Object error) {
     if (error is EntitySyncBatchFailure) {
       return error.message;
+    }
+
+    if (error is NetworkSyncException) {
+      return 'network error: ${error.message}';
+    }
+
+    if (error is AuthSyncException) {
+      return 'auth error: ${error.message}';
+    }
+
+    if (error is RemoteSyncException) {
+      return 'remote error: ${error.message}';
     }
 
     return error.toString();
