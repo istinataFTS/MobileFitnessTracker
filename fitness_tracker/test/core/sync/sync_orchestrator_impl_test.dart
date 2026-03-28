@@ -1,8 +1,10 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/config/app_sync_policy.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
+import 'package:fitness_tracker/core/enums/conflict_resolution_strategy.dart';
 import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/errors/sync_exceptions.dart';
 import 'package:fitness_tracker/core/network/network_status_service.dart';
 import 'package:fitness_tracker/core/sync/initial_cloud_migration_coordinator.dart';
 import 'package:fitness_tracker/core/sync/remote_sync_availability.dart';
@@ -50,6 +52,32 @@ void main() {
     );
   }
 
+  SyncOrchestratorImpl buildOrchestrator({
+    AppSyncPolicy? policy,
+    List<SyncFeature>? features,
+  }) {
+    return SyncOrchestratorImpl(
+      appSessionRepository: repository,
+      syncPolicy: policy ?? AppSyncPolicy.productionDefault,
+      remoteSyncAvailability: RemoteSyncAvailability(
+        runtimePolicy: runtimePolicy,
+        networkStatusService: networkStatusService,
+      ),
+      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
+      features: features ??
+          [
+            SyncFeature(
+              name: 'targets',
+              syncPendingChanges: () async => executionLog.add('targets'),
+            ),
+            SyncFeature(
+              name: 'workout_sets',
+              syncPendingChanges: () async => executionLog.add('workout_sets'),
+            ),
+          ],
+    );
+  }
+
   setUp(() {
     repository = MockAppSessionRepository();
     networkStatusService = MockNetworkStatusService();
@@ -72,29 +100,7 @@ void main() {
       ),
     );
 
-    orchestrator = SyncOrchestratorImpl(
-      appSessionRepository: repository,
-      syncPolicy: AppSyncPolicy.productionDefault,
-      remoteSyncAvailability: RemoteSyncAvailability(
-        runtimePolicy: runtimePolicy,
-        networkStatusService: networkStatusService,
-      ),
-      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
-      features: <SyncFeature>[
-        SyncFeature(
-          name: 'targets',
-          syncPendingChanges: () async {
-            executionLog.add('targets');
-          },
-        ),
-        SyncFeature(
-          name: 'workout_sets',
-          syncPendingChanges: () async {
-            executionLog.add('workout_sets');
-          },
-        ),
-      ],
-    );
+    orchestrator = buildOrchestrator();
   });
 
   test('skips when session is guest', () async {
@@ -137,26 +143,15 @@ void main() {
 
   test('fails when one feature sync throws and does not record sync time',
       () async {
-    orchestrator = SyncOrchestratorImpl(
-      appSessionRepository: repository,
-      syncPolicy: AppSyncPolicy.productionDefault,
-      remoteSyncAvailability: RemoteSyncAvailability(
-        runtimePolicy: runtimePolicy,
-        networkStatusService: networkStatusService,
-      ),
-      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
-      features: <SyncFeature>[
+    orchestrator = buildOrchestrator(
+      features: [
         SyncFeature(
           name: 'targets',
-          syncPendingChanges: () async {
-            executionLog.add('targets');
-          },
+          syncPendingChanges: () async => executionLog.add('targets'),
         ),
         SyncFeature(
           name: 'workout_sets',
-          syncPendingChanges: () async {
-            throw StateError('boom');
-          },
+          syncPendingChanges: () async => throw StateError('boom'),
         ),
       ],
     );
@@ -177,24 +172,15 @@ void main() {
 
   test('preserves structured sync batch failure message for feature result',
       () async {
-    orchestrator = SyncOrchestratorImpl(
-      appSessionRepository: repository,
-      syncPolicy: AppSyncPolicy.productionDefault,
-      remoteSyncAvailability: RemoteSyncAvailability(
-        runtimePolicy: runtimePolicy,
-        networkStatusService: networkStatusService,
-      ),
-      initialCloudMigrationCoordinator: initialCloudMigrationCoordinator,
-      features: <SyncFeature>[
+    orchestrator = buildOrchestrator(
+      features: [
         SyncFeature(
           name: 'targets',
-          syncPendingChanges: () async {
-            throw const EntitySyncBatchFailure(
-              entityLabel: 'target',
-              failedUpsertEntityIds: <String>['target-1'],
-              failedDeleteEntityIds: <String>['target-7'],
-            );
-          },
+          syncPendingChanges: () async => throw const EntitySyncBatchFailure(
+            entityLabel: 'target',
+            failedUpsertEntityIds: <String>['target-1'],
+            failedDeleteEntityIds: <String>['target-7'],
+          ),
         ),
       ],
     );
@@ -283,5 +269,147 @@ void main() {
     expect(executionLog, isEmpty);
     verifyNever(() => repository.recordSuccessfulCloudSync(any()));
     verifyNever(() => initialCloudMigrationCoordinator.runIfRequired());
+  });
+
+  test('skips when trigger is disabled by sync policy', () async {
+    orchestrator = buildOrchestrator(
+      policy: const AppSyncPolicy(
+        offlineFirst: true,
+        localStoreAcceptsWrites: true,
+        remoteIsSourceOfTruthWhenAuthenticated: true,
+        guestModeUsesLocalStorageOnly: true,
+        authenticatedModeUsesUserScopedData: true,
+        initialCloudSyncUploadsLocalData: true,
+        conflictResolutionStrategy: ConflictResolutionStrategy.serverWins,
+        syncTriggers: <SyncTrigger>[],
+      ),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.status, SyncRunStatus.skipped);
+    expect(result.message, 'trigger is disabled by sync policy');
+    verifyNever(() => repository.getCurrentSession());
+  });
+
+  test('returns skipped immediately when sync is already in progress', () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    // Start first run but do not await — it yields inside getCurrentSession.
+    final firstRun = orchestrator.run(SyncTrigger.appLaunch);
+
+    // Second run starts while first is suspended at the getCurrentSession await.
+    final secondResult = await orchestrator.run(SyncTrigger.manualRefresh);
+
+    expect(secondResult.status, SyncRunStatus.skipped);
+    expect(secondResult.message, 'sync already in progress');
+
+    await firstRun;
+  });
+
+  test('releases sync lock after successful run so next run can proceed',
+      () async {
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    await orchestrator.run(SyncTrigger.appLaunch);
+    final secondResult = await orchestrator.run(SyncTrigger.manualRefresh);
+
+    expect(secondResult.status, SyncRunStatus.completed);
+    expect(secondResult.message, isNot('sync already in progress'));
+  });
+
+  test(
+      'releases sync lock after unexpected exception so next run can proceed',
+      () async {
+    when(() => repository.getCurrentSession())
+        .thenThrow(StateError('unexpected db crash'));
+
+    try {
+      await orchestrator.run(SyncTrigger.appLaunch);
+    } catch (_) {}
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    final secondResult = await orchestrator.run(SyncTrigger.manualRefresh);
+
+    expect(secondResult.status, SyncRunStatus.completed);
+  });
+
+  test('resolves NetworkSyncException feature error message', () async {
+    orchestrator = buildOrchestrator(
+      features: [
+        SyncFeature(
+          name: 'targets',
+          syncPendingChanges: () async =>
+              throw const NetworkSyncException('connection refused'),
+        ),
+      ],
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.featureResults.single.isSuccess, isFalse);
+    expect(
+      result.featureResults.single.errorMessage,
+      'network error: connection refused',
+    );
+  });
+
+  test('resolves AuthSyncException feature error message', () async {
+    orchestrator = buildOrchestrator(
+      features: [
+        SyncFeature(
+          name: 'targets',
+          syncPendingChanges: () async =>
+              throw const AuthSyncException('token expired'),
+        ),
+      ],
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.featureResults.single.isSuccess, isFalse);
+    expect(
+      result.featureResults.single.errorMessage,
+      'auth error: token expired',
+    );
+  });
+
+  test('resolves RemoteSyncException feature error message', () async {
+    orchestrator = buildOrchestrator(
+      features: [
+        SyncFeature(
+          name: 'targets',
+          syncPendingChanges: () async =>
+              throw const RemoteSyncException('constraint violation'),
+        ),
+      ],
+    );
+
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession()),
+    );
+
+    final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+    expect(result.featureResults.single.isSuccess, isFalse);
+    expect(
+      result.featureResults.single.errorMessage,
+      'remote error: constraint violation',
+    );
   });
 }

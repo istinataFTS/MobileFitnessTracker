@@ -132,32 +132,65 @@ void main() {
     expect(result.reason, 'remote sync allowed');
   });
 
-  test('runtime policy reports configured only when all required values exist',
-      () {
-    const disabledPolicy = RemoteSyncRuntimePolicy(
-      isSupabaseEnabled: false,
-      supabaseUrl: 'https://example.supabase.co',
-      supabaseAnonKey: 'anon-key',
-    );
-    const missingUrlPolicy = RemoteSyncRuntimePolicy(
-      isSupabaseEnabled: true,
-      supabaseUrl: '',
-      supabaseAnonKey: 'anon-key',
-    );
-    const missingKeyPolicy = RemoteSyncRuntimePolicy(
-      isSupabaseEnabled: true,
-      supabaseUrl: 'https://example.supabase.co',
-      supabaseAnonKey: '',
-    );
-    const validPolicy = RemoteSyncRuntimePolicy(
-      isSupabaseEnabled: true,
-      supabaseUrl: 'https://example.supabase.co',
-      supabaseAnonKey: 'anon-key',
-    );
+  group('RemoteSyncRuntimePolicy.isRemoteSyncConfigured', () {
+    test('returns false when Supabase is disabled', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: false,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      );
 
-    expect(disabledPolicy.isRemoteSyncConfigured, isFalse);
-    expect(missingUrlPolicy.isRemoteSyncConfigured, isFalse);
-    expect(missingKeyPolicy.isRemoteSyncConfigured, isFalse);
-    expect(validPolicy.isRemoteSyncConfigured, isTrue);
+      expect(policy.isRemoteSyncConfigured, isFalse);
+    });
+
+    test('returns false when url is empty', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: '',
+        supabaseAnonKey: 'anon-key',
+      );
+
+      expect(policy.isRemoteSyncConfigured, isFalse);
+    });
+
+    test('returns false when url is whitespace only', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: '   ',
+        supabaseAnonKey: 'anon-key',
+      );
+
+      expect(policy.isRemoteSyncConfigured, isFalse);
+    });
+
+    test('returns false when anon key is empty', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: '',
+      );
+
+      expect(policy.isRemoteSyncConfigured, isFalse);
+    });
+
+    test('returns false when anon key is whitespace only', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: '   ',
+      );
+
+      expect(policy.isRemoteSyncConfigured, isFalse);
+    });
+
+    test('returns true when enabled with non-empty url and key', () {
+      const policy = RemoteSyncRuntimePolicy(
+        isSupabaseEnabled: true,
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      );
+
+      expect(policy.isRemoteSyncConfigured, isTrue);
+    });
   });
 }
