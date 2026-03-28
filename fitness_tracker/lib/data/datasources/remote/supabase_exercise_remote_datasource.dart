@@ -1,6 +1,8 @@
+import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/exercise.dart';
 import '../../dtos/supabase/supabase_exercise_dto.dart';
 import 'exercise_remote_datasource.dart';
+import 'remote_datasource_guard.dart';
 import 'supabase_client_provider.dart';
 
 class SupabaseExerciseRemoteDataSource implements ExerciseRemoteDataSource {
@@ -17,105 +19,117 @@ class SupabaseExerciseRemoteDataSource implements ExerciseRemoteDataSource {
   bool get isConfigured => clientProvider.isConfigured;
 
   @override
-  Future<List<Exercise>> getAllExercises() async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return const <Exercise>[];
-    }
+  Future<List<Exercise>> getAllExercises() {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return const <Exercise>[];
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .order('updated_at', ascending: false);
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .order('updated_at', ascending: false);
 
-    final rows = _asMapList(data);
-    return rows.map(_mapRowToEntity).toList();
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
   }
 
   @override
-  Future<Exercise?> getExerciseById(String id) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return null;
-    }
+  Future<Exercise?> getExerciseById(String id) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return null;
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('id', id)
-        .maybeSingle();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('id', id)
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
-    }
+      if (data == null) {
+        return null;
+      }
 
-    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+      return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+    });
   }
 
   @override
-  Future<Exercise?> getExerciseByName(String name) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return null;
-    }
+  Future<Exercise?> getExerciseByName(String name) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return null;
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('name', name)
-        .maybeSingle();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('name', name)
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
-    }
+      if (data == null) {
+        return null;
+      }
 
-    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+      return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+    });
   }
 
   @override
-  Future<List<Exercise>> getExercisesForMuscle(String muscleGroup) async {
-    final exercises = await getAllExercises();
-    return exercises
-        .where((exercise) => exercise.muscleGroups.contains(muscleGroup))
-        .toList();
+  Future<List<Exercise>> getExercisesForMuscle(String muscleGroup) {
+    return RemoteDatasourceGuard.run(() async {
+      final exercises = await getAllExercises();
+      return exercises
+          .where((exercise) => exercise.muscleGroups.contains(muscleGroup))
+          .toList();
+    });
   }
 
   @override
-  Future<Exercise> upsertExercise(Exercise exercise) async {
-    final userId = _requireAuthenticatedUserId();
+  Future<Exercise> upsertExercise(Exercise exercise) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
 
-    final dto = SupabaseExerciseDto.fromEntity(exercise);
-    final payload = <String, dynamic>{
-      ...dto.toMap(),
-      _userIdColumn: userId,
-    };
+      final dto = SupabaseExerciseDto.fromEntity(exercise);
+      final payload = <String, dynamic>{
+        ...dto.toMap(),
+        _userIdColumn: userId,
+      };
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .upsert(payload)
-        .select()
-        .single();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .upsert(payload)
+          .select()
+          .single();
 
-    final row = Map<String, dynamic>.from(data as Map);
-    return _mapRowToEntity(row);
+      final row = Map<String, dynamic>.from(data as Map);
+      return _mapRowToEntity(row);
+    });
   }
 
   @override
   Future<void> deleteExercise({
     required String localId,
     String? serverId,
-  }) async {
-    final userId = _requireAuthenticatedUserId();
-    final remoteId = serverId ?? localId;
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
+      final remoteId = serverId ?? localId;
 
-    await clientProvider.client
-        .from(_tableName)
-        .delete()
-        .eq(_userIdColumn, userId)
-        .eq('id', remoteId);
+      await clientProvider.client
+          .from(_tableName)
+          .delete()
+          .eq(_userIdColumn, userId)
+          .eq('id', remoteId);
+    });
   }
 
   Exercise _mapRowToEntity(Map<String, dynamic> row) {
@@ -144,8 +158,8 @@ class SupabaseExerciseRemoteDataSource implements ExerciseRemoteDataSource {
   String _requireAuthenticatedUserId() {
     final userId = _currentUserIdOrNull();
     if (userId == null || userId.isEmpty) {
-      throw StateError(
-        'Supabase exercise access requires an authenticated user.',
+      throw const AuthSyncException(
+        'unauthenticated: exercise remote access requires an authenticated user',
       );
     }
 

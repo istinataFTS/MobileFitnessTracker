@@ -1,6 +1,8 @@
+import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/nutrition_log.dart';
 import '../../dtos/supabase/supabase_nutrition_log_dto.dart';
 import 'nutrition_log_remote_datasource.dart';
+import 'remote_datasource_guard.dart';
 import 'supabase_client_provider.dart';
 
 class SupabaseNutritionLogRemoteDataSource
@@ -19,41 +21,45 @@ class SupabaseNutritionLogRemoteDataSource
   bool get isConfigured => clientProvider.isConfigured;
 
   @override
-  Future<List<NutritionLog>> getAllLogs() async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return const <NutritionLog>[];
-    }
+  Future<List<NutritionLog>> getAllLogs() {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return const <NutritionLog>[];
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .order(_loggedAtColumn, ascending: false);
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .order(_loggedAtColumn, ascending: false);
 
-    final rows = _asMapList(data);
-    return rows.map(_mapRowToEntity).toList();
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
   }
 
   @override
-  Future<NutritionLog?> getLogById(String id) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return null;
-    }
+  Future<NutritionLog?> getLogById(String id) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return null;
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('id', id)
-        .maybeSingle();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('id', id)
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
-    }
+      if (data == null) {
+        return null;
+      }
 
-    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+      return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+    });
   }
 
   @override
@@ -68,75 +74,83 @@ class SupabaseNutritionLogRemoteDataSource
   Future<List<NutritionLog>> getLogsByDateRange(
     DateTime startDate,
     DateTime endDate,
-  ) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return const <NutritionLog>[];
-    }
+  ) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return const <NutritionLog>[];
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .gte(_loggedAtColumn, startDate.toIso8601String())
-        .lt(_loggedAtColumn, endDate.toIso8601String())
-        .order(_loggedAtColumn, ascending: false);
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .gte(_loggedAtColumn, startDate.toIso8601String())
+          .lt(_loggedAtColumn, endDate.toIso8601String())
+          .order(_loggedAtColumn, ascending: false);
 
-    final rows = _asMapList(data);
-    return rows.map(_mapRowToEntity).toList();
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
   }
 
   @override
-  Future<List<NutritionLog>> getLogsByMealId(String mealId) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return const <NutritionLog>[];
-    }
+  Future<List<NutritionLog>> getLogsByMealId(String mealId) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return const <NutritionLog>[];
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('meal_id', mealId)
-        .order(_loggedAtColumn, ascending: false);
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('meal_id', mealId)
+          .order(_loggedAtColumn, ascending: false);
 
-    final rows = _asMapList(data);
-    return rows.map(_mapRowToEntity).toList();
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
   }
 
   @override
-  Future<NutritionLog> upsertLog(NutritionLog log) async {
-    final userId = _requireAuthenticatedUserId();
+  Future<NutritionLog> upsertLog(NutritionLog log) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
 
-    final dto = SupabaseNutritionLogDto.fromEntity(log);
-    final payload = <String, dynamic>{
-      ...dto.toMap(),
-      _userIdColumn: userId,
-    };
+      final dto = SupabaseNutritionLogDto.fromEntity(log);
+      final payload = <String, dynamic>{
+        ...dto.toMap(),
+        _userIdColumn: userId,
+      };
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .upsert(payload)
-        .select()
-        .single();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .upsert(payload)
+          .select()
+          .single();
 
-    final row = Map<String, dynamic>.from(data as Map);
-    return _mapRowToEntity(row);
+      final row = Map<String, dynamic>.from(data as Map);
+      return _mapRowToEntity(row);
+    });
   }
 
   @override
   Future<void> deleteLog({
     required String localId,
     String? serverId,
-  }) async {
-    final userId = _requireAuthenticatedUserId();
-    final remoteId = serverId ?? localId;
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
+      final remoteId = serverId ?? localId;
 
-    await clientProvider.client
-        .from(_tableName)
-        .delete()
-        .eq(_userIdColumn, userId)
-        .eq('id', remoteId);
+      await clientProvider.client
+          .from(_tableName)
+          .delete()
+          .eq(_userIdColumn, userId)
+          .eq('id', remoteId);
+    });
   }
 
   NutritionLog _mapRowToEntity(Map<String, dynamic> row) {
@@ -165,8 +179,8 @@ class SupabaseNutritionLogRemoteDataSource
   String _requireAuthenticatedUserId() {
     final userId = _currentUserIdOrNull();
     if (userId == null || userId.isEmpty) {
-      throw StateError(
-        'Supabase nutrition log access requires an authenticated user.',
+      throw const AuthSyncException(
+        'unauthenticated: nutrition log remote access requires an authenticated user',
       );
     }
 

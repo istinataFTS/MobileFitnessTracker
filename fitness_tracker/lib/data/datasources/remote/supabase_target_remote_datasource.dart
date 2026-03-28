@@ -1,5 +1,7 @@
+import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/target.dart';
 import '../../dtos/supabase/supabase_target_dto.dart';
+import 'remote_datasource_guard.dart';
 import 'supabase_client_provider.dart';
 import 'target_remote_datasource.dart';
 
@@ -17,41 +19,45 @@ class SupabaseTargetRemoteDataSource implements TargetRemoteDataSource {
   bool get isConfigured => clientProvider.isConfigured;
 
   @override
-  Future<List<Target>> getAllTargets() async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return const <Target>[];
-    }
+  Future<List<Target>> getAllTargets() {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return const <Target>[];
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .order('updated_at', ascending: false);
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .order('updated_at', ascending: false);
 
-    final rows = _asMapList(data);
-    return rows.map(_mapRowToEntity).toList();
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
   }
 
   @override
-  Future<Target?> getTargetById(String id) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return null;
-    }
+  Future<Target?> getTargetById(String id) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return null;
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('id', id)
-        .maybeSingle();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('id', id)
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
-    }
+      if (data == null) {
+        return null;
+      }
 
-    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+      return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+    });
   }
 
   @override
@@ -59,61 +65,67 @@ class SupabaseTargetRemoteDataSource implements TargetRemoteDataSource {
     TargetType type,
     String categoryKey,
     TargetPeriod period,
-  ) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return null;
-    }
+  ) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _currentUserIdOrNull();
+      if (userId == null) {
+        return null;
+      }
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .select()
-        .eq(_userIdColumn, userId)
-        .eq('type', _targetTypeToStorage(type))
-        .eq('category_key', categoryKey)
-        .eq('period', _targetPeriodToStorage(period))
-        .maybeSingle();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId)
+          .eq('type', _targetTypeToStorage(type))
+          .eq('category_key', categoryKey)
+          .eq('period', _targetPeriodToStorage(period))
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
-    }
+      if (data == null) {
+        return null;
+      }
 
-    return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+      return _mapRowToEntity(Map<String, dynamic>.from(data as Map));
+    });
   }
 
   @override
-  Future<Target> upsertTarget(Target target) async {
-    final userId = _requireAuthenticatedUserId();
+  Future<Target> upsertTarget(Target target) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
 
-    final dto = SupabaseTargetDto.fromEntity(target);
-    final payload = <String, dynamic>{
-      ...dto.toMap(),
-      _userIdColumn: userId,
-    };
+      final dto = SupabaseTargetDto.fromEntity(target);
+      final payload = <String, dynamic>{
+        ...dto.toMap(),
+        _userIdColumn: userId,
+      };
 
-    final dynamic data = await clientProvider.client
-        .from(_tableName)
-        .upsert(payload)
-        .select()
-        .single();
+      final dynamic data = await clientProvider.client
+          .from(_tableName)
+          .upsert(payload)
+          .select()
+          .single();
 
-    final row = Map<String, dynamic>.from(data as Map);
-    return _mapRowToEntity(row);
+      final row = Map<String, dynamic>.from(data as Map);
+      return _mapRowToEntity(row);
+    });
   }
 
   @override
   Future<void> deleteTarget({
     required String localId,
     String? serverId,
-  }) async {
-    final userId = _requireAuthenticatedUserId();
-    final remoteId = serverId ?? localId;
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final userId = _requireAuthenticatedUserId();
+      final remoteId = serverId ?? localId;
 
-    await clientProvider.client
-        .from(_tableName)
-        .delete()
-        .eq(_userIdColumn, userId)
-        .eq('id', remoteId);
+      await clientProvider.client
+          .from(_tableName)
+          .delete()
+          .eq(_userIdColumn, userId)
+          .eq('id', remoteId);
+    });
   }
 
   Target _mapRowToEntity(Map<String, dynamic> row) {
@@ -142,7 +154,9 @@ class SupabaseTargetRemoteDataSource implements TargetRemoteDataSource {
   String _requireAuthenticatedUserId() {
     final userId = _currentUserIdOrNull();
     if (userId == null || userId.isEmpty) {
-      throw StateError('Supabase target access requires an authenticated user.');
+      throw const AuthSyncException(
+        'unauthenticated: target remote access requires an authenticated user',
+      );
     }
 
     return userId;
