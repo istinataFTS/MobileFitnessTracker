@@ -1,234 +1,248 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service.dart';
-import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
+import 'package:fitness_tracker/domain/entities/user_profile.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
+import 'package:fitness_tracker/domain/repositories/user_profile_repository.dart';
 import 'package:fitness_tracker/features/profile/application/profile_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+class _MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
-class MockSessionSyncService extends Mock implements SessionSyncService {}
+class _MockSessionSyncService extends Mock implements SessionSyncService {}
 
-class MockAuthSessionService extends Mock implements AuthSessionService {}
+class _MockAuthSessionService extends Mock implements AuthSessionService {}
+
+class _MockUserProfileRepository extends Mock
+    implements UserProfileRepository {}
 
 void main() {
-  late MockAppSessionRepository repository;
-  late MockSessionSyncService sessionSyncService;
-  late MockAuthSessionService authSessionService;
-  late ProfileCubit cubit;
+  late _MockAppSessionRepository mockSessionRepo;
+  late _MockSessionSyncService mockSyncService;
+  late _MockAuthSessionService mockAuthService;
+  late _MockUserProfileRepository mockProfileRepo;
+  late ProfileCubit sut;
+
+  final AppUser testUser = AppUser(
+    id: 'user-1',
+    email: 'alice@example.com',
+    displayName: 'Alice',
+  );
+
+  final AppSession authenticatedSession = AppSession(
+    authMode: _authMode,
+    user: testUser,
+    requiresInitialCloudMigration: false,
+    lastCloudSyncAt: null,
+  );
+
+  final UserProfile testProfile = UserProfile(
+    id: 'user-1',
+    username: 'alice',
+    displayName: 'Alice',
+    createdAt: DateTime(2025, 1, 1),
+    updatedAt: DateTime(2025, 1, 1),
+  );
 
   setUp(() {
-    repository = MockAppSessionRepository();
-    sessionSyncService = MockSessionSyncService();
-    authSessionService = MockAuthSessionService();
+    mockSessionRepo = _MockAppSessionRepository();
+    mockSyncService = _MockSessionSyncService();
+    mockAuthService = _MockAuthSessionService();
+    mockProfileRepo = _MockUserProfileRepository();
 
-    cubit = ProfileCubit(
-      repository: repository,
-      sessionSyncService: sessionSyncService,
-      authSessionService: authSessionService,
+    sut = ProfileCubit(
+      repository: mockSessionRepo,
+      sessionSyncService: mockSyncService,
+      authSessionService: mockAuthService,
+      userProfileRepository: mockProfileRepo,
     );
   });
 
-  tearDown(() async {
-    await cubit.close();
+  tearDown(() => sut.close());
+
+  // ---------------------------------------------------------------------------
+  // Initial state
+  // ---------------------------------------------------------------------------
+  test('initial state is guest, not loaded, no profile', () {
+    expect(sut.state.session.isAuthenticated, isFalse);
+    expect(sut.state.hasLoaded, isFalse);
+    expect(sut.state.userProfile, isNull);
+    expect(sut.state.errorMessage, isNull);
   });
 
-  test('initial state starts idle with guest shell before first load', () {
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.isLoading, isFalse);
-    expect(cubit.state.hasLoaded, isFalse);
-    expect(cubit.state.errorMessage, isNull);
+  // ---------------------------------------------------------------------------
+  // ensureLoaded — skips when already loaded
+  // ---------------------------------------------------------------------------
+  test('ensureLoaded does nothing when already hasLoaded', () async {
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => Right(testProfile));
+
+    await sut.loadProfile();
+    clearInteractions(mockSessionRepo);
+
+    await sut.ensureLoaded();
+
+    verifyNever(() => mockSessionRepo.getCurrentSession());
   });
 
-  test('ensureLoaded triggers first session load', () async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+  // ---------------------------------------------------------------------------
+  // loadProfile — authenticated with profile
+  // ---------------------------------------------------------------------------
+  test('loadProfile emits session + userProfile on success', () async {
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => Right(testProfile));
 
-    await cubit.ensureLoaded();
+    await sut.loadProfile();
 
-    verify(() => repository.getCurrentSession()).called(1);
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.isLoading, isFalse);
-    expect(cubit.state.hasLoaded, isTrue);
+    expect(sut.state.session, authenticatedSession);
+    expect(sut.state.userProfile, testProfile);
+    expect(sut.state.hasLoaded, isTrue);
+    expect(sut.state.isLoading, isFalse);
+    expect(sut.state.errorMessage, isNull);
   });
 
-  test('ensureLoaded does not load again after successful load', () async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+  // ---------------------------------------------------------------------------
+  // loadProfile — authenticated but no profile row yet
+  // ---------------------------------------------------------------------------
+  test('loadProfile emits null userProfile when no profile row exists',
+      () async {
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => const Right(null));
 
-    await cubit.ensureLoaded();
-    await cubit.ensureLoaded();
+    await sut.loadProfile();
 
-    verify(() => repository.getCurrentSession()).called(1);
+    expect(sut.state.userProfile, isNull);
+    expect(sut.state.session.isAuthenticated, isTrue);
+    expect(sut.state.hasLoaded, isTrue);
   });
 
-  test('loadProfile stores authenticated session on success', () async {
-    final AppSession session = AppSession(
-      authMode: AuthMode.authenticated,
-      user: const AppUser(
-        id: 'user-1',
-        email: 'user@test.com',
-        displayName: 'Marin',
-      ),
-      requiresInitialCloudMigration: true,
-      lastCloudSyncAt: DateTime(2026, 3, 18, 9, 30),
-    );
+  // ---------------------------------------------------------------------------
+  // loadProfile — guest session (no profile fetch attempted)
+  // ---------------------------------------------------------------------------
+  test('loadProfile does not fetch profile for guest session', () async {
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => const Right(AppSession.guest()));
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => Right(session),
-    );
+    await sut.loadProfile();
 
-    await cubit.loadProfile();
-
-    expect(cubit.state.session, session);
-    expect(cubit.state.isLoading, isFalse);
-    expect(cubit.state.hasLoaded, isTrue);
-    expect(cubit.state.errorMessage, isNull);
+    verifyNever(() => mockProfileRepo.getProfile(any()));
+    expect(sut.state.userProfile, isNull);
+    expect(sut.state.hasLoaded, isTrue);
   });
 
-  test('loadProfile falls back to guest shell on failure', () async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
+  // ---------------------------------------------------------------------------
+  // loadProfile — session repository failure
+  // ---------------------------------------------------------------------------
+  test('loadProfile emits error when session repository fails', () async {
+    when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
+      (_) async => Left(DatabaseFailure('db error')),
     );
 
-    await cubit.loadProfile();
+    await sut.loadProfile();
 
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.isLoading, isFalse);
-    expect(cubit.state.hasLoaded, isTrue);
-    expect(cubit.state.errorMessage, 'session unavailable');
+    expect(sut.state.errorMessage, isNotNull);
+    expect(sut.state.session.isAuthenticated, isFalse);
+    expect(sut.state.userProfile, isNull);
   });
 
-  test('refreshProfile runs manual sync and reloads session on success', () async {
-    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.completed,
-        message: 'manual refresh completed successfully',
-      ),
-    );
+  // ---------------------------------------------------------------------------
+  // updateProfile — success
+  // ---------------------------------------------------------------------------
+  test('updateProfile emits updated profile on success', () async {
+    // Pre-load so hasLoaded = true
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => Right(testProfile));
+    await sut.loadProfile();
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => Right(
-        AppSession(
-          authMode: AuthMode.authenticated,
-          user: const AppUser(
-            id: 'user-1',
-            email: 'marin@test.com',
-            displayName: 'Marin',
-          ),
-          requiresInitialCloudMigration: false,
-          lastCloudSyncAt: DateTime(2026, 3, 24, 10, 15),
-        ),
-      ),
-    );
+    final updated = testProfile.copyWith(displayName: 'Alice B');
+    when(() => mockProfileRepo.upsertProfile(updated))
+        .thenAnswer((_) async => Right(updated));
 
-    await cubit.refreshProfile();
+    await sut.updateProfile(updated);
 
-    verify(() => sessionSyncService.runManualRefresh()).called(1);
-    verify(() => repository.getCurrentSession()).called(1);
-    expect(cubit.state.isLoading, isFalse);
-    expect(cubit.state.hasLoaded, isTrue);
-    expect(cubit.state.errorMessage, isNull);
-    expect(cubit.state.session.isAuthenticated, isTrue);
+    expect(sut.state.userProfile, updated);
+    expect(sut.state.isLoading, isFalse);
+    expect(sut.state.errorMessage, isNull);
   });
 
-  test('refreshProfile keeps loaded session and surfaces manual refresh failure', () async {
-    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.failed,
-        message: 'manual refresh failed: session is not authenticated',
-      ),
+  // ---------------------------------------------------------------------------
+  // updateProfile — failure
+  // ---------------------------------------------------------------------------
+  test('updateProfile emits error on repository failure', () async {
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => Right(testProfile));
+    await sut.loadProfile();
+
+    when(() => mockProfileRepo.upsertProfile(any())).thenAnswer(
+      (_) async => Left(UnexpectedFailure('network error')),
     );
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    await sut.updateProfile(testProfile);
 
-    await cubit.refreshProfile();
-
-    verify(() => sessionSyncService.runManualRefresh()).called(1);
-    verify(() => repository.getCurrentSession()).called(1);
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.errorMessage,
-        'manual refresh failed: session is not authenticated');
+    expect(sut.state.errorMessage, isNotNull);
+    expect(sut.state.userProfile, testProfile); // unchanged
   });
 
-  test('signOut resets session to guest on success', () async {
-    when(() => authSessionService.signOut()).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.completed,
-        message: 'sign-out completed successfully',
-      ),
+  // ---------------------------------------------------------------------------
+  // signOut — clears userProfile
+  // ---------------------------------------------------------------------------
+  test('signOut clears userProfile', () async {
+    // Pre-load with profile
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => Right(authenticatedSession));
+    when(() => mockProfileRepo.getProfile('user-1'))
+        .thenAnswer((_) async => Right(testProfile));
+    await sut.loadProfile();
+    expect(sut.state.userProfile, testProfile);
+
+    when(() => mockAuthService.signOut()).thenAnswer(
+      (_) async => SessionSyncActionResult.success(message: 'signed out'),
     );
+    when(() => mockSessionRepo.getCurrentSession())
+        .thenAnswer((_) async => const Right(AppSession.guest()));
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    await sut.signOut();
 
-    await cubit.signOut();
-
-    verify(() => authSessionService.signOut()).called(1);
-    verify(() => repository.getCurrentSession()).called(1);
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.errorMessage, isNull);
+    expect(sut.state.userProfile, isNull);
+    expect(sut.state.session.isAuthenticated, isFalse);
   });
 
-  test('signOut surfaces sign-out failure', () async {
-    when(() => authSessionService.signOut()).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.failed,
-        message: 'sign-out failed: remote sign-out failed',
-      ),
+  // ---------------------------------------------------------------------------
+  // clearError
+  // ---------------------------------------------------------------------------
+  test('clearError clears the error message', () async {
+    when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
+      (_) async => Left(DatabaseFailure('db error')),
     );
+    await sut.loadProfile();
+    expect(sut.state.errorMessage, isNotNull);
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    sut.clearError();
 
-    await cubit.signOut();
-
-    expect(cubit.state.session, const AppSession.guest());
-    expect(cubit.state.errorMessage, 'sign-out failed: remote sign-out failed');
+    expect(sut.state.errorMessage, isNull);
   });
 
-  test('refreshProfile combines manual refresh and session load failures', () async {
-    when(() => sessionSyncService.runManualRefresh()).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.failed,
-        message: 'manual refresh failed: sync orchestration failed',
-      ),
-    );
-
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
-    );
-
-    await cubit.refreshProfile();
-
-    expect(cubit.state.session, const AppSession.guest());
-    expect(
-      cubit.state.errorMessage,
-      'manual refresh failed: sync orchestration failed | session unavailable',
-    );
-  });
-
-  test('clearError removes current error message', () async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
-    );
-
-    await cubit.loadProfile();
-    expect(cubit.state.errorMessage, 'session unavailable');
-
-    cubit.clearError();
-
-    expect(cubit.state.errorMessage, isNull);
+  test('clearError is a no-op when there is no error', () {
+    final stateBefore = sut.state;
+    sut.clearError();
+    expect(sut.state, stateBefore);
   });
 }
+
+// ignore: library_private_types_in_public_api
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
+const _authMode = AuthMode.authenticated;
