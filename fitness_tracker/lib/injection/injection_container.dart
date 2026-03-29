@@ -18,6 +18,7 @@ import '../data/sync/meal_sync_coordinator.dart';
 import '../data/sync/nutrition_log_sync_coordinator.dart';
 import '../data/sync/target_sync_coordinator.dart';
 import '../data/sync/workout_set_sync_coordinator.dart';
+import '../domain/repositories/user_profile_repository.dart';
 import '../features/home/application/home_bloc.dart';
 import '../features/home/application/usecases/load_home_dashboard_data.dart';
 import 'modules/register_core_module.dart';
@@ -25,6 +26,7 @@ import 'modules/register_exercises_module.dart';
 import 'modules/register_history_module.dart';
 import 'modules/register_meals_nutrition_module.dart';
 import 'modules/register_muscle_stimulus_module.dart';
+import 'modules/register_profile_module.dart';
 import 'modules/register_targets_module.dart';
 import 'modules/register_workout_module.dart';
 
@@ -39,6 +41,7 @@ Future<void> init({
   await sl.reset(dispose: true);
 
   registerCoreModule(sl);
+  registerProfileModule(sl);
   registerTargetsModule(sl);
   registerWorkoutModule(sl);
   registerExercisesModule(sl);
@@ -169,6 +172,7 @@ void _registerAppComposition(GetIt sl) {
     () => AuthSessionServiceImpl(
       authRemoteDataSource: sl(),
       sessionSyncService: sl(),
+      userProfileRepository: sl<UserProfileRepository>(),
     ),
   );
 

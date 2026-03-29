@@ -1,18 +1,22 @@
 import '../../core/logging/app_logger.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/user_profile.dart';
+import '../../domain/repositories/user_profile_repository.dart';
 import '../errors/sync_exceptions.dart';
 import '../session/session_sync_service.dart';
 import 'auth_session_service.dart';
 
 class AuthSessionServiceImpl implements AuthSessionService {
-  final AuthRemoteDataSource authRemoteDataSource;
-  final SessionSyncService sessionSyncService;
-
   const AuthSessionServiceImpl({
     required this.authRemoteDataSource,
     required this.sessionSyncService,
+    required this.userProfileRepository,
   });
+
+  final AuthRemoteDataSource authRemoteDataSource;
+  final SessionSyncService sessionSyncService;
+  final UserProfileRepository userProfileRepository;
 
   @override
   Future<AuthSessionActionResult> signInWithEmail({
@@ -77,7 +81,7 @@ class AuthSessionServiceImpl implements AuthSessionService {
       );
 
       // Email confirmation required — account created but no session yet.
-      // Return a success so the UI can show the "check your inbox" screen.
+      // The profile will be created after the user confirms and signs in.
       if (result.requiresEmailConfirmation) {
         return AuthSessionActionResult(
           status: AuthSessionActionStatus.completed,
@@ -88,12 +92,22 @@ class AuthSessionServiceImpl implements AuthSessionService {
         );
       }
 
-      // No email confirmation required — establish the local session now.
-      return await _establishSession(
+      // No email confirmation required — establish session then create profile.
+      final sessionResult = await _establishSession(
         user: result.user,
         successMessage: 'sign-up completed successfully',
         actionLabel: 'sign-up',
       );
+
+      if (sessionResult.isCompleted) {
+        await _createInitialProfile(
+          userId: result.user.id,
+          username: normalizedUsername,
+          displayName: result.user.displayName,
+        );
+      }
+
+      return sessionResult;
     } catch (error, stackTrace) {
       AppLogger.warning(
         'Remote sign-up failed for $normalizedEmail: $error',
@@ -120,8 +134,6 @@ class AuthSessionServiceImpl implements AuthSessionService {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /// Calls [sessionSyncService.establishAuthenticatedSession] and maps the
-  /// result to an [AuthSessionActionResult].
   Future<AuthSessionActionResult> _establishSession({
     required AppUser user,
     required String successMessage,
@@ -139,8 +151,7 @@ class AuthSessionServiceImpl implements AuthSessionService {
 
       return AuthSessionActionResult(
         status: AuthSessionActionStatus.failed,
-        message:
-            '$actionLabel succeeded but session initialization failed: '
+        message: '$actionLabel succeeded but session initialization failed: '
             '${sessionResult.message}',
         user: user,
         sessionResult: sessionResult,
@@ -177,7 +188,36 @@ class AuthSessionServiceImpl implements AuthSessionService {
     );
   }
 
-  /// Maps typed sync exceptions to user-facing messages.
+  /// Creates the initial [UserProfile] row after a successful sign-up.
+  /// Best-effort: logs failures but never blocks the sign-up result.
+  Future<void> _createInitialProfile({
+    required String userId,
+    required String username,
+    String? displayName,
+  }) async {
+    final now = DateTime.now();
+    final profile = UserProfile(
+      id: userId,
+      username: username,
+      displayName: displayName,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final result = await userProfileRepository.upsertProfile(profile);
+
+    result.fold(
+      (failure) => AppLogger.warning(
+        'Best-effort profile creation failed for $userId: ${failure.message}',
+        category: 'auth',
+      ),
+      (_) => AppLogger.info(
+        'Initial profile created for $userId (@$username)',
+        category: 'auth',
+      ),
+    );
+  }
+
   static String _resolveErrorMessage(Object error, {required String action}) {
     if (error is AuthSyncException) {
       return '$action failed: ${error.message}';

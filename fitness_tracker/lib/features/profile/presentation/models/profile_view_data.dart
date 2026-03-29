@@ -13,6 +13,8 @@ class ProfilePageViewData extends Equatable {
     required this.deferredItems,
     required this.isLoading,
     required this.errorMessage,
+    this.username,
+    this.bio,
   });
 
   final String title;
@@ -27,6 +29,12 @@ class ProfilePageViewData extends Equatable {
   final bool isLoading;
   final String? errorMessage;
 
+  /// Populated only when an authenticated profile has been loaded.
+  final String? username;
+
+  /// Populated only when the profile has a bio set.
+  final String? bio;
+
   @override
   List<Object?> get props => <Object?>[
         title,
@@ -40,6 +48,8 @@ class ProfilePageViewData extends Equatable {
         deferredItems,
         isLoading,
         errorMessage,
+        username,
+        bio,
       ];
 }
 

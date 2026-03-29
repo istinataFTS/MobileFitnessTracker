@@ -1,5 +1,6 @@
 import '../../../../core/constants/app_info.dart';
 import '../../../../domain/entities/app_session.dart';
+import '../../../../domain/entities/user_profile.dart';
 import '../../application/profile_cubit.dart';
 import '../models/profile_view_data.dart';
 
@@ -8,40 +9,60 @@ class ProfileViewDataMapper {
 
   static ProfilePageViewData map(ProfileState state) {
     final AppSession session = state.session;
-    final String? displayName = session.user?.displayName?.trim();
-    final String? email = session.user?.email.trim();
+    final UserProfile? profile = state.userProfile;
 
-    final String title = session.isAuthenticated
-        ? ((displayName != null && displayName.isNotEmpty)
-            ? displayName
-            : 'Signed-in User')
-        : 'Guest';
+    // ---------------------------------------------------------------------------
+    // Title / subtitle
+    // Prefer real profile data; fall back to auth user fields; then guest label.
+    // ---------------------------------------------------------------------------
+    final String title = _resolveTitle(session, profile);
+    final String subtitle = _resolveSubtitle(session, profile);
 
-    final String subtitle = session.isAuthenticated
-        ? ((email != null && email.isNotEmpty)
-            ? email
-            : 'Authenticated session')
-        : 'Profile features will expand after auth is enabled';
-
+    // ---------------------------------------------------------------------------
+    // Session / account mode copy
+    // ---------------------------------------------------------------------------
     final String sessionBannerMessage = session.isAuthenticated
-        ? 'This page is intentionally thin. The real profile should attach to authenticated server data, not local placeholders.'
-        : 'You are currently in guest mode. This page is ready for auth states now, while keeping profile details deferred until Supabase-backed accounts are in place.';
+        ? 'Your data is backed by the cloud and stays in sync across devices.'
+        : 'You are in guest mode. Sign in to enable cloud sync and social features.';
 
-    final String accountModeTitle = session.isAuthenticated
-        ? 'Signed-in profile shell'
-        : 'Guest profile shell';
+    final String accountModeTitle =
+        session.isAuthenticated ? 'Cloud account' : 'Guest account';
 
     final String accountModeSubtitle = session.isAuthenticated
-        ? 'Server-owned profile fields can attach here once auth is live'
-        : 'Ready for auth, identity, and cloud sync later';
+        ? 'Data is owned and synced with your authenticated account'
+        : 'Data is stored locally only — sign in to back it up';
 
-    final String cloudMigrationSubtitle = session.requiresInitialCloudMigration
-        ? 'This session is marked as needing an initial cloud migration'
-        : 'No initial cloud migration pending';
+    final String cloudMigrationSubtitle =
+        session.requiresInitialCloudMigration
+            ? 'Waiting to upload local data to the cloud'
+            : 'No initial migration pending';
 
     final String lastSyncSubtitle = session.lastCloudSyncAt != null
         ? _formatDateTime(session.lastCloudSyncAt!)
         : 'No successful cloud sync recorded yet';
+
+    // ---------------------------------------------------------------------------
+    // Deferred items — only list things genuinely not yet built
+    // ---------------------------------------------------------------------------
+    final List<ProfileDeferredItemViewData> deferredItems =
+        session.isAuthenticated
+            ? const <ProfileDeferredItemViewData>[
+                ProfileDeferredItemViewData(
+                  title: 'Avatar',
+                  subtitle: 'Image upload requires cloud storage integration',
+                ),
+                ProfileDeferredItemViewData(
+                  title: 'Social presence',
+                  subtitle:
+                      'Followers, following, and public profile coming in Phase 5',
+                ),
+              ]
+            : const <ProfileDeferredItemViewData>[
+                ProfileDeferredItemViewData(
+                  title: 'All profile features',
+                  subtitle: 'Sign in to unlock cloud-backed profile data',
+                ),
+              ];
 
     return ProfilePageViewData(
       title: title,
@@ -57,26 +78,37 @@ class ProfileViewDataMapper {
           subtitle: AppInfo.versionLabel,
         ),
       ],
-      deferredItems: const <ProfileDeferredItemViewData>[
-        ProfileDeferredItemViewData(
-          title: 'Edit profile',
-          subtitle:
-              'Wait until profile data is owned by the authenticated user',
-        ),
-        ProfileDeferredItemViewData(
-          title: 'Password and sign out',
-          subtitle:
-              'Keep these tied to the real auth provider, not a local placeholder',
-        ),
-        ProfileDeferredItemViewData(
-          title: 'Avatar, handle, privacy, social presence',
-          subtitle:
-              'These are server-shaped and should land after Supabase auth',
-        ),
-      ],
+      deferredItems: deferredItems,
       isLoading: state.isLoading && !state.hasLoaded,
       errorMessage: state.errorMessage,
+      username: profile?.username,
+      bio: profile?.bio,
     );
+  }
+
+  static String _resolveTitle(AppSession session, UserProfile? profile) {
+    if (!session.isAuthenticated) {
+      return 'Guest';
+    }
+
+    final String? name =
+        profile?.displayName?.trim().nullIfEmpty() ??
+        session.user?.displayName?.trim().nullIfEmpty();
+
+    return name ?? profile?.username ?? 'Signed-in User';
+  }
+
+  static String _resolveSubtitle(AppSession session, UserProfile? profile) {
+    if (!session.isAuthenticated) {
+      return 'Sign in to unlock cloud sync and social features';
+    }
+
+    final String? handle = profile?.username;
+    if (handle != null && handle.isNotEmpty) {
+      return '@$handle';
+    }
+
+    return session.user?.email.trim() ?? 'Authenticated session';
   }
 
   static String _formatDateTime(DateTime value) {
@@ -87,4 +119,8 @@ class ProfileViewDataMapper {
     final String minute = value.minute.toString().padLeft(2, '0');
     return '$year-$month-$day $hour:$minute';
   }
+}
+
+extension _NullIfEmpty on String {
+  String? nullIfEmpty() => isEmpty ? null : this;
 }

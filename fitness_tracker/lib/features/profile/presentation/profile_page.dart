@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/auth/auth_session_service.dart';
 import '../../../core/session/session_sync_service.dart';
 import '../../../core/themes/app_theme.dart';
+import '../../../domain/entities/user_profile.dart';
 import '../../../domain/repositories/app_session_repository.dart';
+import '../../../domain/repositories/user_profile_repository.dart';
 import '../../../features/auth/presentation/sign_in_page.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
@@ -43,6 +45,7 @@ class ProfilePage extends StatelessWidget {
         repository: di.sl<AppSessionRepository>(),
         sessionSyncService: di.sl<SessionSyncService>(),
         authSessionService: di.sl<AuthSessionService>(),
+        userProfileRepository: di.sl<UserProfileRepository>(),
       ),
       child: const _ProfileView(),
     );
@@ -61,10 +64,7 @@ class _ProfileViewState extends State<_ProfileView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       context.read<ProfileCubit>().ensureLoaded();
     });
   }
@@ -76,14 +76,10 @@ class _ProfileViewState extends State<_ProfileView> {
           previous.errorMessage != current.errorMessage,
       listener: (BuildContext context, ProfileState state) {
         final String? errorMessage = state.errorMessage;
-        if (errorMessage == null || errorMessage.isEmpty) {
-          return;
-        }
+        if (errorMessage == null || errorMessage.isEmpty) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-          ),
+          SnackBar(content: Text(errorMessage)),
         );
 
         context.read<ProfileCubit>().clearError();
@@ -97,6 +93,19 @@ class _ProfileViewState extends State<_ProfileView> {
             title: const Text('Profile'),
             automaticallyImplyLeading: false,
             actions: [
+              if (state.session.isAuthenticated &&
+                  state.userProfile != null) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit profile',
+                  onPressed: state.isLoading
+                      ? null
+                      : () => _showEditProfileSheet(
+                            context,
+                            state.userProfile!,
+                          ),
+                ),
+              ],
               if (!state.session.isAuthenticated)
                 IconButton(
                   icon: const Icon(Icons.login),
@@ -108,9 +117,7 @@ class _ProfileViewState extends State<_ProfileView> {
                       ),
                     );
 
-                    if (!mounted) {
-                      return;
-                    }
+                    if (!mounted) return;
 
                     if (didSignIn == true) {
                       await context.read<ProfileCubit>().loadProfile();
@@ -161,6 +168,133 @@ class _ProfileViewState extends State<_ProfileView> {
           ),
         );
       },
+    );
+  }
+
+  void _showEditProfileSheet(BuildContext context, UserProfile profile) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.backgroundDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _EditProfileSheet(
+        profile: profile,
+        onSave: (updated) =>
+            context.read<ProfileCubit>().updateProfile(updated),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Edit profile bottom sheet
+// ---------------------------------------------------------------------------
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({
+    required this.profile,
+    required this.onSave,
+  });
+
+  final UserProfile profile;
+  final void Function(UserProfile updated) onSave;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _bioController;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayNameController =
+        TextEditingController(text: widget.profile.displayName ?? '');
+    _bioController = TextEditingController(text: widget.profile.bio ?? '');
+  }
+
+  @override
+  void dispose() {
+    _displayNameController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String displayName = _displayNameController.text.trim();
+    final String bio = _bioController.text.trim();
+
+    final UserProfile updated = widget.profile.copyWith(
+      displayName: displayName.isNotEmpty ? displayName : null,
+      clearDisplayName: displayName.isEmpty,
+      bio: bio.isNotEmpty ? bio : null,
+      clearBio: bio.isEmpty,
+      updatedAt: DateTime.now(),
+    );
+
+    widget.onSave(updated);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Edit Profile',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '@${widget.profile.username}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _displayNameController,
+            decoration: const InputDecoration(
+              labelText: 'Display name',
+              hintText: 'Your name as shown to others',
+            ),
+            textInputAction: TextInputAction.next,
+            maxLength: 50,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _bioController,
+            decoration: const InputDecoration(
+              labelText: 'Bio',
+              hintText: 'A short description about yourself',
+            ),
+            maxLines: 3,
+            maxLength: 160,
+            textInputAction: TextInputAction.done,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _submit,
+            child: const Text('Save'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
     );
   }
 }
