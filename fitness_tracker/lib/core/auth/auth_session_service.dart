@@ -12,11 +12,14 @@ class AuthSessionActionResult {
   final AppUser? user;
   final SessionSyncActionResult? sessionResult;
 
+  final bool requiresEmailConfirmation;
+
   const AuthSessionActionResult({
     required this.status,
     required this.message,
     this.user,
     this.sessionResult,
+    this.requiresEmailConfirmation = false,
   });
 
   bool get isSuccess => status == AuthSessionActionStatus.completed;
@@ -24,9 +27,18 @@ class AuthSessionActionResult {
 }
 
 abstract class AuthSessionService {
+  /// Authenticates an existing user and establishes the local session.
   Future<AuthSessionActionResult> signInWithEmail({
     required String email,
     required String password,
+  });
+
+  /// Registers a new user and, when email confirmation is not required,
+  /// establishes the local session immediately.
+  Future<AuthSessionActionResult> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
   });
 
   Future<SessionSyncActionResult> signOut();

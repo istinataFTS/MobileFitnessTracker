@@ -1,13 +1,13 @@
+import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/app_user.dart';
 import 'auth_remote_datasource.dart';
+import 'remote_datasource_guard.dart';
 import 'supabase_client_provider.dart';
 
 class SupabaseAuthRemoteDataSource implements AuthRemoteDataSource {
   final SupabaseClientProvider clientProvider;
 
-  const SupabaseAuthRemoteDataSource({
-    required this.clientProvider,
-  });
+  const SupabaseAuthRemoteDataSource({required this.clientProvider});
 
   @override
   bool get isConfigured => clientProvider.isConfigured;
@@ -30,23 +30,67 @@ class SupabaseAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<AppUser> signInWithEmail({
     required String email,
     required String password,
-  }) async {
-    final response = await clientProvider.client.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final response = await clientProvider.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
 
-    final user = response.user;
-    if (user == null) {
-      throw StateError('Supabase sign-in completed without a user.');
-    }
+      final user = response.user;
+      if (user == null) {
+        throw const AuthSyncException(
+          'sign-in completed without a user',
+        );
+      }
 
-    return _mapUser(user);
+      return _mapUser(user);
+    });
+  }
+
+  @override
+  Future<SignUpResult> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final response = await clientProvider.client.auth.signUp(
+        email: email,
+        password: password,
+        data: <String, dynamic>{
+          'display_name': username,
+          'username': username,
+        },
+      );
+
+      final user = response.user;
+      if (user == null) {
+        throw const AuthSyncException(
+          'sign-up completed without a user',
+        );
+      }
+
+      return SignUpResult(
+        user: _mapUser(user),
+        // When Supabase requires email confirmation, no session is issued.
+        requiresEmailConfirmation: response.session == null,
+      );
+    });
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) {
+    return RemoteDatasourceGuard.run(() async {
+      await clientProvider.client.auth.resetPasswordForEmail(email);
+    });
   }
 
   @override
   Future<void> signOut() {
-    return clientProvider.client.auth.signOut();
+    return RemoteDatasourceGuard.run(() async {
+      await clientProvider.client.auth.signOut();
+    });
   }
 
   AppUser _mapUser(dynamic user) {

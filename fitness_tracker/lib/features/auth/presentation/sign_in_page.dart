@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/auth/auth_session_service.dart';
 import '../../../injection/injection_container.dart' as di;
 import '../application/sign_in_cubit.dart';
+import 'sign_up_page.dart';
 
 class SignInPage extends StatelessWidget {
   const SignInPage({super.key});
@@ -59,9 +60,7 @@ class _SignInViewState extends State<_SignInView> {
       listener: (context, state) {
         if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.errorMessage!),
-            ),
+            SnackBar(content: Text(state.errorMessage!)),
           );
           context.read<SignInCubit>().clearError();
         }
@@ -72,9 +71,7 @@ class _SignInViewState extends State<_SignInView> {
       },
       builder: (context, state) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Sign in'),
-          ),
+          appBar: AppBar(title: const Text('Sign in')),
           body: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -88,9 +85,8 @@ class _SignInViewState extends State<_SignInView> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                      ),
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(labelText: 'Email'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -98,28 +94,31 @@ class _SignInViewState extends State<_SignInView> {
                       controller: _passwordController,
                       obscureText: true,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                      ),
+                      textInputAction: TextInputAction.done,
+                      decoration:
+                          const InputDecoration(labelText: 'Password'),
+                      onFieldSubmitted: (_) => _submit(context, state),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       key: SignInPage.submitButtonKey,
                       onPressed: state.isSubmitting
                           ? null
-                          : () {
-                              context.read<SignInCubit>().submit(
-                                    email: _emailController.text,
-                                    password: _passwordController.text,
-                                  );
-                            },
+                          : () => _submit(context, state),
                       child: state.isSubmitting
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text('Continue'),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => _navigateToSignUp(context),
+                      child: const Text("Don't have an account? Sign up"),
                     ),
                   ],
                 ),
@@ -129,5 +128,24 @@ class _SignInViewState extends State<_SignInView> {
         );
       },
     );
+  }
+
+  void _submit(BuildContext context, SignInState state) {
+    context.read<SignInCubit>().submit(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
+  }
+
+  Future<void> _navigateToSignUp(BuildContext context) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const SignUpPage()),
+    );
+
+    // Sign-up succeeded and a session was established — propagate the
+    // success back up the navigation stack the same way sign-in does.
+    if (result == true && context.mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 }

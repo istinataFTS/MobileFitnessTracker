@@ -61,26 +61,12 @@ Future<void> resetDependencies() {
 }
 
 void _registerAppComposition(GetIt sl) {
+  // Migration and sync order must respect FK dependencies in the remote schema:
+  //   exercises → meals → workout_sets → nutrition_logs → targets
+  // workout_sets.exercise_id → exercises, nutrition_logs.meal_id → meals.
+  // Syncing a dependent table before its parent causes FK violations in Supabase.
   sl.registerLazySingleton<List<InitialCloudMigrationStep>>(
     () => <InitialCloudMigrationStep>[
-      InitialCloudMigrationStep(
-        key: 'targets',
-        run: (userId) async {
-          await sl<TargetSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
-          await sl<TargetSyncCoordinator>().syncPendingChanges();
-        },
-      ),
-      InitialCloudMigrationStep(
-        key: 'workout_sets',
-        run: (userId) async {
-          await sl<WorkoutSetSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
-          await sl<WorkoutSetSyncCoordinator>().syncPendingChanges();
-        },
-      ),
       InitialCloudMigrationStep(
         key: 'exercises',
         run: (userId) async {
@@ -100,11 +86,29 @@ void _registerAppComposition(GetIt sl) {
         },
       ),
       InitialCloudMigrationStep(
+        key: 'workout_sets',
+        run: (userId) async {
+          await sl<WorkoutSetSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<WorkoutSetSyncCoordinator>().syncPendingChanges();
+        },
+      ),
+      InitialCloudMigrationStep(
         key: 'nutrition_logs',
         run: (userId) async {
           await sl<NutritionLogSyncCoordinator>()
               .prepareForInitialCloudMigration(userId);
           await sl<NutritionLogSyncCoordinator>().syncPendingChanges();
+        },
+      ),
+      InitialCloudMigrationStep(
+        key: 'targets',
+        run: (userId) async {
+          await sl<TargetSyncCoordinator>().prepareForInitialCloudMigration(
+            userId,
+          );
+          await sl<TargetSyncCoordinator>().syncPendingChanges();
         },
       ),
     ],
@@ -120,14 +124,6 @@ void _registerAppComposition(GetIt sl) {
   sl.registerLazySingleton<List<SyncFeature>>(
     () => <SyncFeature>[
       SyncFeature(
-        name: 'targets',
-        syncPendingChanges: sl<TargetSyncCoordinator>().syncPendingChanges,
-      ),
-      SyncFeature(
-        name: 'workout_sets',
-        syncPendingChanges: sl<WorkoutSetSyncCoordinator>().syncPendingChanges,
-      ),
-      SyncFeature(
         name: 'exercises',
         syncPendingChanges: sl<ExerciseSyncCoordinator>().syncPendingChanges,
       ),
@@ -136,9 +132,17 @@ void _registerAppComposition(GetIt sl) {
         syncPendingChanges: sl<MealSyncCoordinator>().syncPendingChanges,
       ),
       SyncFeature(
+        name: 'workout_sets',
+        syncPendingChanges: sl<WorkoutSetSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
         name: 'nutrition_logs',
         syncPendingChanges:
             sl<NutritionLogSyncCoordinator>().syncPendingChanges,
+      ),
+      SyncFeature(
+        name: 'targets',
+        syncPendingChanges: sl<TargetSyncCoordinator>().syncPendingChanges,
       ),
     ],
   );

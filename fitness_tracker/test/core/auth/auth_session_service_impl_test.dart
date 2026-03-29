@@ -1,7 +1,6 @@
-import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service_impl.dart';
-import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/errors/sync_exceptions.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
@@ -23,6 +22,21 @@ void main() {
     displayName: 'Marin',
   );
 
+  const sessionCompleted = SessionSyncActionResult(
+    status: SessionSyncActionStatus.completed,
+    message: 'authenticated session established',
+  );
+
+  const sessionFailed = SessionSyncActionResult(
+    status: SessionSyncActionStatus.failed,
+    message: 'initial sign-in sync failed: sync failed',
+  );
+
+  const sessionSkipped = SessionSyncActionResult(
+    status: SessionSyncActionStatus.skipped,
+    message: 'initial sign-in sync skipped: migration pending',
+  );
+
   setUp(() {
     authRemoteDataSource = MockAuthRemoteDataSource();
     sessionSyncService = MockSessionSyncService();
@@ -33,126 +47,302 @@ void main() {
     );
   });
 
-  test('signInWithEmail authenticates remotely then establishes app session',
-      () async {
-    when(
-      () => authRemoteDataSource.signInWithEmail(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer((_) async => const Right(user));
+  // ---------------------------------------------------------------------------
+  // signInWithEmail
+  // ---------------------------------------------------------------------------
 
-    when(
-      () => sessionSyncService.establishAuthenticatedSession(user),
-    ).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.completed,
-        message: 'authenticated session established',
-      ),
-    );
+  group('signInWithEmail', () {
+    test('authenticates remotely then establishes app session', () async {
+      when(
+        () => authRemoteDataSource.signInWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => user);
 
-    final result = await service.signInWithEmail(
-      email: ' marin@test.com ',
-      password: 'secret-password',
-    );
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionCompleted);
 
-    expect(result.isSuccess, isTrue);
-    expect(result.message, 'sign-in completed successfully');
-    expect(result.user, user);
+      final result = await service.signInWithEmail(
+        email: ' marin@test.com ',
+        password: 'secret-password',
+      );
 
-    verify(
-      () => authRemoteDataSource.signInWithEmail(
+      expect(result.isSuccess, isTrue);
+      expect(result.message, 'sign-in completed successfully');
+      expect(result.user, user);
+      expect(result.requiresEmailConfirmation, isFalse);
+
+      verify(
+        () => authRemoteDataSource.signInWithEmail(
+          email: 'marin@test.com',
+          password: 'secret-password',
+        ),
+      ).called(1);
+
+      verify(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).called(1);
+    });
+
+    test('returns failure with auth message when credentials are wrong',
+        () async {
+      when(
+        () => authRemoteDataSource.signInWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer(
+        (_) async => throw const AuthSyncException('invalid login credentials'),
+      );
+
+      final result = await service.signInWithEmail(
+        email: 'marin@test.com',
+        password: 'bad-password',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'sign-in failed: invalid login credentials',
+      );
+
+      verifyNever(
+        () => sessionSyncService.establishAuthenticatedSession(any()),
+      );
+    });
+
+    test('returns network message when network is unavailable', () async {
+      when(
+        () => authRemoteDataSource.signInWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer(
+        (_) async => throw const NetworkSyncException('connection refused'),
+      );
+
+      final result = await service.signInWithEmail(
         email: 'marin@test.com',
         password: 'secret-password',
-      ),
-    ).called(1);
+      );
 
-    verify(
-      () => sessionSyncService.establishAuthenticatedSession(user),
-    ).called(1);
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'Network unavailable. Please check your connection.',
+      );
+    });
+
+    test('returns failure when session initialization fails after sign-in',
+        () async {
+      when(
+        () => authRemoteDataSource.signInWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => user);
+
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionFailed);
+
+      final result = await service.signInWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'sign-in succeeded but session initialization failed: '
+        'initial sign-in sync failed: sync failed',
+      );
+      expect(result.user, user);
+    });
+
+    test('returns failure when session initialization is skipped', () async {
+      when(
+        () => authRemoteDataSource.signInWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => user);
+
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionSkipped);
+
+      final result = await service.signInWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'sign-in succeeded but session initialization was skipped: '
+        'initial sign-in sync skipped: migration pending',
+      );
+      expect(result.user, user);
+    });
   });
 
-  test('returns failure when remote sign-in fails', () async {
-    when(
-      () => authRemoteDataSource.signInWithEmail(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer(
-      (_) async => const Left(AuthFailure(message: 'invalid credentials')),
+  // ---------------------------------------------------------------------------
+  // signUpWithEmail
+  // ---------------------------------------------------------------------------
+
+  group('signUpWithEmail', () {
+    const signUpResult = SignUpResult(
+      user: user,
+      requiresEmailConfirmation: false,
     );
 
-    final result = await service.signInWithEmail(
-      email: 'marin@test.com',
-      password: 'bad-password',
+    const signUpResultWithConfirmation = SignUpResult(
+      user: user,
+      requiresEmailConfirmation: true,
     );
 
-    expect(result.isFailure, isTrue);
-    expect(result.message, 'sign-in failed: invalid credentials');
+    test('registers and establishes session when no email confirmation needed',
+        () async {
+      when(
+        () => authRemoteDataSource.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer((_) async => signUpResult);
 
-    verifyNever(
-      () => sessionSyncService.establishAuthenticatedSession(any()),
-    );
-  });
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionCompleted);
 
-  test('returns failure when session initialization fails after remote sign-in',
-      () async {
-    when(
-      () => authRemoteDataSource.signInWithEmail(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer((_) async => const Right(user));
+      final result = await service.signUpWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+        username: 'marin',
+      );
 
-    when(
-      () => sessionSyncService.establishAuthenticatedSession(user),
-    ).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.failed,
-        message: 'initial sign-in sync failed: sync failed',
-      ),
-    );
+      expect(result.isSuccess, isTrue);
+      expect(result.message, 'sign-up completed successfully');
+      expect(result.requiresEmailConfirmation, isFalse);
+      expect(result.user, user);
 
-    final result = await service.signInWithEmail(
-      email: 'marin@test.com',
-      password: 'secret-password',
-    );
+      verify(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).called(1);
+    });
 
-    expect(result.isFailure, isTrue);
-    expect(
-      result.message,
-      'sign-in succeeded but session initialization failed: initial sign-in sync failed: sync failed',
-    );
-    expect(result.user, user);
-  });
+    test(
+        'returns success with requiresEmailConfirmation when backend requires '
+        'confirmation', () async {
+      when(
+        () => authRemoteDataSource.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer((_) async => signUpResultWithConfirmation);
 
-  test('returns failure when session initialization is skipped', () async {
-    when(
-      () => authRemoteDataSource.signInWithEmail(
-        email: any(named: 'email'),
-        password: any(named: 'password'),
-      ),
-    ).thenAnswer((_) async => const Right(user));
+      final result = await service.signUpWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+        username: 'marin',
+      );
 
-    when(
-      () => sessionSyncService.establishAuthenticatedSession(user),
-    ).thenAnswer(
-      (_) async => const SessionSyncActionResult(
-        status: SessionSyncActionStatus.skipped,
-        message: 'initial sign-in sync skipped: migration pending',
-      ),
-    );
+      expect(result.isSuccess, isTrue);
+      expect(result.requiresEmailConfirmation, isTrue);
+      expect(
+        result.message,
+        contains('check your email'),
+      );
 
-    final result = await service.signInWithEmail(
-      email: 'marin@test.com',
-      password: 'secret-password',
-    );
+      // Session must NOT be established while email is unconfirmed.
+      verifyNever(
+        () => sessionSyncService.establishAuthenticatedSession(any()),
+      );
+    });
 
-    expect(result.isFailure, isTrue);
-    expect(
-      result.message,
-      'sign-in succeeded but session initialization was skipped: initial sign-in sync skipped: migration pending',
-    );
-    expect(result.user, user);
+    test('returns failure with auth message when sign-up is rejected',
+        () async {
+      when(
+        () => authRemoteDataSource.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            throw const AuthSyncException('email already registered'),
+      );
+
+      final result = await service.signUpWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+        username: 'marin',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(result.message, 'sign-up failed: email already registered');
+
+      verifyNever(
+        () => sessionSyncService.establishAuthenticatedSession(any()),
+      );
+    });
+
+    test('returns network message when network is unavailable during sign-up',
+        () async {
+      when(
+        () => authRemoteDataSource.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer(
+        (_) async => throw const NetworkSyncException('no route to host'),
+      );
+
+      final result = await service.signUpWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+        username: 'marin',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'Network unavailable. Please check your connection.',
+      );
+    });
+
+    test(
+        'returns failure when sign-up succeeds but session initialization fails',
+        () async {
+      when(
+        () => authRemoteDataSource.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer((_) async => signUpResult);
+
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionFailed);
+
+      final result = await service.signUpWithEmail(
+        email: 'marin@test.com',
+        password: 'secret-password',
+        username: 'marin',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        contains('sign-up succeeded but session initialization failed'),
+      );
+      expect(result.user, user);
+    });
   });
 }

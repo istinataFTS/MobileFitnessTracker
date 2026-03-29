@@ -8,9 +8,7 @@ class NoopAuthRemoteDataSource implements AuthRemoteDataSource {
   bool get isConfigured => false;
 
   @override
-  Future<AppUser?> getCurrentUser() async {
-    return null;
-  }
+  Future<AppUser?> getCurrentUser() async => null;
 
   @override
   Future<AppUser> signInWithEmail({
@@ -18,6 +16,20 @@ class NoopAuthRemoteDataSource implements AuthRemoteDataSource {
     required String password,
   }) async {
     throw UnsupportedError('Remote auth is not configured.');
+  }
+
+  @override
+  Future<SignUpResult> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    throw UnsupportedError('Remote auth is not configured.');
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    // No-op: password reset is not available without a remote backend.
   }
 
   @override
