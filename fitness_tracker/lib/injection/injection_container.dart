@@ -27,6 +27,7 @@ import 'modules/register_history_module.dart';
 import 'modules/register_meals_nutrition_module.dart';
 import 'modules/register_muscle_stimulus_module.dart';
 import 'modules/register_profile_module.dart';
+import 'modules/register_social_module.dart';
 import 'modules/register_targets_module.dart';
 import 'modules/register_workout_module.dart';
 
@@ -42,6 +43,7 @@ Future<void> init({
 
   registerCoreModule(sl);
   registerProfileModule(sl);
+  registerSocialModule(sl);
   registerTargetsModule(sl);
   registerWorkoutModule(sl);
   registerExercisesModule(sl);
@@ -66,51 +68,40 @@ Future<void> resetDependencies() {
 void _registerAppComposition(GetIt sl) {
   // Migration and sync order must respect FK dependencies in the remote schema:
   //   exercises → meals → workout_sets → nutrition_logs → targets
-  // workout_sets.exercise_id → exercises, nutrition_logs.meal_id → meals.
-  // Syncing a dependent table before its parent causes FK violations in Supabase.
   sl.registerLazySingleton<List<InitialCloudMigrationStep>>(
     () => <InitialCloudMigrationStep>[
       InitialCloudMigrationStep(
         key: 'exercises',
         run: (userId) async {
-          await sl<ExerciseSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
+          await sl<ExerciseSyncCoordinator>().prepareForInitialCloudMigration(userId);
           await sl<ExerciseSyncCoordinator>().syncPendingChanges();
         },
       ),
       InitialCloudMigrationStep(
         key: 'meals',
         run: (userId) async {
-          await sl<MealSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
+          await sl<MealSyncCoordinator>().prepareForInitialCloudMigration(userId);
           await sl<MealSyncCoordinator>().syncPendingChanges();
         },
       ),
       InitialCloudMigrationStep(
         key: 'workout_sets',
         run: (userId) async {
-          await sl<WorkoutSetSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
+          await sl<WorkoutSetSyncCoordinator>().prepareForInitialCloudMigration(userId);
           await sl<WorkoutSetSyncCoordinator>().syncPendingChanges();
         },
       ),
       InitialCloudMigrationStep(
         key: 'nutrition_logs',
         run: (userId) async {
-          await sl<NutritionLogSyncCoordinator>()
-              .prepareForInitialCloudMigration(userId);
+          await sl<NutritionLogSyncCoordinator>().prepareForInitialCloudMigration(userId);
           await sl<NutritionLogSyncCoordinator>().syncPendingChanges();
         },
       ),
       InitialCloudMigrationStep(
         key: 'targets',
         run: (userId) async {
-          await sl<TargetSyncCoordinator>().prepareForInitialCloudMigration(
-            userId,
-          );
+          await sl<TargetSyncCoordinator>().prepareForInitialCloudMigration(userId);
           await sl<TargetSyncCoordinator>().syncPendingChanges();
         },
       ),
@@ -140,8 +131,7 @@ void _registerAppComposition(GetIt sl) {
       ),
       SyncFeature(
         name: 'nutrition_logs',
-        syncPendingChanges:
-            sl<NutritionLogSyncCoordinator>().syncPendingChanges,
+        syncPendingChanges: sl<NutritionLogSyncCoordinator>().syncPendingChanges,
       ),
       SyncFeature(
         name: 'targets',

@@ -1,11 +1,16 @@
 import '../../../domain/entities/user_profile.dart';
+import '../../../domain/entities/user_profile_summary.dart';
 
 abstract class UserProfileRemoteDataSource {
   bool get isConfigured;
 
-  /// Returns `null` when no row exists for [userId].
   Future<UserProfile?> getProfile(String userId);
 
-  /// Upserts the profile row and returns the persisted entity.
   Future<UserProfile> upsertProfile(UserProfile profile);
+
+  /// Case-insensitive username prefix/substring search.
+  Future<List<UserProfileSummary>> searchByUsername(
+    String query, {
+    int limit = 20,
+  });
 }

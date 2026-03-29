@@ -1,4 +1,5 @@
 import '../../../domain/entities/user_profile.dart';
+import '../../../domain/entities/user_profile_summary.dart';
 import 'user_profile_remote_datasource.dart';
 
 class NoopUserProfileRemoteDataSource implements UserProfileRemoteDataSource {
@@ -16,4 +17,11 @@ class NoopUserProfileRemoteDataSource implements UserProfileRemoteDataSource {
       'NoopUserProfileRemoteDataSource does not support upsertProfile.',
     );
   }
+
+  @override
+  Future<List<UserProfileSummary>> searchByUsername(
+    String query, {
+    int limit = 20,
+  }) async =>
+      const <UserProfileSummary>[];
 }
