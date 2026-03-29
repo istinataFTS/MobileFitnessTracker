@@ -80,8 +80,6 @@ class AuthSessionServiceImpl implements AuthSessionService {
         category: 'auth',
       );
 
-      // Email confirmation required — account created but no session yet.
-      // The profile will be created after the user confirms and signs in.
       if (result.requiresEmailConfirmation) {
         return AuthSessionActionResult(
           status: AuthSessionActionStatus.completed,
@@ -92,14 +90,14 @@ class AuthSessionServiceImpl implements AuthSessionService {
         );
       }
 
-      // No email confirmation required — establish session then create profile.
       final sessionResult = await _establishSession(
         user: result.user,
         successMessage: 'sign-up completed successfully',
         actionLabel: 'sign-up',
       );
 
-      if (sessionResult.isCompleted) {
+      // Best-effort profile creation — only when session was fully established.
+      if (sessionResult.isSuccess) {                          // ← fix: was isCompleted
         await _createInitialProfile(
           userId: result.user.id,
           username: normalizedUsername,
@@ -188,8 +186,6 @@ class AuthSessionServiceImpl implements AuthSessionService {
     );
   }
 
-  /// Creates the initial [UserProfile] row after a successful sign-up.
-  /// Best-effort: logs failures but never blocks the sign-up result.
   Future<void> _createInitialProfile({
     required String userId,
     required String username,
