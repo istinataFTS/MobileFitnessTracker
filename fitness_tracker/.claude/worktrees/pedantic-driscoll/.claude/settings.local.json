@@ -22,7 +22,8 @@
       "Bash(/tmp/check_noop.sh:*)",
       "Bash(bash /tmp/check_noop.sh)",
       "Bash(/tmp/find_sync_unused.sh:*)",
-      "Bash(bash /tmp/find_sync_unused.sh)"
+      "Bash(bash /tmp/find_sync_unused.sh)",
+      "Bash(dir \"C:\\\\Users\\\\User\\\\Desktop\\\\AllinAll\\\\MobileApp\\\\fitness_tracker\\\\lib\\\\features\" /s /b)"
     ]
   }
 }
