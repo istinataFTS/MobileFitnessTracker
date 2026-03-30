@@ -1,7 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(BASE=\"C:/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker\" find \"$BASE/lib/data/datasources/remote\" -name \"*.dart\")"
+      "Bash(BASE=\"C:/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker\" find \"$BASE/lib/data/datasources/remote\" -name \"*.dart\")",
+      "Bash(xargs grep:*)",
+      "Bash(/tmp/find_unused2.sh:*)",
+      "Bash(bash /tmp/find_unused2.sh)",
+      "Bash(/tmp/find_unused3.sh:*)",
+      "Bash(bash /tmp/find_unused3.sh)",
+      "Bash(/tmp/find_unused4.sh:*)",
+      "Bash(bash /tmp/find_unused4.sh)",
+      "Bash(/tmp/find_unused5.sh:*)",
+      "Bash(bash /tmp/find_unused5.sh)",
+      "Bash(/tmp/find_unused6.sh:*)",
+      "Bash(bash /tmp/find_unused6.sh)",
+      "Bash(/tmp/find_unused7.sh:*)",
+      "Bash(bash /tmp/find_unused7.sh)",
+      "Bash(/tmp/find_unused8.sh:*)",
+      "Bash(bash /tmp/find_unused8.sh)",
+      "Bash(/tmp/find_unused9.sh:*)",
+      "Bash(bash /tmp/find_unused9.sh)",
+      "Bash(/tmp/check_noop.sh:*)",
+      "Bash(bash /tmp/check_noop.sh)",
+      "Bash(/tmp/find_sync_unused.sh:*)",
+      "Bash(bash /tmp/find_sync_unused.sh)"
     ]
   }
 }
