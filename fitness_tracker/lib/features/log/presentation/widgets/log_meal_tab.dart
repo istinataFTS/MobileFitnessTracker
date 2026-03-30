@@ -12,7 +12,7 @@ import '../../../../core/utils/macro_calculator.dart';
 import '../../../../domain/entities/meal.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../library/application/meal_bloc.dart';
-import '../../../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import '../../application/nutrition_log_bloc.dart';
 
 class LogMealTab extends StatefulWidget {
   final DateTime? initialDate;

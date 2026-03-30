@@ -9,12 +9,12 @@ import '../../features/home/home.dart';
 import '../../features/library/application/exercise_bloc.dart';
 import '../../features/library/application/meal_bloc.dart';
 import '../../features/library/library.dart';
-import '../../features/log/presentation/bloc/workout_bloc.dart';
+import '../../features/log/application/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
 import '../../features/profile/profile.dart';
 import '../../features/settings/presentation/settings_scope.dart';
 import '../../features/targets/targets.dart';
-import '../pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import '../../features/log/application/nutrition_log_bloc.dart';
 
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});

@@ -20,7 +20,7 @@ import '../features/settings/presentation/settings_scope.dart';
 import '../features/targets/application/targets_bloc.dart';
 import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
-import '../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import '../features/log/application/nutrition_log_bloc.dart';
 import 'listeners/app_domain_effects_listener.dart';
 import 'startup/app_startup_listener.dart';
 

@@ -8,7 +8,7 @@ import '../../features/home/application/home_bloc.dart';
 import '../../features/home/application/muscle_visual_bloc.dart';
 import '../../features/log/log.dart';
 import '../../features/targets/application/targets_bloc.dart';
-import '../../presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import '../features/log/application/nutrition_log_bloc.dart';
 
 class AppDomainEffectsListener extends StatefulWidget {
   const AppDomainEffectsListener({required this.child, super.key});
