@@ -2,7 +2,7 @@ class AppConstants {
   AppConstants._();
 
   // ==================== DATABASE ====================
-  static const int databaseVersion = 1;
+  // databaseVersion is defined in EnvConfig (supports env override via DATABASE_VERSION)
   static const String databaseName = 'fitness_tracker.db';
   
   // ==================== EXERCISE LIMITS ====================

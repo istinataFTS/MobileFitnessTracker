@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../entities/muscle_stimulus.dart' as muscle_stimulus_entity;
 import '../../repositories/muscle_factor_repository.dart';
 import '../../repositories/muscle_stimulus_repository.dart';
@@ -66,9 +67,9 @@ class RecordWorkoutSet {
             updateResult.fold(
               (failure) {
                 if (EnvConfig.enableDebugLogs) {
-                  print(
-                    'Failed to update stimulus for '
-                    '$muscleGroup: ${failure.message}',
+                  AppLogger.debug(
+                    'Failed to update stimulus for $muscleGroup: ${failure.message}',
+                    category: 'stimulus',
                   );
                 }
               },
@@ -216,11 +217,17 @@ class RecordWorkoutSet {
       await muscleStimulusRepository.applyDailyDecayToAll();
 
       if (EnvConfig.enableDebugLogs) {
-        print('[STIMULUS] Applied daily decay to all muscle groups');
+        AppLogger.debug(
+          'Applied daily decay to all muscle groups',
+          category: 'stimulus',
+        );
       }
     } catch (e) {
       if (EnvConfig.enableDebugLogs) {
-        print('[STIMULUS] Failed to apply daily decay: $e');
+        AppLogger.debug(
+          'Failed to apply daily decay: $e',
+          category: 'stimulus',
+        );
       }
     }
   }

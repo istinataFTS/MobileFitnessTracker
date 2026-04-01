@@ -102,7 +102,7 @@ class EnvConfig {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.yourapp.com',
+    defaultValue: '',
   );
 
   static const String apiKey = String.fromEnvironment(
@@ -165,6 +165,10 @@ class EnvConfig {
 
     if (isProduction && forceReseed) {
       issues.add('FORCE_RESEED must be false in production.');
+    }
+
+    if (isProduction && apiBaseUrl.isEmpty) {
+      issues.add('API_BASE_URL must be set in production.');
     }
 
     if (isProduction && apiKey.isEmpty) {

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../config/env_config.dart';
+import '../core/constants/app_dimensions.dart';
 import '../core/constants/app_strings.dart';
 import '../core/themes/app_theme.dart';
 import '../features/history/history.dart';
@@ -97,57 +98,63 @@ class _WebPhoneFrame extends StatelessWidget {
 
   final Widget child;
 
-  static const double _phoneWidth = 430;
-  static const double _phoneMaxHeight = 932;
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        if (constraints.maxWidth <= 480) {
+        if (constraints.maxWidth <= AppDimensions.webPhoneBreakpoint) {
           return child;
         }
 
-        final double availableHeight = math.max(0, constraints.maxHeight - 32);
-        final double phoneHeight = math.min(_phoneMaxHeight, availableHeight);
+        final double availableHeight = math.max(
+          0,
+          constraints.maxHeight - AppDimensions.webPhoneFramePadding,
+        );
+        final double phoneHeight = math.min(
+          AppDimensions.webPhoneMaxHeight,
+          availableHeight,
+        );
 
         return ColoredBox(
-          color: const Color(0xFF111111),
+          color: AppTheme.webFrameBackground,
           child: Center(
             child: Container(
-              width: _phoneWidth,
+              width: AppDimensions.webPhoneWidth,
               height: phoneHeight,
               decoration: BoxDecoration(
                 color: AppTheme.backgroundDark,
-                borderRadius: BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(AppDimensions.webPhoneFrameRadius),
                 border: Border.all(color: AppTheme.borderDark, width: 1.5),
                 boxShadow: const <BoxShadow>[
                   BoxShadow(
-                    color: Color(0x66000000),
+                    color: AppTheme.webFrameShadow,
                     blurRadius: 28,
                     offset: Offset(0, 18),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(AppDimensions.webPhoneContentRadius),
                 child: Stack(
                   children: <Widget>[
                     Positioned.fill(child: child),
                     const Positioned(
-                      top: 10,
+                      top: AppDimensions.webPhoneNotchTopOffset,
                       left: 0,
                       right: 0,
                       child: IgnorePointer(
                         child: Center(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: Color(0xFF252525),
+                              color: AppTheme.webFrameNotch,
                               borderRadius: BorderRadius.all(
                                 Radius.circular(999),
                               ),
                             ),
-                            child: SizedBox(width: 110, height: 18),
+                            child: SizedBox(
+                              width: AppDimensions.webPhoneNotchWidth,
+                              height: AppDimensions.webPhoneNotchHeight,
+                            ),
                           ),
                         ),
                       ),

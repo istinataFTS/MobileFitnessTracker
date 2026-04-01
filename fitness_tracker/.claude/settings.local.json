@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(dart\\)$\")",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/test -type f -name *.dart)",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib -name *network* -o -name *connectivity*)",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib -name \"*.dart\" -exec wc -l {} +)",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/test -name *.dart)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)"
+    ]
+  }
+}

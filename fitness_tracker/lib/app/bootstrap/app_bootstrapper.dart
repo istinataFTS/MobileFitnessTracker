@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/env_config.dart';
 import '../../core/enums/sync_trigger.dart';
 import '../../core/logging/app_logger.dart';
+import '../../core/network/network_status_service.dart';
 import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../core/sync/sync_orchestrator.dart';
 import '../../core/utils/app_lifecycle_manager.dart';
@@ -146,9 +147,25 @@ class AppBootstrapper {
   }
 
   void _registerSyncLifecycleHooks() {
+    if (kIsWeb) {
+      return;
+    }
+
     final SyncOrchestrator syncOrchestrator = di.sl<SyncOrchestrator>();
+    final NetworkStatusService networkStatusService =
+        di.sl<NetworkStatusService>();
 
     AppLifecycleManager().addResumeCallback(() {
+      unawaited(syncOrchestrator.run(SyncTrigger.appResume));
+    });
+
+    // Trigger sync immediately when internet connectivity is restored,
+    // so offline-queued changes flush without waiting for app resume.
+    networkStatusService.onConnectivityRestored.listen((_) {
+      AppLogger.info(
+        'Connectivity restored — triggering sync',
+        category: 'sync',
+      );
       unawaited(syncOrchestrator.run(SyncTrigger.appResume));
     });
   }

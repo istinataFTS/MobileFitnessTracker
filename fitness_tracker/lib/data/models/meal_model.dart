@@ -1,5 +1,6 @@
 import '../../core/constants/database_tables.dart';
 import '../../core/enums/sync_status.dart';
+import '../../core/logging/app_logger.dart';
 import '../../core/utils/macro_calculator.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/meal.dart';
@@ -141,14 +142,12 @@ class MealModel extends Meal {
   void validateAndLogCalories() {
     if (!hasValidCalories) {
       final calculated = calculatedCalories;
-      print('⚠️ Meal "$name" calorie mismatch:');
-      print(
-        'Calories mismatch: stated $caloriesPer100g cal, '
-        'calculated ${calculated.toStringAsFixed(1)} cal from macros',
-      );
-      print(
-        'Difference: '
-        '${(caloriesPer100g - calculated).abs().toStringAsFixed(1)} cal',
+      AppLogger.warning(
+        'Meal "$name" calorie mismatch: '
+        'stated $caloriesPer100g cal, '
+        'calculated ${calculated.toStringAsFixed(1)} cal from macros '
+        '(diff: ${(caloriesPer100g - calculated).abs().toStringAsFixed(1)} cal)',
+        category: 'nutrition',
       );
     }
   }

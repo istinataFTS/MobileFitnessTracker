@@ -162,7 +162,6 @@ class NutritionDayDetailsBottomSheet extends StatelessWidget {
   Widget _buildNutritionList(BuildContext context) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      shrinkWrap: true,
       itemCount: logs.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int index) {

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 import 'network_status_service.dart';
 
 class DefaultNetworkStatusService implements NetworkStatusService {
@@ -19,5 +21,24 @@ class DefaultNetworkStatusService implements NetworkStatusService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Emits `true` each time connectivity transitions from none → any network.
+  /// Uses connectivity_plus for efficient platform-level change detection,
+  /// then confirms actual internet reachability before emitting.
+  @override
+  Stream<bool> get onConnectivityRestored {
+    return Connectivity()
+        .onConnectivityChanged
+        .asyncMap((List<ConnectivityResult> results) async {
+          final bool hasInterface = results.any(
+            (ConnectivityResult r) => r != ConnectivityResult.none,
+          );
+          if (!hasInterface) return false;
+          // Verify we actually have internet, not just a local network.
+          return isNetworkAvailable();
+        })
+        .where((bool reachable) => reachable)
+        .distinct();
   }
 }

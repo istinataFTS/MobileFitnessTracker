@@ -1,5 +1,6 @@
 import '../../core/constants/database_tables.dart';
 import '../../core/enums/sync_status.dart';
+import '../../core/logging/app_logger.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/nutrition_log.dart';
 
@@ -128,10 +129,10 @@ class NutritionLogModel extends NutritionLog {
       );
     }
     if (!hasValidCalories) {
-      print(
-        'WARNING: Calorie mismatch for log "$mealName": '
-        'stated $calories cal, calculated '
-        '${calculatedCalories.toStringAsFixed(1)} cal',
+      AppLogger.warning(
+        'Calorie mismatch for log "$mealName": '
+        'stated $calories cal, calculated ${calculatedCalories.toStringAsFixed(1)} cal',
+        category: 'nutrition',
       );
     }
   }

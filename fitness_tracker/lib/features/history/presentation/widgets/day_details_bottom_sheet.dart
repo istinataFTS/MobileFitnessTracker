@@ -129,7 +129,6 @@ class DayDetailsBottomSheet extends StatelessWidget {
 
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          shrinkWrap: true,
           itemCount: sets.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (BuildContext context, int index) {

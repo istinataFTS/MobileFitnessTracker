@@ -259,4 +259,11 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     return cacheAge <= _cacheValidityDuration;
   }
+
+  @override
+  Future<void> close() {
+    _periodCache.clear();
+    _cacheTimestamps.clear();
+    return super.close();
+  }
 }
