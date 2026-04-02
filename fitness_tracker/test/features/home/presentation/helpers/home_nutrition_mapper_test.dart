@@ -40,12 +40,11 @@ void main() {
       id: id,
       mealId: isMealLog ? 'meal-$id' : null,
       mealName: mealName,
-      servingSizeGrams: 100,
       proteinGrams: protein,
       carbsGrams: carbs,
       fatGrams: fats,
       calories: calories,
-      date: createdAt,
+      loggedAt: createdAt,
       createdAt: createdAt,
     );
   }

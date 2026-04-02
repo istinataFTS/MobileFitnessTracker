@@ -3,6 +3,7 @@ import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
+import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
@@ -146,8 +147,8 @@ void main() {
             visualIntensity: 0.85,
             bucket: MuscleVisualBucket.maximum,
             coverageState: MuscleVisualCoverageState.full,
-            aggregationMode: MuscleVisualAggregationMode.cumulative,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.back},
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.back},
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -158,8 +159,8 @@ void main() {
             visualIntensity: 0.55,
             bucket: MuscleVisualBucket.heavy,
             coverageState: MuscleVisualCoverageState.partial,
-            aggregationMode: MuscleVisualAggregationMode.cumulative,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -170,8 +171,8 @@ void main() {
             visualIntensity: 0.18,
             bucket: MuscleVisualBucket.light,
             coverageState: MuscleVisualCoverageState.partial,
-            aggregationMode: MuscleVisualAggregationMode.cumulative,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -224,8 +225,8 @@ void main() {
             visualIntensity: 0.55,
             bucket: MuscleVisualBucket.heavy,
             coverageState: MuscleVisualCoverageState.partial,
-            aggregationMode: MuscleVisualAggregationMode.cumulative,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -236,8 +237,8 @@ void main() {
             visualIntensity: 0,
             bucket: MuscleVisualBucket.empty,
             coverageState: MuscleVisualCoverageState.empty,
-            aggregationMode: MuscleVisualAggregationMode.cumulative,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.back},
+            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.back},
             overflowAmount: 0,
             hasTrained: false,
           ),

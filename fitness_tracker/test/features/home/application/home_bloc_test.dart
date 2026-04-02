@@ -189,7 +189,7 @@ void main() {
       ),
     ),
     act: (HomeBloc bloc) => bloc.add(const RefreshHomeDataEvent()),
-    expect: () => <Matcher>[
+    expect: () => <HomeState>[
       HomeLoaded(
         data: buildDashboardData(
           todaysLogs: <NutritionLog>[newerLog],
@@ -216,7 +216,7 @@ void main() {
       ),
     ),
     act: (HomeBloc bloc) => bloc.add(const RefreshHomeDataEvent()),
-    expect: () => <Matcher>[
+    expect: () => <HomeState>[
       HomeLoaded(
         data: buildDashboardData(
           todaysLogs: <NutritionLog>[olderLog, newerLog],

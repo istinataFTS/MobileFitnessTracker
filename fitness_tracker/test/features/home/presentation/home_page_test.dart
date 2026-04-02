@@ -118,7 +118,7 @@ void main() {
         visualIntensity: 1.0,
         bucket: MuscleVisualBucket.maximum,
         coverageState: MuscleVisualCoverageState.full,
-        aggregationMode: MuscleVisualAggregationMode.cumulative,
+        aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
         visibleSurfaces: const <MuscleVisualSurface>{
           MuscleVisualSurface.front,
         },
@@ -317,7 +317,7 @@ void main() {
           visualIntensity: 1.0,
           bucket: MuscleVisualBucket.maximum,
           coverageState: MuscleVisualCoverageState.full,
-          aggregationMode: MuscleVisualAggregationMode.cumulative,
+          aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
           visibleSurfaces: const <MuscleVisualSurface>{
             MuscleVisualSurface.front,
           },
