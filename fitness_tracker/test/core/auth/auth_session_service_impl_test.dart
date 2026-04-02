@@ -4,6 +4,7 @@ import 'package:fitness_tracker/core/errors/sync_exceptions.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
+import 'package:fitness_tracker/domain/repositories/user_profile_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -11,9 +12,12 @@ class MockAuthRemoteDataSource extends Mock implements AuthRemoteDataSource {}
 
 class MockSessionSyncService extends Mock implements SessionSyncService {}
 
+class MockUserProfileRepository extends Mock implements UserProfileRepository {}
+
 void main() {
   late MockAuthRemoteDataSource authRemoteDataSource;
   late MockSessionSyncService sessionSyncService;
+  late MockUserProfileRepository userProfileRepository;
   late AuthSessionService service;
 
   const user = AppUser(
@@ -40,10 +44,12 @@ void main() {
   setUp(() {
     authRemoteDataSource = MockAuthRemoteDataSource();
     sessionSyncService = MockSessionSyncService();
+    userProfileRepository = MockUserProfileRepository();
 
     service = AuthSessionServiceImpl(
       authRemoteDataSource: authRemoteDataSource,
       sessionSyncService: sessionSyncService,
+      userProfileRepository: userProfileRepository,
     );
   });
 

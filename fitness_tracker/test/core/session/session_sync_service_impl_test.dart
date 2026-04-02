@@ -87,7 +87,7 @@ void main() {
             any(named: 'requiresInitialCloudMigration'),
       ),
     ).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'write failed')),
+      (_) async => const Left(CacheFailure('write failed')),
     );
 
     final result = await service.establishAuthenticatedSession(user);
@@ -213,7 +213,7 @@ void main() {
 
   test('signOut fails when remote sign-out fails', () async {
     when(() => authRemoteDataSource.signOut()).thenAnswer(
-      (_) async => const Left(AuthFailure(message: 'remote sign-out failed')),
+      (_) async => const Left(AuthFailure('remote sign-out failed')),
     );
 
     final result = await service.signOut();
@@ -228,7 +228,7 @@ void main() {
     when(() => authRemoteDataSource.signOut())
         .thenAnswer((_) async => const Right(null));
     when(() => repository.clearSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session reset failed')),
+      (_) async => const Left(CacheFailure('session reset failed')),
     );
 
     final result = await service.signOut();

@@ -131,7 +131,7 @@ void main() {
 
   test('fails when session lookup fails', () async {
     when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
+      (_) async => const Left(CacheFailure('session unavailable')),
     );
 
     final result = await orchestrator.run(SyncTrigger.appLaunch);

@@ -5,7 +5,6 @@ import 'package:fitness_tracker/features/history/history.dart';
 import 'package:fitness_tracker/features/home/home.dart';
 import 'package:fitness_tracker/features/log/log.dart';
 import 'package:fitness_tracker/features/targets/application/targets_bloc.dart';
-import 'package:fitness_tracker/presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

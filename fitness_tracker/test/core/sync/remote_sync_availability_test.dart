@@ -34,7 +34,7 @@ void main() {
   });
 
   test('denies when remote sync runtime policy is not configured', () async {
-    const availability = RemoteSyncAvailability(
+    final availability = RemoteSyncAvailability(
       runtimePolicy: RemoteSyncRuntimePolicy(
         isSupabaseEnabled: false,
         supabaseUrl: '',
