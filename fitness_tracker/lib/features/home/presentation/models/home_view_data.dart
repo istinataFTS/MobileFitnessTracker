@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../domain/entities/time_period.dart';
+import '../../application/muscle_visual_bloc.dart' show MuscleMapMode;
 
 enum HomeTone { muted, primary, warning, success }
 
@@ -103,6 +104,8 @@ class HomeProgressCardViewData extends Equatable {
     required this.title,
     required this.selectedPeriod,
     required this.selectorEnabled,
+    required this.showPeriodSelector,
+    required this.muscleMapMode,
     required this.totalSetsLabel,
     required this.remainingTargetLabel,
     required this.trainedMusclesLabel,
@@ -115,7 +118,17 @@ class HomeProgressCardViewData extends Equatable {
 
   final String title;
   final TimePeriod selectedPeriod;
+
+  /// Whether the period dropdown is responsive to taps (disabled while loading).
   final bool selectorEnabled;
+
+  /// Whether the period selector is visible at all.
+  /// Hidden in fatigue mode because fatigue is always "right now".
+  final bool showPeriodSelector;
+
+  /// Which visualisation lens is active.
+  final MuscleMapMode muscleMapMode;
+
   final String totalSetsLabel;
   final String remainingTargetLabel;
   final String trainedMusclesLabel;
@@ -130,6 +143,8 @@ class HomeProgressCardViewData extends Equatable {
     title,
     selectedPeriod,
     selectorEnabled,
+    showPeriodSelector,
+    muscleMapMode,
     totalSetsLabel,
     remainingTargetLabel,
     trainedMusclesLabel,
@@ -145,15 +160,19 @@ class HomeBodyVisualViewData extends Equatable {
   const HomeBodyVisualViewData({
     required this.frontLayers,
     required this.backLayers,
+    required this.subtitle,
   });
 
   final List<HomeBodyOverlayViewData> frontLayers;
   final List<HomeBodyOverlayViewData> backLayers;
 
+  /// Descriptive caption shown in the top-right of the muscle map card.
+  final String subtitle;
+
   bool get hasHighlights => frontLayers.isNotEmpty || backLayers.isNotEmpty;
 
   @override
-  List<Object?> get props => <Object?>[frontLayers, backLayers];
+  List<Object?> get props => <Object?>[frontLayers, backLayers, subtitle];
 }
 
 class HomeBodyOverlayViewData extends Equatable {

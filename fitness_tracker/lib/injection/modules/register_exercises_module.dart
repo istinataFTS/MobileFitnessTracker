@@ -2,7 +2,6 @@ import 'package:get_it/get_it.dart';
 
 import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/exercise_local_datasource.dart';
-import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
 import '../../data/datasources/remote/exercise_remote_datasource.dart';
 import '../../data/datasources/remote/noop_exercise_remote_datasource.dart';
 import '../../data/datasources/remote/supabase_exercise_remote_datasource.dart';

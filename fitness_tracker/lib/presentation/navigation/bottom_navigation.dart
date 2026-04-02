@@ -9,7 +9,6 @@ import '../../features/home/home.dart';
 import '../../features/library/application/exercise_bloc.dart';
 import '../../features/library/application/meal_bloc.dart';
 import '../../features/library/library.dart';
-import '../../features/log/application/workout_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
 import '../../features/profile/profile.dart';
 import '../../features/settings/presentation/settings_scope.dart';

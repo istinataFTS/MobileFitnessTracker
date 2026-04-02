@@ -5,7 +5,6 @@ import '../../data/datasources/local/meal_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource_impl.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource_impl.dart';
-import '../../data/datasources/local/pending_sync_delete_local_datasource.dart';
 import '../../data/datasources/remote/meal_remote_datasource.dart';
 import '../../data/datasources/remote/noop_meal_remote_datasource.dart';
 import '../../data/datasources/remote/noop_nutrition_log_remote_datasource.dart';

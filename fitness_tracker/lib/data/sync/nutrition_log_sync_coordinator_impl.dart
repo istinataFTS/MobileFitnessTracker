@@ -2,7 +2,6 @@ import '../../core/enums/sync_entity_type.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/nutrition_log.dart';
 import '../datasources/local/nutrition_log_local_datasource.dart';
-import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/nutrition_log_remote_datasource.dart';
 import '../models/nutrition_log_model.dart';
 import 'base_entity_sync_coordinator.dart';

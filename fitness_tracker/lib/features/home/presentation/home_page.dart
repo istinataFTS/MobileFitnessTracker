@@ -96,6 +96,11 @@ class HomePage extends StatelessWidget {
                           const RefreshVisualsEvent(),
                         );
                   },
+                  onModeChanged: (mode) {
+                    context.read<MuscleVisualBloc>().add(
+                          ChangeModeEvent(mode),
+                        );
+                  },
                 );
               },
             );

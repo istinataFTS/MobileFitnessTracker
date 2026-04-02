@@ -1583,6 +1583,16 @@ class WebDemoAuthSessionService implements AuthSessionService {
   }
 
   @override
+  Future<AuthSessionActionResult> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    // Demo mode: sign-up behaves the same as sign-in — no real account created.
+    return signInWithEmail(email: email, password: password);
+  }
+
+  @override
   Future<SessionSyncActionResult> signOut() async {
     _store.session = const AppSession.guest();
     _store.migrationState = null;

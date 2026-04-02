@@ -2,7 +2,6 @@ import '../../core/enums/sync_entity_type.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/exercise.dart';
 import '../datasources/local/exercise_local_datasource.dart';
-import '../datasources/local/pending_sync_delete_local_datasource.dart';
 import '../datasources/remote/exercise_remote_datasource.dart';
 import '../models/exercise_model.dart';
 import 'base_entity_sync_coordinator.dart';

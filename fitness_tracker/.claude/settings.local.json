@@ -7,7 +7,13 @@
       "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib -name \"*.dart\" -exec wc -l {} +)",
       "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/test -name *.dart)",
       "Bash(flutter pub:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(grep -r ENABLE_SUPABASE --include=*.yaml --include=*.json --include=*.md .)",
+      "Bash(grep -r dart-define . --include=*.md --include=*.yaml)",
+      "Bash(if not:*)",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib/features/log/application -type f -name *.dart)",
+      "Bash(sed -i \"/import ''package:flutter\\\\/material\\\\.dart'';/d\" \"C:/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib/features/home/presentation/mappers/home_view_data_mapper.dart\")",
+      "Bash(sed -i \"/import ''.*application\\\\/workout_bloc\\\\.dart'';/d\" \"C:/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker/lib/presentation/navigation/bottom_navigation.dart\")"
     ]
   }
 }

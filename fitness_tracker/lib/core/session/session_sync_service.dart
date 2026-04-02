@@ -1,7 +1,5 @@
-import '../enums/sync_trigger.dart';
 import '../sync/sync_orchestrator.dart';
 import '../../domain/entities/app_user.dart';
-import '../../domain/repositories/app_session_repository.dart';
 
 enum SessionSyncActionStatus {
   completed,

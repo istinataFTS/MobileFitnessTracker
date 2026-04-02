@@ -35,9 +35,7 @@ class BodyVisualWidget extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                viewData.hasHighlights
-                    ? 'Front and back load'
-                    : 'No training load yet',
+                viewData.subtitle,
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppTheme.textMedium),

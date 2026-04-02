@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../../../../domain/entities/time_period.dart';
+import '../../application/muscle_visual_bloc.dart' show MuscleMapMode;
 import '../home_page_keys.dart';
 import '../models/home_view_data.dart';
 import 'body_visual_widget.dart';
@@ -15,12 +16,14 @@ class HomeContent extends StatelessWidget {
     required this.onRefresh,
     required this.onPeriodChanged,
     required this.onRetryVisuals,
+    required this.onModeChanged,
   });
 
   final HomePageViewData viewData;
   final Future<void> Function() onRefresh;
   final ValueChanged<TimePeriod> onPeriodChanged;
   final VoidCallback onRetryVisuals;
+  final ValueChanged<MuscleMapMode> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +42,7 @@ class HomeContent extends StatelessWidget {
             viewData: viewData.progress,
             onPeriodChanged: onPeriodChanged,
             onRetryVisuals: onRetryVisuals,
+            onModeChanged: onModeChanged,
           ),
           const SizedBox(height: 24),
           if (viewData.showMuscleGroups)
@@ -295,11 +299,13 @@ class _ProgressCard extends StatelessWidget {
     required this.viewData,
     required this.onPeriodChanged,
     required this.onRetryVisuals,
+    required this.onModeChanged,
   });
 
   final HomeProgressCardViewData viewData;
   final ValueChanged<TimePeriod> onPeriodChanged;
   final VoidCallback onRetryVisuals;
+  final ValueChanged<MuscleMapMode> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -310,42 +316,48 @@ class _ProgressCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // ── Header row: icon + title + mode toggle ──────────────────
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                Expanded(
-                  child: Row(
-                    children: <Widget>[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryOrange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.analytics,
-                          color: AppTheme.primaryOrange,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          viewData.title,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.analytics,
+                    color: AppTheme.primaryOrange,
                   ),
                 ),
                 const SizedBox(width: 12),
-                PeriodSelectorWidget(
+                Expanded(
+                  child: Text(
+                    viewData.title,
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _MuscleMapModeToggle(
+                  currentMode: viewData.muscleMapMode,
+                  onModeChanged: onModeChanged,
+                ),
+              ],
+            ),
+            // ── Period selector (volume mode only) ───────────────────────
+            if (viewData.showPeriodSelector) ...<Widget>[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: PeriodSelectorWidget(
                   selectedPeriod: viewData.selectedPeriod,
                   onPeriodChanged: onPeriodChanged,
                   enabled: viewData.selectorEnabled,
                 ),
-              ],
-            ),
+              ),
+            ],
             const SizedBox(height: 20),
             if (viewData.isLoading)
               const Center(
@@ -512,6 +524,89 @@ class _ProgressStatsRow extends StatelessWidget {
             color: AppTheme.primaryOrange,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact two-segment toggle that lets the user switch between
+/// [MuscleMapMode.volume] (training load for the selected period) and
+/// [MuscleMapMode.fatigue] (current accumulated fatigue / rolling weekly load).
+class _MuscleMapModeToggle extends StatelessWidget {
+  const _MuscleMapModeToggle({
+    required this.currentMode,
+    required this.onModeChanged,
+  });
+
+  final MuscleMapMode currentMode;
+  final ValueChanged<MuscleMapMode> onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.borderDark),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _buildTab(
+            context,
+            label: 'Volume',
+            icon: Icons.bar_chart_rounded,
+            mode: MuscleMapMode.volume,
+          ),
+          _buildTab(
+            context,
+            label: 'Fatigue',
+            icon: Icons.local_fire_department_rounded,
+            mode: MuscleMapMode.fatigue,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required MuscleMapMode mode,
+  }) {
+    final bool isSelected = currentMode == mode;
+
+    return GestureDetector(
+      onTap: () => onModeChanged(mode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryOrange : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Colors.white : AppTheme.textDim,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppTheme.textDim,
+                fontSize: 12,
+                fontWeight:
+                    isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

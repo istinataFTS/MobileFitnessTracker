@@ -56,7 +56,7 @@ void main() {
       expect(result, const AuthSyncFailure('token expired'));
     });
 
-    test('maps RemoteSyncException to RemoteSyncFailure', () {
+    test('maps RemoteSyncException to RemoteSyncFailure', () {g
       final Failure result = RepositoryErrorMapper.map(
         const RemoteSyncException('constraint violation'),
       );

@@ -16,7 +16,7 @@ import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../library/application/exercise_bloc.dart';
 import '../../../settings/presentation/settings_scope.dart';
-import '../bloc/workout_bloc.dart';
+import '../../application/workout_bloc.dart';
 import 'intensity_slider_widget.dart';
 
 class LogExerciseTab extends StatefulWidget {

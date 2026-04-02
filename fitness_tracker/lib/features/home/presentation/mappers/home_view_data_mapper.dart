@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 import '../../../../config/env_config.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -73,6 +72,7 @@ class HomeViewDataMapper {
     );
     final List<Target> macroTargets = _filterMacroTargets(homeData.targets);
     final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
+    final MuscleMapMode currentMode = _resolveCurrentMode(muscleVisualState);
 
     return HomePageViewData(
       greeting: '${AppStrings.hello}, ${EnvConfig.userName}!',
@@ -90,6 +90,7 @@ class HomeViewDataMapper {
         trainingTargets: trainingTargets,
         muscleVisualState: muscleVisualState,
         currentPeriod: currentPeriod,
+        currentMode: currentMode,
       ),
       muscleGroups: _mapMuscleGroupProgress(
         targets: trainingTargets,
@@ -126,6 +127,13 @@ class HomeViewDataMapper {
     }
 
     return TimePeriod.week;
+  }
+
+  static MuscleMapMode _resolveCurrentMode(MuscleVisualState muscleVisualState) {
+    if (muscleVisualState is MuscleVisualLoaded) return muscleVisualState.mode;
+    if (muscleVisualState is MuscleVisualLoading) return muscleVisualState.mode;
+    if (muscleVisualState is MuscleVisualError) return muscleVisualState.mode;
+    return MuscleMapMode.volume;
   }
 
   static HomeNutritionCardViewData _mapNutrition({
@@ -212,6 +220,7 @@ class HomeViewDataMapper {
     required List<Target> trainingTargets,
     required MuscleVisualState muscleVisualState,
     required TimePeriod currentPeriod,
+    required MuscleMapMode currentMode,
   }) {
     final int totalSets = weeklySets.length;
     final int totalTarget = trainingTargets.fold<int>(
@@ -221,25 +230,38 @@ class HomeViewDataMapper {
     final int remainingTarget = (totalTarget - totalSets).clamp(0, totalTarget);
     final bool selectorEnabled = muscleVisualState is! MuscleVisualLoading;
 
+    // In fatigue mode the period selector is hidden — fatigue is always "now".
+    final bool showPeriodSelector = currentMode == MuscleMapMode.volume;
+
+    final String cardTitle = currentMode == MuscleMapMode.fatigue
+        ? 'Muscle Fatigue'
+        : '${AppStrings.progress} • ${_periodLabel(currentPeriod)}';
+
+    final HomeBodyVisualViewData emptyVisual = HomeBodyVisualViewData(
+      frontLayers: const <HomeBodyOverlayViewData>[],
+      backLayers: const <HomeBodyOverlayViewData>[],
+      subtitle: _bodySubtitle(
+        hasHighlights: false,
+        mode: currentMode,
+      ),
+    );
+
     if (muscleVisualState is MuscleVisualLoading ||
         muscleVisualState is MuscleVisualInitial) {
       return HomeProgressCardViewData(
-        title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+        title: cardTitle,
         selectedPeriod: currentPeriod,
         selectorEnabled: selectorEnabled,
+        showPeriodSelector: showPeriodSelector,
+        muscleMapMode: currentMode,
         totalSetsLabel: totalSets.toString(),
-        remainingTargetLabel: totalTarget > 0
-            ? remainingTarget.toString()
-            : '-',
+        remainingTargetLabel: totalTarget > 0 ? remainingTarget.toString() : '-',
         trainedMusclesLabel: '-',
         targetTone: _targetTone(
           remainingTarget,
           showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
         ),
-        bodyVisual: const HomeBodyVisualViewData(
-          frontLayers: <HomeBodyOverlayViewData>[],
-          backLayers: <HomeBodyOverlayViewData>[],
-        ),
+        bodyVisual: emptyVisual,
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: true,
         errorMessage: null,
@@ -248,9 +270,11 @@ class HomeViewDataMapper {
 
     if (muscleVisualState is MuscleVisualError) {
       return HomeProgressCardViewData(
-        title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+        title: cardTitle,
         selectedPeriod: currentPeriod,
         selectorEnabled: selectorEnabled,
+        showPeriodSelector: showPeriodSelector,
+        muscleMapMode: currentMode,
         totalSetsLabel: totalSets.toString(),
         remainingTargetLabel:
             totalTarget > 0 && currentPeriod == TimePeriod.week
@@ -261,10 +285,7 @@ class HomeViewDataMapper {
           remainingTarget,
           showTarget: totalTarget > 0 && currentPeriod == TimePeriod.week,
         ),
-        bodyVisual: const HomeBodyVisualViewData(
-          frontLayers: <HomeBodyOverlayViewData>[],
-          backLayers: <HomeBodyOverlayViewData>[],
-        ),
+        bodyVisual: emptyVisual,
         muscleSummary: const <HomeMuscleSummaryItemViewData>[],
         isLoading: false,
         errorMessage: muscleVisualState.message,
@@ -287,15 +308,22 @@ class HomeViewDataMapper {
                 b.totalStimulus.compareTo(a.totalStimulus),
           );
 
+    final HomeBodyVisualViewData bodyVisual = _mapBodyVisual(
+      loaded.muscleData,
+      mode: currentMode,
+    );
+
     return HomeProgressCardViewData(
-      title: '${AppStrings.progress} • ${_periodLabel(currentPeriod)}',
+      title: cardTitle,
       selectedPeriod: currentPeriod,
       selectorEnabled: selectorEnabled,
+      showPeriodSelector: showPeriodSelector,
+      muscleMapMode: currentMode,
       totalSetsLabel: totalSets.toString(),
       remainingTargetLabel: showTarget ? remainingTarget.toString() : '-',
       trainedMusclesLabel: loaded.trainedMuscleCount.toString(),
       targetTone: _targetTone(remainingTarget, showTarget: showTarget),
-      bodyVisual: _mapBodyVisual(loaded.muscleData),
+      bodyVisual: bodyVisual,
       muscleSummary: trained
           .take(6)
           .map(
@@ -313,8 +341,9 @@ class HomeViewDataMapper {
   }
 
   static HomeBodyVisualViewData _mapBodyVisual(
-    Map<String, MuscleVisualData> muscleData,
-  ) {
+    Map<String, MuscleVisualData> muscleData, {
+    required MuscleMapMode mode,
+  }) {
     final Map<String, HomeBodyOverlayViewData> frontLayers =
         <String, HomeBodyOverlayViewData>{};
     final Map<String, HomeBodyOverlayViewData> backLayers =
@@ -336,10 +365,24 @@ class HomeViewDataMapper {
       }
     }
 
+    final bool hasHighlights =
+        frontLayers.isNotEmpty || backLayers.isNotEmpty;
+
     return HomeBodyVisualViewData(
       frontLayers: frontLayers.values.toList(growable: false),
       backLayers: backLayers.values.toList(growable: false),
+      subtitle: _bodySubtitle(hasHighlights: hasHighlights, mode: mode),
     );
+  }
+
+  static String _bodySubtitle({
+    required bool hasHighlights,
+    required MuscleMapMode mode,
+  }) {
+    if (mode == MuscleMapMode.fatigue) {
+      return hasHighlights ? 'Current fatigue level' : 'Muscles fully recovered';
+    }
+    return hasHighlights ? 'Front and back load' : 'No training load yet';
   }
 
   static void _mergeOverlay(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/datasources/local/database_helper.dart';
@@ -159,7 +160,10 @@ class AppLifecycleManager with WidgetsBindingObserver {
   ///
   /// This method verifies the database connection is active.
   /// DatabaseHelper singleton will automatically reinitialize if needed.
+  /// On web, SQLite is not supported — this is a no-op.
   Future<void> _ensureDatabaseOpen() async {
+    if (kIsWeb) return;
+
     try {
       // Access database to trigger initialization if needed.
       // This is a no-op if database is already open.
