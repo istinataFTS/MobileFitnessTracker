@@ -18,7 +18,7 @@ void main() {
   late MockAuthenticatedDataSourcePreferenceResolver resolver;
   late GetAllTargets getAllTargets;
 
-  const target = Target(
+  final target = Target(
     id: 'target-1',
     type: TargetType.macro,
     categoryKey: 'protein',
@@ -45,11 +45,11 @@ void main() {
       () => repository.getAllTargets(
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<Target>[target]));
+    ).thenAnswer((_) async => Right(<Target>[target]));
 
     final result = await getAllTargets();
 
-    expect(result, const Right<Failure, List<Target>>(<Target>[target]));
+    expect(result, Right<Failure, List<Target>>(<Target>[target]));
     verify(
       () => repository.getAllTargets(
         sourcePreference: DataSourcePreference.remoteThenLocal,

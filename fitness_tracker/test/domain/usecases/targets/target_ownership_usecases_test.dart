@@ -22,7 +22,7 @@ void main() {
   late AddTarget addTarget;
   late UpdateTarget updateTarget;
 
-  const baseTarget = Target(
+  final baseTarget = Target(
     id: 'target-1',
     type: TargetType.macro,
     categoryKey: 'protein',
@@ -117,7 +117,7 @@ void main() {
   test('UpdateTarget leaves target unchanged when session lookup fails',
       () async {
     when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'session unavailable')),
+      (_) async => const Left(CacheFailure('session unavailable')),
     );
 
     final result = await updateTarget(baseTarget);

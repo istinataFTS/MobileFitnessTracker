@@ -23,7 +23,7 @@ void main() {
   late GetExerciseById getExerciseById;
   late GetExercisesForMuscle getExercisesForMuscle;
 
-  const exercise = Exercise(
+  final exercise = Exercise(
     id: 'exercise-1',
     name: 'Bench Press',
     muscleGroups: <String>['chest', 'triceps'],
@@ -56,11 +56,11 @@ void main() {
       () => repository.getAllExercises(
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<Exercise>[exercise]));
+    ).thenAnswer((_) async => Right(<Exercise>[exercise]));
 
     final result = await getAllExercises();
 
-    expect(result, const Right<Failure, List<Exercise>>(<Exercise>[exercise]));
+    expect(result, Right<Failure, List<Exercise>>(<Exercise>[exercise]));
     verify(
       () => repository.getAllExercises(
         sourcePreference: DataSourcePreference.remoteThenLocal,
@@ -77,11 +77,11 @@ void main() {
         'exercise-1',
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(exercise));
+    ).thenAnswer((_) async => Right(exercise));
 
     final result = await getExerciseById('exercise-1');
 
-    expect(result, const Right<Failure, Exercise?>(exercise));
+    expect(result, Right<Failure, Exercise?>(exercise));
     verify(
       () => repository.getExerciseById(
         'exercise-1',
@@ -99,11 +99,11 @@ void main() {
         'chest',
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<Exercise>[exercise]));
+    ).thenAnswer((_) async => Right(<Exercise>[exercise]));
 
     final result = await getExercisesForMuscle('chest');
 
-    expect(result, const Right<Failure, List<Exercise>>(<Exercise>[exercise]));
+    expect(result, Right<Failure, List<Exercise>>(<Exercise>[exercise]));
     verify(
       () => repository.getExercisesForMuscle(
         'chest',

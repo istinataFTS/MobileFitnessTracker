@@ -29,7 +29,7 @@ void main() {
   final startDate = DateTime(2026, 3, 1);
   final endDate = DateTime(2026, 3, 31);
 
-  const workoutSet = WorkoutSet(
+  final workoutSet = WorkoutSet(
     id: 'set-1',
     exerciseId: 'exercise-1',
     reps: 10,
@@ -39,7 +39,7 @@ void main() {
     createdAt: DateTime(2026, 3, 26),
   );
 
-  const exercise = Exercise(
+  final exercise = Exercise(
     id: 'exercise-1',
     name: 'Bench Press',
     muscleGroups: <String>['chest', 'triceps'],
@@ -71,11 +71,11 @@ void main() {
       () => workoutSetRepository.getAllSets(
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<WorkoutSet>[workoutSet]));
+    ).thenAnswer((_) async => Right(<WorkoutSet>[workoutSet]));
 
     final result = await getAllWorkoutSets();
 
-    expect(result, const Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
+    expect(result, Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
     verify(
       () => workoutSetRepository.getAllSets(
         sourcePreference: DataSourcePreference.remoteThenLocal,
@@ -94,12 +94,12 @@ void main() {
         endDate,
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<WorkoutSet>[workoutSet]));
+    ).thenAnswer((_) async => Right(<WorkoutSet>[workoutSet]));
     when(
       () => exerciseRepository.getAllExercises(
         sourcePreference: DataSourcePreference.remoteThenLocal,
       ),
-    ).thenAnswer((_) async => const Right(<Exercise>[exercise]));
+    ).thenAnswer((_) async => Right(<Exercise>[exercise]));
 
     final result = await getSetsByDateRange(
       startDate: startDate,
@@ -107,7 +107,7 @@ void main() {
       muscleGroup: 'chest',
     );
 
-    expect(result, const Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
+    expect(result, Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
     verify(
       () => workoutSetRepository.getSetsByDateRange(
         startDate,

@@ -81,7 +81,7 @@ void main() {
 
   test('falls back to original set when session lookup fails', () async {
     when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => Left(CacheFailure(message: 'session unavailable')),
+      (_) async => Left(CacheFailure('session unavailable')),
     );
 
     await usecase(baseSet);
