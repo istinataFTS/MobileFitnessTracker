@@ -4,8 +4,8 @@ import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datas
 import 'package:fitness_tracker/data/datasources/local/pending_sync_delete_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/nutrition_log_remote_datasource.dart';
 import 'package:fitness_tracker/data/sync/nutrition_log_sync_coordinator_impl.dart';
+import 'package:fitness_tracker/data/models/nutrition_log_model.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
-import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/pending_sync_delete.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -27,12 +27,12 @@ void main() {
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
-  NutritionLog buildLog({
+  NutritionLogModel buildLog({
     required String id,
     SyncStatus status = SyncStatus.synced,
     String? serverId = 'server-1',
   }) {
-    return NutritionLog(
+    return NutritionLogModel(
       id: id,
       mealId: 'meal-1',
       mealName: 'Chicken Bowl',
@@ -78,7 +78,7 @@ void main() {
 
   test('delete marks synced row as pending delete before remote delete',
       () async {
-    final NutritionLog existing = buildLog(id: 'log-1');
+    final NutritionLogModel existing = buildLog(id: 'log-1');
 
     when(() => remoteDataSource.isConfigured).thenReturn(true);
     when(() => localDataSource.getLogById('log-1')).thenAnswer(
@@ -125,7 +125,7 @@ void main() {
   });
 
   test('delete removes purely local row immediately', () async {
-    final NutritionLog existing = buildLog(
+    final NutritionLogModel existing = buildLog(
       id: 'log-1',
       status: SyncStatus.localOnly,
       serverId: null,
@@ -144,7 +144,7 @@ void main() {
   });
 
   test('failed remote delete keeps queued delete for retry', () async {
-    final NutritionLog existing = buildLog(id: 'log-1');
+    final NutritionLogModel existing = buildLog(id: 'log-1');
 
     when(() => remoteDataSource.isConfigured).thenReturn(true);
     when(() => localDataSource.getLogById('log-1')).thenAnswer(

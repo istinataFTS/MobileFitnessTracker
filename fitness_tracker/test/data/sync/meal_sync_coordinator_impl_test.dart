@@ -4,8 +4,8 @@ import 'package:fitness_tracker/data/datasources/local/meal_local_datasource.dar
 import 'package:fitness_tracker/data/datasources/local/pending_sync_delete_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/meal_remote_datasource.dart';
 import 'package:fitness_tracker/data/sync/meal_sync_coordinator_impl.dart';
+import 'package:fitness_tracker/data/models/meal_model.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
-import 'package:fitness_tracker/domain/entities/meal.dart';
 import 'package:fitness_tracker/domain/entities/pending_sync_delete.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -25,12 +25,12 @@ void main() {
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
-  Meal buildMeal({
+  MealModel buildMeal({
     required String id,
     SyncStatus status = SyncStatus.synced,
     String? serverId = 'server-1',
   }) {
-    return Meal(
+    return MealModel(
       id: id,
       name: 'Chicken Bowl',
       servingSizeGrams: 100,
@@ -74,7 +74,7 @@ void main() {
 
   test('delete marks synced row as pending delete before remote delete',
       () async {
-    final Meal existing = buildMeal(id: 'meal-1');
+    final MealModel existing = buildMeal(id: 'meal-1');
 
     when(() => remoteDataSource.isConfigured).thenReturn(true);
     when(() => localDataSource.getMealById('meal-1')).thenAnswer(
@@ -121,7 +121,7 @@ void main() {
   });
 
   test('delete removes purely local row immediately', () async {
-    final Meal existing = buildMeal(
+    final MealModel existing = buildMeal(
       id: 'meal-1',
       status: SyncStatus.localOnly,
       serverId: null,
@@ -140,7 +140,7 @@ void main() {
   });
 
   test('failed remote delete keeps queued delete for retry', () async {
-    final Meal existing = buildMeal(id: 'meal-1');
+    final MealModel existing = buildMeal(id: 'meal-1');
 
     when(() => remoteDataSource.isConfigured).thenReturn(true);
     when(() => localDataSource.getMealById('meal-1')).thenAnswer(

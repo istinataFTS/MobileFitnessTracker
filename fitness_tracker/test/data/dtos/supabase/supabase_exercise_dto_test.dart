@@ -95,7 +95,7 @@ void main() {
     });
 
     test('serializes to expected supabase map', () {
-      const dto = SupabaseExerciseDto(
+      final dto = SupabaseExerciseDto(
         id: 'server-1',
         userId: 'user-1',
         name: 'Bench Press',
