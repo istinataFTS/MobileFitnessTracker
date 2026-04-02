@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
@@ -210,7 +211,10 @@ void main() {
     expect(sut.state.userProfile, testProfile);
 
     when(() => mockAuthService.signOut()).thenAnswer(
-      (_) async => SessionSyncActionResult.success(message: 'signed out'),
+      (_) async => const SessionSyncActionResult(
+          status: SessionSyncActionStatus.completed,
+          message: 'signed out',
+        ),
     );
     when(() => mockSessionRepo.getCurrentSession())
         .thenAnswer((_) async => const Right(AppSession.guest()));
@@ -243,6 +247,4 @@ void main() {
   });
 }
 
-// ignore: library_private_types_in_public_api
-import 'package:fitness_tracker/core/enums/auth_mode.dart';
 const _authMode = AuthMode.authenticated;

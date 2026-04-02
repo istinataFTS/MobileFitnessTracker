@@ -64,7 +64,7 @@ void main() {
 
   test('loadSettings stores failure and marks state as loaded', () async {
     when(() => repository.getSettings()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'settings unavailable')),
+      (_) async => const Left(CacheFailure('settings unavailable')),
     );
 
     await cubit.loadSettings();
@@ -173,7 +173,7 @@ void main() {
 
   test('saveSettings stores error and returns false on failure', () async {
     when(() => repository.saveSettings(any())).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'save failed')),
+      (_) async => const Left(CacheFailure('save failed')),
     );
 
     final bool success = await cubit.setWeightUnit(WeightUnit.pounds);
@@ -185,7 +185,7 @@ void main() {
 
   test('successful load clears previous error message', () async {
     when(() => repository.getSettings()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'settings unavailable')),
+      (_) async => const Left(CacheFailure('settings unavailable')),
     );
 
     await cubit.loadSettings();
@@ -203,7 +203,7 @@ void main() {
 
   test('clearError removes an existing error message', () async {
     when(() => repository.getSettings()).thenAnswer(
-      (_) async => const Left(CacheFailure(message: 'settings unavailable')),
+      (_) async => const Left(CacheFailure('settings unavailable')),
     );
 
     await cubit.loadSettings();

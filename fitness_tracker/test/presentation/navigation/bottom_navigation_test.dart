@@ -10,7 +10,7 @@ import 'package:fitness_tracker/features/settings/application/app_settings_cubit
 import 'package:fitness_tracker/features/settings/presentation/settings_scope.dart';
 import 'package:fitness_tracker/features/targets/application/targets_bloc.dart';
 import 'package:fitness_tracker/presentation/navigation/bottom_navigation.dart';
-import 'package:fitness_tracker/presentation/pages/nutrition_log/bloc/nutrition_log_bloc.dart';
+import 'package:fitness_tracker/features/log/application/nutrition_log_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';

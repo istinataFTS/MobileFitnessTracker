@@ -27,12 +27,11 @@ void main() {
     return NutritionLog(
       id: id,
       mealName: 'Meal $id',
-      servingSizeGrams: 100,
       proteinGrams: 25,
       carbsGrams: 30,
       fatGrams: 10,
       calories: 310,
-      date: date,
+      loggedAt: date,
       createdAt: date,
     );
   }

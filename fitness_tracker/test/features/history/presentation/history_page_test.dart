@@ -4,7 +4,8 @@ import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/history/history.dart';
-import 'package:fitness_tracker/presentation/pages/exercises/bloc/exercise_bloc.dart';
+import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/features/library/application/exercise_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,7 +99,7 @@ void main() {
           BlocProvider<HistoryBloc>.value(value: historyBloc),
           BlocProvider<ExerciseBloc>.value(value: exerciseBloc),
         ],
-        child: const HistoryPage(),
+        child: const HistoryPage(settings: AppSettings.defaults()),
       ),
     );
   }

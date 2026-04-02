@@ -18,13 +18,11 @@ void main() {
       id: id,
       mealId: 'meal-$id',
       mealName: mealName,
-      servingSizeGrams: 100,
       gramsConsumed: gramsConsumed,
       proteinGrams: protein,
       carbsGrams: carbs,
       fatGrams: fats,
       calories: calories,
-      date: createdAt,
       loggedAt: createdAt,
       createdAt: createdAt,
     );

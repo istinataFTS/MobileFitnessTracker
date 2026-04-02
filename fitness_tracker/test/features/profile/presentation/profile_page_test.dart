@@ -201,7 +201,7 @@ void main() {
   ) async {
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => const Left(
-        CacheFailure(message: 'session unavailable'),
+        CacheFailure('session unavailable'),
       ),
     );
 
