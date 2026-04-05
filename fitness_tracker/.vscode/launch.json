@@ -16,7 +16,7 @@
       "args": [
         "--dart-define=APP_ENV=development",
         "--dart-define=ENABLE_SUPABASE=true",
-        "--dart-define=SUPABASE_URL=http://185.47.172.83:8000",
+        "--dart-define=SUPABASE_URL=https://liftleaguelegends.com",
         "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc1MDc5NTYzLCJleHAiOjE5MzI3NTk1NjN9.Pchm8XcfRaT0xAD7JHOE_53IJPoIuV1V6qGPK8dQZO4"
       ]
     },
@@ -27,7 +27,7 @@
       "args": [
         "--dart-define=APP_ENV=development",
         "--dart-define=ENABLE_SUPABASE=true",
-        "--dart-define=SUPABASE_URL=http://185.47.172.83:8000",
+        "--dart-define=SUPABASE_URL=https://liftleaguelegends.com",
         "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc1MDc5NTYzLCJleHAiOjE5MzI3NTk1NjN9.Pchm8XcfRaT0xAD7JHOE_53IJPoIuV1V6qGPK8dQZO4",
         "--dart-define=ENABLE_DEBUG_LOGS=true"
       ]
@@ -39,7 +39,7 @@
       "args": [
         "--dart-define=APP_ENV=staging",
         "--dart-define=ENABLE_SUPABASE=true",
-        "--dart-define=SUPABASE_URL=http://185.47.172.83:8000",
+        "--dart-define=SUPABASE_URL=https://liftleaguelegends.com",
         "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc1MDc5NTYzLCJleHAiOjE5MzI3NTk1NjN9.Pchm8XcfRaT0xAD7JHOE_53IJPoIuV1V6qGPK8dQZO4"
       ]
     }

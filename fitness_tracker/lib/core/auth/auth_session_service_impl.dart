@@ -36,11 +36,19 @@ class AuthSessionServiceImpl implements AuthSessionService {
         category: 'auth',
       );
 
-      return await _establishSession(
+      final sessionResult = await _establishSession(
         user: user,
         successMessage: 'sign-in completed successfully',
         actionLabel: 'sign-in',
       );
+
+      // Best-effort profile creation on first sign-in.
+      // Covers users who confirmed their email before a profile row existed.
+      if (sessionResult.isSuccess) {
+        await _ensureProfileExists(user);
+      }
+
+      return sessionResult;
     } catch (error, stackTrace) {
       AppLogger.warning(
         'Remote sign-in failed for $normalizedEmail: $error',
@@ -183,6 +191,36 @@ class AuthSessionServiceImpl implements AuthSessionService {
       message: successMessage,
       user: user,
       sessionResult: sessionResult,
+    );
+  }
+
+  /// Creates a profile row if none exists yet for this user.
+  ///
+  /// This handles the email-confirmation flow where sign-up returns early
+  /// before a session is established, so profile creation is deferred to
+  /// the first successful sign-in.
+  Future<void> _ensureProfileExists(AppUser user) async {
+    final existing = await userProfileRepository.getProfile(user.id);
+
+    final profileExists = existing.fold(
+      (_) => false,
+      (profile) => profile != null,
+    );
+
+    if (profileExists) return;
+
+    AppLogger.info(
+      'No profile found for ${user.id} — creating on first sign-in',
+      category: 'auth',
+    );
+
+    final username = user.displayName?.replaceAll(' ', '_').toLowerCase() ??
+        'user_${user.id.substring(0, 8)}';
+
+    await _createInitialProfile(
+      userId: user.id,
+      username: username,
+      displayName: user.displayName,
     );
   }
 
