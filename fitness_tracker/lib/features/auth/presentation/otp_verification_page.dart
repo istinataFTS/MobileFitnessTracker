@@ -17,15 +17,13 @@ class OtpVerificationPage extends StatelessWidget {
         authSessionService: di.sl<AuthSessionService>(),
         email: email,
       ),
-      child: _OtpVerificationView(email: email),
+      child: const _OtpVerificationView(),
     );
   }
 }
 
 class _OtpVerificationView extends StatefulWidget {
-  const _OtpVerificationView({required this.email});
-
-  final String email;
+  const _OtpVerificationView();
 
   @override
   State<_OtpVerificationView> createState() => _OtpVerificationViewState();
@@ -56,6 +54,7 @@ class _OtpVerificationViewState extends State<_OtpVerificationView> {
         }
       },
       builder: (context, state) {
+        final email = context.read<OtpVerificationCubit>().email;
         return Scaffold(
           appBar: AppBar(title: const Text('Check your email')),
           body: SafeArea(
@@ -70,7 +69,7 @@ class _OtpVerificationViewState extends State<_OtpVerificationView> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Enter the 6-digit code sent to ${widget.email}',
+                    'Enter the 6-digit code sent to $email',
                     style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),

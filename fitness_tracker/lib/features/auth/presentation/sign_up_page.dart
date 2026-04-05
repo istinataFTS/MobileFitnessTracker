@@ -41,6 +41,7 @@ class _SignUpViewState extends State<_SignUpView> {
   late final TextEditingController _confirmPasswordController;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+  bool _otpNavigationInProgress = false;
 
   @override
   void initState() {
@@ -81,16 +82,7 @@ class _SignUpViewState extends State<_SignUpView> {
         }
 
         if (state.isAwaitingEmailConfirmation && state.email != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            final confirmed = await Navigator.of(context).push<bool>(
-              MaterialPageRoute<bool>(
-                builder: (_) => OtpVerificationPage(email: state.email!),
-              ),
-            );
-            if (confirmed == true && context.mounted) {
-              Navigator.of(context).pop(true);
-            }
-          });
+          _navigateToOtpVerification(context, state.email!);
         }
       },
       builder: (context, state) {
@@ -201,5 +193,24 @@ class _SignUpViewState extends State<_SignUpView> {
           username: _usernameController.text,
         );
   }
-}
 
+  Future<void> _navigateToOtpVerification(
+    BuildContext context,
+    String email,
+  ) async {
+    if (_otpNavigationInProgress) return;
+    _otpNavigationInProgress = true;
+
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => OtpVerificationPage(email: email),
+      ),
+    );
+
+    _otpNavigationInProgress = false;
+
+    if ((confirmed ?? false) && context.mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+}

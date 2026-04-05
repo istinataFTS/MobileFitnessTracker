@@ -155,8 +155,18 @@ class AuthSessionServiceImpl implements AuthSessionService {
         actionLabel: 'otp-verification',
       );
 
+      // Profile is guaranteed absent at this point — the user just confirmed
+      // their email for the first time, so skip the existence check and write
+      // directly.
       if (sessionResult.isSuccess) {
-        await _ensureProfileExists(user);
+        final username =
+            user.displayName?.replaceAll(' ', '_').toLowerCase() ??
+                'user_${user.id.substring(0, 8)}';
+        await _createInitialProfile(
+          userId: user.id,
+          username: username,
+          displayName: user.displayName,
+        );
       }
 
       return sessionResult;

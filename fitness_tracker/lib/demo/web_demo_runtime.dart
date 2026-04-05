@@ -1597,7 +1597,6 @@ class WebDemoAuthSessionService implements AuthSessionService {
     required String email,
     required String token,
   }) async {
-    // Demo mode: OTP verification is not supported.
     throw UnsupportedError('OTP verification is not available in demo mode.');
   }
 
