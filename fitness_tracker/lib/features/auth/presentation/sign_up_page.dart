@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/auth/auth_session_service.dart';
 import '../../../injection/injection_container.dart' as di;
 import '../application/sign_up_cubit.dart';
+import 'otp_verification_page.dart';
 
 class SignUpPage extends StatelessWidget {
   const SignUpPage({super.key});
@@ -78,14 +79,21 @@ class _SignUpViewState extends State<_SignUpView> {
         if (state.isSuccess) {
           Navigator.of(context).pop(true);
         }
+
+        if (state.isAwaitingEmailConfirmation && state.email != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            final confirmed = await Navigator.of(context).push<bool>(
+              MaterialPageRoute<bool>(
+                builder: (_) => OtpVerificationPage(email: state.email!),
+              ),
+            );
+            if (confirmed == true && context.mounted) {
+              Navigator.of(context).pop(true);
+            }
+          });
+        }
       },
       builder: (context, state) {
-        if (state.isAwaitingEmailConfirmation) {
-          return _ConfirmationSentView(
-            email: _emailController.text.trim(),
-          );
-        }
-
         return Scaffold(
           appBar: AppBar(title: const Text('Create account')),
           body: SafeArea(
@@ -195,48 +203,3 @@ class _SignUpViewState extends State<_SignUpView> {
   }
 }
 
-/// Shown after a successful sign-up when email confirmation is required.
-class _ConfirmationSentView extends StatelessWidget {
-  const _ConfirmationSentView({required this.email});
-
-  final String email;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Check your email')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(
-                Icons.mark_email_unread_outlined,
-                size: 64,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Confirmation sent',
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'We sent a confirmation link to $email.\n'
-                'Open it to activate your account, then sign in.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Back to sign in'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -132,6 +132,52 @@ class AuthSessionServiceImpl implements AuthSessionService {
   }
 
   @override
+  Future<AuthSessionActionResult> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    final normalizedEmail = email.trim();
+
+    try {
+      final AppUser user = await authRemoteDataSource.verifyEmailOtp(
+        email: normalizedEmail,
+        token: token.trim(),
+      );
+
+      AppLogger.info(
+        'OTP verification succeeded for ${user.id}; establishing session',
+        category: 'auth',
+      );
+
+      final sessionResult = await _establishSession(
+        user: user,
+        successMessage: 'email verified successfully',
+        actionLabel: 'otp-verification',
+      );
+
+      if (sessionResult.isSuccess) {
+        await _ensureProfileExists(user);
+      }
+
+      return sessionResult;
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'OTP verification failed for $normalizedEmail: $error',
+        category: 'auth',
+      );
+      AppLogger.debug(
+        'OTP verification stack trace: $stackTrace',
+        category: 'auth',
+      );
+
+      return AuthSessionActionResult(
+        status: AuthSessionActionStatus.failed,
+        message: _resolveErrorMessage(error, action: 'otp-verification'),
+      );
+    }
+  }
+
+  @override
   Future<SessionSyncActionResult> signOut() {
     return sessionSyncService.signOut();
   }

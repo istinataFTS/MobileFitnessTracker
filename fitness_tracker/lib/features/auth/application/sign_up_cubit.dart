@@ -19,10 +19,12 @@ enum SignUpStatus {
 class SignUpState extends Equatable {
   final SignUpStatus status;
   final String? errorMessage;
+  final String? email;
 
   const SignUpState({
     required this.status,
     this.errorMessage,
+    this.email,
   });
 
   factory SignUpState.initial() =>
@@ -39,16 +41,18 @@ class SignUpState extends Equatable {
     SignUpStatus? status,
     String? errorMessage,
     bool clearErrorMessage = false,
+    String? email,
   }) {
     return SignUpState(
       status: status ?? this.status,
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      email: email ?? this.email,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[status, errorMessage];
+  List<Object?> get props => <Object?>[status, errorMessage, email];
 }
 
 class SignUpCubit extends Cubit<SignUpState> {
@@ -118,6 +122,7 @@ class SignUpCubit extends Cubit<SignUpState> {
         state.copyWith(
           status: SignUpStatus.awaitingEmailConfirmation,
           clearErrorMessage: true,
+          email: email.trim(),
         ),
       );
       return;

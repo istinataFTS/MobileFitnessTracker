@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/app_user.dart';
 import 'auth_remote_datasource.dart';
@@ -76,6 +78,29 @@ class SupabaseAuthRemoteDataSource implements AuthRemoteDataSource {
         // When Supabase requires email confirmation, no session is issued.
         requiresEmailConfirmation: response.session == null,
       );
+    });
+  }
+
+  @override
+  Future<AppUser> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      final response = await clientProvider.client.auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.signup,
+      );
+
+      final user = response.user;
+      if (user == null) {
+        throw const AuthSyncException(
+          'OTP verification completed without a user',
+        );
+      }
+
+      return _mapUser(user);
     });
   }
 

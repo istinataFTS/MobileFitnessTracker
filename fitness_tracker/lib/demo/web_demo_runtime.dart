@@ -1593,6 +1593,15 @@ class WebDemoAuthSessionService implements AuthSessionService {
   }
 
   @override
+  Future<AuthSessionActionResult> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    // Demo mode: OTP verification is not supported.
+    throw UnsupportedError('OTP verification is not available in demo mode.');
+  }
+
+  @override
   Future<SessionSyncActionResult> signOut() async {
     _store.session = const AppSession.guest();
     _store.migrationState = null;

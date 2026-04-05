@@ -27,6 +27,11 @@ abstract class AuthRemoteDataSource {
   });
 
 
+  Future<AppUser> verifyEmailOtp({
+    required String email,
+    required String token,
+  });
+
   Future<void> sendPasswordResetEmail({required String email});
 
   Future<void> signOut();

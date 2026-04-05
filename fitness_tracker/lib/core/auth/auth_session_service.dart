@@ -41,5 +41,12 @@ abstract class AuthSessionService {
     required String username,
   });
 
+  /// Verifies the 6-digit OTP sent to [email] during sign-up and establishes
+  /// the local session on success.
+  Future<AuthSessionActionResult> verifyEmailOtp({
+    required String email,
+    required String token,
+  });
+
   Future<SessionSyncActionResult> signOut();
 }

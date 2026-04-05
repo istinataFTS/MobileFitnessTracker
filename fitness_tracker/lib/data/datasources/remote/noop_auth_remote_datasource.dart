@@ -28,6 +28,14 @@ class NoopAuthRemoteDataSource implements AuthRemoteDataSource {
   }
 
   @override
+  Future<AppUser> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    throw UnsupportedError('Remote auth is not configured.');
+  }
+
+  @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     // No-op: password reset is not available without a remote backend.
   }
