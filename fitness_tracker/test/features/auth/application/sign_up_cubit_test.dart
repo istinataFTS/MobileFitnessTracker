@@ -223,6 +223,27 @@ void main() {
       expect(cubit.state.isAwaitingEmailConfirmation, isTrue);
       expect(cubit.state.errorMessage, isNull);
     });
+
+    test('stores trimmed email in state when awaiting email confirmation',
+        () async {
+      when(
+        () => authSessionService.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          username: any(named: 'username'),
+        ),
+      ).thenAnswer((_) async => confirmationResult);
+
+      await cubit.submit(
+        email: '  marin@test.com  ',
+        password: 'password123',
+        confirmPassword: 'password123',
+        username: 'marin',
+      );
+
+      expect(cubit.state.isAwaitingEmailConfirmation, isTrue);
+      expect(cubit.state.email, 'marin@test.com');
+    });
   });
 
   // ---------------------------------------------------------------------------

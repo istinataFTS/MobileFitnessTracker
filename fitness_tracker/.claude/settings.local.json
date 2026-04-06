@@ -17,7 +17,13 @@
       "Bash(grep -iv \"//.*redirect\")",
       "Bash(grep -v \"//.*\")",
       "Bash(grep -E \"\\\\.dart$\")",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(flutter test:*)",
+      "Bash(/tmp/check_tests.py:*)",
+      "Bash(python /tmp/check_tests.py)",
+      "Read(//tmp/**)",
+      "Bash(xargs wc:*)",
+      "Bash(xargs cat:*)"
     ]
   }
 }

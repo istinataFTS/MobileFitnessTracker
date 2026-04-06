@@ -74,6 +74,13 @@ void main() {
       );
     });
 
+    test('verifyEmailOtp throws UnsupportedError', () async {
+      await expectLater(
+        dataSource.verifyEmailOtp(email: 'test@test.com', token: '123456'),
+        throwsUnsupportedError,
+      );
+    });
+
     test('sendPasswordResetEmail is a silent no-op', () async {
       await expectLater(
         dataSource.sendPasswordResetEmail(email: 'test@test.com'),

@@ -1,9 +1,11 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service.dart';
 import 'package:fitness_tracker/core/auth/auth_session_service_impl.dart';
 import 'package:fitness_tracker/core/errors/sync_exceptions.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
+import 'package:fitness_tracker/domain/entities/user_profile.dart';
 import 'package:fitness_tracker/domain/repositories/user_profile_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -26,6 +28,14 @@ void main() {
     displayName: 'Marin',
   );
 
+  final profileFixture = UserProfile(
+    id: 'user-1',
+    username: 'marin',
+    displayName: 'Marin',
+    createdAt: DateTime(2026),
+    updatedAt: DateTime(2026),
+  );
+
   const sessionCompleted = SessionSyncActionResult(
     status: SessionSyncActionStatus.completed,
     message: 'authenticated session established',
@@ -40,6 +50,10 @@ void main() {
     status: SessionSyncActionStatus.skipped,
     message: 'initial sign-in sync skipped: migration pending',
   );
+
+  setUpAll(() {
+    registerFallbackValue(profileFixture);
+  });
 
   setUp(() {
     authRemoteDataSource = MockAuthRemoteDataSource();
@@ -61,14 +75,19 @@ void main() {
     test('authenticates remotely then establishes app session', () async {
       when(
         () => authRemoteDataSource.signInWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
+          email: 'marin@test.com',
+          password: 'secret-password',
         ),
       ).thenAnswer((_) async => user);
 
       when(
         () => sessionSyncService.establishAuthenticatedSession(user),
       ).thenAnswer((_) async => sessionCompleted);
+
+      // _ensureProfileExists reads the profile; stub it to report exists.
+      when(
+        () => userProfileRepository.getProfile('user-1'),
+      ).thenAnswer((_) async => Right(profileFixture));
 
       final result = await service.signInWithEmail(
         email: ' marin@test.com ',
@@ -96,8 +115,8 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signInWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
+          email: 'marin@test.com',
+          password: 'bad-password',
         ),
       ).thenAnswer(
         (_) async => throw const AuthSyncException('invalid login credentials'),
@@ -109,10 +128,7 @@ void main() {
       );
 
       expect(result.isFailure, isTrue);
-      expect(
-        result.message,
-        'sign-in failed: invalid login credentials',
-      );
+      expect(result.message, 'sign-in failed: invalid login credentials');
 
       verifyNever(
         () => sessionSyncService.establishAuthenticatedSession(any()),
@@ -122,8 +138,8 @@ void main() {
     test('returns network message when network is unavailable', () async {
       when(
         () => authRemoteDataSource.signInWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
+          email: 'marin@test.com',
+          password: 'secret-password',
         ),
       ).thenAnswer(
         (_) async => throw const NetworkSyncException('connection refused'),
@@ -145,8 +161,8 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signInWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
+          email: 'marin@test.com',
+          password: 'secret-password',
         ),
       ).thenAnswer((_) async => user);
 
@@ -171,8 +187,8 @@ void main() {
     test('returns failure when session initialization is skipped', () async {
       when(
         () => authRemoteDataSource.signInWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
+          email: 'marin@test.com',
+          password: 'secret-password',
         ),
       ).thenAnswer((_) async => user);
 
@@ -214,15 +230,19 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signUpWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-          username: any(named: 'username'),
+          email: 'marin@test.com',
+          password: 'secret-password',
+          username: 'marin',
         ),
       ).thenAnswer((_) async => signUpResult);
 
       when(
         () => sessionSyncService.establishAuthenticatedSession(user),
       ).thenAnswer((_) async => sessionCompleted);
+
+      when(
+        () => userProfileRepository.upsertProfile(any()),
+      ).thenAnswer((_) async => Right(profileFixture));
 
       final result = await service.signUpWithEmail(
         email: 'marin@test.com',
@@ -245,9 +265,9 @@ void main() {
         'confirmation', () async {
       when(
         () => authRemoteDataSource.signUpWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-          username: any(named: 'username'),
+          email: 'marin@test.com',
+          password: 'secret-password',
+          username: 'marin',
         ),
       ).thenAnswer((_) async => signUpResultWithConfirmation);
 
@@ -259,10 +279,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       expect(result.requiresEmailConfirmation, isTrue);
-      expect(
-        result.message,
-        contains('check your email'),
-      );
+      expect(result.message, contains('check your email'));
 
       // Session must NOT be established while email is unconfirmed.
       verifyNever(
@@ -274,9 +291,9 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signUpWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-          username: any(named: 'username'),
+          email: 'marin@test.com',
+          password: 'secret-password',
+          username: 'marin',
         ),
       ).thenAnswer(
         (_) async =>
@@ -301,9 +318,9 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signUpWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-          username: any(named: 'username'),
+          email: 'marin@test.com',
+          password: 'secret-password',
+          username: 'marin',
         ),
       ).thenAnswer(
         (_) async => throw const NetworkSyncException('no route to host'),
@@ -327,9 +344,9 @@ void main() {
         () async {
       when(
         () => authRemoteDataSource.signUpWithEmail(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-          username: any(named: 'username'),
+          email: 'marin@test.com',
+          password: 'secret-password',
+          username: 'marin',
         ),
       ).thenAnswer((_) async => signUpResult);
 
@@ -349,6 +366,135 @@ void main() {
         contains('sign-up succeeded but session initialization failed'),
       );
       expect(result.user, user);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // verifyEmailOtp
+  // ---------------------------------------------------------------------------
+
+  group('verifyEmailOtp', () {
+    test(
+        'verifies OTP remotely, establishes session, and creates initial profile',
+        () async {
+      when(
+        () => authRemoteDataSource.verifyEmailOtp(
+          email: 'marin@test.com',
+          token: '123456',
+        ),
+      ).thenAnswer((_) async => user);
+
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionCompleted);
+
+      when(
+        () => userProfileRepository.upsertProfile(any()),
+      ).thenAnswer((_) async => Right(profileFixture));
+
+      final result = await service.verifyEmailOtp(
+        email: ' marin@test.com ',
+        token: '123456',
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(result.message, 'email verified successfully');
+      expect(result.user, user);
+
+      verify(
+        () => authRemoteDataSource.verifyEmailOtp(
+          email: 'marin@test.com',
+          token: '123456',
+        ),
+      ).called(1);
+
+      verify(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).called(1);
+
+      verify(
+        () => userProfileRepository.upsertProfile(any()),
+      ).called(1);
+    });
+
+    test('returns failure with auth message when OTP is invalid or expired',
+        () async {
+      when(
+        () => authRemoteDataSource.verifyEmailOtp(
+          email: 'marin@test.com',
+          token: '000000',
+        ),
+      ).thenAnswer(
+        (_) async =>
+            throw const AuthSyncException('token has expired or is invalid'),
+      );
+
+      final result = await service.verifyEmailOtp(
+        email: 'marin@test.com',
+        token: '000000',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'otp-verification failed: token has expired or is invalid',
+      );
+
+      verifyNever(
+        () => sessionSyncService.establishAuthenticatedSession(any()),
+      );
+    });
+
+    test('returns network message when network is unavailable', () async {
+      when(
+        () => authRemoteDataSource.verifyEmailOtp(
+          email: 'marin@test.com',
+          token: '123456',
+        ),
+      ).thenAnswer(
+        (_) async => throw const NetworkSyncException('connection timed out'),
+      );
+
+      final result = await service.verifyEmailOtp(
+        email: 'marin@test.com',
+        token: '123456',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'Network unavailable. Please check your connection.',
+      );
+    });
+
+    test(
+        'returns failure when OTP is valid but session initialization fails',
+        () async {
+      when(
+        () => authRemoteDataSource.verifyEmailOtp(
+          email: 'marin@test.com',
+          token: '123456',
+        ),
+      ).thenAnswer((_) async => user);
+
+      when(
+        () => sessionSyncService.establishAuthenticatedSession(user),
+      ).thenAnswer((_) async => sessionFailed);
+
+      final result = await service.verifyEmailOtp(
+        email: 'marin@test.com',
+        token: '123456',
+      );
+
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        contains('otp-verification succeeded but session initialization failed'),
+      );
+      expect(result.user, user);
+
+      // Profile must not be created when session fails.
+      verifyNever(() => userProfileRepository.upsertProfile(any()));
     });
   });
 }
