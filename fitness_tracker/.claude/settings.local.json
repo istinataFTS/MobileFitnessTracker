@@ -23,7 +23,9 @@
       "Bash(python /tmp/check_tests.py)",
       "Read(//tmp/**)",
       "Bash(xargs wc:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
