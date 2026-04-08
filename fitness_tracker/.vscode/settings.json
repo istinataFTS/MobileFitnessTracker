@@ -1,3 +1,8 @@
 {
-    "git.ignoreLimitWarning": true
-}
+    "explorer.decorations.colors": true,
+    "problems.decorations.enabled": false,
+  
+    "workbench.colorCustomizations": {
+      "gitDecoration.modifiedResourceForeground": "#d19a66"
+    }
+  }

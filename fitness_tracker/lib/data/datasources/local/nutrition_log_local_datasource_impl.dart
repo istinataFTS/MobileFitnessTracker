@@ -4,12 +4,14 @@ import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/sync/local_remote_merge.dart';
+import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/nutrition_log_model.dart';
 import 'database_helper.dart';
 import 'nutrition_log_local_datasource.dart';
 
 class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   final DatabaseHelper databaseHelper;
+  final AppSessionRepository appSessionRepository;
 
   static final LocalRemoteMerge<NutritionLogModel> _merge =
       LocalRemoteMerge<NutritionLogModel>(
@@ -18,7 +20,15 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
         getSyncMetadata: (log) => log.syncMetadata,
       );
 
-  const NutritionLogLocalDataSourceImpl({required this.databaseHelper});
+  const NutritionLogLocalDataSourceImpl({
+    required this.databaseHelper,
+    required this.appSessionRepository,
+  });
+
+  Future<String?> _getCurrentUserId() async {
+    final result = await appSessionRepository.getCurrentSession();
+    return result.fold((_) => null, (session) => session.user?.id);
+  }
 
   @override
   Future<List<NutritionLogModel>> getAllLogs() async {
@@ -41,6 +51,10 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   @override
   Future<List<NutritionLogModel>> getLogsByDate(DateTime date) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
@@ -48,11 +62,12 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)$userFilter',
         whereArgs: [
           startOfDay.toIso8601String(),
           endOfDay.toIso8601String(),
           SyncStatus.pendingDelete.name,
+          ...userArgs,
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
@@ -69,6 +84,10 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
     DateTime endDate,
   ) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final start = DateTime(startDate.year, startDate.month, startDate.day);
       final end = DateTime(
@@ -83,11 +102,12 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
+            '${DatabaseTables.nutritionLogDate} >= ? AND ${DatabaseTables.nutritionLogDate} <= ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)$userFilter',
         whereArgs: [
           start.toIso8601String(),
           end.toIso8601String(),
           SyncStatus.pendingDelete.name,
+          ...userArgs,
         ],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
@@ -101,12 +121,16 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   @override
   Future<List<NutritionLogModel>> getLogsByMealId(String mealId) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogMealId} = ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
-        whereArgs: [mealId, SyncStatus.pendingDelete.name],
+            '${DatabaseTables.nutritionLogMealId} = ? AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)$userFilter',
+        whereArgs: [mealId, SyncStatus.pendingDelete.name, ...userArgs],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -145,12 +169,16 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   @override
   Future<List<NutritionLogModel>> getMealLogs() async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogMealId} IS NOT NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
-        whereArgs: [SyncStatus.pendingDelete.name],
+            '${DatabaseTables.nutritionLogMealId} IS NOT NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)$userFilter',
+        whereArgs: [SyncStatus.pendingDelete.name, ...userArgs],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();
@@ -162,12 +190,16 @@ class NutritionLogLocalDataSourceImpl implements NutritionLogLocalDataSource {
   @override
   Future<List<NutritionLogModel>> getDirectMacroLogs() async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.nutritionLogs,
         where:
-            '${DatabaseTables.nutritionLogMealId} IS NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)',
-        whereArgs: [SyncStatus.pendingDelete.name],
+            '${DatabaseTables.nutritionLogMealId} IS NULL AND (${DatabaseTables.nutritionLogSyncStatus} IS NULL OR ${DatabaseTables.nutritionLogSyncStatus} != ?)$userFilter',
+        whereArgs: [SyncStatus.pendingDelete.name, ...userArgs],
         orderBy: '${DatabaseTables.nutritionLogCreatedAt} DESC',
       );
       return maps.map(NutritionLogModel.fromMap).toList();

@@ -5,12 +5,14 @@ import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/entities/workout_set.dart';
+import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/workout_set_model.dart';
 import 'database_helper.dart';
 import 'workout_set_local_datasource.dart';
 
 class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   final DatabaseHelper databaseHelper;
+  final AppSessionRepository appSessionRepository;
 
   static final LocalRemoteMerge<WorkoutSet> _merge =
       LocalRemoteMerge<WorkoutSet>(
@@ -19,7 +21,15 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
         getSyncMetadata: (set) => set.syncMetadata,
       );
 
-  const WorkoutSetLocalDataSourceImpl({required this.databaseHelper});
+  const WorkoutSetLocalDataSourceImpl({
+    required this.databaseHelper,
+    required this.appSessionRepository,
+  });
+
+  Future<String?> _getCurrentUserId() async {
+    final result = await appSessionRepository.getCurrentSession();
+    return result.fold((_) => null, (session) => session.user?.id);
+  }
 
   @override
   Future<List<WorkoutSet>> getAllSets() async {
@@ -42,15 +52,18 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   @override
   Future<List<WorkoutSet>> getSetsByExerciseId(String exerciseId) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.workoutSets,
-        where:
-            '''
+        where: '''
           ${DatabaseTables.setExerciseId} = ? AND
-          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)$userFilter
         ''',
-        whereArgs: [exerciseId, SyncStatus.pendingDelete.name],
+        whereArgs: [exerciseId, SyncStatus.pendingDelete.name, ...userArgs],
         orderBy:
             '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
       );
@@ -67,19 +80,23 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
     DateTime endDate,
   ) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.workoutSets,
-        where:
-            '''
+        where: '''
           ${DatabaseTables.setDate} >= ? AND
           ${DatabaseTables.setDate} <= ? AND
-          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+          (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)$userFilter
         ''',
         whereArgs: [
           startDate.toIso8601String(),
           endDate.toIso8601String(),
           SyncStatus.pendingDelete.name,
+          ...userArgs,
         ],
         orderBy:
             '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
@@ -328,12 +345,16 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   Future<List<WorkoutSet>> _getVisibleSets() async {
+    final userId = await _getCurrentUserId();
+    final userFilter =
+        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+    final userArgs = userId != null ? [userId] : <Object?>[];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.workoutSets,
       where:
-          '${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?',
-      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+          '(${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)$userFilter',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name, ...userArgs],
       orderBy:
           '${DatabaseTables.setDate} DESC, ${DatabaseTables.setCreatedAt} DESC',
     );
@@ -342,15 +363,18 @@ class WorkoutSetLocalDataSourceImpl implements WorkoutSetLocalDataSource {
   }
 
   Future<WorkoutSet?> _getVisibleSetById(String id) async {
+    final userId = await _getCurrentUserId();
+    final userFilter =
+        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+    final userArgs = userId != null ? [userId] : <Object?>[];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.workoutSets,
-      where:
-          '''
+      where: '''
         ${DatabaseTables.setId} = ? AND
-        (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)
+        (${DatabaseTables.setSyncStatus} IS NULL OR ${DatabaseTables.setSyncStatus} != ?)$userFilter
       ''',
-      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name, ...userArgs],
       limit: 1,
     );
 

@@ -25,7 +25,11 @@
       "Bash(xargs wc:*)",
       "Bash(xargs cat:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(grep -rn \"Confirmation sent\\\\|Back to sign in\\\\|activate your account\\\\|confirmation link\" /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker --include=*.dart --include=*.arb --include=*.json)",
+      "Bash(find /c/Users/User/Desktop/AllinAll/MobileApp/fitness_tracker -name *.html -o -name *.htm)",
+      "Bash(xargs grep:*)",
+      "Bash(ssh root@lsfc1914 \"grep 'ENABLE_EMAIL_AUTOCONFIRM' /root/supabase/docker/.env\")"
     ]
   }
 }
