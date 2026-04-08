@@ -62,7 +62,10 @@ void registerTargetsModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<TargetLocalDataSource>(
-    () => TargetLocalDataSourceImpl(databaseHelper: sl()),
+    () => TargetLocalDataSourceImpl(
+      databaseHelper: sl(),
+      appSessionRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton<TargetRemoteDataSource>(

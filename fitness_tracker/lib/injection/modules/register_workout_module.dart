@@ -73,7 +73,10 @@ void registerWorkoutModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<WorkoutSetLocalDataSource>(
-    () => WorkoutSetLocalDataSourceImpl(databaseHelper: sl()),
+    () => WorkoutSetLocalDataSourceImpl(
+      databaseHelper: sl(),
+      appSessionRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton<PendingSyncDeleteLocalDataSource>(

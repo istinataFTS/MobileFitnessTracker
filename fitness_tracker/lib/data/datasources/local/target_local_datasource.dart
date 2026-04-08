@@ -5,6 +5,7 @@ import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/entities/target.dart';
+import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/target_model.dart';
 import 'database_helper.dart';
 
@@ -37,6 +38,7 @@ abstract class TargetLocalDataSource {
 
 class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   final DatabaseHelper databaseHelper;
+  final AppSessionRepository appSessionRepository;
 
   static final LocalRemoteMerge<TargetModel> _merge =
       LocalRemoteMerge<TargetModel>(
@@ -45,7 +47,15 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
         getSyncMetadata: (target) => target.syncMetadata,
       );
 
-  const TargetLocalDataSourceImpl({required this.databaseHelper});
+  const TargetLocalDataSourceImpl({
+    required this.databaseHelper,
+    required this.appSessionRepository,
+  });
+
+  Future<String?> _getCurrentUserId() async {
+    final result = await appSessionRepository.getCurrentSession();
+    return result.fold((_) => null, (session) => session.user?.id);
+  }
 
   @override
   Future<List<TargetModel>> getAllTargets() async {
@@ -72,24 +82,29 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
     TargetPeriod period,
   ) async {
     try {
+      final userId = await _getCurrentUserId();
+      final userFilter =
+          userId != null ? 'AND ${DatabaseTables.ownerUserId} = ?' : '';
+      final userArgs = userId != null ? [userId] : <Object?>[];
       final db = await databaseHelper.database;
       final typeValue = _targetTypeToString(type);
       final periodValue = _targetPeriodToString(period);
 
       final maps = await db.query(
         DatabaseTables.targets,
-        where:
-            '''
+        where: '''
           ${DatabaseTables.targetType} = ? AND
           ${DatabaseTables.targetCategoryKey} = ? AND
           ${DatabaseTables.targetPeriod} = ? AND
           (${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)
+          $userFilter
         ''',
         whereArgs: [
           typeValue,
           categoryKey,
           periodValue,
           SyncStatus.pendingDelete.name,
+          ...userArgs,
         ],
         limit: 1,
       );
@@ -340,14 +355,17 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   }
 
   Future<List<TargetModel>> _getVisibleTargets() async {
+    final userId = await _getCurrentUserId();
+    final userFilter =
+        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+    final userArgs = userId != null ? [userId] : <Object?>[];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.targets,
       where:
-          '${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?',
-      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
-      orderBy:
-          '''
+          '(${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)$userFilter',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name, ...userArgs],
+      orderBy: '''
         ${DatabaseTables.targetType} ASC,
         ${DatabaseTables.targetPeriod} ASC,
         ${DatabaseTables.targetCreatedAt} DESC
@@ -358,12 +376,16 @@ class TargetLocalDataSourceImpl implements TargetLocalDataSource {
   }
 
   Future<TargetModel?> _getVisibleTargetById(String id) async {
+    final userId = await _getCurrentUserId();
+    final userFilter =
+        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
+    final userArgs = userId != null ? [userId] : <Object?>[];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.targets,
       where:
-          '${DatabaseTables.targetId} = ? AND (${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)',
-      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+          '${DatabaseTables.targetId} = ? AND (${DatabaseTables.targetSyncStatus} IS NULL OR ${DatabaseTables.targetSyncStatus} != ?)$userFilter',
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name, ...userArgs],
       limit: 1,
     );
 

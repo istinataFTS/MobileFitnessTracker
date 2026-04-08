@@ -153,11 +153,17 @@ void registerMealsNutritionModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<MealLocalDataSource>(
-    () => MealLocalDataSourceImpl(databaseHelper: sl()),
+    () => MealLocalDataSourceImpl(
+      databaseHelper: sl(),
+      appSessionRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton<NutritionLogLocalDataSource>(
-    () => NutritionLogLocalDataSourceImpl(databaseHelper: sl()),
+    () => NutritionLogLocalDataSourceImpl(
+      databaseHelper: sl(),
+      appSessionRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton<MealRemoteDataSource>(
