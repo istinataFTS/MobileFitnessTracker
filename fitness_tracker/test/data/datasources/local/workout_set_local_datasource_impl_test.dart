@@ -1,9 +1,14 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:fitness_tracker/data/datasources/local/workout_set_local_datasource_impl.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite/sqflite.dart';
@@ -11,11 +16,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database database;
   late MockDatabaseHelper databaseHelper;
+  late MockAppSessionRepository mockSessionRepository;
   late WorkoutSetLocalDataSourceImpl dataSource;
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
@@ -77,7 +85,20 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
-    dataSource = WorkoutSetLocalDataSourceImpl(databaseHelper: databaseHelper);
+    mockSessionRepository = MockAppSessionRepository();
+    when(() => mockSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: AppUser(id: 'user-1', email: 'user1@test.com'),
+        ),
+      ),
+    );
+
+    dataSource = WorkoutSetLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+      appSessionRepository: mockSessionRepository,
+    );
   });
 
   tearDown(() async {
@@ -350,6 +371,62 @@ void main() {
         rawRows.single[DatabaseTables.setSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('WorkoutSetLocalDataSourceImpl user isolation', () {
+    test('getAllSets only returns sets owned by the current user', () async {
+      await dataSource.addSet(
+        buildSet(id: 'set-1', exerciseId: 'bench', date: baseDate),
+      );
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-2',
+          exerciseId: 'squat',
+          date: baseDate,
+        ).copyWith(ownerUserId: 'user-2'),
+      );
+
+      final sets = await dataSource.getAllSets();
+
+      expect(sets.map((s) => s.id).toList(), <String>['set-1']);
+    });
+
+    test('getSetsByExerciseId excludes other users sets', () async {
+      await dataSource.addSet(
+        buildSet(id: 'set-1', exerciseId: 'bench', date: baseDate),
+      );
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-2',
+          exerciseId: 'bench',
+          date: baseDate,
+        ).copyWith(ownerUserId: 'user-2'),
+      );
+
+      final sets = await dataSource.getSetsByExerciseId('bench');
+
+      expect(sets.map((s) => s.id).toList(), <String>['set-1']);
+    });
+
+    test('getSetsByDateRange excludes other users sets', () async {
+      await dataSource.addSet(
+        buildSet(id: 'set-1', exerciseId: 'bench', date: baseDate),
+      );
+      await dataSource.addSet(
+        buildSet(
+          id: 'set-2',
+          exerciseId: 'squat',
+          date: baseDate,
+        ).copyWith(ownerUserId: 'user-2'),
+      );
+
+      final sets = await dataSource.getSetsByDateRange(
+        baseDate.subtract(const Duration(hours: 1)),
+        baseDate.add(const Duration(hours: 1)),
+      );
+
+      expect(sets.map((s) => s.id).toList(), <String>['set-1']);
     });
   });
 

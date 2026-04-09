@@ -1,9 +1,14 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datasource_impl.dart';
 import 'package:fitness_tracker/data/models/nutrition_log_model.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite/sqflite.dart';
@@ -11,11 +16,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database database;
   late MockDatabaseHelper databaseHelper;
+  late MockAppSessionRepository mockSessionRepository;
   late NutritionLogLocalDataSourceImpl dataSource;
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
@@ -89,8 +97,19 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
+    mockSessionRepository = MockAppSessionRepository();
+    when(() => mockSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: AppUser(id: 'user-1', email: 'user1@test.com'),
+        ),
+      ),
+    );
+
     dataSource = NutritionLogLocalDataSourceImpl(
       databaseHelper: databaseHelper,
+      appSessionRepository: mockSessionRepository,
     );
   });
 
@@ -378,6 +397,64 @@ void main() {
         rawRows.single[DatabaseTables.nutritionLogSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('NutritionLogLocalDataSourceImpl user isolation', () {
+    test('getAllLogs only returns logs owned by the current user', () async {
+      await dataSource.insertLog(
+        buildLog(id: 'log-1', loggedAt: baseDate, ownerUserId: 'user-1'),
+      );
+      await dataSource.insertLog(
+        buildLog(id: 'log-2', loggedAt: baseDate, ownerUserId: 'user-2'),
+      );
+
+      final logs = await dataSource.getAllLogs();
+
+      expect(logs.map((l) => l.id).toList(), <String>['log-1']);
+    });
+
+    test('getLogsByDate only returns current user logs', () async {
+      await dataSource.insertLog(
+        buildLog(id: 'log-1', loggedAt: baseDate, ownerUserId: 'user-1'),
+      );
+      await dataSource.insertLog(
+        buildLog(id: 'log-2', loggedAt: baseDate, ownerUserId: 'user-2'),
+      );
+
+      final logs = await dataSource.getLogsByDate(baseDate);
+
+      expect(logs.map((l) => l.id).toList(), <String>['log-1']);
+    });
+
+    test('getDailyMacros only sums current user logs', () async {
+      await dataSource.insertLog(
+        buildLog(
+          id: 'log-1',
+          loggedAt: baseDate,
+          ownerUserId: 'user-1',
+          calories: 500,
+          protein: 40,
+          carbs: 50,
+          fat: 15,
+        ),
+      );
+      await dataSource.insertLog(
+        buildLog(
+          id: 'log-2',
+          loggedAt: baseDate,
+          ownerUserId: 'user-2',
+          calories: 999,
+          protein: 99,
+          carbs: 99,
+          fat: 99,
+        ),
+      );
+
+      final macros = await dataSource.getDailyMacros(baseDate);
+
+      expect(macros['totalCalories'], 500.0);
+      expect(macros['totalProtein'], 40.0);
     });
   });
 

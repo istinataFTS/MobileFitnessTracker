@@ -1,9 +1,14 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:fitness_tracker/data/datasources/local/meal_local_datasource_impl.dart';
 import 'package:fitness_tracker/data/models/meal_model.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite/sqflite.dart';
@@ -11,11 +16,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database database;
   late MockDatabaseHelper databaseHelper;
+  late MockAppSessionRepository mockSessionRepository;
   late MealLocalDataSourceImpl dataSource;
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
@@ -78,7 +86,20 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
-    dataSource = MealLocalDataSourceImpl(databaseHelper: databaseHelper);
+    mockSessionRepository = MockAppSessionRepository();
+    when(() => mockSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: AppUser(id: 'user-1', email: 'user1@test.com'),
+        ),
+      ),
+    );
+
+    dataSource = MealLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+      appSessionRepository: mockSessionRepository,
+    );
   });
 
   tearDown(() async {
@@ -325,6 +346,61 @@ void main() {
         rawRows.single[DatabaseTables.mealSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('MealLocalDataSourceImpl user isolation', () {
+    test('getAllMeals only returns meals owned by the current user', () async {
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-1', name: 'My Meal', ownerUserId: 'user-1'),
+      );
+      await dataSource.insertMeal(
+        buildMeal(
+          id: 'meal-2',
+          name: 'Other User Meal',
+          ownerUserId: 'user-2',
+        ),
+      );
+
+      final meals = await dataSource.getAllMeals();
+
+      expect(meals.map((m) => m.id).toList(), <String>['meal-1']);
+    });
+
+    test('getMealById returns null for a meal owned by another user', () async {
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-1', name: 'Other Meal', ownerUserId: 'user-2'),
+      );
+
+      final meal = await dataSource.getMealById('meal-1');
+
+      expect(meal, isNull);
+    });
+
+    test('searchMealsByName excludes other users meals', () async {
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-1', name: 'Chicken Bowl', ownerUserId: 'user-1'),
+      );
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-2', name: 'Chicken Rice', ownerUserId: 'user-2'),
+      );
+
+      final results = await dataSource.searchMealsByName('Chicken');
+
+      expect(results.map((m) => m.id).toList(), <String>['meal-1']);
+    });
+
+    test('getMealsCount excludes other users meals', () async {
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-1', name: 'My Meal', ownerUserId: 'user-1'),
+      );
+      await dataSource.insertMeal(
+        buildMeal(id: 'meal-2', name: 'Other Meal', ownerUserId: 'user-2'),
+      );
+
+      final count = await dataSource.getMealsCount();
+
+      expect(count, 1);
     });
   });
 

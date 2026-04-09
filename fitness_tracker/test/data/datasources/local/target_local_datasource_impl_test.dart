@@ -1,10 +1,15 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:fitness_tracker/data/datasources/local/target_local_datasource.dart';
 import 'package:fitness_tracker/data/models/target_model.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite/sqflite.dart';
@@ -12,11 +17,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database database;
   late MockDatabaseHelper databaseHelper;
+  late MockAppSessionRepository mockSessionRepository;
   late TargetLocalDataSourceImpl dataSource;
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
@@ -80,7 +88,20 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
-    dataSource = TargetLocalDataSourceImpl(databaseHelper: databaseHelper);
+    mockSessionRepository = MockAppSessionRepository();
+    when(() => mockSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: AppUser(id: 'user-1', email: 'user1@test.com'),
+        ),
+      ),
+    );
+
+    dataSource = TargetLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+      appSessionRepository: mockSessionRepository,
+    );
   });
 
   tearDown(() async {
@@ -334,6 +355,57 @@ void main() {
         rawRows.single[DatabaseTables.targetSyncStatus],
         SyncStatus.pendingDelete.name,
       );
+    });
+  });
+
+  group('TargetLocalDataSourceImpl user isolation', () {
+    test('getAllTargets only returns targets owned by the current user',
+        () async {
+      await dataSource.insertTarget(
+        buildTarget(id: 'target-1', categoryKey: 'chest', ownerUserId: 'user-1'),
+      );
+      await dataSource.insertTarget(
+        buildTarget(id: 'target-2', categoryKey: 'back', ownerUserId: 'user-2'),
+      );
+
+      final targets = await dataSource.getAllTargets();
+
+      expect(targets.map((t) => t.id).toList(), <String>['target-1']);
+    });
+
+    test('getTargetById returns null for a target owned by another user',
+        () async {
+      await dataSource.insertTarget(
+        buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          ownerUserId: 'user-2',
+        ),
+      );
+
+      final target = await dataSource.getTargetById('target-1');
+
+      expect(target, isNull);
+    });
+
+    test(
+        'getTargetByTypeAndCategory returns null for another user\'s target',
+        () async {
+      await dataSource.insertTarget(
+        buildTarget(
+          id: 'target-1',
+          categoryKey: 'chest',
+          ownerUserId: 'user-2',
+        ),
+      );
+
+      final target = await dataSource.getTargetByTypeAndCategory(
+        TargetType.muscleSets,
+        'chest',
+        TargetPeriod.weekly,
+      );
+
+      expect(target, isNull);
     });
   });
 
