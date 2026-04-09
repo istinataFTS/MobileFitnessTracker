@@ -13,6 +13,10 @@ import '../core/sync/sync_feature.dart';
 import '../core/sync/sync_orchestrator.dart';
 import '../core/sync/sync_orchestrator_impl.dart';
 import '../data/datasources/local/database_helper.dart';
+import '../data/datasources/local/meal_local_datasource.dart';
+import '../data/datasources/local/nutrition_log_local_datasource.dart';
+import '../data/datasources/local/target_local_datasource.dart';
+import '../data/datasources/local/workout_set_local_datasource.dart';
 import '../data/sync/exercise_sync_coordinator.dart';
 import '../data/sync/meal_sync_coordinator.dart';
 import '../data/sync/nutrition_log_sync_coordinator.dart';
@@ -155,6 +159,10 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
+      mealLocalDataSource: sl(),
+      nutritionLogLocalDataSource: sl(),
+      targetLocalDataSource: sl(),
+      workoutSetLocalDataSource: sl(),
     ),
   );
 

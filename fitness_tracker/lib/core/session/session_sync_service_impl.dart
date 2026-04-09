@@ -1,4 +1,8 @@
 import '../../core/logging/app_logger.dart';
+import '../../data/datasources/local/meal_local_datasource.dart';
+import '../../data/datasources/local/nutrition_log_local_datasource.dart';
+import '../../data/datasources/local/target_local_datasource.dart';
+import '../../data/datasources/local/workout_set_local_datasource.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../enums/sync_trigger.dart';
 import '../sync/sync_orchestrator.dart';
@@ -10,11 +14,19 @@ class SessionSyncServiceImpl implements SessionSyncService {
   final AppSessionRepository appSessionRepository;
   final AuthRemoteDataSource authRemoteDataSource;
   final SyncOrchestrator syncOrchestrator;
+  final MealLocalDataSource mealLocalDataSource;
+  final NutritionLogLocalDataSource nutritionLogLocalDataSource;
+  final TargetLocalDataSource targetLocalDataSource;
+  final WorkoutSetLocalDataSource workoutSetLocalDataSource;
 
   const SessionSyncServiceImpl({
     required this.appSessionRepository,
     required this.authRemoteDataSource,
     required this.syncOrchestrator,
+    required this.mealLocalDataSource,
+    required this.nutritionLogLocalDataSource,
+    required this.targetLocalDataSource,
+    required this.workoutSetLocalDataSource,
   });
 
   @override
@@ -138,8 +150,10 @@ class SessionSyncServiceImpl implements SessionSyncService {
         );
       },
       (_) async {
+        await _clearAllLocalUserData();
+
         AppLogger.info(
-          'Session signed out and local session reset completed',
+          'Session signed out, local session reset, and local user data cleared',
           category: 'session',
         );
 
@@ -149,5 +163,21 @@ class SessionSyncServiceImpl implements SessionSyncService {
         );
       },
     );
+  }
+
+  Future<void> _clearAllLocalUserData() async {
+    try {
+      await Future.wait(<Future<void>>[
+        mealLocalDataSource.clearAllMeals(),
+        nutritionLogLocalDataSource.clearAllLogs(),
+        targetLocalDataSource.clearAllTargets(),
+        workoutSetLocalDataSource.clearAllSets(),
+      ]);
+    } catch (error) {
+      AppLogger.warning(
+        'Failed to fully clear local user data on sign-out: $error',
+        category: 'session',
+      );
+    }
   }
 }
