@@ -6,6 +6,7 @@ import '../../data/datasources/remote/supabase_user_profile_remote_datasource.da
 import '../../data/datasources/remote/user_profile_remote_datasource.dart';
 import '../../data/repositories/user_profile_repository_impl.dart';
 import '../../domain/repositories/user_profile_repository.dart';
+import '../../features/profile/application/profile_cubit.dart';
 
 void registerProfileModule(GetIt sl) {
   sl.registerLazySingleton<UserProfileRemoteDataSource>(
@@ -16,5 +17,17 @@ void registerProfileModule(GetIt sl) {
 
   sl.registerLazySingleton<UserProfileRepository>(
     () => UserProfileRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Factory so each BlocProvider gets a fresh instance. At app level this means
+  // exactly one instance exists for the lifetime of the widget tree; future
+  // test harnesses can inject a fresh one per test without teardown concerns.
+  sl.registerFactory<ProfileCubit>(
+    () => ProfileCubit(
+      repository: sl(),
+      sessionSyncService: sl(),
+      authSessionService: sl(),
+      userProfileRepository: sl(),
+    ),
   );
 }

@@ -16,6 +16,7 @@ import '../features/home/application/muscle_visual_bloc.dart';
 import '../features/library/application/exercise_bloc.dart';
 import '../features/library/application/meal_bloc.dart';
 import '../features/log/log.dart';
+import '../features/profile/application/profile_cubit.dart';
 import '../features/settings/application/app_settings_cubit.dart';
 import '../features/settings/presentation/settings_scope.dart';
 import '../features/targets/application/targets_bloc.dart';
@@ -52,6 +53,9 @@ class FitnessTrackerApp extends StatelessWidget {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AppSettingsCubit>(
           create: (_) => AppSettingsCubit(repository: di.sl())..loadSettings(),
+        ),
+        BlocProvider<ProfileCubit>(
+          create: (_) => di.sl<ProfileCubit>()..loadProfile(),
         ),
         BlocProvider<TargetsBloc>(create: (_) => di.sl<TargetsBloc>()),
         BlocProvider<WorkoutBloc>(create: (_) => di.sl<WorkoutBloc>()),

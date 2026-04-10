@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/auth/auth_session_service.dart';
-import '../../../core/session/session_sync_service.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/user_profile.dart';
-import '../../../domain/repositories/app_session_repository.dart';
-import '../../../domain/repositories/user_profile_repository.dart';
 import '../../../features/auth/presentation/sign_in_page.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
 import '../../../features/settings/presentation/settings_scope.dart';
 import '../../../features/targets/targets.dart';
-import '../../../injection/injection_container.dart' as di;
 import '../application/profile_cubit.dart';
 import 'mappers/profile_view_data_mapper.dart';
 import 'models/profile_view_data.dart';
@@ -40,15 +35,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ProfileCubit>(
-      create: (_) => ProfileCubit(
-        repository: di.sl<AppSessionRepository>(),
-        sessionSyncService: di.sl<SessionSyncService>(),
-        authSessionService: di.sl<AuthSessionService>(),
-        userProfileRepository: di.sl<UserProfileRepository>(),
-      ),
-      child: const _ProfileView(),
-    );
+    return const _ProfileView();
   }
 }
 
