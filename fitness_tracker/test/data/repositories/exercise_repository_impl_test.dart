@@ -338,6 +338,18 @@ void main() {
   });
 
   group('ExerciseRepositoryImpl writes', () {
+    test('clearUserOwnedExercises delegates to local data source', () async {
+      when(() => localDataSource.clearUserOwnedExercises('user-1'))
+          .thenAnswer((_) async {});
+
+      final Either<Failure, void> result =
+          await repository.clearUserOwnedExercises('user-1');
+
+      expect(result.isRight(), isTrue);
+      verify(() => localDataSource.clearUserOwnedExercises('user-1')).called(1);
+      verifyNever(() => localDataSource.clearAllExercises());
+    });
+
     test('addExercise delegates to sync coordinator', () async {
       final Exercise exercise = buildExercise(
         id: 'exercise-1',
