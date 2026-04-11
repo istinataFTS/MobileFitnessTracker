@@ -1,16 +1,19 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/config/app_sync_policy.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_trigger.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/core/session/session_sync_service_impl.dart';
 import 'package:fitness_tracker/core/sync/sync_feature.dart';
 import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
+import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/meal_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/target_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/workout_set_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +24,9 @@ class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
 
 class MockAuthRemoteDataSource extends Mock implements AuthRemoteDataSource {}
+
+class MockExerciseLocalDataSource extends Mock
+    implements ExerciseLocalDataSource {}
 
 class MockMealLocalDataSource extends Mock implements MealLocalDataSource {}
 
@@ -41,6 +47,7 @@ void main() {
   late MockAppSessionRepository repository;
   late MockSyncOrchestrator syncOrchestrator;
   late MockAuthRemoteDataSource authRemoteDataSource;
+  late MockExerciseLocalDataSource exerciseLocalDataSource;
   late MockMealLocalDataSource mealLocalDataSource;
   late MockNutritionLogLocalDataSource nutritionLogLocalDataSource;
   late MockTargetLocalDataSource targetLocalDataSource;
@@ -53,10 +60,16 @@ void main() {
     displayName: 'Marin',
   );
 
+  final AppSession authenticatedSession = AppSession(
+    authMode: AuthMode.authenticated,
+    user: user,
+  );
+
   setUp(() {
     repository = MockAppSessionRepository();
     syncOrchestrator = MockSyncOrchestrator();
     authRemoteDataSource = MockAuthRemoteDataSource();
+    exerciseLocalDataSource = MockExerciseLocalDataSource();
     mealLocalDataSource = MockMealLocalDataSource();
     nutritionLogLocalDataSource = MockNutritionLogLocalDataSource();
     targetLocalDataSource = MockTargetLocalDataSource();
@@ -64,10 +77,18 @@ void main() {
 
     when(() => repository.syncPolicy).thenReturn(AppSyncPolicy.productionDefault);
 
-    // Default stubs so tests that don't exercise these paths don't crash
+    // signOut reads the session upfront to capture userId for targeted cleanup.
+    when(() => repository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession),
+    );
+
+    // Default stubs so tests that don't exercise these paths don't crash.
     when(() => authRemoteDataSource.signOut()).thenAnswer((_) async {});
     when(() => repository.clearSession())
         .thenAnswer((_) async => const Right(null));
+    when(
+      () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
+    ).thenAnswer((_) async {});
     when(() => mealLocalDataSource.clearAllMeals()).thenAnswer((_) async {});
     when(() => nutritionLogLocalDataSource.clearAllLogs())
         .thenAnswer((_) async {});
@@ -80,6 +101,7 @@ void main() {
       appSessionRepository: repository,
       authRemoteDataSource: authRemoteDataSource,
       syncOrchestrator: syncOrchestrator,
+      exerciseLocalDataSource: exerciseLocalDataSource,
       mealLocalDataSource: mealLocalDataSource,
       nutritionLogLocalDataSource: nutritionLogLocalDataSource,
       targetLocalDataSource: targetLocalDataSource,
@@ -238,54 +260,88 @@ void main() {
     },
   );
 
-  test('signOut signs out remotely, clears session, and wipes local data',
-      () async {
-    final result = await service.signOut();
+  group('signOut', () {
+    test('signs out remotely, clears session, and wipes all local user data',
+        () async {
+      final result = await service.signOut();
 
-    expect(result.isSuccess, isTrue);
-    expect(result.message, 'sign-out completed successfully');
+      expect(result.isSuccess, isTrue);
+      expect(result.message, 'sign-out completed successfully');
 
-    verify(() => authRemoteDataSource.signOut()).called(1);
-    verify(() => repository.clearSession()).called(1);
-    verify(() => mealLocalDataSource.clearAllMeals()).called(1);
-    verify(() => nutritionLogLocalDataSource.clearAllLogs()).called(1);
-    verify(() => targetLocalDataSource.clearAllTargets()).called(1);
-    verify(() => workoutSetLocalDataSource.clearAllSets()).called(1);
-  });
+      verify(() => authRemoteDataSource.signOut()).called(1);
+      verify(() => repository.clearSession()).called(1);
+      // All user-scoped tables must be cleared.
+      verify(() => mealLocalDataSource.clearAllMeals()).called(1);
+      verify(() => nutritionLogLocalDataSource.clearAllLogs()).called(1);
+      verify(() => targetLocalDataSource.clearAllTargets()).called(1);
+      verify(() => workoutSetLocalDataSource.clearAllSets()).called(1);
+      // Only user-owned exercises — seeded rows are preserved.
+      verify(
+        () => exerciseLocalDataSource.clearUserOwnedExercises('user-1'),
+      ).called(1);
+    });
 
-  test('signOut fails when remote sign-out throws', () async {
-    when(() => authRemoteDataSource.signOut())
-        .thenThrow('remote sign-out failed');
+    test('fails when remote sign-out throws; no local state is touched',
+        () async {
+      when(() => authRemoteDataSource.signOut())
+          .thenThrow('remote sign-out failed');
 
-    final result = await service.signOut();
+      final result = await service.signOut();
 
-    expect(result.isFailure, isTrue);
-    expect(result.message, 'sign-out failed: remote sign-out failed');
+      expect(result.isFailure, isTrue);
+      expect(result.message, 'sign-out failed: remote sign-out failed');
 
-    verifyNever(() => repository.clearSession());
-    verifyNever(() => mealLocalDataSource.clearAllMeals());
-    verifyNever(() => nutritionLogLocalDataSource.clearAllLogs());
-    verifyNever(() => targetLocalDataSource.clearAllTargets());
-    verifyNever(() => workoutSetLocalDataSource.clearAllSets());
-  });
+      verifyNever(() => repository.clearSession());
+      verifyNever(() => mealLocalDataSource.clearAllMeals());
+      verifyNever(() => nutritionLogLocalDataSource.clearAllLogs());
+      verifyNever(() => targetLocalDataSource.clearAllTargets());
+      verifyNever(() => workoutSetLocalDataSource.clearAllSets());
+      verifyNever(
+        () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
+      );
+    });
 
-  test('signOut fails when local session clear fails', () async {
-    when(() => repository.clearSession()).thenAnswer(
-      (_) async => const Left(CacheFailure('session reset failed')),
-    );
+    test(
+        'fails when local session clear fails but still performs best-effort '
+        'data cleanup', () async {
+      when(() => repository.clearSession()).thenAnswer(
+        (_) async => const Left(CacheFailure('session reset failed')),
+      );
 
-    final result = await service.signOut();
+      final result = await service.signOut();
 
-    expect(result.isFailure, isTrue);
-    expect(
-      result.message,
-      'sign-out succeeded remotely but local session reset failed: session reset failed',
-    );
+      expect(result.isFailure, isTrue);
+      expect(
+        result.message,
+        'sign-out succeeded remotely but local session reset failed: session reset failed',
+      );
 
-    // Data clearing must not happen if the session itself failed to clear
-    verifyNever(() => mealLocalDataSource.clearAllMeals());
-    verifyNever(() => nutritionLogLocalDataSource.clearAllLogs());
-    verifyNever(() => targetLocalDataSource.clearAllTargets());
-    verifyNever(() => workoutSetLocalDataSource.clearAllSets());
+      // Best-effort cleanup must still run even when the session clear fails.
+      // The AuthSessionShell key change is the primary data-isolation guard,
+      // but a clean database matters for reinstall / edge-case scenarios.
+      verify(() => mealLocalDataSource.clearAllMeals()).called(1);
+      verify(() => nutritionLogLocalDataSource.clearAllLogs()).called(1);
+      verify(() => targetLocalDataSource.clearAllTargets()).called(1);
+      verify(() => workoutSetLocalDataSource.clearAllSets()).called(1);
+      verify(
+        () => exerciseLocalDataSource.clearUserOwnedExercises('user-1'),
+      ).called(1);
+    });
+
+    test('skips clearUserOwnedExercises when no authenticated user', () async {
+      when(() => repository.getCurrentSession()).thenAnswer(
+        (_) async => const Right(AppSession.guest()),
+      );
+
+      final result = await service.signOut();
+
+      expect(result.isSuccess, isTrue);
+      // Exercises: nothing to delete — no userId.
+      verifyNever(
+        () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
+      );
+      // Other tables are always cleared.
+      verify(() => mealLocalDataSource.clearAllMeals()).called(1);
+    });
   });
 }

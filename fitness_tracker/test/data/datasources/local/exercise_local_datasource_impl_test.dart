@@ -1,9 +1,14 @@
+import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource.dart';
 import 'package:fitness_tracker/data/models/exercise_model.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite/sqflite.dart';
@@ -11,12 +16,23 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockDatabaseHelper extends Mock implements DatabaseHelper {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Database database;
   late MockDatabaseHelper databaseHelper;
+  late MockAppSessionRepository appSessionRepository;
   late ExerciseLocalDataSourceImpl dataSource;
+
+  const String currentUserId = 'user-1';
+  const String otherUserId = 'user-2';
+
+  final AppSession authenticatedSession = AppSession(
+    authMode: AuthMode.authenticated,
+    user: const AppUser(id: currentUserId, email: 'user@test.com'),
+  );
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
@@ -71,12 +87,24 @@ void main() {
     databaseHelper = MockDatabaseHelper();
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
-    dataSource = ExerciseLocalDataSourceImpl(databaseHelper: databaseHelper);
+    appSessionRepository = MockAppSessionRepository();
+    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => Right(authenticatedSession),
+    );
+
+    dataSource = ExerciseLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+      appSessionRepository: appSessionRepository,
+    );
   });
 
   tearDown(() async {
     await database.close();
   });
+
+  // ---------------------------------------------------------------------------
+  // pendingDelete filtering (existing behaviour, unchanged)
+  // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl reads', () {
     test('getAllExercises hides pendingDelete rows', () async {
@@ -158,6 +186,213 @@ void main() {
       ]);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // User isolation
+  // ---------------------------------------------------------------------------
+
+  group('ExerciseLocalDataSourceImpl user isolation', () {
+    test('getAllExercises returns seeded (null owner) exercises to all users',
+        () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'seeded-1',
+          ownerUserId: null,
+          name: 'Squat',
+        ),
+      );
+
+      final exercises = await dataSource.getAllExercises();
+
+      expect(exercises.map((e) => e.id).toList(), <String>['seeded-1']);
+    });
+
+    test('getAllExercises returns current user exercises but not other users',
+        () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'mine',
+          ownerUserId: currentUserId,
+          name: 'My Exercise',
+        ),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'theirs',
+          ownerUserId: otherUserId,
+          name: 'Their Exercise',
+        ),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'seeded',
+          ownerUserId: null,
+          name: 'Seeded Exercise',
+        ),
+      );
+
+      final exercises = await dataSource.getAllExercises();
+      final ids = exercises.map((e) => e.id).toSet();
+
+      expect(ids, containsAll(<String>['mine', 'seeded']));
+      expect(ids, isNot(contains('theirs')));
+    });
+
+    test('getAllExercises returns only seeded exercises for guest session',
+        () async {
+      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+        (_) async => const Right(AppSession.guest()),
+      );
+
+      await dataSource.insertExercise(
+        buildExercise(id: 'seeded', ownerUserId: null, name: 'Squat'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'user-owned',
+          ownerUserId: currentUserId,
+          name: 'My Custom',
+        ),
+      );
+
+      final exercises = await dataSource.getAllExercises();
+      final ids = exercises.map((e) => e.id).toSet();
+
+      expect(ids, contains('seeded'));
+      expect(ids, isNot(contains('user-owned')));
+    });
+
+    test('getExerciseById respects owner filter', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'theirs',
+          ownerUserId: otherUserId,
+          name: 'Their Exercise',
+        ),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'mine',
+          ownerUserId: currentUserId,
+          name: 'My Exercise',
+        ),
+      );
+
+      expect(await dataSource.getExerciseById('mine'), isNotNull);
+      expect(await dataSource.getExerciseById('theirs'), isNull);
+    });
+
+    test('getExerciseByName respects owner filter', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'theirs',
+          ownerUserId: otherUserId,
+          name: 'Deadlift',
+        ),
+      );
+
+      expect(await dataSource.getExerciseByName('Deadlift'), isNull);
+    });
+
+    test('getExercisesForMuscle respects owner filter', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'mine',
+          ownerUserId: currentUserId,
+          name: 'Romanian DL',
+          muscleGroups: const <String>['hamstrings'],
+        ),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'theirs',
+          ownerUserId: otherUserId,
+          name: 'Nordic Curl',
+          muscleGroups: const <String>['hamstrings'],
+        ),
+      );
+
+      final exercises = await dataSource.getExercisesForMuscle('hamstrings');
+      final ids = exercises.map((e) => e.id).toSet();
+
+      expect(ids, contains('mine'));
+      expect(ids, isNot(contains('theirs')));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // clearUserOwnedExercises
+  // ---------------------------------------------------------------------------
+
+  group('ExerciseLocalDataSourceImpl clearUserOwnedExercises', () {
+    test('deletes only rows owned by the given userId', () async {
+      await dataSource.insertExercise(
+        buildExercise(id: 'seeded', ownerUserId: null, name: 'Squat'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'mine',
+          ownerUserId: currentUserId,
+          name: 'My Exercise',
+        ),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'theirs',
+          ownerUserId: otherUserId,
+          name: 'Their Exercise',
+        ),
+      );
+
+      await dataSource.clearUserOwnedExercises(currentUserId);
+
+      final rawRows = await database.query(DatabaseTables.exercises);
+      final ids = rawRows.map((r) => r[DatabaseTables.exerciseId]).toSet();
+
+      // user-1's exercise is gone; seeded and other-user rows survive
+      expect(ids, containsAll(<String>['seeded', 'theirs']));
+      expect(ids, isNot(contains('mine')));
+    });
+
+    test('is a no-op when the user owns no exercises', () async {
+      await dataSource.insertExercise(
+        buildExercise(id: 'seeded', ownerUserId: null, name: 'Squat'),
+      );
+
+      await dataSource.clearUserOwnedExercises(currentUserId);
+
+      final rawRows = await database.query(DatabaseTables.exercises);
+      expect(rawRows, hasLength(1));
+    });
+
+    test('never deletes seeded exercises (ownerUserId IS NULL)', () async {
+      await dataSource.insertExercise(
+        buildExercise(id: 'seeded-1', ownerUserId: null, name: 'Squat'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(id: 'seeded-2', ownerUserId: null, name: 'Bench Press'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'mine',
+          ownerUserId: currentUserId,
+          name: 'My Custom',
+        ),
+      );
+
+      await dataSource.clearUserOwnedExercises(currentUserId);
+
+      final rawRows = await database.query(DatabaseTables.exercises);
+      final ids = rawRows.map((r) => r[DatabaseTables.exerciseId]).toSet();
+
+      expect(ids, containsAll(<String>['seeded-1', 'seeded-2']));
+      expect(ids, isNot(contains('mine')));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Merge (existing behaviour, unchanged)
+  // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl mergeRemoteExercises', () {
     test('preserves pending local update over newer remote row', () async {
@@ -258,6 +493,10 @@ void main() {
     );
   });
 
+  // ---------------------------------------------------------------------------
+  // State transitions (existing behaviour, unchanged)
+  // ---------------------------------------------------------------------------
+
   group('ExerciseLocalDataSourceImpl state transitions', () {
     test('markAsPendingDelete updates sync status and error', () async {
       await dataSource.insertExercise(
@@ -340,6 +579,10 @@ void main() {
       );
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // prepareForInitialCloudMigration (existing behaviour, unchanged)
+  // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl prepareForInitialCloudMigration', () {
     test('claims guest localOnly exercise and queues upload', () async {

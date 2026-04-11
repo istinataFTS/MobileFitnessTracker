@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:fitness_tracker/core/auth/auth_session_service.dart';
 import 'package:fitness_tracker/core/config/app_sync_policy.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
@@ -6,9 +7,11 @@ import 'package:fitness_tracker/core/session/session_sync_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
+import 'package:fitness_tracker/domain/repositories/user_profile_repository.dart';
+import 'package:fitness_tracker/features/profile/application/profile_cubit.dart';
 import 'package:fitness_tracker/features/profile/presentation/profile_page.dart';
-import 'package:fitness_tracker/injection/injection_container.dart' as di;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -16,27 +19,21 @@ class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 class MockSessionSyncService extends Mock implements SessionSyncService {}
 
+class MockAuthSessionService extends Mock implements AuthSessionService {}
+
+class MockUserProfileRepository extends Mock implements UserProfileRepository {}
+
 void main() {
   late MockAppSessionRepository repository;
   late MockSessionSyncService sessionSyncService;
+  late MockAuthSessionService authSessionService;
+  late MockUserProfileRepository userProfileRepository;
 
-  setUp(() async {
+  setUp(() {
     repository = MockAppSessionRepository();
     sessionSyncService = MockSessionSyncService();
-
-    if (!di.sl.isRegistered<AppSessionRepository>()) {
-      di.sl.registerLazySingleton<AppSessionRepository>(() => repository);
-    } else {
-      await di.sl.unregister<AppSessionRepository>();
-      di.sl.registerLazySingleton<AppSessionRepository>(() => repository);
-    }
-
-    if (!di.sl.isRegistered<SessionSyncService>()) {
-      di.sl.registerLazySingleton<SessionSyncService>(() => sessionSyncService);
-    } else {
-      await di.sl.unregister<SessionSyncService>();
-      di.sl.registerLazySingleton<SessionSyncService>(() => sessionSyncService);
-    }
+    authSessionService = MockAuthSessionService();
+    userProfileRepository = MockUserProfileRepository();
 
     when(() => repository.syncPolicy)
         .thenReturn(AppSyncPolicy.productionDefault);
@@ -47,21 +44,27 @@ void main() {
         message: 'manual refresh completed successfully',
       ),
     );
+
+    // getProfile is called when the session is authenticated.
+    // Return a Left so the cubit falls back to null profile — sufficient
+    // for the presentation tests that only inspect session/user fields.
+    when(() => userProfileRepository.getProfile(any()))
+        .thenAnswer((_) async => const Left(CacheFailure('no profile')));
   });
 
-  tearDown(() async {
-    if (di.sl.isRegistered<AppSessionRepository>()) {
-      await di.sl.unregister<AppSessionRepository>();
-    }
-
-    if (di.sl.isRegistered<SessionSyncService>()) {
-      await di.sl.unregister<SessionSyncService>();
-    }
-  });
-
+  // ProfilePage reads ProfileCubit from its ancestor. Each test pumps a
+  // fresh BlocProvider so the cubit starts from ProfileState.initial().
   Widget buildSubject() {
-    return const MaterialApp(
-      home: ProfilePage(),
+    return BlocProvider<ProfileCubit>(
+      create: (_) => ProfileCubit(
+        repository: repository,
+        sessionSyncService: sessionSyncService,
+        authSessionService: authSessionService,
+        userProfileRepository: userProfileRepository,
+      ),
+      child: const MaterialApp(
+        home: ProfilePage(),
+      ),
     );
   }
 
