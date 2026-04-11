@@ -10,21 +10,11 @@ import '../config/env_config.dart';
 import '../core/constants/app_dimensions.dart';
 import '../core/constants/app_strings.dart';
 import '../core/themes/app_theme.dart';
-import '../features/history/history.dart';
-import '../features/home/application/home_bloc.dart';
-import '../features/home/application/muscle_visual_bloc.dart';
-import '../features/library/application/exercise_bloc.dart';
-import '../features/library/application/meal_bloc.dart';
-import '../features/log/log.dart';
 import '../features/profile/application/profile_cubit.dart';
 import '../features/settings/application/app_settings_cubit.dart';
 import '../features/settings/presentation/settings_scope.dart';
-import '../features/targets/application/targets_bloc.dart';
 import '../injection/injection_container.dart' as di;
-import '../presentation/navigation/bottom_navigation.dart';
-import '../features/log/application/nutrition_log_bloc.dart';
-import 'listeners/app_domain_effects_listener.dart';
-import 'startup/app_startup_listener.dart';
+import 'auth_session_shell.dart';
 
 class AppHost extends StatelessWidget {
   const AppHost({super.key});
@@ -49,6 +39,9 @@ class FitnessTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Only app-lifetime (non-user-scoped) state lives here.
+    // All user-data BLoCs live inside AuthSessionShell, which is keyed on the
+    // authenticated user id and is therefore rebuilt on every session change.
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AppSettingsCubit>(
@@ -56,18 +49,6 @@ class FitnessTrackerApp extends StatelessWidget {
         ),
         BlocProvider<ProfileCubit>(
           create: (_) => di.sl<ProfileCubit>()..loadProfile(),
-        ),
-        BlocProvider<TargetsBloc>(create: (_) => di.sl<TargetsBloc>()),
-        BlocProvider<WorkoutBloc>(create: (_) => di.sl<WorkoutBloc>()),
-        BlocProvider<HomeBloc>(create: (_) => di.sl<HomeBloc>()),
-        BlocProvider<MuscleVisualBloc>(
-          create: (_) => di.sl<MuscleVisualBloc>(),
-        ),
-        BlocProvider<ExerciseBloc>(create: (_) => di.sl<ExerciseBloc>()),
-        BlocProvider<HistoryBloc>(create: (_) => di.sl<HistoryBloc>()),
-        BlocProvider<MealBloc>(create: (_) => di.sl<MealBloc>()),
-        BlocProvider<NutritionLogBloc>(
-          create: (_) => di.sl<NutritionLogBloc>(),
         ),
       ],
       child: SettingsScope(
@@ -88,9 +69,7 @@ class FitnessTrackerApp extends StatelessWidget {
           locale: useDevicePreviewAdapters
               ? DevicePreview.locale(context)
               : null,
-          home: const AppStartupListener(
-            child: AppDomainEffectsListener(child: BottomNavigation()),
-          ),
+          home: const AuthSessionShell(),
         ),
       ),
     );
