@@ -82,7 +82,10 @@ void registerExercisesModule(GetIt sl) {
   );
 
   sl.registerLazySingleton<ExerciseLocalDataSource>(
-    () => ExerciseLocalDataSourceImpl(databaseHelper: sl()),
+    () => ExerciseLocalDataSourceImpl(
+      databaseHelper: sl(),
+      appSessionRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton<ExerciseRemoteDataSource>(

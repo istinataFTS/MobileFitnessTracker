@@ -32,5 +32,9 @@ abstract class ExerciseRepository {
 
   Future<Either<Failure, void>> clearAllExercises();
 
+  /// Deletes only exercises owned by [userId]. Seeded/system exercises
+  /// (owner_user_id IS NULL) are never touched.
+  Future<Either<Failure, void>> clearUserOwnedExercises(String userId);
+
   Future<Either<Failure, void>> syncPendingExercises();
 }

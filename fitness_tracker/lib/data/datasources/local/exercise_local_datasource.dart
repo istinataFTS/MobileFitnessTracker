@@ -4,6 +4,7 @@ import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/sync/local_remote_merge.dart';
+import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/exercise_model.dart';
 import 'database_helper.dart';
 
@@ -29,10 +30,15 @@ abstract class ExerciseLocalDataSource {
   Future<void> replaceAllExercises(List<ExerciseModel> exercises);
   Future<void> deleteExercise(String id);
   Future<void> clearAllExercises();
+
+  /// Deletes only exercises owned by [userId]. Seeded/system exercises
+  /// (owner_user_id IS NULL) are never touched.
+  Future<void> clearUserOwnedExercises(String userId);
 }
 
 class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   final DatabaseHelper databaseHelper;
+  final AppSessionRepository appSessionRepository;
 
   static final LocalRemoteMerge<ExerciseModel> _merge =
       LocalRemoteMerge<ExerciseModel>(
@@ -41,7 +47,14 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         getSyncMetadata: (exercise) => exercise.syncMetadata,
       );
 
-  const ExerciseLocalDataSourceImpl({required this.databaseHelper});
+  const ExerciseLocalDataSourceImpl({
+    required this.databaseHelper,
+    required this.appSessionRepository,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Public reads
+  // ---------------------------------------------------------------------------
 
   @override
   Future<List<ExerciseModel>> getAllExercises() async {
@@ -64,14 +77,17 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<ExerciseModel?> getExerciseByName(String name) async {
     try {
+      final userId = await _getCurrentUserId();
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.exercises,
         where:
             'LOWER(${DatabaseTables.exerciseName}) = LOWER(?) AND '
             '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-            '${DatabaseTables.exerciseSyncStatus} != ?)',
-        whereArgs: [name, SyncStatus.pendingDelete.name],
+            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+            '(${DatabaseTables.ownerUserId} IS NULL OR '
+            '${DatabaseTables.ownerUserId} = ?)',
+        whereArgs: [name, SyncStatus.pendingDelete.name, userId],
         limit: 1,
       );
 
@@ -88,14 +104,17 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup) async {
     try {
+      final userId = await _getCurrentUserId();
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.exercises,
         where:
             '${DatabaseTables.exerciseMuscleGroups} LIKE ? AND '
             '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-            '${DatabaseTables.exerciseSyncStatus} != ?)',
-        whereArgs: ['%"$muscleGroup"%', SyncStatus.pendingDelete.name],
+            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+            '(${DatabaseTables.ownerUserId} IS NULL OR '
+            '${DatabaseTables.ownerUserId} = ?)',
+        whereArgs: ['%"$muscleGroup"%', SyncStatus.pendingDelete.name, userId],
         orderBy: '${DatabaseTables.exerciseName} ASC',
       );
       return maps.map(ExerciseModel.fromMap).toList();
@@ -125,6 +144,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       throw CacheDatabaseException('Failed to get pending sync exercises: $e');
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Writes
+  // ---------------------------------------------------------------------------
 
   @override
   Future<void> insertExercise(ExerciseModel exercise) async {
@@ -341,28 +364,67 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     }
   }
 
+  @override
+  Future<void> clearUserOwnedExercises(String userId) async {
+    try {
+      final db = await databaseHelper.database;
+      await db.delete(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.ownerUserId} = ?',
+        whereArgs: [userId],
+      );
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to clear user-owned exercises: $e',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Returns the authenticated user's id, or `null` for guest sessions.
+  Future<String?> _getCurrentUserId() async {
+    final result = await appSessionRepository.getCurrentSession();
+    return result.fold((_) => null, (session) => session.user?.id);
+  }
+
+  /// Exercises visible to the current user:
+  /// - Seeded/system exercises (owner_user_id IS NULL) are visible to everyone.
+  /// - User-created exercises (owner_user_id = currentUserId) are private.
+  /// - Soft-deleted exercises (sync_status = pendingDelete) are excluded.
+  ///
+  /// When [userId] is null (guest), the `= ?` branch evaluates to false, so
+  /// only seeded exercises are returned — correct guest behaviour.
   Future<List<ExerciseModel>> _getVisibleExercises() async {
+    final userId = await _getCurrentUserId();
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.exercises,
       where:
-          '${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-          '${DatabaseTables.exerciseSyncStatus} != ?',
-      whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+          '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+          '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+          '(${DatabaseTables.ownerUserId} IS NULL OR '
+          '${DatabaseTables.ownerUserId} = ?)',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name, userId],
       orderBy: '${DatabaseTables.exerciseName} ASC',
     );
     return maps.map(ExerciseModel.fromMap).toList();
   }
 
   Future<ExerciseModel?> _getVisibleExerciseById(String id) async {
+    final userId = await _getCurrentUserId();
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.exercises,
       where:
           '${DatabaseTables.exerciseId} = ? AND '
           '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-          '${DatabaseTables.exerciseSyncStatus} != ?)',
-      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name],
+          '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+          '(${DatabaseTables.ownerUserId} IS NULL OR '
+          '${DatabaseTables.ownerUserId} = ?)',
+      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name, userId],
       limit: 1,
     );
 

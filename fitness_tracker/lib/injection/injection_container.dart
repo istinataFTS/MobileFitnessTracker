@@ -159,6 +159,7 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
+      exerciseLocalDataSource: sl(),
       mealLocalDataSource: sl(),
       nutritionLogLocalDataSource: sl(),
       targetLocalDataSource: sl(),

@@ -1,4 +1,5 @@
 import '../../core/logging/app_logger.dart';
+import '../../data/datasources/local/exercise_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../../data/datasources/local/target_local_datasource.dart';
@@ -14,6 +15,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
   final AppSessionRepository appSessionRepository;
   final AuthRemoteDataSource authRemoteDataSource;
   final SyncOrchestrator syncOrchestrator;
+  final ExerciseLocalDataSource exerciseLocalDataSource;
   final MealLocalDataSource mealLocalDataSource;
   final NutritionLogLocalDataSource nutritionLogLocalDataSource;
   final TargetLocalDataSource targetLocalDataSource;
@@ -23,6 +25,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
     required this.appSessionRepository,
     required this.authRemoteDataSource,
     required this.syncOrchestrator,
+    required this.exerciseLocalDataSource,
     required this.mealLocalDataSource,
     required this.nutritionLogLocalDataSource,
     required this.targetLocalDataSource,
@@ -119,6 +122,11 @@ class SessionSyncServiceImpl implements SessionSyncService {
 
   @override
   Future<SessionSyncActionResult> signOut() async {
+    // Capture the user id now, before the session is cleared.  We need it
+    // to perform a targeted exercise delete (only user-owned rows, not seeds).
+    final sessionResult = await appSessionRepository.getCurrentSession();
+    final userId = sessionResult.fold((_) => null, (s) => s.user?.id);
+
     try {
       await authRemoteDataSource.signOut();
     } catch (error) {
@@ -143,6 +151,11 @@ class SessionSyncServiceImpl implements SessionSyncService {
           error: failure,
         );
 
+        // Best-effort data cleanup even when the session clear failed.
+        // The AuthSessionShell key change is the primary safeguard, but a
+        // clean database is still important for fresh installs or edge cases.
+        await _clearAllLocalUserData(userId);
+
         return SessionSyncActionResult(
           status: SessionSyncActionStatus.failed,
           message:
@@ -150,7 +163,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
         );
       },
       (_) async {
-        await _clearAllLocalUserData();
+        await _clearAllLocalUserData(userId);
 
         AppLogger.info(
           'Session signed out, local session reset, and local user data cleared',
@@ -165,14 +178,29 @@ class SessionSyncServiceImpl implements SessionSyncService {
     );
   }
 
-  Future<void> _clearAllLocalUserData() async {
+  /// Clears all local data belonging to the signing-out user.
+  ///
+  /// Ordering matters for FK integrity:
+  /// - meals before nutrition_logs (nutrition_logs.meal_id → meals.id)
+  /// - targets and workout_sets are independent and run in parallel
+  /// - exercises: only user-owned rows; seeded exercises (owner_user_id IS NULL)
+  ///   are never deleted
+  Future<void> _clearAllLocalUserData(String? userId) async {
     try {
+      // meals first — nutrition_logs reference meal_id via FK
+      await mealLocalDataSource.clearAllMeals();
+      await nutritionLogLocalDataSource.clearAllLogs();
+
+      // independent tables — safe to clear in parallel
       await Future.wait(<Future<void>>[
-        mealLocalDataSource.clearAllMeals(),
-        nutritionLogLocalDataSource.clearAllLogs(),
         targetLocalDataSource.clearAllTargets(),
         workoutSetLocalDataSource.clearAllSets(),
       ]);
+
+      // exercises: targeted delete to preserve seeded data
+      if (userId != null) {
+        await exerciseLocalDataSource.clearUserOwnedExercises(userId);
+      }
     } catch (error) {
       AppLogger.warning(
         'Failed to fully clear local user data on sign-out: $error',

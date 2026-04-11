@@ -268,6 +268,13 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
   }
 
   @override
+  Future<Either<Failure, void>> clearUserOwnedExercises(String userId) {
+    return RepositoryGuard.run(() async {
+      await localDataSource.clearUserOwnedExercises(userId);
+    });
+  }
+
+  @override
   Future<Either<Failure, void>> syncPendingExercises() {
     return RepositoryGuard.run(() async {
       await syncCoordinator.syncPendingChanges();
