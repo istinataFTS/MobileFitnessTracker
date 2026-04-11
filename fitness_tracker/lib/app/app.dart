@@ -14,7 +14,10 @@ import '../features/profile/application/profile_cubit.dart';
 import '../features/settings/application/app_settings_cubit.dart';
 import '../features/settings/presentation/settings_scope.dart';
 import '../injection/injection_container.dart' as di;
+import '../presentation/navigation/bottom_navigation.dart';
 import 'auth_session_shell.dart';
+import 'listeners/app_domain_effects_listener.dart';
+import 'startup/app_startup_listener.dart';
 
 class AppHost extends StatelessWidget {
   const AppHost({super.key});
@@ -51,25 +54,37 @@ class FitnessTrackerApp extends StatelessWidget {
           create: (_) => di.sl<ProfileCubit>()..loadProfile(),
         ),
       ],
-      child: SettingsScope(
-        child: AppShell(
-          builder: (BuildContext context, Widget? child) {
-            Widget builtChild = child ?? const SizedBox.shrink();
+      child: AuthSessionShell(
+        child: SettingsScope(
+          child: AppShell(
+            builder: (BuildContext context, Widget? child) {
+              Widget builtChild = child ?? const SizedBox.shrink();
 
-            if (useDevicePreviewAdapters) {
-              builtChild = DevicePreview.appBuilder(context, builtChild);
-            }
+              if (useDevicePreviewAdapters) {
+                builtChild = DevicePreview.appBuilder(context, builtChild);
+              }
 
-            if (EnvConfig.enableWebPhoneFrame) {
-              builtChild = _WebPhoneFrame(child: builtChild);
-            }
+              if (EnvConfig.enableWebPhoneFrame) {
+                builtChild = _WebPhoneFrame(child: builtChild);
+              }
 
-            return builtChild;
-          },
-          locale: useDevicePreviewAdapters
-              ? DevicePreview.locale(context)
-              : null,
-          home: const AuthSessionShell(),
+              return builtChild;
+            },
+            locale: useDevicePreviewAdapters
+                ? DevicePreview.locale(context)
+                : null,
+            // AppStartupListener and AppDomainEffectsListener are intentionally
+            // inside the AppShell (MaterialApp) so they re-subscribe to streams
+            // and re-dispatch initial loads for every new session. They sit
+            // *inside* the navigator, which means they are descendants of the
+            // user-scoped MultiBlocProvider inside AuthSessionShell — as are
+            // all routes pushed onto the navigator and every modal sheet.
+            home: const AppStartupListener(
+              child: AppDomainEffectsListener(
+                child: BottomNavigation(),
+              ),
+            ),
+          ),
         ),
       ),
     );

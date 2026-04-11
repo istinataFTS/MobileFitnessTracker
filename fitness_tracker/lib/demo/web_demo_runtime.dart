@@ -871,6 +871,12 @@ class WebDemoExerciseRepository implements ExerciseRepository {
   }
 
   @override
+  Future<Either<Failure, void>> clearUserOwnedExercises(String userId) async {
+    _store.exercises.removeWhere((exercise) => exercise.ownerUserId == userId);
+    return const Right(null);
+  }
+
+  @override
   Future<Either<Failure, void>> syncPendingExercises() async {
     return const Right(null);
   }

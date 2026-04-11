@@ -11,28 +11,37 @@ import '../features/log/log.dart';
 import '../features/profile/application/profile_cubit.dart';
 import '../features/targets/application/targets_bloc.dart';
 import '../injection/injection_container.dart' as di;
-import '../presentation/navigation/bottom_navigation.dart';
-import 'listeners/app_domain_effects_listener.dart';
-import 'startup/app_startup_listener.dart';
 
 /// Establishes the authentication boundary in the widget tree.
 ///
 /// Listens to [ProfileCubit] and derives a stable *session key* from the
 /// current user id (`'guest'` when unauthenticated). A [KeyedSubtree] keyed
-/// on that value wraps the entire user-scoped sub-tree.
+/// on that value wraps the entire user-scoped sub-tree, including [child].
 ///
 /// **Why this matters:** when the session key changes (sign-out → `'guest'`,
 /// or `'guest'` → a new authenticated user id), Flutter disposes the entire
 /// old sub-tree in full before building the new one. Every user-data BLoC
 /// underneath is closed and recreated, so no stale state from a previous
-/// session can ever leak into the next. The one-shot guard flags inside
-/// [AppStartupListener] and [BottomNavigation] reset naturally because their
-/// owning [State] objects are destroyed along with the old tree.
+/// session can ever leak into the next.
+///
+/// **Important – navigator scope:** [child] should contain the [MaterialApp]
+/// (or equivalent navigator host). Placing [MaterialApp] *inside* the keyed
+/// [MultiBlocProvider] means every route pushed onto the navigator, and every
+/// modal bottom sheet, is a descendant of this provider. `context.read<T>()`
+/// therefore resolves user-scoped blocs correctly from any route or overlay
+/// entry — something that would silently fail if [MaterialApp] were an
+/// *ancestor* of this widget.
 ///
 /// Blocs that are *not* user-scoped ([AppSettingsCubit], [ProfileCubit]) live
 /// above this widget and are unaffected by the key change.
 class AuthSessionShell extends StatelessWidget {
-  const AuthSessionShell({super.key});
+  const AuthSessionShell({required this.child, super.key});
+
+  /// The subtree to place inside the user-scoped [MultiBlocProvider].
+  ///
+  /// Must contain the app's navigator host (e.g. [MaterialApp]) so that all
+  /// pushed routes and modal sheets inherit the user-scoped blocs.
+  final Widget child;
 
   // Sentinel key used when no authenticated user is present.
   static const String _guestKey = 'guest';
@@ -74,14 +83,7 @@ class AuthSessionShell extends StatelessWidget {
                 create: (_) => di.sl<NutritionLogBloc>(),
               ),
             ],
-            // AppStartupListener and AppDomainEffectsListener are intentionally
-            // placed *inside* the keyed sub-tree so they re-subscribe to streams
-            // and re-dispatch initial loads for every new session.
-            child: const AppStartupListener(
-              child: AppDomainEffectsListener(
-                child: BottomNavigation(),
-              ),
-            ),
+            child: child,
           ),
         );
       },
