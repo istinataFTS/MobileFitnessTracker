@@ -332,10 +332,15 @@ class ExerciseData {
   final List<String> muscleGroups;
   final String category; // For organizational purposes
 
-  /// Convert to Exercise entity for database insertion
-  Exercise toEntity(String id, DateTime createdAt) {
+  /// Convert to Exercise entity for database insertion.
+  ///
+  /// Pass [ownerUserId] to create a user-owned exercise (e.g. for per-user
+  /// seeding). Omit it (or pass null) to create a system/shared exercise
+  /// with no owner, visible to all users.
+  Exercise toEntity(String id, DateTime createdAt, {String? ownerUserId}) {
     return Exercise(
       id: id,
+      ownerUserId: ownerUserId,
       name: name,
       muscleGroups: muscleGroups,
       createdAt: createdAt,
