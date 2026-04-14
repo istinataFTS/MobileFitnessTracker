@@ -12,7 +12,15 @@ class SeedExercises {
 
   const SeedExercises(this.repository);
 
-  Future<Either<Failure, int>> call() async {
+  /// Seeds default exercises if none exist yet.
+  ///
+  /// [ownerUserId] — when provided the seeded exercises are owned by that
+  /// user (per-user seeding). When omitted the exercises are created as
+  /// system/shared exercises (owner_user_id IS NULL), visible to all users.
+  ///
+  /// Returns the number of exercises actually inserted, or 0 if seeding was
+  /// skipped because exercises already existed.
+  Future<Either<Failure, int>> call({String? ownerUserId}) async {
     try {
       // Step 1: Check if seeding is enabled
       if (!EnvConfig.seedDefaultData) {
@@ -22,10 +30,13 @@ class SeedExercises {
 
       _log('Starting database seeding process...');
       _log('Seed data version: ${EnvConfig.seedDataVersion}');
+      if (ownerUserId != null) {
+        _log('Seeding as user-owned exercises (userId: $ownerUserId)');
+      }
 
       // Step 2: Check if database already has exercises
       final existingExercisesResult = await repository.getAllExercises();
-      
+
       return await existingExercisesResult.fold(
         // Error getting existing exercises
         (failure) async {
@@ -50,7 +61,7 @@ class SeedExercises {
           }
 
           // Step 4: Perform seeding
-          return await _seedDefaultExercises();
+          return await _seedDefaultExercises(ownerUserId: ownerUserId);
         },
       );
     } catch (e) {
@@ -72,10 +83,16 @@ class SeedExercises {
     }
   }
 
-  /// Seed all default exercises
-  Future<Either<Failure, int>> _seedDefaultExercises() async {
+  /// Seed all default exercises.
+  ///
+  /// [ownerUserId] is forwarded to [ExerciseData.toEntity] so each inserted
+  /// exercise can be owned by a specific user or kept as a shared system
+  /// exercise (null).
+  Future<Either<Failure, int>> _seedDefaultExercises({
+    String? ownerUserId,
+  }) async {
     _log('Seeding default exercises...');
-    
+
     final defaultExercises = DefaultExercisesData.getDefaultExercises();
     _log('Total exercises to seed: ${defaultExercises.length}');
 
@@ -88,8 +105,9 @@ class SeedExercises {
     for (final exerciseData in defaultExercises) {
       try {
         final exercise = exerciseData.toEntity(
-          _uuid.v4(), 
+          _uuid.v4(),
           now,
+          ownerUserId: ownerUserId,
         );
 
         final result = await repository.addExercise(exercise);

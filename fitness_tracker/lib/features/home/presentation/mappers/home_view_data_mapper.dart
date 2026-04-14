@@ -468,11 +468,15 @@ class HomeViewDataMapper {
       }
 
       for (final String muscle in exercise.muscleGroups) {
-        if (!MuscleGroups.isValid(muscle)) {
+        // Normalize to lowercase so user-created exercises whose muscle groups
+        // were stored with any casing still match the target's categoryKey
+        // (which always comes from MuscleGroups.all, which is all-lowercase).
+        final String key = muscle.toLowerCase().trim();
+        if (!MuscleGroups.isValid(key)) {
           continue;
         }
 
-        result[muscle] = (result[muscle] ?? 0) + 1;
+        result[key] = (result[key] ?? 0) + 1;
       }
     }
 

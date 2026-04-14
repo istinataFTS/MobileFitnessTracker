@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/exercise.dart';
 import '../../../domain/usecases/exercises/add_exercise.dart';
 import '../../../domain/usecases/exercises/delete_exercise.dart';
+import '../../../domain/usecases/exercises/ensure_default_exercises.dart';
 import '../../../domain/usecases/exercises/get_all_exercises.dart';
 import '../../../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../../../domain/usecases/exercises/get_exercises_for_muscle.dart';
@@ -118,6 +119,7 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     required this.addExercise,
     required this.updateExercise,
     required this.deleteExercise,
+    required this.ensureDefaultExercises,
   }) : super(ExerciseInitial()) {
     on<LoadExercisesEvent>(_onLoadExercises);
     on<LoadExerciseByIdEvent>(_onLoadExerciseById);
@@ -133,6 +135,12 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   final AddExercise addExercise;
   final UpdateExercise updateExercise;
   final DeleteExercise deleteExercise;
+  final EnsureDefaultExercises ensureDefaultExercises;
+
+  /// Guards against running the default-exercise seeding more than once per
+  /// bloc instance (= per user session, since [AuthSessionShell] recreates
+  /// the bloc on every user switch).
+  bool _hasEnsuredDefaults = false;
 
   Future<void> _onLoadExercises(
     LoadExercisesEvent event,
@@ -140,9 +148,29 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   ) async {
     emit(ExerciseLoading());
     final result = await getAllExercises();
-    result.fold(
-      (failure) => emit(ExerciseError(failure.message)),
-      (exercises) => emit(ExercisesLoaded(exercises)),
+
+    await result.fold(
+      (failure) async => emit(ExerciseError(failure.message)),
+      (exercises) async {
+        // If the user has no exercises and we haven't seeded yet this session,
+        // run the per-user default-exercise seeding as a safety-net fallback
+        // (e.g. fresh device, second user on a shared device, cloud account
+        // with no exercises). The flag prevents an infinite re-seed loop.
+        if (exercises.isEmpty && !_hasEnsuredDefaults) {
+          _hasEnsuredDefaults = true;
+          await ensureDefaultExercises();
+
+          // Reload after seeding so the UI shows the freshly inserted exercises.
+          final reloadResult = await getAllExercises();
+          reloadResult.fold(
+            (failure) => emit(ExerciseError(failure.message)),
+            (seeded) => emit(ExercisesLoaded(seeded)),
+          );
+          return;
+        }
+
+        emit(ExercisesLoaded(exercises));
+      },
     );
   }
 
