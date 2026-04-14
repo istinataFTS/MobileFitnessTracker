@@ -11,6 +11,7 @@ import '../../data/sync/exercise_sync_coordinator_impl.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/usecases/exercises/add_exercise.dart';
 import '../../domain/usecases/exercises/delete_exercise.dart';
+import '../../domain/usecases/exercises/ensure_default_exercises.dart';
 import '../../domain/usecases/exercises/get_all_exercises.dart';
 import '../../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../../domain/usecases/exercises/get_exercises_for_muscle.dart';
@@ -28,6 +29,7 @@ void registerExercisesModule(GetIt sl) {
       addExercise: sl(),
       updateExercise: sl(),
       deleteExercise: sl(),
+      ensureDefaultExercises: sl(),
     ),
   );
 
@@ -63,6 +65,13 @@ void registerExercisesModule(GetIt sl) {
     ),
   );
   sl.registerLazySingleton(() => SeedExercises(sl()));
+  sl.registerLazySingleton(
+    () => EnsureDefaultExercises(
+      appSessionRepository: sl(),
+      seedExercises: sl(),
+      seedExerciseFactors: sl(),
+    ),
+  );
   sl.registerLazySingleton(() => SyncExerciseMuscleFactors(sl()));
 
   sl.registerLazySingleton<ExerciseRepository>(
