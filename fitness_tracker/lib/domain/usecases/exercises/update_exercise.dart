@@ -22,19 +22,31 @@ class UpdateExercise {
   });
 
   Future<Either<Failure, void>> call(Exercise exercise) async {
+    // Normalize muscle group names to lowercase at save time so the stored
+    // data is always consistent, regardless of how the exercise was built
+    // (UI chip selection, import, sync, etc.).
+    final normalizedExercise = exercise.copyWith(
+      muscleGroups: exercise.muscleGroups
+          .map((m) => m.toLowerCase().trim())
+          .toList(),
+    );
+
     final sessionResult = await appSessionRepository.getCurrentSession();
 
-    final preparedExercise = sessionResult.fold((_) => exercise, (session) {
-      if (!session.isAuthenticated || session.user == null) {
-        return exercise;
-      }
+    final preparedExercise = sessionResult.fold(
+      (_) => normalizedExercise,
+      (session) {
+        if (!session.isAuthenticated || session.user == null) {
+          return normalizedExercise;
+        }
 
-      if (exercise.ownerUserId == session.user!.id) {
-        return exercise;
-      }
+        if (normalizedExercise.ownerUserId == session.user!.id) {
+          return normalizedExercise;
+        }
 
-      return exercise.copyWith(ownerUserId: session.user!.id);
-    });
+        return normalizedExercise.copyWith(ownerUserId: session.user!.id);
+      },
+    );
 
     final updateResult = await repository.updateExercise(preparedExercise);
 
