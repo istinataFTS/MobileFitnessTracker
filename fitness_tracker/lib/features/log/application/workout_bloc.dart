@@ -118,14 +118,12 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
 
         await _loadWeeklySetsData(emit);
 
-        if (state is WorkoutLoaded) {
-          emitEffect(
-            WorkoutLoggedEffect(
-              message: AppStrings.setLogged,
-              affectedMuscles: affectedMuscles,
-            ),
-          );
-        }
+        emitEffect(
+          WorkoutLoggedEffect(
+            message: AppStrings.setLogged,
+            affectedMuscles: affectedMuscles,
+          ),
+        );
       },
     );
   }

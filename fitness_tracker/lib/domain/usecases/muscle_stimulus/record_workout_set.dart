@@ -1,3 +1,5 @@
+import 'dart:math' show pow;
+
 import 'package:dartz/dartz.dart';
 import 'package:uuid/uuid.dart';
 
@@ -44,11 +46,6 @@ class RecordWorkoutSet {
         (muscleStimuli) async {
           if (muscleStimuli.isEmpty) {
             return const Right([]);
-          }
-
-          final shouldApplyDecay = await _shouldApplyDailyDecay(setTimestamp);
-          if (shouldApplyDecay) {
-            await _applyDailyDecay();
           }
 
           final affectedMuscles = <String>[];
@@ -133,25 +130,40 @@ class RecordWorkoutSet {
     required DateTime date,
   }) async {
     try {
-      final yesterday = date.subtract(const Duration(days: 1));
-      final yesterdayResult =
-          await muscleStimulusRepository.getStimulusByMuscleAndDate(
+      // Look back up to 30 days for the most recent stored record and apply
+      // time-based decay: decayedLoad = storedLoad * 0.6^daysSince.
+      // This avoids any batch-decay mutations and correctly handles multi-day gaps.
+      final lookbackStart = date.subtract(const Duration(days: 30));
+      final pastRecordsResult =
+          await muscleStimulusRepository.getStimulusByDateRange(
         muscleGroup: muscleGroup,
-        date: yesterday,
+        startDate: lookbackStart,
+        endDate: date.subtract(const Duration(days: 1)),
       );
 
-      double previousWeeklyLoad = 0.0;
-      yesterdayResult.fold(
+      double previousDecayedLoad = 0.0;
+      pastRecordsResult.fold(
         (_) {},
-        (yesterdayStimulus) {
-          if (yesterdayStimulus != null) {
-            previousWeeklyLoad = yesterdayStimulus.rollingWeeklyLoad;
+        (records) {
+          if (records.isNotEmpty) {
+            // Records are returned DESC by date, so first = most recent.
+            final mostRecent = records.first;
+            final daysSince = date
+                .difference(
+                  DateTime(
+                    mostRecent.date.year,
+                    mostRecent.date.month,
+                    mostRecent.date.day,
+                  ),
+                )
+                .inDays;
+            previousDecayedLoad = mostRecent.rollingWeeklyLoad *
+                pow(MuscleStimulus.weeklyDecayFactor, daysSince).toDouble();
           }
         },
       );
 
-      final newWeeklyLoad =
-          (previousWeeklyLoad * MuscleStimulus.weeklyDecayFactor) + setStimulus;
+      final newWeeklyLoad = previousDecayedLoad + setStimulus;
 
       final stimulus = muscle_stimulus_entity.MuscleStimulus(
         id: _uuid.v4(),
@@ -189,46 +201,6 @@ class RecordWorkoutSet {
       );
     } catch (e) {
       return Left(UnexpectedFailure('Failed to update stimulus record: $e'));
-    }
-  }
-
-  Future<bool> _shouldApplyDailyDecay(DateTime setTimestamp) async {
-    try {
-      final today = DateTime(
-        setTimestamp.year,
-        setTimestamp.month,
-        setTimestamp.day,
-      );
-
-      final todayResult =
-          await muscleStimulusRepository.getAllStimulusForDate(today);
-
-      return todayResult.fold(
-        (_) => false,
-        (todayRecords) => todayRecords.isEmpty,
-      );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _applyDailyDecay() async {
-    try {
-      await muscleStimulusRepository.applyDailyDecayToAll();
-
-      if (EnvConfig.enableDebugLogs) {
-        AppLogger.debug(
-          'Applied daily decay to all muscle groups',
-          category: 'stimulus',
-        );
-      }
-    } catch (e) {
-      if (EnvConfig.enableDebugLogs) {
-        AppLogger.debug(
-          'Failed to apply daily decay: $e',
-          category: 'stimulus',
-        );
-      }
     }
   }
 

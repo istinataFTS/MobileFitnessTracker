@@ -1,3 +1,5 @@
+import 'dart:math' show pow;
+
 import 'package:dartz/dartz.dart';
 
 import '../../../core/constants/muscle_stimulus_constants.dart';
@@ -237,30 +239,55 @@ class GetMuscleVisualData {
     required String muscleGroup,
     required DateTime todayStart,
   }) async {
-    final yesterday = todayStart.subtract(const Duration(days: 1));
     final aggregationMode = MuscleVisualContract.aggregationModeForPeriod(
       TimePeriod.week,
     );
 
-    final yesterdayResult = await muscleStimulusRepository
-        .getStimulusByMuscleAndDate(muscleGroup: muscleGroup, date: yesterday);
+    // Look back up to 30 days for the most recent stored record and compute
+    // decayedLoad = storedLoad * 0.6^daysSince (passive time-based decay).
+    final lookbackStart = todayStart.subtract(const Duration(days: 30));
+    final pastRecordsResult = await muscleStimulusRepository
+        .getStimulusByDateRange(
+          muscleGroup: muscleGroup,
+          startDate: lookbackStart,
+          endDate: todayStart.subtract(const Duration(days: 1)),
+        );
 
-    return yesterdayResult.fold(
+    return pastRecordsResult.fold(
       (_) => MuscleVisualData.untrained(
         muscleGroup,
         aggregationMode: aggregationMode,
       ),
-      (yesterdayStimulus) {
-        if (yesterdayStimulus == null) {
+      (records) {
+        if (records.isEmpty) {
           return MuscleVisualData.untrained(
             muscleGroup,
             aggregationMode: aggregationMode,
           );
         }
 
-        final decayedLoad =
-            yesterdayStimulus.rollingWeeklyLoad *
-            MuscleStimulus.weeklyDecayFactor;
+        // Records are returned DESC by date — first is most recent.
+        final mostRecent = records.first;
+        final daysSince = todayStart
+            .difference(
+              DateTime(
+                mostRecent.date.year,
+                mostRecent.date.month,
+                mostRecent.date.day,
+              ),
+            )
+            .inDays;
+
+        final decayedLoad = mostRecent.rollingWeeklyLoad *
+            pow(MuscleStimulus.weeklyDecayFactor, daysSince).toDouble();
+
+        // If the muscle has recovered below the threshold, show it as untrained.
+        if (decayedLoad < MuscleStimulus.recoveredThreshold) {
+          return MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          );
+        }
 
         return _buildVisualData(
           muscleGroup: muscleGroup,
