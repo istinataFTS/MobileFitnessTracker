@@ -483,12 +483,22 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     String userId,
   ) {
     final ownerUserId = exercise.ownerUserId;
-    if (ownerUserId != null &&
-        ownerUserId.isNotEmpty &&
-        ownerUserId != userId) {
+
+    // System / shared exercises (owner_user_id IS NULL) must never be claimed
+    // by a specific user or queued for upload. They live on-device only and
+    // are visible to everyone via the NULL-owner query clause.
+    if (ownerUserId == null || ownerUserId.isEmpty) {
       return exercise;
     }
 
+    // Don't touch exercises that belong to a different user.
+    if (ownerUserId != userId) {
+      return exercise;
+    }
+
+    // This exercise already belongs to the current user.
+    // Leave the owner as-is and update the sync metadata so it gets
+    // uploaded to the cloud on the next sync pass.
     final currentMetadata = exercise.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
@@ -508,10 +518,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     };
 
     return ExerciseModel.fromEntity(
-      exercise.copyWith(
-        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
-        syncMetadata: updatedMetadata,
-      ),
+      exercise.copyWith(syncMetadata: updatedMetadata),
     );
   }
 }
