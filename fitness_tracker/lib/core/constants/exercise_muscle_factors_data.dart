@@ -38,7 +38,7 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.triceps, 0.3),
       ],
 
-      'Push Ups': [
+      'Push-ups': [
         const MuscleFactorData(MuscleStimulus.midChest, 1.0),
         const MuscleFactorData(MuscleStimulus.upperChest, 0.3),
         const MuscleFactorData(MuscleStimulus.lowerChest, 0.3),
@@ -47,28 +47,38 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.abs, 0.2), // Stabilizer
       ],
 
-      'Cable Chest Flyes': [
+      'Cable Crossover': [
         const MuscleFactorData(MuscleStimulus.midChest, 1.0),
         const MuscleFactorData(MuscleStimulus.upperChest, 0.4),
         const MuscleFactorData(MuscleStimulus.lowerChest, 0.4),
         const MuscleFactorData(MuscleStimulus.frontDelts, 0.2),
       ],
 
-      'Chest Dips': [
-        const MuscleFactorData(MuscleStimulus.lowerChest, 1.0),
-        const MuscleFactorData(MuscleStimulus.midChest, 0.6),
-        const MuscleFactorData(MuscleStimulus.frontDelts, 0.4),
-        const MuscleFactorData(MuscleStimulus.triceps, 0.5),
-      ],
-
       // ==================== BACK EXERCISES ====================
 
-      'Pull Ups': [
+      'Pull-ups': [
         const MuscleFactorData(MuscleStimulus.lats, 1.0),
         const MuscleFactorData(MuscleStimulus.middleTraps, 0.4),
         const MuscleFactorData(MuscleStimulus.biceps, 0.5),
         const MuscleFactorData(MuscleStimulus.rearDelts, 0.3),
         const MuscleFactorData(MuscleStimulus.forearms, 0.2),
+      ],
+
+      'Chin-ups': [
+        const MuscleFactorData(MuscleStimulus.lats, 1.0),
+        const MuscleFactorData(MuscleStimulus.biceps, 0.7),
+        const MuscleFactorData(MuscleStimulus.middleTraps, 0.3),
+        const MuscleFactorData(MuscleStimulus.rearDelts, 0.2),
+        const MuscleFactorData(MuscleStimulus.forearms, 0.2),
+      ],
+
+      'Dumbbell Row': [
+        const MuscleFactorData(MuscleStimulus.lats, 1.0),
+        const MuscleFactorData(MuscleStimulus.middleTraps, 0.6),
+        const MuscleFactorData(MuscleStimulus.lowerTraps, 0.4),
+        const MuscleFactorData(MuscleStimulus.rearDelts, 0.4),
+        const MuscleFactorData(MuscleStimulus.biceps, 0.5),
+        const MuscleFactorData(MuscleStimulus.lowerBack, 0.2),
       ],
 
       'Barbell Row': [
@@ -150,18 +160,6 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.upperTraps, 0.3),
       ],
 
-      'Dumbbell Shoulder Press': [
-        const MuscleFactorData(MuscleStimulus.frontDelts, 1.0),
-        const MuscleFactorData(MuscleStimulus.sideDelts, 0.5),
-        const MuscleFactorData(MuscleStimulus.triceps, 0.5),
-        const MuscleFactorData(MuscleStimulus.upperTraps, 0.3),
-      ],
-
-      'Cable Lateral Raises': [
-        const MuscleFactorData(MuscleStimulus.sideDelts, 1.0),
-        const MuscleFactorData(MuscleStimulus.frontDelts, 0.2),
-      ],
-
       'Rear Delt Flyes': [
         const MuscleFactorData(MuscleStimulus.rearDelts, 1.0),
         const MuscleFactorData(MuscleStimulus.middleTraps, 0.3),
@@ -174,12 +172,17 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.forearms, 0.3),
       ],
 
-      'Hammer Curls': [
+      'Dumbbell Curl': [
+        const MuscleFactorData(MuscleStimulus.biceps, 1.0),
+        const MuscleFactorData(MuscleStimulus.forearms, 0.3),
+      ],
+
+      'Hammer Curl': [
         const MuscleFactorData(MuscleStimulus.biceps, 1.0),
         const MuscleFactorData(MuscleStimulus.forearms, 0.5),
       ],
 
-      'Preacher Curls': [
+      'Preacher Curl': [
         const MuscleFactorData(MuscleStimulus.biceps, 1.0),
         const MuscleFactorData(MuscleStimulus.forearms, 0.2),
       ],
@@ -190,7 +193,7 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.frontDelts, 0.3),
       ],
 
-      'Tricep Pushdowns': [
+      'Tricep Pushdown': [
         const MuscleFactorData(MuscleStimulus.triceps, 1.0),
       ],
 
@@ -205,14 +208,9 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.frontDelts, 0.4),
       ],
 
-      'Concentration Curls': [
+      'Concentration Curl': [
         const MuscleFactorData(MuscleStimulus.biceps, 1.0),
         const MuscleFactorData(MuscleStimulus.forearms, 0.2),
-      ],
-
-      'Cable Curls': [
-        const MuscleFactorData(MuscleStimulus.biceps, 1.0),
-        const MuscleFactorData(MuscleStimulus.forearms, 0.3),
       ],
 
       'Overhead Tricep Extension': [
@@ -220,7 +218,11 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.forearms, 0.2),
       ],
 
-      'Wrist Curls': [
+      'Wrist Curl': [
+        const MuscleFactorData(MuscleStimulus.forearms, 1.0),
+      ],
+
+      'Reverse Wrist Curl': [
         const MuscleFactorData(MuscleStimulus.forearms, 1.0),
       ],
 
@@ -271,6 +273,18 @@ class ExerciseMuscleFactorsData {
         const MuscleFactorData(MuscleStimulus.hamstrings, 0.3),
       ],
 
+      'Front Squat': [
+        const MuscleFactorData(MuscleStimulus.quads, 1.0),
+        const MuscleFactorData(MuscleStimulus.glutes, 0.5),
+        const MuscleFactorData(MuscleStimulus.hamstrings, 0.3),
+        const MuscleFactorData(MuscleStimulus.abs, 0.3), // Core stabilization
+      ],
+
+      'Nordic Curls': [
+        const MuscleFactorData(MuscleStimulus.hamstrings, 1.0),
+        const MuscleFactorData(MuscleStimulus.glutes, 0.3),
+      ],
+
       'Lunges': [
         const MuscleFactorData(MuscleStimulus.quads, 1.0),
         const MuscleFactorData(MuscleStimulus.glutes, 0.7),
@@ -290,6 +304,11 @@ class ExerciseMuscleFactorsData {
 
       'Crunches': [
         const MuscleFactorData(MuscleStimulus.abs, 1.0),
+      ],
+
+      'Sit-ups': [
+        const MuscleFactorData(MuscleStimulus.abs, 1.0),
+        const MuscleFactorData(MuscleStimulus.obliques, 0.2),
       ],
 
       'Planks': [

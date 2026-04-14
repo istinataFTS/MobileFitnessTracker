@@ -15,6 +15,7 @@ class MuscleGroups {
     'glutes',
     'hamstring',
     'quads',
+    'calves',
   ];
   
   /// Display names for muscle groups (for UI)
@@ -33,6 +34,7 @@ class MuscleGroups {
     'glutes': 'Glutes',
     'hamstring': 'Hamstrings',
     'quads': 'Quads',
+    'calves': 'Calves',
   };
 
   /// Validate if a muscle group name is valid
