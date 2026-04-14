@@ -75,9 +75,10 @@ class EnvConfig {
   /// Version 13: Added remote-ready sync metadata columns to meals and nutrition logs.
   /// Version 14: Added app metadata storage for session and migration state.
   /// Version 15: Replaced destructive legacy upgrade behavior with explicit compatibility failure.
+  /// Version 16: Clear stale exercise_muscle_factors and muscle_stimulus to force reseed with corrected factor names.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 15,
+    defaultValue: 16,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

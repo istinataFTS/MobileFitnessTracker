@@ -398,6 +398,14 @@ class DatabaseHelper {
       await _migrateOwnershipColumns(db);
     }
 
+    if (oldVersion < 16) {
+      // Clear stale muscle factor and stimulus data so the seeder re-runs
+      // with the corrected exercise name mappings from exercise_muscle_factors_data.dart.
+      // muscle_stimulus will be rebuilt from workout history by AppDataSeeder after reseeding.
+      await db.delete(DatabaseTables.exerciseMuscleFactors);
+      await db.delete(DatabaseTables.muscleStimulus);
+    }
+
     await _createIndexes(db);
   }
 
