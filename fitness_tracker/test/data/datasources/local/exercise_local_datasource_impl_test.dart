@@ -581,15 +581,141 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // prepareForInitialCloudMigration (existing behaviour, unchanged)
+  // prepareForInitialCloudMigration
   // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl prepareForInitialCloudMigration', () {
-    test('claims guest localOnly exercise and queues upload', () async {
+    // System exercises — never claimed or uploaded
+
+    test('leaves system localOnly exercise unchanged', () async {
       await dataSource.insertExercise(
         buildExercise(
           id: 'exercise-1',
           ownerUserId: null,
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.localOnly,
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final rawRows = await database.query(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: <Object?>['exercise-1'],
+      );
+      expect(rawRows, hasLength(1));
+      expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+      expect(
+        rawRows.single[DatabaseTables.exerciseSyncStatus],
+        SyncStatus.localOnly.name,
+      );
+    });
+
+    test('leaves system syncError exercise unchanged', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.syncError,
+            lastSyncError: 'prior error',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final rawRows = await database.query(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseId} = ?',
+        whereArgs: <Object?>['exercise-1'],
+      );
+      expect(rawRows, hasLength(1));
+      expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+      expect(
+        rawRows.single[DatabaseTables.exerciseSyncStatus],
+        SyncStatus.syncError.name,
+      );
+    });
+
+    // Corruption healing — system exercises incorrectly stuck in pendingUpload
+    // or pendingUpdate must be reset to localOnly so they do not block migration.
+
+    test(
+      'resets system pendingUpload exercise to localOnly (corruption heal)',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'exercise-1',
+            ownerUserId: null,
+            name: 'Bench Press',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.pendingUpload,
+              lastSyncError: 'prior error',
+            ),
+          ),
+        );
+
+        await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+        final rawRows = await database.query(
+          DatabaseTables.exercises,
+          where: '${DatabaseTables.exerciseId} = ?',
+          whereArgs: <Object?>['exercise-1'],
+        );
+        expect(rawRows, hasLength(1));
+        expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+        expect(
+          rawRows.single[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.localOnly.name,
+        );
+        expect(rawRows.single[DatabaseTables.exerciseLastSyncError], isNull);
+      },
+    );
+
+    test(
+      'resets system pendingUpdate exercise to localOnly (corruption heal)',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'exercise-1',
+            ownerUserId: null,
+            name: 'Bench Press',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.pendingUpdate,
+              lastSyncError: 'prior error',
+            ),
+          ),
+        );
+
+        await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+        final rawRows = await database.query(
+          DatabaseTables.exercises,
+          where: '${DatabaseTables.exerciseId} = ?',
+          whereArgs: <Object?>['exercise-1'],
+        );
+        expect(rawRows, hasLength(1));
+        expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+        expect(
+          rawRows.single[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.localOnly.name,
+        );
+        expect(rawRows.single[DatabaseTables.exerciseLastSyncError], isNull);
+      },
+    );
+
+    // User-owned exercises — queued for upload
+
+    test('queues user-owned localOnly exercise for upload', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'exercise-1',
+          ownerUserId: 'user-1',
           name: 'Bench Press',
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.localOnly,
@@ -607,11 +733,11 @@ void main() {
       expect(exercise.syncMetadata.lastSyncError, isNull);
     });
 
-    test('recovers guest syncError exercise into pendingUpload', () async {
+    test('recovers user-owned syncError exercise into pendingUpload', () async {
       await dataSource.insertExercise(
         buildExercise(
           id: 'exercise-1',
-          ownerUserId: null,
+          ownerUserId: 'user-1',
           name: 'Bench Press',
           syncMetadata: const EntitySyncMetadata(
             status: SyncStatus.syncError,
@@ -627,6 +753,27 @@ void main() {
       expect(exercise!.ownerUserId, 'user-1');
       expect(exercise.syncMetadata.status, SyncStatus.pendingUpload);
       expect(exercise.syncMetadata.lastSyncError, isNull);
+    });
+
+    test('leaves user-owned synced exercise unchanged', () async {
+      await dataSource.insertExercise(
+        buildExercise(
+          id: 'exercise-1',
+          ownerUserId: 'user-1',
+          name: 'Bench Press',
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.synced,
+            serverId: 'server-1',
+          ),
+        ),
+      );
+
+      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+      final exercise = await dataSource.getExerciseById('exercise-1');
+      expect(exercise, isNotNull);
+      expect(exercise!.syncMetadata.status, SyncStatus.synced);
+      expect(exercise.syncMetadata.serverId, 'server-1');
     });
   });
 }

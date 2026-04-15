@@ -28,6 +28,8 @@ void main() {
   late RebuildMuscleStimulusFromWorkoutHistory usecase;
   late List<MuscleStimulus> upsertedRecords;
 
+  const String testUserId = 'user-1';
+
   final today = DateTime.now();
   final todayStart = DateTime(today.year, today.month, today.day);
   final twoDaysAgo = todayStart.subtract(const Duration(days: 2));
@@ -36,6 +38,7 @@ void main() {
     registerFallbackValue(
       MuscleStimulus(
         id: 'fallback',
+        ownerUserId: testUserId,
         muscleGroup: stimulus_constants.MuscleStimulus.midChest,
         date: DateTime(2026, 1, 1),
         dailyStimulus: 0,
@@ -61,7 +64,7 @@ void main() {
     );
 
     when(
-      () => muscleStimulusRepository.clearAllStimulus(),
+      () => muscleStimulusRepository.clearStimulusForUser(testUserId),
     ).thenAnswer((_) async => const Right(null));
 
     when(() => muscleStimulusRepository.upsertStimulus(any())).thenAnswer((
@@ -145,10 +148,14 @@ void main() {
   test(
     'rebuild clears stale today muscles while preserving historic load',
     () async {
-      final result = await usecase();
+      final result = await usecase(testUserId);
 
       expect(result.isRight(), isTrue);
-      verify(() => muscleStimulusRepository.clearAllStimulus()).called(1);
+      // Must call the user-scoped clear, never the global clear
+      verify(
+        () => muscleStimulusRepository.clearStimulusForUser(testUserId),
+      ).called(1);
+      verifyNever(() => muscleStimulusRepository.clearAllStimulus());
 
       final todayQuads = upsertedRecords.firstWhere(
         (record) =>
@@ -166,4 +173,27 @@ void main() {
       expect(todayChest.dailyStimulus, greaterThan(0));
     },
   );
+
+  test('rebuilt records are stamped with the provided userId', () async {
+    await usecase(testUserId);
+
+    expect(
+      upsertedRecords.every((r) => r.ownerUserId == testUserId),
+      isTrue,
+      reason: 'every rebuilt record must carry the correct ownerUserId',
+    );
+  });
+
+  test('does not touch clearStimulusForUser for a different userId', () async {
+    const otherUserId = 'user-other';
+    when(
+      () => muscleStimulusRepository.clearStimulusForUser(otherUserId),
+    ).thenAnswer((_) async => const Right(null));
+
+    await usecase(testUserId);
+
+    verifyNever(
+      () => muscleStimulusRepository.clearStimulusForUser(otherUserId),
+    );
+  });
 }

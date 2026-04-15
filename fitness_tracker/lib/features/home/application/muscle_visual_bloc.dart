@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../domain/entities/muscle_visual_data.dart';
 import '../../../domain/entities/time_period.dart';
+import '../../../domain/repositories/app_session_repository.dart';
 import '../../../domain/usecases/muscle_stimulus/get_muscle_visual_data.dart';
 
 /// Controls what the 2D human model visualises.
@@ -101,7 +102,8 @@ class MuscleVisualLoaded extends MuscleVisualState {
       muscleData.values.any((MuscleVisualData data) => data.hasTrained);
 
   @override
-  List<Object?> get props => <Object?>[muscleData, currentPeriod, loadedAt, mode];
+  List<Object?> get props =>
+      <Object?>[muscleData, currentPeriod, loadedAt, mode];
 }
 
 class MuscleVisualError extends MuscleVisualState {
@@ -122,6 +124,7 @@ class MuscleVisualError extends MuscleVisualState {
 class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   MuscleVisualBloc({
     required this.getMuscleVisualData,
+    required this.appSessionRepository,
   }) : super(const MuscleVisualInitial()) {
     on<LoadMuscleVisualsEvent>(_onLoadMuscleVisuals);
     on<ChangePeriodEvent>(_onChangePeriod);
@@ -131,6 +134,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   }
 
   final GetMuscleVisualData getMuscleVisualData;
+  final AppSessionRepository appSessionRepository;
 
   final Map<TimePeriod, Map<String, MuscleVisualData>> _periodCache =
       <TimePeriod, Map<String, MuscleVisualData>>{};
@@ -140,6 +144,17 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   MuscleMapMode _currentMode = MuscleMapMode.volume;
 
   static const Duration _cacheValidityDuration = Duration(minutes: 5);
+
+  /// Resolves the current user's ID from the session.
+  /// Returns an empty string for the guest / unauthenticated state so that
+  /// stimulus queries are correctly scoped to the `owner_user_id = ''` rows.
+  Future<String> _resolveUserId() async {
+    final result = await appSessionRepository.getCurrentSession();
+    return result.fold(
+      (_) => '',
+      (session) => session.user?.id ?? '',
+    );
+  }
 
   Future<void> _onLoadMuscleVisuals(
     LoadMuscleVisualsEvent event,
@@ -161,7 +176,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(event.period, mode: _currentMode));
 
-    final result = await getMuscleVisualData(event.period);
+    final userId = await _resolveUserId();
+    final result = await getMuscleVisualData(event.period, userId);
 
     result.fold(
       (failure) => emit(
@@ -217,7 +233,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(event.newPeriod, mode: _currentMode));
 
-    final result = await getMuscleVisualData(event.newPeriod);
+    final userId = await _resolveUserId();
+    final result = await getMuscleVisualData(event.newPeriod, userId);
 
     result.fold(
       (failure) => emit(
@@ -274,7 +291,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(_currentPeriod, mode: _currentMode));
 
-    final result = await getMuscleVisualData(periodToFetch);
+    final userId = await _resolveUserId();
+    final result = await getMuscleVisualData(periodToFetch, userId);
 
     result.fold(
       (failure) => emit(
@@ -313,7 +331,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(_currentPeriod, mode: _currentMode));
 
-    final result = await getMuscleVisualData(periodToRefresh);
+    final userId = await _resolveUserId();
+    final result = await getMuscleVisualData(periodToRefresh, userId);
 
     result.fold(
       (failure) => emit(

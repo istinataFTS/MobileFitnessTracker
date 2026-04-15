@@ -484,10 +484,27 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   ) {
     final ownerUserId = exercise.ownerUserId;
 
-    // System / shared exercises (owner_user_id IS NULL) must never be claimed
-    // by a specific user or queued for upload. They live on-device only and
-    // are visible to everyone via the NULL-owner query clause.
+    // System / shared exercises (owner_user_id IS NULL) must never be uploaded
+    // to the cloud — the Supabase DTO requires a non-null owner and the RLS
+    // policy enforces user_id = auth.uid().
+    //
+    // If one ended up with a pending-upload or pending-update status (e.g.
+    // seeded while remote sync was configured but before the owner guard was
+    // in place), reset it to localOnly so it is excluded from
+    // syncPendingChanges and cannot block migration.
     if (ownerUserId == null || ownerUserId.isEmpty) {
+      final status = exercise.syncMetadata.status;
+      if (status == SyncStatus.pendingUpload ||
+          status == SyncStatus.pendingUpdate) {
+        return ExerciseModel.fromEntity(
+          exercise.copyWith(
+            syncMetadata: exercise.syncMetadata.copyWith(
+              status: SyncStatus.localOnly,
+              clearLastSyncError: true,
+            ),
+          ),
+        );
+      }
       return exercise;
     }
 

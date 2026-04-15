@@ -1,4 +1,5 @@
 import '../../core/enums/sync_entity_type.dart';
+import '../../core/enums/sync_status.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/exercise.dart';
 import '../datasources/local/exercise_local_datasource.dart';
@@ -46,7 +47,7 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   Exercise buildAddedLocalEntity(Exercise entity, DateTime now) {
     return entity.copyWith(
       updatedAt: now,
-      syncMetadata: buildAddedSyncMetadata(entity.syncMetadata),
+      syncMetadata: _syncMetadataForAdd(entity),
     );
   }
 
@@ -58,10 +59,40 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   }) {
     return entity.copyWith(
       updatedAt: now,
-      syncMetadata: buildUpdatedSyncMetadata(
-        incomingMetadata: entity.syncMetadata,
-        existingLocalMetadata: existingLocal?.syncMetadata,
+      syncMetadata: _syncMetadataForUpdate(
+        entity: entity,
+        existingLocal: existingLocal,
       ),
+    );
+  }
+
+  /// Returns [SyncStatus.localOnly] for system exercises (no owner) so they
+  /// are never queued for a remote upsert that would always fail — the
+  /// Supabase DTO requires a non-null [ownerUserId] and the RLS policy
+  /// requires [user_id = auth.uid()].
+  EntitySyncMetadata _syncMetadataForAdd(Exercise entity) {
+    if (entity.ownerUserId == null) {
+      return entity.syncMetadata.copyWith(
+        status: SyncStatus.localOnly,
+        clearLastSyncError: true,
+      );
+    }
+    return buildAddedSyncMetadata(entity.syncMetadata);
+  }
+
+  EntitySyncMetadata _syncMetadataForUpdate({
+    required Exercise entity,
+    required Exercise? existingLocal,
+  }) {
+    if (entity.ownerUserId == null) {
+      return (existingLocal?.syncMetadata ?? entity.syncMetadata).copyWith(
+        status: SyncStatus.localOnly,
+        clearLastSyncError: true,
+      );
+    }
+    return buildUpdatedSyncMetadata(
+      incomingMetadata: entity.syncMetadata,
+      existingLocalMetadata: existingLocal?.syncMetadata,
     );
   }
 

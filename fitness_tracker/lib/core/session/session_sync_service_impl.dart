@@ -1,6 +1,7 @@
 import '../../core/logging/app_logger.dart';
 import '../../data/datasources/local/exercise_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource.dart';
+import '../../data/datasources/local/muscle_stimulus_local_datasource.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
 import '../../data/datasources/local/target_local_datasource.dart';
 import '../../data/datasources/local/workout_set_local_datasource.dart';
@@ -17,6 +18,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
   final SyncOrchestrator syncOrchestrator;
   final ExerciseLocalDataSource exerciseLocalDataSource;
   final MealLocalDataSource mealLocalDataSource;
+  final MuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
   final NutritionLogLocalDataSource nutritionLogLocalDataSource;
   final TargetLocalDataSource targetLocalDataSource;
   final WorkoutSetLocalDataSource workoutSetLocalDataSource;
@@ -27,6 +29,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
     required this.syncOrchestrator,
     required this.exerciseLocalDataSource,
     required this.mealLocalDataSource,
+    required this.muscleStimulusLocalDataSource,
     required this.nutritionLogLocalDataSource,
     required this.targetLocalDataSource,
     required this.workoutSetLocalDataSource,
@@ -182,7 +185,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
   ///
   /// Ordering matters for FK integrity:
   /// - meals before nutrition_logs (nutrition_logs.meal_id → meals.id)
-  /// - targets and workout_sets are independent and run in parallel
+  /// - targets, workout_sets, and muscle_stimulus are independent and run in parallel
   /// - exercises: only user-owned rows; seeded exercises (owner_user_id IS NULL)
   ///   are never deleted
   Future<void> _clearAllLocalUserData(String? userId) async {
@@ -197,9 +200,16 @@ class SessionSyncServiceImpl implements SessionSyncService {
         workoutSetLocalDataSource.clearAllSets(),
       ]);
 
-      // exercises: targeted delete to preserve seeded data
+      // User-scoped tables: only clear when a real authenticated userId is
+      // present.  Guest sessions have no owned rows to remove.
       if (userId != null) {
-        await exerciseLocalDataSource.clearUserOwnedExercises(userId);
+        await Future.wait(<Future<void>>[
+          // exercises: targeted delete to preserve seeded data
+          exerciseLocalDataSource.clearUserOwnedExercises(userId),
+          // Scope muscle_stimulus removal to the signing-out user only so
+          // other profiles' training history is not affected.
+          muscleStimulusLocalDataSource.clearStimulusForUser(userId),
+        ]);
       }
     } catch (error) {
       AppLogger.warning(

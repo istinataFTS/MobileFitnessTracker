@@ -21,6 +21,7 @@ class MockCalculateMuscleStimulus extends Mock
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const String _testUserId = 'user-1';
 final _testDate = DateTime(2026, 4, 6);
 
 MuscleStimulus _makeStimulusRecord({
@@ -31,6 +32,7 @@ MuscleStimulus _makeStimulusRecord({
 }) {
   return MuscleStimulus(
     id: id,
+    ownerUserId: _testUserId,
     muscleGroup: muscleGroup,
     date: _testDate,
     dailyStimulus: dailyStimulus,
@@ -76,6 +78,7 @@ void main() {
         ).thenAnswer((_) async => const Left(_calcFailure));
 
         final result = await useCase(
+          userId: _testUserId,
           exerciseId: 'ex-1',
           sets: 1,
           intensity: 3,
@@ -96,6 +99,7 @@ void main() {
         ).thenAnswer((_) async => const Right(<String, double>{}));
 
         final result = await useCase(
+          userId: _testUserId,
           exerciseId: 'ex-1',
           sets: 1,
           intensity: 3,
@@ -118,27 +122,31 @@ void main() {
           (_) async => const Right(<String, double>{'chest': 1.0}),
         );
 
-        // No records today → apply decay
-        when(
-          () => mockStimulusRepo.getAllStimulusForDate(any()),
-        ).thenAnswer((_) async => const Right([]));
-        when(
-          () => mockStimulusRepo.applyDailyDecayToAll(),
-        ).thenAnswer((_) async => const Right(null));
-
-        // No existing record for today or yesterday
+        // No existing record for today
         when(
           () => mockStimulusRepo.getStimulusByMuscleAndDate(
+            userId: _testUserId,
             muscleGroup: any(named: 'muscleGroup'),
             date: any(named: 'date'),
           ),
         ).thenAnswer((_) async => const Right(null));
+
+        // No past records in date range
+        when(
+          () => mockStimulusRepo.getStimulusByDateRange(
+            userId: _testUserId,
+            muscleGroup: any(named: 'muscleGroup'),
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+          ),
+        ).thenAnswer((_) async => const Right([]));
 
         when(() => mockStimulusRepo.upsertStimulus(any())).thenAnswer(
           (_) async => const Right(null),
         );
 
         final result = await useCase(
+          userId: _testUserId,
           exerciseId: 'ex-1',
           sets: 1,
           intensity: 5,
@@ -149,6 +157,55 @@ void main() {
         final muscles = (result as Right).value as List<String>;
         expect(muscles, contains('chest'));
         verify(() => mockStimulusRepo.upsertStimulus(any())).called(1);
+      });
+
+      test('new record is stamped with the provided userId', () async {
+        MuscleStimulus? capturedStimulus;
+
+        when(
+          () => mockCalculate.calculateForSet(
+            exerciseId: 'ex-1',
+            sets: 1,
+            intensity: 5,
+          ),
+        ).thenAnswer(
+          (_) async => const Right(<String, double>{'chest': 1.0}),
+        );
+
+        when(
+          () => mockStimulusRepo.getStimulusByMuscleAndDate(
+            userId: _testUserId,
+            muscleGroup: any(named: 'muscleGroup'),
+            date: any(named: 'date'),
+          ),
+        ).thenAnswer((_) async => const Right(null));
+
+        when(
+          () => mockStimulusRepo.getStimulusByDateRange(
+            userId: _testUserId,
+            muscleGroup: any(named: 'muscleGroup'),
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+          ),
+        ).thenAnswer((_) async => const Right([]));
+
+        when(() => mockStimulusRepo.upsertStimulus(any())).thenAnswer(
+          (inv) async {
+            capturedStimulus =
+                inv.positionalArguments.first as MuscleStimulus;
+            return const Right(null);
+          },
+        );
+
+        await useCase(
+          userId: _testUserId,
+          exerciseId: 'ex-1',
+          sets: 1,
+          intensity: 5,
+          timestamp: _testDate,
+        );
+
+        expect(capturedStimulus?.ownerUserId, _testUserId);
       });
 
       test('updates existing record when stimulus for today already exists',
@@ -168,14 +225,10 @@ void main() {
           (_) async => const Right(<String, double>{'chest': 1.0}),
         );
 
-        // Records exist for today → skip decay
-        when(
-          () => mockStimulusRepo.getAllStimulusForDate(any()),
-        ).thenAnswer((_) async => Right([existing]));
-
         // Existing record found for today
         when(
           () => mockStimulusRepo.getStimulusByMuscleAndDate(
+            userId: _testUserId,
             muscleGroup: any(named: 'muscleGroup'),
             date: any(named: 'date'),
           ),
@@ -192,6 +245,7 @@ void main() {
         ).thenAnswer((_) async => const Right(null));
 
         final result = await useCase(
+          userId: _testUserId,
           exerciseId: 'ex-1',
           sets: 1,
           intensity: 5,

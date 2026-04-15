@@ -16,9 +16,11 @@ class MockMuscleStimulusLocalDataSource extends Mock
 // ---------------------------------------------------------------------------
 
 final _date = DateTime(2026, 4, 7);
+const _userId = 'user-1';
 
 final _stimulusModel = MuscleStimulusModel(
   id: 'stim-1',
+  ownerUserId: _userId,
   muscleGroup: 'chest',
   date: _date,
   dailyStimulus: 5.0,
@@ -29,6 +31,7 @@ final _stimulusModel = MuscleStimulusModel(
 
 final _stimulusEntity = MuscleStimulus(
   id: 'stim-1',
+  ownerUserId: _userId,
   muscleGroup: 'chest',
   date: _date,
   dailyStimulus: 5.0,
@@ -58,11 +61,13 @@ void main() {
     group('getStimulusByMuscleAndDate', () {
       test('returns model from datasource on success', () async {
         when(() => mockDataSource.getStimulusByMuscleAndDate(
+              userId: _userId,
               muscleGroup: 'chest',
               date: _date,
             )).thenAnswer((_) async => _stimulusModel);
 
         final result = await repository.getStimulusByMuscleAndDate(
+          userId: _userId,
           muscleGroup: 'chest',
           date: _date,
         );
@@ -73,11 +78,13 @@ void main() {
 
       test('returns null from datasource when no record exists', () async {
         when(() => mockDataSource.getStimulusByMuscleAndDate(
+              userId: _userId,
               muscleGroup: 'chest',
               date: _date,
             )).thenAnswer((_) async => null);
 
         final result = await repository.getStimulusByMuscleAndDate(
+          userId: _userId,
           muscleGroup: 'chest',
           date: _date,
         );
@@ -88,11 +95,13 @@ void main() {
 
       test('returns DatabaseFailure on exception', () async {
         when(() => mockDataSource.getStimulusByMuscleAndDate(
+              userId: _userId,
               muscleGroup: 'chest',
               date: _date,
             )).thenThrow(_dbException);
 
         final result = await repository.getStimulusByMuscleAndDate(
+          userId: _userId,
           muscleGroup: 'chest',
           date: _date,
         );
@@ -108,12 +117,14 @@ void main() {
 
       test('returns list from datasource on success', () async {
         when(() => mockDataSource.getStimulusByDateRange(
+              userId: _userId,
               muscleGroup: 'chest',
               startDate: startDate,
               endDate: endDate,
             )).thenAnswer((_) async => [_stimulusModel]);
 
         final result = await repository.getStimulusByDateRange(
+          userId: _userId,
           muscleGroup: 'chest',
           startDate: startDate,
           endDate: endDate,
@@ -125,12 +136,14 @@ void main() {
 
       test('returns DatabaseFailure on exception', () async {
         when(() => mockDataSource.getStimulusByDateRange(
+              userId: _userId,
               muscleGroup: 'chest',
               startDate: startDate,
               endDate: endDate,
             )).thenThrow(_dbException);
 
         final result = await repository.getStimulusByDateRange(
+          userId: _userId,
           muscleGroup: 'chest',
           startDate: startDate,
           endDate: endDate,
@@ -143,20 +156,20 @@ void main() {
 
     group('getTodayStimulus', () {
       test('returns model from datasource on success', () async {
-        when(() => mockDataSource.getTodayStimulus('chest'))
+        when(() => mockDataSource.getTodayStimulus(_userId, 'chest'))
             .thenAnswer((_) async => _stimulusModel);
 
-        final result = await repository.getTodayStimulus('chest');
+        final result = await repository.getTodayStimulus(_userId, 'chest');
 
         expect(result.isRight(), isTrue);
         expect((result as Right).value, _stimulusModel);
       });
 
       test('returns DatabaseFailure on exception', () async {
-        when(() => mockDataSource.getTodayStimulus('chest'))
+        when(() => mockDataSource.getTodayStimulus(_userId, 'chest'))
             .thenThrow(_dbException);
 
-        final result = await repository.getTodayStimulus('chest');
+        final result = await repository.getTodayStimulus(_userId, 'chest');
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
@@ -165,20 +178,20 @@ void main() {
 
     group('getAllStimulusForDate', () {
       test('returns list from datasource on success', () async {
-        when(() => mockDataSource.getAllStimulusForDate(_date))
+        when(() => mockDataSource.getAllStimulusForDate(_userId, _date))
             .thenAnswer((_) async => [_stimulusModel]);
 
-        final result = await repository.getAllStimulusForDate(_date);
+        final result = await repository.getAllStimulusForDate(_userId, _date);
 
         expect(result.isRight(), isTrue);
         expect((result as Right).value, [_stimulusModel]);
       });
 
       test('returns DatabaseFailure on exception', () async {
-        when(() => mockDataSource.getAllStimulusForDate(_date))
+        when(() => mockDataSource.getAllStimulusForDate(_userId, _date))
             .thenThrow(_dbException);
 
-        final result = await repository.getAllStimulusForDate(_date);
+        final result = await repository.getAllStimulusForDate(_userId, _date);
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
@@ -197,6 +210,7 @@ void main() {
           () => mockDataSource.upsertStimulus(captureAny()),
         ).captured.single as MuscleStimulusModel;
         expect(captured.id, _stimulusEntity.id);
+        expect(captured.ownerUserId, _stimulusEntity.ownerUserId);
         expect(captured.muscleGroup, _stimulusEntity.muscleGroup);
         expect(captured.dailyStimulus, _stimulusEntity.dailyStimulus);
       });
@@ -253,20 +267,20 @@ void main() {
 
     group('applyDailyDecayToAll', () {
       test('delegates to datasource on success', () async {
-        when(() => mockDataSource.applyDailyDecayToAll())
+        when(() => mockDataSource.applyDailyDecayToAll(_userId))
             .thenAnswer((_) async {});
 
-        final result = await repository.applyDailyDecayToAll();
+        final result = await repository.applyDailyDecayToAll(_userId);
 
         expect(result.isRight(), isTrue);
-        verify(() => mockDataSource.applyDailyDecayToAll()).called(1);
+        verify(() => mockDataSource.applyDailyDecayToAll(_userId)).called(1);
       });
 
       test('returns DatabaseFailure on exception', () async {
-        when(() => mockDataSource.applyDailyDecayToAll())
+        when(() => mockDataSource.applyDailyDecayToAll(_userId))
             .thenThrow(_dbException);
 
-        final result = await repository.applyDailyDecayToAll();
+        final result = await repository.applyDailyDecayToAll(_userId);
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
@@ -275,22 +289,22 @@ void main() {
 
     group('getMaxStimulusForMuscle', () {
       test('returns value from datasource on success', () async {
-        when(() => mockDataSource.getMaxStimulusForMuscle('chest'))
+        when(() => mockDataSource.getMaxStimulusForMuscle(_userId, 'chest'))
             .thenAnswer((_) async => 15.0);
 
         final result =
-            await repository.getMaxStimulusForMuscle('chest');
+            await repository.getMaxStimulusForMuscle(_userId, 'chest');
 
         expect(result.isRight(), isTrue);
         expect((result as Right).value, 15.0);
       });
 
       test('returns DatabaseFailure on exception', () async {
-        when(() => mockDataSource.getMaxStimulusForMuscle('chest'))
+        when(() => mockDataSource.getMaxStimulusForMuscle(_userId, 'chest'))
             .thenThrow(_dbException);
 
         final result =
-            await repository.getMaxStimulusForMuscle('chest');
+            await repository.getMaxStimulusForMuscle(_userId, 'chest');
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
@@ -299,20 +313,20 @@ void main() {
 
     group('deleteOlderThan', () {
       test('delegates to datasource on success', () async {
-        when(() => mockDataSource.deleteOlderThan(_date))
+        when(() => mockDataSource.deleteOlderThan(_userId, _date))
             .thenAnswer((_) async {});
 
-        final result = await repository.deleteOlderThan(_date);
+        final result = await repository.deleteOlderThan(_userId, _date);
 
         expect(result.isRight(), isTrue);
-        verify(() => mockDataSource.deleteOlderThan(_date)).called(1);
+        verify(() => mockDataSource.deleteOlderThan(_userId, _date)).called(1);
       });
 
       test('returns DatabaseFailure on exception', () async {
-        when(() => mockDataSource.deleteOlderThan(_date))
+        when(() => mockDataSource.deleteOlderThan(_userId, _date))
             .thenThrow(_dbException);
 
-        final result = await repository.deleteOlderThan(_date);
+        final result = await repository.deleteOlderThan(_userId, _date);
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
@@ -335,6 +349,28 @@ void main() {
             .thenThrow(_dbException);
 
         final result = await repository.clearAllStimulus();
+
+        expect(result.isLeft(), isTrue);
+        expect((result as Left).value, isA<DatabaseFailure>());
+      });
+    });
+
+    group('clearStimulusForUser', () {
+      test('delegates to datasource on success', () async {
+        when(() => mockDataSource.clearStimulusForUser(_userId))
+            .thenAnswer((_) async {});
+
+        final result = await repository.clearStimulusForUser(_userId);
+
+        expect(result.isRight(), isTrue);
+        verify(() => mockDataSource.clearStimulusForUser(_userId)).called(1);
+      });
+
+      test('returns DatabaseFailure on exception', () async {
+        when(() => mockDataSource.clearStimulusForUser(_userId))
+            .thenThrow(_dbException);
+
+        final result = await repository.clearStimulusForUser(_userId);
 
         expect(result.isLeft(), isTrue);
         expect((result as Left).value, isA<DatabaseFailure>());
