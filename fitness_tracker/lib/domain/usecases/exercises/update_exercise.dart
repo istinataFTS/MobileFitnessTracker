@@ -32,6 +32,10 @@ class UpdateExercise {
     );
 
     final sessionResult = await appSessionRepository.getCurrentSession();
+    final userId = sessionResult.fold(
+      (_) => '',
+      (session) => session.user?.id ?? '',
+    );
 
     final preparedExercise = sessionResult.fold(
       (_) => normalizedExercise,
@@ -54,7 +58,7 @@ class UpdateExercise {
       final syncResult = await syncExerciseMuscleFactors(preparedExercise);
       return syncResult.fold(
         (failure) async => Left(failure),
-        (_) async => rebuildMuscleStimulusFromWorkoutHistory(),
+        (_) async => rebuildMuscleStimulusFromWorkoutHistory(userId),
       );
     });
   }

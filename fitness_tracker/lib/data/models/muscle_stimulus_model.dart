@@ -4,6 +4,7 @@ import '../../domain/entities/muscle_stimulus.dart';
 class MuscleStimulusModel extends MuscleStimulus {
   const MuscleStimulusModel({
     required super.id,
+    required super.ownerUserId,
     required super.muscleGroup,
     required super.date,
     required super.dailyStimulus,
@@ -18,6 +19,7 @@ class MuscleStimulusModel extends MuscleStimulus {
   factory MuscleStimulusModel.fromEntity(MuscleStimulus stimulus) {
     return MuscleStimulusModel(
       id: stimulus.id,
+      ownerUserId: stimulus.ownerUserId,
       muscleGroup: stimulus.muscleGroup,
       date: stimulus.date,
       dailyStimulus: stimulus.dailyStimulus,
@@ -32,6 +34,7 @@ class MuscleStimulusModel extends MuscleStimulus {
   factory MuscleStimulusModel.fromMap(Map<String, dynamic> map) {
     return MuscleStimulusModel(
       id: map[DatabaseTables.stimulusId] as String,
+      ownerUserId: map[DatabaseTables.ownerUserId] as String? ?? '',
       muscleGroup: map[DatabaseTables.stimulusMuscleGroup] as String,
       date: DateTime.parse(map[DatabaseTables.stimulusDate] as String),
       dailyStimulus: (map[DatabaseTables.stimulusDailyStimulus] as num).toDouble(),
@@ -50,6 +53,7 @@ class MuscleStimulusModel extends MuscleStimulus {
   Map<String, dynamic> toMap() {
     return {
       DatabaseTables.stimulusId: id,
+      DatabaseTables.ownerUserId: ownerUserId,
       DatabaseTables.stimulusMuscleGroup: muscleGroup,
       DatabaseTables.stimulusDate: formatDateForDb(date),
       DatabaseTables.stimulusDailyStimulus: dailyStimulus,
@@ -79,6 +83,7 @@ class MuscleStimulusModel extends MuscleStimulus {
   factory MuscleStimulusModel.fromJson(Map<String, dynamic> json) {
     return MuscleStimulusModel(
       id: json['id'] as String,
+      ownerUserId: json['ownerUserId'] as String? ?? '',
       muscleGroup: json['muscleGroup'] as String,
       date: DateTime.parse(json['date'] as String),
       dailyStimulus: (json['dailyStimulus'] as num).toDouble(),
@@ -94,6 +99,7 @@ class MuscleStimulusModel extends MuscleStimulus {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ownerUserId': ownerUserId,
       'muscleGroup': muscleGroup,
       'date': date.toIso8601String(),
       'dailyStimulus': dailyStimulus,

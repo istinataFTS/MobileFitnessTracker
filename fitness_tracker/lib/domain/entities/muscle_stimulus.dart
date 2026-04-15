@@ -4,6 +4,10 @@ import '../../core/constants/muscle_stimulus_constants.dart' as constants;
 
 class MuscleStimulus extends Equatable {
   final String id;
+
+  /// The user who owns this record. Empty string for guest/unauthenticated.
+  final String ownerUserId;
+
   final String muscleGroup;
   
   /// Date in YYYY-MM-DD format
@@ -30,6 +34,7 @@ class MuscleStimulus extends Equatable {
 
   const MuscleStimulus({
     required this.id,
+    required this.ownerUserId,
     required this.muscleGroup,
     required this.date,
     required this.dailyStimulus,
@@ -104,6 +109,7 @@ class MuscleStimulus extends Equatable {
 
   MuscleStimulus copyWith({
     String? id,
+    String? ownerUserId,
     String? muscleGroup,
     DateTime? date,
     double? dailyStimulus,
@@ -115,6 +121,7 @@ class MuscleStimulus extends Equatable {
   }) {
     return MuscleStimulus(
       id: id ?? this.id,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       muscleGroup: muscleGroup ?? this.muscleGroup,
       date: date ?? this.date,
       dailyStimulus: dailyStimulus ?? this.dailyStimulus,
@@ -129,6 +136,7 @@ class MuscleStimulus extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        ownerUserId,
         muscleGroup,
         date,
         dailyStimulus,

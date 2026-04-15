@@ -50,11 +50,13 @@ void main() {
 
   Exercise buildExercise({
     required String id,
+    String? ownerUserId = 'user-1',
     SyncStatus status = SyncStatus.synced,
     String? serverId = 'server-1',
   }) {
     return Exercise(
       id: id,
+      ownerUserId: ownerUserId,
       name: 'Bench Press',
       muscleGroups: const <String>['chest', 'triceps'],
       createdAt: baseDate,
@@ -75,6 +77,138 @@ void main() {
       localDataSource: localDataSource,
       remoteDataSource: remoteDataSource,
       pendingSyncDeleteLocalDataSource: pendingDeleteDataSource,
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // System-exercise guard: buildAddedLocalEntity / buildUpdatedLocalEntity
+  // ---------------------------------------------------------------------------
+
+  group('ExerciseSyncCoordinatorImpl system-exercise guard', () {
+    test(
+      'buildAddedLocalEntity gives system exercise localOnly status even when remote is configured',
+      () {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+
+        final Exercise systemExercise = Exercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+        );
+
+        final result = coordinator.buildAddedLocalEntity(
+          systemExercise,
+          baseDate,
+        );
+
+        expect(result.syncMetadata.status, SyncStatus.localOnly);
+      },
+    );
+
+    test(
+      'buildAddedLocalEntity gives user-owned exercise pendingUpload when remote is configured',
+      () {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+
+        final Exercise userExercise = Exercise(
+          id: 'exercise-1',
+          ownerUserId: 'user-1',
+          name: 'Bench Press',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+        );
+
+        final result = coordinator.buildAddedLocalEntity(
+          userExercise,
+          baseDate,
+        );
+
+        expect(result.syncMetadata.status, SyncStatus.pendingUpload);
+      },
+    );
+
+    test(
+      'buildAddedLocalEntity gives user-owned exercise localOnly when remote is not configured',
+      () {
+        when(() => remoteDataSource.isConfigured).thenReturn(false);
+
+        final Exercise userExercise = Exercise(
+          id: 'exercise-1',
+          ownerUserId: 'user-1',
+          name: 'Bench Press',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+        );
+
+        final result = coordinator.buildAddedLocalEntity(
+          userExercise,
+          baseDate,
+        );
+
+        expect(result.syncMetadata.status, SyncStatus.localOnly);
+      },
+    );
+
+    test(
+      'buildUpdatedLocalEntity gives system exercise localOnly status even when remote is configured',
+      () {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+
+        final Exercise systemExercise = Exercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press Updated',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+        );
+
+        final result = coordinator.buildUpdatedLocalEntity(
+          entity: systemExercise,
+          existingLocal: null,
+          now: baseDate,
+        );
+
+        expect(result.syncMetadata.status, SyncStatus.localOnly);
+      },
+    );
+
+    test(
+      'buildUpdatedLocalEntity preserves existing sync metadata for system exercise',
+      () {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+
+        final Exercise existingLocal = Exercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+          syncMetadata: const EntitySyncMetadata(
+            status: SyncStatus.pendingUpload,
+            lastSyncError: 'prior error',
+          ),
+        );
+
+        final Exercise incoming = Exercise(
+          id: 'exercise-1',
+          ownerUserId: null,
+          name: 'Bench Press Updated',
+          muscleGroups: const <String>['chest'],
+          createdAt: baseDate,
+        );
+
+        final result = coordinator.buildUpdatedLocalEntity(
+          entity: incoming,
+          existingLocal: ExerciseModel.fromEntity(existingLocal),
+          now: baseDate,
+        );
+
+        // pendingUpload from existing local is overridden to localOnly
+        expect(result.syncMetadata.status, SyncStatus.localOnly);
+        expect(result.syncMetadata.lastSyncError, isNull);
+      },
     );
   });
 

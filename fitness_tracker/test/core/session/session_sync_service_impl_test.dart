@@ -11,6 +11,7 @@ import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource
 import 'package:fitness_tracker/data/datasources/local/meal_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/target_local_datasource.dart';
+import 'package:fitness_tracker/data/datasources/local/muscle_stimulus_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/workout_set_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
@@ -38,6 +39,9 @@ class MockTargetLocalDataSource extends Mock implements TargetLocalDataSource {}
 class MockWorkoutSetLocalDataSource extends Mock
     implements WorkoutSetLocalDataSource {}
 
+class MockMuscleStimulusLocalDataSource extends Mock
+    implements MuscleStimulusLocalDataSource {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const AppUser(id: '', email: ''));
@@ -52,6 +56,7 @@ void main() {
   late MockNutritionLogLocalDataSource nutritionLogLocalDataSource;
   late MockTargetLocalDataSource targetLocalDataSource;
   late MockWorkoutSetLocalDataSource workoutSetLocalDataSource;
+  late MockMuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
   late SessionSyncService service;
 
   const user = AppUser(
@@ -74,6 +79,7 @@ void main() {
     nutritionLogLocalDataSource = MockNutritionLogLocalDataSource();
     targetLocalDataSource = MockTargetLocalDataSource();
     workoutSetLocalDataSource = MockWorkoutSetLocalDataSource();
+    muscleStimulusLocalDataSource = MockMuscleStimulusLocalDataSource();
 
     when(() => repository.syncPolicy).thenReturn(AppSyncPolicy.productionDefault);
 
@@ -96,6 +102,8 @@ void main() {
         .thenAnswer((_) async {});
     when(() => workoutSetLocalDataSource.clearAllSets())
         .thenAnswer((_) async {});
+    when(() => muscleStimulusLocalDataSource.clearStimulusForUser(any()))
+        .thenAnswer((_) async {});
 
     service = SessionSyncServiceImpl(
       appSessionRepository: repository,
@@ -106,6 +114,7 @@ void main() {
       nutritionLogLocalDataSource: nutritionLogLocalDataSource,
       targetLocalDataSource: targetLocalDataSource,
       workoutSetLocalDataSource: workoutSetLocalDataSource,
+      muscleStimulusLocalDataSource: muscleStimulusLocalDataSource,
     );
   });
 
@@ -279,6 +288,10 @@ void main() {
       verify(
         () => exerciseLocalDataSource.clearUserOwnedExercises('user-1'),
       ).called(1);
+      // Muscle stimulus cleared for this user only.
+      verify(
+        () => muscleStimulusLocalDataSource.clearStimulusForUser('user-1'),
+      ).called(1);
     });
 
     test('fails when remote sign-out throws; no local state is touched',
@@ -298,6 +311,9 @@ void main() {
       verifyNever(() => workoutSetLocalDataSource.clearAllSets());
       verifyNever(
         () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
+      );
+      verifyNever(
+        () => muscleStimulusLocalDataSource.clearStimulusForUser(any()),
       );
     });
 
@@ -326,6 +342,9 @@ void main() {
       verify(
         () => exerciseLocalDataSource.clearUserOwnedExercises('user-1'),
       ).called(1);
+      verify(
+        () => muscleStimulusLocalDataSource.clearStimulusForUser('user-1'),
+      ).called(1);
     });
 
     test('skips clearUserOwnedExercises when no authenticated user', () async {
@@ -339,6 +358,10 @@ void main() {
       // Exercises: nothing to delete — no userId.
       verifyNever(
         () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
+      );
+      // Muscle stimulus: nothing to delete — no userId.
+      verifyNever(
+        () => muscleStimulusLocalDataSource.clearStimulusForUser(any()),
       );
       // Other tables are always cleared.
       verify(() => mealLocalDataSource.clearAllMeals()).called(1);

@@ -161,6 +161,7 @@ void _registerAppComposition(GetIt sl) {
       syncOrchestrator: sl(),
       exerciseLocalDataSource: sl(),
       mealLocalDataSource: sl(),
+      muscleStimulusLocalDataSource: sl(),
       nutritionLogLocalDataSource: sl(),
       targetLocalDataSource: sl(),
       workoutSetLocalDataSource: sl(),

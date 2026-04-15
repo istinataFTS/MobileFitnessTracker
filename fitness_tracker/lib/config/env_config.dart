@@ -78,7 +78,7 @@ class EnvConfig {
   /// Version 16: Clear stale exercise_muscle_factors and muscle_stimulus to force reseed with corrected factor names.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 16,
+    defaultValue: 17,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

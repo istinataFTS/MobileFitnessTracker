@@ -60,6 +60,7 @@ void registerExercisesModule(GetIt sl) {
   sl.registerLazySingleton(
     () => DeleteExercise(
       sl(),
+      appSessionRepository: sl(),
       muscleFactorRepository: sl(),
       rebuildMuscleStimulusFromWorkoutHistory: sl(),
     ),

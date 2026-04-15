@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/bloc/bloc_effects_mixin.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../domain/entities/workout_set.dart';
+import '../../../../domain/repositories/app_session_repository.dart';
 import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
@@ -80,6 +81,7 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
   final RecordWorkoutSet recordWorkoutSet;
+  final AppSessionRepository appSessionRepository;
 
   List<WorkoutSet> _cachedWeeklySets = [];
 
@@ -87,6 +89,7 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     required this.addWorkoutSet,
     required this.getWeeklySets,
     required this.recordWorkoutSet,
+    required this.appSessionRepository,
   }) : super(WorkoutInitial()) {
     on<AddWorkoutSetEvent>(_onAddWorkoutSet);
     on<LoadWeeklySetsEvent>(_onLoadWeeklySets);
@@ -104,7 +107,14 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     await addResult.fold(
       (failure) async => emit(WorkoutError(failure.message)),
       (_) async {
+        final sessionResult = await appSessionRepository.getCurrentSession();
+        final userId = sessionResult.fold(
+          (_) => '',
+          (session) => session.user?.id ?? '',
+        );
+
         final affectedMusclesResult = await recordWorkoutSet(
+          userId: userId,
           exerciseId: event.workoutSet.exerciseId,
           sets: 1,
           intensity: event.workoutSet.intensity,

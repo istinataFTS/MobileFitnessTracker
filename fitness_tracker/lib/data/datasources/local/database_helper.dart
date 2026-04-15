@@ -181,6 +181,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.muscleStimulus} (
         ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT NOT NULL DEFAULT '',
         ${DatabaseTables.stimulusMuscleGroup} TEXT NOT NULL,
         ${DatabaseTables.stimulusDate} TEXT NOT NULL,
         ${DatabaseTables.stimulusDailyStimulus} REAL NOT NULL DEFAULT 0.0,
@@ -189,7 +190,7 @@ class DatabaseHelper {
         ${DatabaseTables.stimulusLastSetStimulus} REAL,
         ${DatabaseTables.stimulusCreatedAt} TEXT NOT NULL,
         ${DatabaseTables.stimulusUpdatedAt} TEXT NOT NULL,
-        UNIQUE(${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+        UNIQUE(${DatabaseTables.ownerUserId}, ${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
       )
     ''');
 
@@ -404,6 +405,61 @@ class DatabaseHelper {
       // muscle_stimulus will be rebuilt from workout history by AppDataSeeder after reseeding.
       await db.delete(DatabaseTables.exerciseMuscleFactors);
       await db.delete(DatabaseTables.muscleStimulus);
+    }
+
+    if (oldVersion < 17) {
+      // Add owner_user_id to muscle_stimulus and update the unique constraint
+      // from (muscle_group, date) to (owner_user_id, muscle_group, date).
+      // SQLite does not support DROP CONSTRAINT, so the table must be recreated.
+      await db.execute('''
+        CREATE TABLE muscle_stimulus_v17 (
+          ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
+          ${DatabaseTables.ownerUserId} TEXT NOT NULL DEFAULT '',
+          ${DatabaseTables.stimulusMuscleGroup} TEXT NOT NULL,
+          ${DatabaseTables.stimulusDate} TEXT NOT NULL,
+          ${DatabaseTables.stimulusDailyStimulus} REAL NOT NULL DEFAULT 0.0,
+          ${DatabaseTables.stimulusRollingWeeklyLoad} REAL NOT NULL DEFAULT 0.0,
+          ${DatabaseTables.stimulusLastSetTimestamp} INTEGER,
+          ${DatabaseTables.stimulusLastSetStimulus} REAL,
+          ${DatabaseTables.stimulusCreatedAt} TEXT NOT NULL,
+          ${DatabaseTables.stimulusUpdatedAt} TEXT NOT NULL,
+          UNIQUE(${DatabaseTables.ownerUserId}, ${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+        )
+      ''');
+
+      // Copy existing rows; pre-auth records receive owner_user_id = ''
+      // so they remain accessible to the guest/unauthenticated state.
+      await db.execute('''
+        INSERT INTO muscle_stimulus_v17 (
+          ${DatabaseTables.stimulusId},
+          ${DatabaseTables.ownerUserId},
+          ${DatabaseTables.stimulusMuscleGroup},
+          ${DatabaseTables.stimulusDate},
+          ${DatabaseTables.stimulusDailyStimulus},
+          ${DatabaseTables.stimulusRollingWeeklyLoad},
+          ${DatabaseTables.stimulusLastSetTimestamp},
+          ${DatabaseTables.stimulusLastSetStimulus},
+          ${DatabaseTables.stimulusCreatedAt},
+          ${DatabaseTables.stimulusUpdatedAt}
+        )
+        SELECT
+          ${DatabaseTables.stimulusId},
+          '',
+          ${DatabaseTables.stimulusMuscleGroup},
+          ${DatabaseTables.stimulusDate},
+          ${DatabaseTables.stimulusDailyStimulus},
+          ${DatabaseTables.stimulusRollingWeeklyLoad},
+          ${DatabaseTables.stimulusLastSetTimestamp},
+          ${DatabaseTables.stimulusLastSetStimulus},
+          ${DatabaseTables.stimulusCreatedAt},
+          ${DatabaseTables.stimulusUpdatedAt}
+        FROM ${DatabaseTables.muscleStimulus}
+      ''');
+
+      await db.execute('DROP TABLE ${DatabaseTables.muscleStimulus}');
+      await db.execute(
+        'ALTER TABLE muscle_stimulus_v17 RENAME TO ${DatabaseTables.muscleStimulus}',
+      );
     }
 
     await _createIndexes(db);
@@ -872,6 +928,11 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_owner_user_id
+      ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.ownerUserId})
+    ''');
+
+    await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_group
       ON ${DatabaseTables.muscleStimulus}(${DatabaseTables.stimulusMuscleGroup})
     ''');
@@ -882,8 +943,9 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_muscle_date
+      CREATE INDEX IF NOT EXISTS idx_muscle_stimulus_owner_muscle_date
       ON ${DatabaseTables.muscleStimulus}(
+        ${DatabaseTables.ownerUserId},
         ${DatabaseTables.stimulusMuscleGroup},
         ${DatabaseTables.stimulusDate}
       )

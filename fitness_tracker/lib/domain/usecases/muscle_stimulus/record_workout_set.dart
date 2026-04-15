@@ -26,6 +26,7 @@ class RecordWorkoutSet {
   });
 
   Future<Either<Failure, List<String>>> call({
+    required String userId,
     required String exerciseId,
     required int sets,
     required int intensity,
@@ -55,6 +56,7 @@ class RecordWorkoutSet {
             final setStimulus = entry.value;
 
             final updateResult = await _updateMuscleStimulus(
+              userId: userId,
               muscleGroup: muscleGroup,
               setStimulus: setStimulus,
               setTimestamp: setTimestamp.millisecondsSinceEpoch,
@@ -85,6 +87,7 @@ class RecordWorkoutSet {
   }
 
   Future<Either<Failure, void>> _updateMuscleStimulus({
+    required String userId,
     required String muscleGroup,
     required double setStimulus,
     required int setTimestamp,
@@ -95,6 +98,7 @@ class RecordWorkoutSet {
 
       final existingResult =
           await muscleStimulusRepository.getStimulusByMuscleAndDate(
+        userId: userId,
         muscleGroup: muscleGroup,
         date: today,
       );
@@ -104,6 +108,7 @@ class RecordWorkoutSet {
         (existingStimulus) async {
           if (existingStimulus == null) {
             return await _createNewStimulusRecord(
+              userId: userId,
               muscleGroup: muscleGroup,
               setStimulus: setStimulus,
               setTimestamp: setTimestamp,
@@ -124,6 +129,7 @@ class RecordWorkoutSet {
   }
 
   Future<Either<Failure, void>> _createNewStimulusRecord({
+    required String userId,
     required String muscleGroup,
     required double setStimulus,
     required int setTimestamp,
@@ -136,6 +142,7 @@ class RecordWorkoutSet {
       final lookbackStart = date.subtract(const Duration(days: 30));
       final pastRecordsResult =
           await muscleStimulusRepository.getStimulusByDateRange(
+        userId: userId,
         muscleGroup: muscleGroup,
         startDate: lookbackStart,
         endDate: date.subtract(const Duration(days: 1)),
@@ -167,6 +174,7 @@ class RecordWorkoutSet {
 
       final stimulus = muscle_stimulus_entity.MuscleStimulus(
         id: _uuid.v4(),
+        ownerUserId: userId,
         muscleGroup: muscleGroup,
         date: date,
         dailyStimulus: setStimulus,

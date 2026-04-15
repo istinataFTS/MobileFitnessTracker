@@ -317,6 +317,7 @@ void main() {
   group('MuscleStimulusModel', () {
     final _stimulusEntity = MuscleStimulus(
       id: 'stim-1',
+      ownerUserId: 'user-1',
       muscleGroup: 'chest',
       date: _createdAt,
       dailyStimulus: 5.0,
@@ -346,6 +347,7 @@ void main() {
       test('preserves null optional fields', () {
         final stimulusNoOptionals = MuscleStimulus(
           id: 'stim-2',
+          ownerUserId: '',
           muscleGroup: 'back',
           date: _createdAt,
           dailyStimulus: 3.0,

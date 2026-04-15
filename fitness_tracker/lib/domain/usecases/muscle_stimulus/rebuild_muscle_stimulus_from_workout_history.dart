@@ -22,7 +22,10 @@ class RebuildMuscleStimulusFromWorkoutHistory {
   final CalculateMuscleStimulus calculateMuscleStimulus;
   final Uuid _uuid = const Uuid();
 
-  Future<Either<Failure, void>> call() async {
+  /// Rebuilds all muscle stimulus records for [userId] from their full workout
+  /// history.  Only the records belonging to [userId] are cleared and
+  /// re-generated — other users' data is never touched.
+  Future<Either<Failure, void>> call(String userId) async {
     final workoutSetsResult = await workoutSetRepository.getAllSets(
       sourcePreference: DataSourcePreference.localOnly,
     );
@@ -30,18 +33,19 @@ class RebuildMuscleStimulusFromWorkoutHistory {
     return workoutSetsResult.fold((failure) async => Left(failure), (
       workoutSets,
     ) async {
-      final recordsResult = await _buildRecords(workoutSets);
+      final recordsResult = await _buildRecords(userId, workoutSets);
 
       return recordsResult.fold((failure) async => Left(failure), (
         records,
       ) async {
-        final clearResult = await muscleStimulusRepository.clearAllStimulus();
+        // Clears only the current user's records, leaving other profiles intact.
+        final clearResult =
+            await muscleStimulusRepository.clearStimulusForUser(userId);
 
         return clearResult.fold((failure) async => Left(failure), (_) async {
           for (final record in records) {
-            final upsertResult = await muscleStimulusRepository.upsertStimulus(
-              record,
-            );
+            final upsertResult =
+                await muscleStimulusRepository.upsertStimulus(record);
             if (upsertResult.isLeft()) {
               return upsertResult;
             }
@@ -54,6 +58,7 @@ class RebuildMuscleStimulusFromWorkoutHistory {
   }
 
   Future<Either<Failure, List<MuscleStimulus>>> _buildRecords(
+    String userId,
     List<WorkoutSet> workoutSets,
   ) async {
     if (workoutSets.isEmpty) {
@@ -158,6 +163,7 @@ class RebuildMuscleStimulusFromWorkoutHistory {
         records.add(
           MuscleStimulus(
             id: _uuid.v4(),
+            ownerUserId: userId,
             muscleGroup: muscleGroup,
             date: day,
             dailyStimulus: stimulus,

@@ -28,6 +28,10 @@ class UpdateWorkoutSet {
   /// Returns: Either a Failure or void on success
   Future<Either<Failure, void>> call(WorkoutSet set) async {
     final sessionResult = await appSessionRepository.getCurrentSession();
+    final userId = sessionResult.fold(
+      (_) => '',
+      (session) => session.user?.id ?? '',
+    );
 
     final preparedSet = sessionResult.fold((_) => set, (session) {
       if (!session.isAuthenticated || session.user == null) {
@@ -45,7 +49,7 @@ class UpdateWorkoutSet {
 
     return updateResult.fold(
       (failure) async => Left(failure),
-      (_) async => rebuildMuscleStimulusFromWorkoutHistory(),
+      (_) async => rebuildMuscleStimulusFromWorkoutHistory(userId),
     );
   }
 }

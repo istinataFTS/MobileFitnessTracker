@@ -26,6 +26,7 @@ void registerWorkoutModule(GetIt sl) {
       addWorkoutSet: sl(),
       getWeeklySets: sl(),
       recordWorkoutSet: sl(),
+      appSessionRepository: sl(),
     ),
   );
 
@@ -46,7 +47,11 @@ void registerWorkoutModule(GetIt sl) {
     ),
   );
   sl.registerLazySingleton(
-    () => DeleteWorkoutSet(sl(), rebuildMuscleStimulusFromWorkoutHistory: sl()),
+    () => DeleteWorkoutSet(
+      sl(),
+      appSessionRepository: sl(),
+      rebuildMuscleStimulusFromWorkoutHistory: sl(),
+    ),
   );
   sl.registerLazySingleton(
     () => UpdateWorkoutSet(

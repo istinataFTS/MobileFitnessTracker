@@ -15,7 +15,12 @@ import '../../domain/usecases/muscle_stimulus/record_workout_set.dart';
 import '../../features/home/application/muscle_visual_bloc.dart';
 
 void registerMuscleStimulusModule(GetIt sl) {
-  sl.registerFactory(() => MuscleVisualBloc(getMuscleVisualData: sl()));
+  sl.registerFactory(
+    () => MuscleVisualBloc(
+      getMuscleVisualData: sl(),
+      appSessionRepository: sl(),
+    ),
+  );
 
   sl.registerLazySingleton(
     () => SeedExerciseFactors(

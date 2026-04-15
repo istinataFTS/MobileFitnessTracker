@@ -17,6 +17,8 @@ void main() {
   late MockMuscleStimulusRepository repository;
   late GetMuscleVisualData usecase;
 
+  const String testUserId = 'user-1';
+
   setUp(() {
     repository = MockMuscleStimulusRepository();
     usecase = GetMuscleVisualData(repository);
@@ -36,6 +38,7 @@ void main() {
         if (muscleGroup == stimulus_constants.MuscleStimulus.quads) {
           when(
             () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
               muscleGroup: muscleGroup,
               date: todayStart,
             ),
@@ -43,6 +46,7 @@ void main() {
             (_) async => Right(
               stimulus_entity.MuscleStimulus(
                 id: 'quads-today',
+                ownerUserId: testUserId,
                 muscleGroup: muscleGroup,
                 date: todayStart,
                 dailyStimulus: 8.0,
@@ -57,6 +61,7 @@ void main() {
         } else {
           when(
             () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
               muscleGroup: muscleGroup,
               date: todayStart,
             ),
@@ -64,7 +69,7 @@ void main() {
         }
       }
 
-      final result = await usecase(TimePeriod.today);
+      final result = await usecase(TimePeriod.today, testUserId);
       final visualData = result.getOrElse(
         () => throw StateError('expected data'),
       );
@@ -75,4 +80,89 @@ void main() {
       expect(quads.coverageState, MuscleVisualCoverageState.full);
     },
   );
+
+  test(
+    'returns untrained data for all muscles when user has no stimulus records',
+    () async {
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+
+      for (final String muscleGroup
+          in stimulus_constants.MuscleStimulus.allMuscleGroups) {
+        when(
+          () => repository.getStimulusByMuscleAndDate(
+            userId: testUserId,
+            muscleGroup: muscleGroup,
+            date: todayStart,
+          ),
+        ).thenAnswer((_) async => const Right(null));
+      }
+
+      final result = await usecase(TimePeriod.today, testUserId);
+      final visualData = result.getOrElse(
+        () => throw StateError('expected data'),
+      );
+
+      expect(
+        visualData.values.every((data) => !data.hasTrained),
+        isTrue,
+        reason: 'a profile with no workouts should show no muscle activity',
+      );
+    },
+  );
+
+  test('userId is forwarded to every repository query', () async {
+    const otherUserId = 'user-other';
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+
+    // Stub for the other user: all muscles have stimulus
+    for (final String muscleGroup
+        in stimulus_constants.MuscleStimulus.allMuscleGroups) {
+      when(
+        () => repository.getStimulusByMuscleAndDate(
+          userId: otherUserId,
+          muscleGroup: muscleGroup,
+          date: todayStart,
+        ),
+      ).thenAnswer(
+        (_) async => Right(
+          stimulus_entity.MuscleStimulus(
+            id: '$muscleGroup-today',
+            ownerUserId: otherUserId,
+            muscleGroup: muscleGroup,
+            date: todayStart,
+            dailyStimulus: 5.0,
+            rollingWeeklyLoad: 5.0,
+            createdAt: todayStart,
+            updatedAt: todayStart,
+          ),
+        ),
+      );
+
+      // Stub for testUserId: all muscles return null
+      when(
+        () => repository.getStimulusByMuscleAndDate(
+          userId: testUserId,
+          muscleGroup: muscleGroup,
+          date: todayStart,
+        ),
+      ).thenAnswer((_) async => const Right(null));
+    }
+
+    final result = await usecase(TimePeriod.today, testUserId);
+    final visualData = result.getOrElse(() => throw StateError(''));
+
+    // testUserId has no data, so all muscles must be untrained
+    expect(visualData.values.every((d) => !d.hasTrained), isTrue);
+
+    // Verify no query was ever made with otherUserId
+    verifyNever(
+      () => repository.getStimulusByMuscleAndDate(
+        userId: otherUserId,
+        muscleGroup: any(named: 'muscleGroup'),
+        date: any(named: 'date'),
+      ),
+    );
+  });
 }
