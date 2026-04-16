@@ -19,6 +19,19 @@ class MockAuthenticatedDataSourcePreferenceResolver extends Mock
     implements AuthenticatedDataSourcePreferenceResolver {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      WorkoutSet(
+        id: 'fallback-set',
+        exerciseId: 'fallback-exercise',
+        reps: 10,
+        weight: 80,
+        date: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockWorkoutSetRepository workoutSetRepository;
   late MockExerciseRepository exerciseRepository;
   late MockAuthenticatedDataSourcePreferenceResolver resolver;
@@ -75,7 +88,8 @@ void main() {
 
     final result = await getAllWorkoutSets();
 
-    expect(result, Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
+    expect(result.isRight(), isTrue);
+    expect((result as Right).value, <WorkoutSet>[workoutSet]);
     verify(
       () => workoutSetRepository.getAllSets(
         sourcePreference: DataSourcePreference.remoteThenLocal,
@@ -107,7 +121,8 @@ void main() {
       muscleGroup: 'chest',
     );
 
-    expect(result, Right<Failure, List<WorkoutSet>>(<WorkoutSet>[workoutSet]));
+    expect(result.isRight(), isTrue);
+    expect((result as Right).value, <WorkoutSet>[workoutSet]);
     verify(
       () => workoutSetRepository.getSetsByDateRange(
         startDate,

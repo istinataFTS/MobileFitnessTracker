@@ -11,6 +11,11 @@ class MockAppSettingsCubit extends MockCubit<AppSettingsState>
     implements AppSettingsCubit {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(WeekStartDay.monday);
+    registerFallbackValue(WeightUnit.kilograms);
+  });
+
   late MockAppSettingsCubit cubit;
 
   AppSettingsState buildState({
@@ -199,6 +204,11 @@ void main() {
   testWidgets('saving state disables selection tiles and shows saving indicator', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final AppSettingsState savingState = buildState(
       isSaving: true,
       settings: const AppSettings(
@@ -230,6 +240,7 @@ void main() {
   testWidgets('error state shows feature error banner and clears error', (
     WidgetTester tester,
   ) async {
+    final AppSettingsState noErrorState = buildState();
     final AppSettingsState errorState = buildState(
       errorMessage: 'save failed',
     );
@@ -238,7 +249,7 @@ void main() {
     whenListen<AppSettingsState>(
       cubit,
       Stream<AppSettingsState>.fromIterable(<AppSettingsState>[errorState]),
-      initialState: errorState,
+      initialState: noErrorState,
     );
 
     await tester.pumpWidget(buildSubject());

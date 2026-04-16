@@ -174,6 +174,10 @@ void main() {
   testWidgets('exercise filters reset from no-results state', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(buildSubject());
 
     await tester.enterText(
@@ -188,7 +192,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(ExercisesTab.clearFiltersButtonKey));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('3 of 3 exercises'), findsOneWidget);
     expect(find.text('Bench Press'), findsOneWidget);
@@ -239,6 +243,11 @@ void main() {
   testWidgets('meal search resets from no-results state', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(buildSubject());
     await openMealsTab(tester);
 
@@ -251,7 +260,7 @@ void main() {
     expect(find.text('No meals match the current search.'), findsOneWidget);
 
     await tester.tap(find.byKey(MealsTab.clearResultsButtonKey));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('2 of 2 meals'), findsOneWidget);
     expect(find.text('Chicken Bowl'), findsOneWidget);

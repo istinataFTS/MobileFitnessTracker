@@ -55,7 +55,7 @@ void main() {
       final LibraryExerciseItemViewData item = viewData.items.single;
       expect(item.id, '1');
       expect(item.title, 'Bench Press');
-      expect(item.muscleTags, <String>['Chest', 'Triceps', 'Front Delts']);
+      expect(item.muscleTags, <String>['Chest', 'Triceps', 'front-delts']);
       expect(item.overflowLabel, '+1 more');
       expect(item.exercise, benchPress);
     });

@@ -16,6 +16,20 @@ class MockTargetRepository extends Mock implements TargetRepository {}
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      Target(
+        id: 'fallback-id',
+        type: TargetType.muscleSets,
+        categoryKey: 'chest',
+        targetValue: 12,
+        unit: 'sets',
+        period: TargetPeriod.weekly,
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockTargetRepository targetRepository;
   late MockAppSessionRepository appSessionRepository;
 

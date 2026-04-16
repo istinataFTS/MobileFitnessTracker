@@ -162,6 +162,8 @@ void main() {
       await tester.enterText(find.byType(TextField).at(0), '10');
       await tester.enterText(find.byType(TextField).at(1), '80');
 
+      await tester.ensureVisible(find.text(AppStrings.logSetButton));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.logSetButton));
       await tester.pump();
 

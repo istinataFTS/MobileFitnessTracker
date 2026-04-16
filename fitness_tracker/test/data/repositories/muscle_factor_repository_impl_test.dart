@@ -12,6 +12,17 @@ class MockMuscleFactorLocalDataSource extends Mock
     implements MuscleFactorLocalDataSource {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      const MuscleFactorModel(
+        id: 'fallback',
+        exerciseId: 'fallback-exercise',
+        muscleGroup: 'chest',
+        factor: 1.0,
+      ),
+    );
+  });
+
   late MockMuscleFactorLocalDataSource localDataSource;
   late MuscleFactorRepositoryImpl repository;
 
@@ -66,7 +77,8 @@ void main() {
 
       final result = await repository.getFactorsByMuscleGroup('chest');
 
-      expect(result, const Right(<MuscleFactor>[chestFactor]));
+      expect(result.isRight(), isTrue);
+      expect((result as Right).value, const <MuscleFactor>[chestFactor]);
       verify(() => localDataSource.getAllFactors()).called(1);
     });
   });

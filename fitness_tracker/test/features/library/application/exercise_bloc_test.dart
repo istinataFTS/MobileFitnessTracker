@@ -4,6 +4,7 @@ import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/add_exercise.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/delete_exercise.dart';
+import 'package:fitness_tracker/domain/usecases/exercises/ensure_default_exercises.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/get_all_exercises.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/get_exercise_by_id.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/get_exercises_for_muscle.dart';
@@ -23,6 +24,9 @@ class MockAddExercise extends Mock implements AddExercise {}
 class MockUpdateExercise extends Mock implements UpdateExercise {}
 
 class MockDeleteExercise extends Mock implements DeleteExercise {}
+
+class MockEnsureDefaultExercises extends Mock
+    implements EnsureDefaultExercises {}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -44,6 +48,7 @@ void main() {
   late MockAddExercise mockAdd;
   late MockUpdateExercise mockUpdate;
   late MockDeleteExercise mockDelete;
+  late MockEnsureDefaultExercises mockEnsureDefaultExercises;
 
   ExerciseBloc buildBloc() => ExerciseBloc(
         getAllExercises: mockGetAll,
@@ -52,6 +57,7 @@ void main() {
         addExercise: mockAdd,
         updateExercise: mockUpdate,
         deleteExercise: mockDelete,
+        ensureDefaultExercises: mockEnsureDefaultExercises,
       );
 
   setUpAll(() {
@@ -65,6 +71,7 @@ void main() {
     mockAdd = MockAddExercise();
     mockUpdate = MockUpdateExercise();
     mockDelete = MockDeleteExercise();
+    mockEnsureDefaultExercises = MockEnsureDefaultExercises();
   });
 
   group('ExerciseBloc', () {

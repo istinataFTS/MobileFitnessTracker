@@ -20,6 +20,29 @@ class MockPendingSyncDeleteLocalDataSource extends Mock
     implements PendingSyncDeleteLocalDataSource {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      NutritionLogModel(
+        id: 'fallback-id',
+        mealName: 'Fallback Log',
+        proteinGrams: 25,
+        carbsGrams: 30,
+        fatGrams: 10,
+        calories: 310,
+        loggedAt: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
+    registerFallbackValue(
+      PendingSyncDelete(
+        id: 'fallback-delete',
+        entityType: SyncEntityType.nutritionLog,
+        localEntityId: 'fallback-local-id',
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockNutritionLogLocalDataSource localDataSource;
   late MockNutritionLogRemoteDataSource remoteDataSource;
   late MockPendingSyncDeleteLocalDataSource pendingDeleteDataSource;

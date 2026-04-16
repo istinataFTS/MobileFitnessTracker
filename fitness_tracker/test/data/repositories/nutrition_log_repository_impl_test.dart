@@ -23,6 +23,33 @@ class MockNutritionLogSyncCoordinator extends Mock
     implements NutritionLogSyncCoordinator {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      NutritionLogModel(
+        id: 'fallback-id',
+        mealName: 'Fallback Log',
+        proteinGrams: 25,
+        carbsGrams: 30,
+        fatGrams: 10,
+        calories: 310,
+        loggedAt: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
+    registerFallbackValue(
+      NutritionLog(
+        id: 'fallback-log-id',
+        mealName: 'Fallback Log Entity',
+        proteinGrams: 25,
+        carbsGrams: 30,
+        fatGrams: 10,
+        calories: 310,
+        loggedAt: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockNutritionLogLocalDataSource localDataSource;
   late MockNutritionLogRemoteDataSource remoteDataSource;
   late MockNutritionLogSyncCoordinator syncCoordinator;

@@ -19,6 +19,20 @@ class MockTargetRemoteDataSource extends Mock implements TargetRemoteDataSource 
 class MockTargetSyncCoordinator extends Mock implements TargetSyncCoordinator {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      TargetModel(
+        id: 'fallback-id',
+        type: TargetType.muscleSets,
+        categoryKey: 'chest',
+        targetValue: 12,
+        unit: 'sets',
+        period: TargetPeriod.weekly,
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockTargetLocalDataSource localDataSource;
   late MockTargetRemoteDataSource remoteDataSource;
   late MockTargetSyncCoordinator syncCoordinator;

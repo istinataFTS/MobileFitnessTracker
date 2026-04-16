@@ -14,6 +14,20 @@ class MockAuthenticatedDataSourcePreferenceResolver extends Mock
     implements AuthenticatedDataSourcePreferenceResolver {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      Target(
+        id: 'fallback-id',
+        type: TargetType.muscleSets,
+        categoryKey: 'chest',
+        targetValue: 12,
+        unit: 'sets',
+        period: TargetPeriod.weekly,
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockTargetRepository repository;
   late MockAuthenticatedDataSourcePreferenceResolver resolver;
   late GetAllTargets getAllTargets;
@@ -49,7 +63,8 @@ void main() {
 
     final result = await getAllTargets();
 
-    expect(result, Right<Failure, List<Target>>(<Target>[target]));
+    expect(result.isRight(), isTrue);
+    expect((result as Right).value, <Target>[target]);
     verify(
       () => repository.getAllTargets(
         sourcePreference: DataSourcePreference.remoteThenLocal,

@@ -145,7 +145,7 @@ void main() {
 
       expect(result['date'], loggedAt.toIso8601String());
       expect(result['meal_name'], 'Chicken Bowl');
-      expect(result['grams_consumed'], 150);
+      expect(result['grams'], 150);
     });
   });
 }

@@ -143,6 +143,10 @@ void main() {
     testWidgets('renders prepared progress stats inside the page', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
@@ -163,6 +167,10 @@ void main() {
     testWidgets('renders muted target placeholder when target is hidden', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final MuscleVisualLoaded allTimeState = MuscleVisualLoaded(
         muscleData: <String, MuscleVisualData>{
           'chest': MuscleVisualData(
@@ -201,6 +209,10 @@ void main() {
     testWidgets('shows visual error state and retry action', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       when(() => muscleVisualBloc.state).thenReturn(
         const MuscleVisualError(
           message: 'visual load failed',
