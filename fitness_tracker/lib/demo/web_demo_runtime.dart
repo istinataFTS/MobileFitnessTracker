@@ -1320,6 +1320,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, MuscleStimulus?>> getStimulusByMuscleAndDate({
+    required String userId,
     required String muscleGroup,
     required DateTime date,
   }) async {
@@ -1336,6 +1337,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, List<MuscleStimulus>>> getStimulusByDateRange({
+    required String userId,
     required String muscleGroup,
     required DateTime startDate,
     required DateTime endDate,
@@ -1354,9 +1356,11 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, MuscleStimulus?>> getTodayStimulus(
+    String userId,
     String muscleGroup,
   ) async {
     return getStimulusByMuscleAndDate(
+      userId: userId,
       muscleGroup: muscleGroup,
       date: DateTime.now(),
     );
@@ -1364,6 +1368,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, List<MuscleStimulus>>> getAllStimulusForDate(
+    String userId,
     DateTime date,
   ) async {
     final normalizedDate = _startOfDay(date);
@@ -1420,7 +1425,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
   }
 
   @override
-  Future<Either<Failure, void>> applyDailyDecayToAll() async {
+  Future<Either<Failure, void>> applyDailyDecayToAll(String userId) async {
     final today = _startOfDay(DateTime.now());
     final latestByMuscle = <String, MuscleStimulus>{};
 
@@ -1450,6 +1455,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
       _store.muscleStimulusRecords.add(
         MuscleStimulus(
           id: const Uuid().v4(),
+          ownerUserId: previous.ownerUserId,
           muscleGroup: previous.muscleGroup,
           date: today,
           dailyStimulus: 0,
@@ -1467,6 +1473,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, double>> getMaxStimulusForMuscle(
+    String userId,
     String muscleGroup,
   ) async {
     final values = _store.muscleStimulusRecords
@@ -1483,7 +1490,7 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteOlderThan(DateTime date) async {
+  Future<Either<Failure, void>> deleteOlderThan(String userId, DateTime date) async {
     final cutoff = _startOfDay(date);
     _store.muscleStimulusRecords.removeWhere(
       (record) => record.date.isBefore(cutoff),
@@ -1493,6 +1500,13 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
 
   @override
   Future<Either<Failure, void>> clearAllStimulus() async {
+    _store.muscleStimulusRecords.clear();
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> clearStimulusForUser(String userId) async {
+    // Demo mode is single-user; clear all stimulus records on user sign-out.
     _store.muscleStimulusRecords.clear();
     return const Right(null);
   }
@@ -1780,6 +1794,7 @@ List<MuscleStimulus> _buildSeededMuscleStimulusRecords({
       records.add(
         MuscleStimulus(
           id: 'stimulus-$recordId',
+          ownerUserId: '',
           muscleGroup: muscleGroup,
           date: day,
           dailyStimulus: stimulus,
