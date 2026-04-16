@@ -1,0 +1,487 @@
+import 'package:fitness_tracker/core/constants/database_tables.dart';
+import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
+import 'package:fitness_tracker/data/datasources/local/muscle_stimulus_local_datasource.dart';
+import 'package:fitness_tracker/data/models/muscle_stimulus_model.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+class MockDatabaseHelper extends Mock implements DatabaseHelper {}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Database database;
+  late MockDatabaseHelper databaseHelper;
+  late MuscleStimulusLocalDataSourceImpl dataSource;
+
+  const String userA = 'user-a';
+  const String userB = 'user-b';
+
+  final DateTime baseDate = DateTime(2026, 4, 7);
+  final DateTime yesterday = DateTime(2026, 4, 6);
+  final DateTime twoDaysAgo = DateTime(2026, 4, 5);
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  MuscleStimulusModel buildStimulus({
+    required String id,
+    required String ownerUserId,
+    String muscleGroup = 'chest',
+    DateTime? date,
+    double dailyStimulus = 5.0,
+    double rollingWeeklyLoad = 10.0,
+    int? lastSetTimestamp,
+    double? lastSetStimulus,
+  }) {
+    final d = date ?? baseDate;
+    return MuscleStimulusModel(
+      id: id,
+      ownerUserId: ownerUserId,
+      muscleGroup: muscleGroup,
+      date: d,
+      dailyStimulus: dailyStimulus,
+      rollingWeeklyLoad: rollingWeeklyLoad,
+      lastSetTimestamp: lastSetTimestamp,
+      lastSetStimulus: lastSetStimulus,
+      createdAt: d,
+      updatedAt: d,
+    );
+  }
+
+  Future<void> createSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.muscleStimulus} (
+        ${DatabaseTables.stimulusId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT NOT NULL DEFAULT '',
+        ${DatabaseTables.stimulusMuscleGroup} TEXT NOT NULL,
+        ${DatabaseTables.stimulusDate} TEXT NOT NULL,
+        ${DatabaseTables.stimulusDailyStimulus} REAL NOT NULL DEFAULT 0.0,
+        ${DatabaseTables.stimulusRollingWeeklyLoad} REAL NOT NULL DEFAULT 0.0,
+        ${DatabaseTables.stimulusLastSetTimestamp} INTEGER,
+        ${DatabaseTables.stimulusLastSetStimulus} REAL,
+        ${DatabaseTables.stimulusCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.stimulusUpdatedAt} TEXT NOT NULL,
+        UNIQUE(${DatabaseTables.ownerUserId}, ${DatabaseTables.stimulusMuscleGroup}, ${DatabaseTables.stimulusDate})
+      )
+    ''');
+  }
+
+  setUp(() async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+
+    database = await databaseFactory.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (db, _) async => createSchema(db),
+      ),
+    );
+
+    databaseHelper = MockDatabaseHelper();
+    when(() => databaseHelper.database).thenAnswer((_) async => database);
+
+    dataSource = MuscleStimulusLocalDataSourceImpl(
+      databaseHelper: databaseHelper,
+    );
+  });
+
+  tearDown(() async {
+    await database.close();
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — getStimulusByMuscleAndDate
+  // ---------------------------------------------------------------------------
+
+  group('getStimulusByMuscleAndDate user isolation', () {
+    test('returns record for the correct user', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'stim-a', ownerUserId: userA),
+      );
+
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userA,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.id, 'stim-a');
+      expect(result.ownerUserId, userA);
+    });
+
+    test('returns nothing for user B when only user A has data', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'stim-a', ownerUserId: userA),
+      );
+
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userB,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('returns null when no record exists for the user on that date',
+        () async {
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userA,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — getStimulusByDateRange
+  // ---------------------------------------------------------------------------
+
+  group('getStimulusByDateRange user isolation', () {
+    test('returns only records belonging to the requested user', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'a-today', ownerUserId: userA, date: baseDate),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'a-yesterday', ownerUserId: userA, date: yesterday),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-today', ownerUserId: userB, date: baseDate),
+      );
+
+      final results = await dataSource.getStimulusByDateRange(
+        userId: userA,
+        muscleGroup: 'chest',
+        startDate: yesterday,
+        endDate: baseDate,
+      );
+
+      final ids = results.map((r) => r.id).toSet();
+      expect(ids, containsAll(<String>['a-today', 'a-yesterday']));
+      expect(ids, isNot(contains('b-today')));
+    });
+
+    test('returns empty list when user has no data in range', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-today', ownerUserId: userB, date: baseDate),
+      );
+
+      final results = await dataSource.getStimulusByDateRange(
+        userId: userA,
+        muscleGroup: 'chest',
+        startDate: yesterday,
+        endDate: baseDate,
+      );
+
+      expect(results, isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — getAllStimulusForDate
+  // ---------------------------------------------------------------------------
+
+  group('getAllStimulusForDate user isolation', () {
+    test('returns all muscle records for user on the given date', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-chest',
+          ownerUserId: userA,
+          muscleGroup: 'chest',
+          date: baseDate,
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-back',
+          ownerUserId: userA,
+          muscleGroup: 'back',
+          date: baseDate,
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'b-chest',
+          ownerUserId: userB,
+          muscleGroup: 'chest',
+          date: baseDate,
+        ),
+      );
+
+      final results = await dataSource.getAllStimulusForDate(userA, baseDate);
+      final ids = results.map((r) => r.id).toSet();
+
+      expect(ids, containsAll(<String>['a-chest', 'a-back']));
+      expect(ids, isNot(contains('b-chest')));
+    });
+
+    test('returns empty list when user has no records on that date', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-chest', ownerUserId: userB, date: baseDate),
+      );
+
+      final results = await dataSource.getAllStimulusForDate(userA, baseDate);
+      expect(results, isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — applyDailyDecayToAll
+  // ---------------------------------------------------------------------------
+
+  group('applyDailyDecayToAll user isolation', () {
+    test('only decays records belonging to the specified user', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-chest',
+          ownerUserId: userA,
+          rollingWeeklyLoad: 10.0,
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'b-chest',
+          ownerUserId: userB,
+          muscleGroup: 'back',
+          rollingWeeklyLoad: 10.0,
+        ),
+      );
+
+      await dataSource.applyDailyDecayToAll(userA);
+
+      final allRows = await database.query(DatabaseTables.muscleStimulus);
+      final byId = {for (final r in allRows) r[DatabaseTables.stimulusId]: r};
+
+      // user A's record should be decayed (10.0 * 0.6 = 6.0)
+      expect(
+        (byId['a-chest']![DatabaseTables.stimulusRollingWeeklyLoad] as num)
+            .toDouble(),
+        closeTo(6.0, 0.001),
+      );
+
+      // user B's record must remain untouched
+      expect(
+        (byId['b-chest']![DatabaseTables.stimulusRollingWeeklyLoad] as num)
+            .toDouble(),
+        closeTo(10.0, 0.001),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — getMaxStimulusForMuscle
+  // ---------------------------------------------------------------------------
+
+  group('getMaxStimulusForMuscle user isolation', () {
+    test('returns max daily stimulus for the specified user only', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-chest',
+          ownerUserId: userA,
+          date: baseDate,
+          dailyStimulus: 8.0,
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'b-chest',
+          ownerUserId: userB,
+          muscleGroup: 'chest',
+          date: yesterday,
+          dailyStimulus: 20.0,
+        ),
+      );
+
+      final max = await dataSource.getMaxStimulusForMuscle(userA, 'chest');
+
+      expect(max, closeTo(8.0, 0.001));
+    });
+
+    test('returns 0.0 when user has no records for that muscle', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-chest', ownerUserId: userB, dailyStimulus: 15.0),
+      );
+
+      final max = await dataSource.getMaxStimulusForMuscle(userA, 'chest');
+      expect(max, closeTo(0.0, 0.001));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // User isolation — deleteOlderThan
+  // ---------------------------------------------------------------------------
+
+  group('deleteOlderThan user isolation', () {
+    test('only deletes records older than the cutoff for the specified user',
+        () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'a-old', ownerUserId: userA, date: twoDaysAgo),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'a-new', ownerUserId: userA, date: baseDate),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-old', ownerUserId: userB, date: twoDaysAgo),
+      );
+
+      await dataSource.deleteOlderThan(userA, yesterday);
+
+      final allRows = await database.query(DatabaseTables.muscleStimulus);
+      final ids =
+          allRows.map((r) => r[DatabaseTables.stimulusId] as String).toSet();
+
+      // user A's old record deleted; user A's new record and user B's old record survive
+      expect(ids, containsAll(<String>['a-new', 'b-old']));
+      expect(ids, isNot(contains('a-old')));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // clearStimulusForUser
+  // ---------------------------------------------------------------------------
+
+  group('clearStimulusForUser', () {
+    test('only deletes rows owned by the given userId', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'a-chest', ownerUserId: userA),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'b-chest',
+          ownerUserId: userB,
+          muscleGroup: 'back',
+        ),
+      );
+
+      await dataSource.clearStimulusForUser(userA);
+
+      final allRows = await database.query(DatabaseTables.muscleStimulus);
+      final ids =
+          allRows.map((r) => r[DatabaseTables.stimulusId] as String).toSet();
+
+      expect(ids, isNot(contains('a-chest')));
+      expect(ids, contains('b-chest'));
+    });
+
+    test('is a no-op when the user has no records', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'b-chest', ownerUserId: userB),
+      );
+
+      await dataSource.clearStimulusForUser(userA);
+
+      final allRows = await database.query(DatabaseTables.muscleStimulus);
+      expect(allRows, hasLength(1));
+    });
+
+    test('deletes all records for the user across every muscle group', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-chest',
+          ownerUserId: userA,
+          muscleGroup: 'chest',
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-back',
+          ownerUserId: userA,
+          muscleGroup: 'back',
+          date: yesterday,
+        ),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'a-legs',
+          ownerUserId: userA,
+          muscleGroup: 'quads',
+          date: twoDaysAgo,
+        ),
+      );
+
+      await dataSource.clearStimulusForUser(userA);
+
+      final allRows = await database.query(DatabaseTables.muscleStimulus);
+      expect(allRows, isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // upsertStimulus / updateStimulusValues (core write behaviour)
+  // ---------------------------------------------------------------------------
+
+  group('upsertStimulus', () {
+    test('inserts a new record', () async {
+      final model = buildStimulus(id: 'stim-1', ownerUserId: userA);
+      await dataSource.upsertStimulus(model);
+
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userA,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.id, 'stim-1');
+      expect(result.ownerUserId, userA);
+      expect(result.dailyStimulus, 5.0);
+    });
+
+    test('replaces an existing record on conflict', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'stim-1', ownerUserId: userA, dailyStimulus: 5.0),
+      );
+      await dataSource.upsertStimulus(
+        buildStimulus(id: 'stim-1', ownerUserId: userA, dailyStimulus: 8.0),
+      );
+
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userA,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result!.dailyStimulus, 8.0);
+    });
+  });
+
+  group('updateStimulusValues', () {
+    test('updates daily stimulus and rolling load for the given id', () async {
+      await dataSource.upsertStimulus(
+        buildStimulus(
+          id: 'stim-1',
+          ownerUserId: userA,
+          dailyStimulus: 5.0,
+          rollingWeeklyLoad: 10.0,
+        ),
+      );
+
+      await dataSource.updateStimulusValues(
+        id: 'stim-1',
+        dailyStimulus: 7.0,
+        rollingWeeklyLoad: 14.0,
+        lastSetTimestamp: 1000,
+        lastSetStimulus: 3.0,
+      );
+
+      final result = await dataSource.getStimulusByMuscleAndDate(
+        userId: userA,
+        muscleGroup: 'chest',
+        date: baseDate,
+      );
+
+      expect(result!.dailyStimulus, 7.0);
+      expect(result.rollingWeeklyLoad, 14.0);
+      expect(result.lastSetTimestamp, 1000);
+      expect(result.lastSetStimulus, 3.0);
+    });
+  });
+}

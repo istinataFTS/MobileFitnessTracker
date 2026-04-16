@@ -53,6 +53,9 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(profileFixture);
+    registerFallbackValue(
+      const AppUser(id: 'fallback-id', email: 'fallback@test.com'),
+    );
   });
 
   setUp(() {

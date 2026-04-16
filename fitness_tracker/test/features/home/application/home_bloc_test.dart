@@ -189,13 +189,21 @@ void main() {
       ),
     ),
     act: (HomeBloc bloc) => bloc.add(const RefreshHomeDataEvent()),
-    expect: () => <HomeState>[
-      HomeLoaded(
-        data: buildDashboardData(
-          todaysLogs: <NutritionLog>[newerLog],
+    // Bloc deduplication: emit(state) is a no-op when state hasn't changed,
+    // so no new state is emitted when the refresh fails and the current state
+    // is preserved.
+    expect: () => <HomeState>[],
+    verify: (_) {
+      // Confirm the bloc still holds the original loaded state
+      expect(
+        bloc.state,
+        HomeLoaded(
+          data: buildDashboardData(
+            todaysLogs: <NutritionLog>[newerLog],
+          ),
         ),
-      ),
-    ],
+      );
+    },
   );
 
   blocTest<HomeBloc, HomeState>(

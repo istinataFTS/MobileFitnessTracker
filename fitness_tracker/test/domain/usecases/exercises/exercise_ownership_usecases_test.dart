@@ -92,7 +92,7 @@ void main() {
       () => muscleFactorRepository.addMuscleFactorsBatch(any()),
     ).thenAnswer((_) async => const Right(null));
     when(
-      () => rebuildMuscleStimulusFromWorkoutHistory(),
+      () => rebuildMuscleStimulusFromWorkoutHistory(any()),
     ).thenAnswer((_) async => const Right(null));
   });
 
@@ -157,7 +157,7 @@ void main() {
       verify(
         () => muscleFactorRepository.addMuscleFactorsBatch(any()),
       ).called(1);
-      verify(() => rebuildMuscleStimulusFromWorkoutHistory()).called(1);
+      verify(() => rebuildMuscleStimulusFromWorkoutHistory(any())).called(1);
     },
   );
 
@@ -186,7 +186,7 @@ void main() {
       expect(result, const Right(null));
 
       verify(() => exerciseRepository.updateExercise(baseExercise)).called(1);
-      verify(() => rebuildMuscleStimulusFromWorkoutHistory()).called(1);
+      verify(() => rebuildMuscleStimulusFromWorkoutHistory(any())).called(1);
     },
   );
 }

@@ -19,6 +19,33 @@ class MockMealRemoteDataSource extends Mock implements MealRemoteDataSource {}
 class MockMealSyncCoordinator extends Mock implements MealSyncCoordinator {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      MealModel(
+        id: 'fallback-id',
+        name: 'Fallback Meal',
+        servingSizeGrams: 100,
+        proteinPer100g: 20,
+        carbsPer100g: 30,
+        fatPer100g: 10,
+        caloriesPer100g: 290,
+        createdAt: DateTime(2026),
+      ),
+    );
+    registerFallbackValue(
+      Meal(
+        id: 'fallback-meal-id',
+        name: 'Fallback Meal Entity',
+        servingSizeGrams: 100,
+        proteinPer100g: 20,
+        carbsPer100g: 30,
+        fatPer100g: 10,
+        caloriesPer100g: 290,
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockMealLocalDataSource localDataSource;
   late MockMealRemoteDataSource remoteDataSource;
   late MockMealSyncCoordinator syncCoordinator;

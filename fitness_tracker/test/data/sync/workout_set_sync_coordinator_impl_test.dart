@@ -37,6 +37,16 @@ void main() {
         createdAt: DateTime(2026, 3, 22, 10, 0),
       ),
     );
+    registerFallbackValue(
+      WorkoutSet(
+        id: 'fallback-set',
+        exerciseId: 'fallback-exercise',
+        reps: 10,
+        weight: 80,
+        date: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
   });
 
   WorkoutSet buildWorkoutSet({

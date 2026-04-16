@@ -221,6 +221,10 @@ void main() {
   testWidgets('renders core loaded sections through stable feature keys', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
@@ -239,6 +243,10 @@ void main() {
   testWidgets('period selector exposes stable key and dispatches month change', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
@@ -260,6 +268,10 @@ void main() {
   testWidgets('visual retry uses progress retry button key', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     when(() => muscleVisualBloc.state).thenReturn(
       const MuscleVisualError(
         message: 'visual load failed',
@@ -289,6 +301,10 @@ void main() {
   testWidgets('visual loading shows dedicated progress loading indicator', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     when(() => muscleVisualBloc.state).thenReturn(
       const MuscleVisualLoading(TimePeriod.month),
     );
@@ -308,6 +324,10 @@ void main() {
   testWidgets('month period hides weekly target in stable target value field', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final MuscleVisualLoaded monthState = MuscleVisualLoaded(
       muscleData: <String, MuscleVisualData>{
         'chest': MuscleVisualData(

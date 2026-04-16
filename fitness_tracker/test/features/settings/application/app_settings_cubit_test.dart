@@ -9,6 +9,10 @@ import 'package:mocktail/mocktail.dart';
 class MockAppSettingsRepository extends Mock implements AppSettingsRepository {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const AppSettings.defaults());
+  });
+
   late MockAppSettingsRepository repository;
   late AppSettingsCubit cubit;
 
@@ -95,8 +99,6 @@ void main() {
 
     final Future<bool> saveFuture =
         cubit.saveSettings(const AppSettings.defaults());
-
-    await Future<void>.delayed(Duration.zero);
 
     await cubit.refreshSettings();
 

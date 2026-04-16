@@ -89,23 +89,32 @@ void main() {
     setUp(() {
       useCase = DeleteWorkoutSet(
         mockSetRepo,
+        appSessionRepository: mockSessionRepo,
         rebuildMuscleStimulusFromWorkoutHistory: mockRebuild,
       );
     });
 
     test('deletes set and rebuilds stimulus on success', () async {
+      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
+        (_) async => const Right(_authenticatedSession),
+      );
       when(() => mockSetRepo.deleteSet('ws-1')).thenAnswer(
         (_) async => const Right(null),
       );
-      when(() => mockRebuild()).thenAnswer((_) async => const Right(null));
+      when(() => mockRebuild('user-1')).thenAnswer(
+        (_) async => const Right(null),
+      );
 
       final result = await useCase('ws-1');
 
       expect(result.isRight(), isTrue);
-      verify(() => mockRebuild()).called(1);
+      verify(() => mockRebuild('user-1')).called(1);
     });
 
     test('propagates repository failure without rebuilding', () async {
+      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
+        (_) async => const Right(_authenticatedSession),
+      );
       when(() => mockSetRepo.deleteSet('ws-1')).thenAnswer(
         (_) async => const Left(_dbFailure),
       );
@@ -113,7 +122,7 @@ void main() {
       final result = await useCase('ws-1');
 
       expect(result, const Left(_dbFailure));
-      verifyNever(() => mockRebuild());
+      verifyNever(() => mockRebuild(any()));
     });
   });
 
@@ -308,12 +317,12 @@ void main() {
       when(() => mockSetRepo.updateSet(_workoutSetFixture)).thenAnswer(
         (_) async => const Right(null),
       );
-      when(() => mockRebuild()).thenAnswer((_) async => const Right(null));
+      when(() => mockRebuild('')).thenAnswer((_) async => const Right(null));
 
       final result = await useCase(_workoutSetFixture);
 
       expect(result.isRight(), isTrue);
-      verify(() => mockRebuild()).called(1);
+      verify(() => mockRebuild('')).called(1);
     });
 
     test('sets ownerUserId when session is authenticated', () async {
@@ -325,7 +334,9 @@ void main() {
       when(() => mockSetRepo.updateSet(setWithOwner)).thenAnswer(
         (_) async => const Right(null),
       );
-      when(() => mockRebuild()).thenAnswer((_) async => const Right(null));
+      when(() => mockRebuild('user-1')).thenAnswer(
+        (_) async => const Right(null),
+      );
 
       final result = await useCase(_workoutSetFixture);
 
@@ -344,7 +355,7 @@ void main() {
       final result = await useCase(_workoutSetFixture);
 
       expect(result, const Left(_dbFailure));
-      verifyNever(() => mockRebuild());
+      verifyNever(() => mockRebuild(any()));
     });
   });
 }

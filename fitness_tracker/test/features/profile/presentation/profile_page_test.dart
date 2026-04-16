@@ -79,6 +79,7 @@ void main() {
     );
 
     await tester.pumpWidget(buildSubject());
+    await tester.pump(); // process post-frame callbacks so loading state renders
 
     expect(find.byKey(ProfilePage.loadingIndicatorKey), findsOneWidget);
 
@@ -89,6 +90,11 @@ void main() {
   testWidgets('renders guest profile shell through stable keys', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => const Right(AppSession.guest()),
     );
@@ -110,14 +116,19 @@ void main() {
     expect(find.byKey(ProfilePage.appVersionTileKey), findsOneWidget);
 
     expect(find.text('Guest'), findsOneWidget);
-    expect(find.text('Guest profile shell'), findsWidgets);
-    expect(find.text('No initial cloud migration pending'), findsOneWidget);
+    expect(find.text('Guest account'), findsWidgets);
+    expect(find.text('No initial migration pending'), findsOneWidget);
     expect(find.text('No successful cloud sync recorded yet'), findsOneWidget);
   });
 
   testWidgets('renders authenticated profile shell through stable keys', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     when(() => repository.getCurrentSession()).thenAnswer(
       (_) async => Right(
         AppSession(
@@ -140,9 +151,9 @@ void main() {
     expect(find.byKey(ProfilePage.subtitleKey), findsOneWidget);
     expect(find.text('Marin Dinchev'), findsOneWidget);
     expect(find.text('marin@test.com'), findsOneWidget);
-    expect(find.text('Signed-in profile shell'), findsWidgets);
+    expect(find.text('Cloud account'), findsWidgets);
     expect(
-      find.text('This session is marked as needing an initial cloud migration'),
+      find.text('Waiting to upload local data to the cloud'),
       findsOneWidget,
     );
     expect(find.text('2026-03-18 14:45'), findsOneWidget);

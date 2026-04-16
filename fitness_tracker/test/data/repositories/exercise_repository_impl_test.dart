@@ -22,6 +22,17 @@ class MockExerciseSyncCoordinator extends Mock
     implements ExerciseSyncCoordinator {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      ExerciseModel(
+        id: 'fallback-id',
+        name: 'Fallback Exercise',
+        muscleGroups: const <String>['chest'],
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockExerciseLocalDataSource localDataSource;
   late MockExerciseRemoteDataSource remoteDataSource;
   late MockExerciseSyncCoordinator syncCoordinator;

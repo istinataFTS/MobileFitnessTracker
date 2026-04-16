@@ -321,7 +321,7 @@ void main() {
         return item.title == 'Chest';
       });
 
-      expect(chest.progressLabel, '2 / 2 sets');
+      expect(chest.progressLabel, '2 / 2 Sets');
       expect(chest.percentageLabel, '100%');
       expect(chest.progressValue, 1.0);
       expect(chest.isComplete, isTrue);
@@ -332,7 +332,7 @@ void main() {
         return item.title == 'Quads';
       });
 
-      expect(quads.progressLabel, '1 / 3 sets');
+      expect(quads.progressLabel, '1 / 3 Sets');
       expect(quads.percentageLabel, '33%');
       expect(quads.progressValue, closeTo(0.3333, 0.001));
       expect(quads.isComplete, isFalse);

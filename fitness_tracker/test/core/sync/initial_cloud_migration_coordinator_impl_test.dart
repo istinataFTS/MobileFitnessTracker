@@ -15,6 +15,16 @@ import 'package:mocktail/mocktail.dart';
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      InitialCloudMigrationState(
+        userId: 'fallback-user',
+        startedAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockAppSessionRepository repository;
   late InitialCloudMigrationCoordinator coordinator;
   late List<String> executionLog;

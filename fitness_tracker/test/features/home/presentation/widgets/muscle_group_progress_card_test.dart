@@ -71,6 +71,10 @@ void main() {
     testWidgets('renders progress content without completion badge', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final HomeLoaded state = HomeLoaded(
         data: HomeDashboardData(
           targets: <Target>[
@@ -131,6 +135,10 @@ void main() {
     testWidgets('renders completion badge for completed muscle target', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final HomeLoaded state = HomeLoaded(
         data: HomeDashboardData(
           targets: <Target>[

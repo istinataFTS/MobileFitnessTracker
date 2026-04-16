@@ -2,7 +2,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/app_strings.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:fitness_tracker/domain/usecases/muscle_stimulus/record_workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/add_workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/get_weekly_sets.dart';
@@ -16,10 +18,13 @@ class MockGetWeeklySets extends Mock implements GetWeeklySets {}
 
 class MockRecordWorkoutSet extends Mock implements RecordWorkoutSet {}
 
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
 void main() {
   late MockAddWorkoutSet mockAddWorkoutSet;
   late MockGetWeeklySets mockGetWeeklySets;
   late MockRecordWorkoutSet mockRecordWorkoutSet;
+  late MockAppSessionRepository mockAppSessionRepository;
   late WorkoutBloc bloc;
 
   final workoutSet = WorkoutSet(
@@ -41,11 +46,13 @@ void main() {
     mockAddWorkoutSet = MockAddWorkoutSet();
     mockGetWeeklySets = MockGetWeeklySets();
     mockRecordWorkoutSet = MockRecordWorkoutSet();
+    mockAppSessionRepository = MockAppSessionRepository();
 
     bloc = WorkoutBloc(
       addWorkoutSet: mockAddWorkoutSet,
       getWeeklySets: mockGetWeeklySets,
       recordWorkoutSet: mockRecordWorkoutSet,
+      appSessionRepository: mockAppSessionRepository,
     );
   });
 
@@ -54,6 +61,8 @@ void main() {
   });
 
   group('WorkoutBloc', () {
+    late Future<WorkoutUiEffect> _addSetEffectFuture;
+
     blocTest<WorkoutBloc, WorkoutState>(
       'emits loading then loaded when weekly sets load succeeds',
       build: () {
@@ -92,8 +101,12 @@ void main() {
         when(() => mockAddWorkoutSet(workoutSet))
             .thenAnswer((_) async => const Right(null));
 
+        when(() => mockAppSessionRepository.getCurrentSession())
+            .thenAnswer((_) async => const Right(AppSession.guest()));
+
         when(
           () => mockRecordWorkoutSet(
+            userId: '',
             exerciseId: workoutSet.exerciseId,
             sets: 1,
             intensity: workoutSet.intensity,
@@ -104,6 +117,7 @@ void main() {
         when(() => mockGetWeeklySets())
             .thenAnswer((_) async => Right(weeklySets));
 
+        _addSetEffectFuture = bloc.effects.first;
         return bloc;
       },
       act: (bloc) => bloc.add(AddWorkoutSetEvent(workoutSet)),
@@ -114,7 +128,7 @@ void main() {
       verify: (_) async {
         expect(bloc.cachedWeeklySets, weeklySets);
 
-        final effect = await bloc.effects.first;
+        final effect = await _addSetEffectFuture;
         expect(effect, isA<WorkoutLoggedEffect>());
 
         final loggedEffect = effect as WorkoutLoggedEffect;

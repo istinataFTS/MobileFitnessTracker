@@ -108,7 +108,7 @@ class ProfileViewDataMapper {
       return '@$handle';
     }
 
-    return session.user?.email.trim() ?? 'Authenticated session';
+    return session.user?.email.trim().nullIfEmpty() ?? 'Authenticated session';
   }
 
   static String _formatDateTime(DateTime value) {

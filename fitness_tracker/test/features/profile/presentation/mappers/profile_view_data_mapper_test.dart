@@ -17,11 +17,11 @@ void main() {
     final viewData = ProfileViewDataMapper.map(state);
 
     expect(viewData.title, 'Guest');
-    expect(viewData.subtitle, 'Profile features will expand after auth is enabled');
-    expect(viewData.accountModeTitle, 'Guest profile shell');
-    expect(viewData.cloudMigrationSubtitle, 'No initial cloud migration pending');
+    expect(viewData.subtitle, 'Sign in to unlock cloud sync and social features');
+    expect(viewData.accountModeTitle, 'Guest account');
+    expect(viewData.cloudMigrationSubtitle, 'No initial migration pending');
     expect(viewData.lastSyncSubtitle, 'No successful cloud sync recorded yet');
-    expect(viewData.deferredItems, hasLength(3));
+    expect(viewData.deferredItems, hasLength(1));
     expect(viewData.infoTiles, hasLength(1));
     expect(viewData.isLoading, isFalse);
   });
@@ -47,14 +47,14 @@ void main() {
 
     expect(viewData.title, 'Marin Dinchev');
     expect(viewData.subtitle, 'marin@test.com');
-    expect(viewData.accountModeTitle, 'Signed-in profile shell');
+    expect(viewData.accountModeTitle, 'Cloud account');
     expect(
       viewData.accountModeSubtitle,
-      'Server-owned profile fields can attach here once auth is live',
+      'Data is owned and synced with your authenticated account',
     );
     expect(
       viewData.cloudMigrationSubtitle,
-      'This session is marked as needing an initial cloud migration',
+      'Waiting to upload local data to the cloud',
     );
     expect(viewData.lastSyncSubtitle, '2026-03-18 14:45');
   });

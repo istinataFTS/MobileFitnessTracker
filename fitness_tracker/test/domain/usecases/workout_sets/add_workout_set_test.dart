@@ -16,6 +16,19 @@ class MockWorkoutSetRepository extends Mock implements WorkoutSetRepository {}
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      WorkoutSet(
+        id: 'fallback-set',
+        exerciseId: 'fallback-exercise',
+        reps: 10,
+        weight: 80,
+        date: DateTime(2026),
+        createdAt: DateTime(2026),
+      ),
+    );
+  });
+
   late MockWorkoutSetRepository workoutSetRepository;
   late MockAppSessionRepository appSessionRepository;
   late AddWorkoutSet usecase;

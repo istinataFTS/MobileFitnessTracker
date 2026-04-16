@@ -106,7 +106,11 @@ void main() {
 
       final result = await sut.getFollowers(currentUserId);
 
-      expect(result, Right<dynamic, List<UserProfileSummary>>([summaryA]));
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (_) => fail('expected Right'),
+        (list) => expect(list, <UserProfileSummary>[summaryA]),
+      );
     });
 
     test('returns Right(empty) when no followers', () async {
@@ -129,7 +133,11 @@ void main() {
 
       final result = await sut.getFollowing(currentUserId);
 
-      expect(result, Right<dynamic, List<UserProfileSummary>>([summaryA]));
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (_) => fail('expected Right'),
+        (list) => expect(list, <UserProfileSummary>[summaryA]),
+      );
     });
   });
 

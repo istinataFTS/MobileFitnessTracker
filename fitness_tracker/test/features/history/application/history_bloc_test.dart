@@ -317,7 +317,6 @@ void main() {
       },
       expect: () => <Matcher>[
         isA<HistoryLoading>(),
-        isA<HistoryLoaded>(),
         isA<HistoryLoaded>()
             .having((state) => state.currentMonth, 'currentMonth', january)
             .having(

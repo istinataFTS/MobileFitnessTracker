@@ -60,7 +60,8 @@ void main() {
 
     final result = await getAllExercises();
 
-    expect(result, Right<Failure, List<Exercise>>(<Exercise>[exercise]));
+    expect(result.isRight(), isTrue);
+    expect((result as Right).value, <Exercise>[exercise]);
     verify(
       () => repository.getAllExercises(
         sourcePreference: DataSourcePreference.remoteThenLocal,
@@ -103,7 +104,8 @@ void main() {
 
     final result = await getExercisesForMuscle('chest');
 
-    expect(result, Right<Failure, List<Exercise>>(<Exercise>[exercise]));
+    expect(result.isRight(), isTrue);
+    expect((result as Right).value, <Exercise>[exercise]);
     verify(
       () => repository.getExercisesForMuscle(
         'chest',

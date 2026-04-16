@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../config/env_config.dart';
+import '../../domain/repositories/app_session_repository.dart';
 import '../../domain/usecases/exercises/seed_exercises.dart';
 import '../../domain/usecases/muscle_factors/seed_exercise_factors.dart';
 import '../../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
@@ -53,9 +54,15 @@ class AppDataSeeder {
               // in the fatigue map and weekly targets immediately on first launch.
               debugPrint('🔄 Rebuilding muscle stimulus from workout history...');
               final rebuildStart = DateTime.now();
+              final sessionRepo = di.sl<AppSessionRepository>();
+              final sessionResult = await sessionRepo.getCurrentSession();
+              final userId = sessionResult.fold(
+                (_) => '',
+                (session) => session.user?.id ?? '',
+              );
               final rebuild =
                   di.sl<RebuildMuscleStimulusFromWorkoutHistory>();
-              final rebuildResult = await rebuild();
+              final rebuildResult = await rebuild(userId);
               final rebuildDuration =
                   DateTime.now().difference(rebuildStart);
               rebuildResult.fold(

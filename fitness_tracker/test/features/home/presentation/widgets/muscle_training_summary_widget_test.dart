@@ -113,6 +113,10 @@ void main() {
     testWidgets('shows empty summary list when no trained muscles are present', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final MuscleVisualLoaded emptyState = MuscleVisualLoaded(
         muscleData: const <String, MuscleVisualData>{},
         currentPeriod: TimePeriod.week,
@@ -138,6 +142,10 @@ void main() {
     testWidgets('shows ranked trained muscles in display order', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final MuscleVisualLoaded visualState = MuscleVisualLoaded(
         muscleData: <String, MuscleVisualData>{
           'lats': const MuscleVisualData(

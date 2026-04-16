@@ -22,6 +22,17 @@ class _MockUserProfileRepository extends Mock
     implements UserProfileRepository {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      UserProfile(
+        id: '',
+        username: '',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ),
+    );
+  });
+
   late _MockAppSessionRepository mockSessionRepo;
   late _MockSessionSyncService mockSyncService;
   late _MockAuthSessionService mockAuthService;

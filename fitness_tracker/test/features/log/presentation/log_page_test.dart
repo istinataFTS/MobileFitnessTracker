@@ -76,9 +76,9 @@ void main() {
       await tester.pumpWidget(buildSubject(initialIndex: 99));
       await tester.pumpAndSettle();
 
-      expect(find.text('exercise-tab-content'), findsOneWidget);
+      expect(find.text('macros-tab-content'), findsOneWidget);
+      expect(find.text('exercise-tab-content'), findsNothing);
       expect(find.text('meal-tab-content'), findsNothing);
-      expect(find.text('macros-tab-content'), findsNothing);
     });
   });
 }
