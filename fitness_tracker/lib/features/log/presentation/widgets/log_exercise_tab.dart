@@ -52,6 +52,9 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
     _selectedDate = widget.initialDate ?? DateTime.now();
 
+    _repsController.addListener(() => setState(() {}));
+    _weightController.addListener(() => setState(() {}));
+
     final WorkoutBloc workoutBloc = context.read<WorkoutBloc>();
     _workoutEffectsSub = workoutBloc.effects.listen((effect) {
       if (!mounted) {
