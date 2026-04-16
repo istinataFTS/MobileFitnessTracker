@@ -442,7 +442,7 @@ class HomeViewDataMapper {
 
           return HomeMuscleGroupProgressViewData(
             title: MuscleGroups.getDisplayName(target.categoryKey),
-            progressLabel: '$currentSets / $targetSets ${AppStrings.sets}',
+            progressLabel: '$currentSets / $targetSets ${target.unit}',
             percentageLabel: '$percentage%',
             progressValue: progressValue,
             isComplete: isComplete,
