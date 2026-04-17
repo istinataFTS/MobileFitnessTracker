@@ -69,10 +69,12 @@ void main() {
             SyncFeature(
               name: 'targets',
               syncPendingChanges: () async => executionLog.add('targets'),
+              pullRemoteChanges: (_, __) async {},
             ),
             SyncFeature(
               name: 'workout_sets',
               syncPendingChanges: () async => executionLog.add('workout_sets'),
+              pullRemoteChanges: (_, __) async {},
             ),
           ],
     );
@@ -148,10 +150,12 @@ void main() {
         SyncFeature(
           name: 'targets',
           syncPendingChanges: () async => executionLog.add('targets'),
+          pullRemoteChanges: (_, __) async {},
         ),
         SyncFeature(
           name: 'workout_sets',
           syncPendingChanges: () async => throw StateError('boom'),
+          pullRemoteChanges: (_, __) async {},
         ),
       ],
     );
@@ -181,6 +185,7 @@ void main() {
             failedUpsertEntityIds: <String>['target-1'],
             failedDeleteEntityIds: <String>['target-7'],
           ),
+          pullRemoteChanges: (_, __) async {},
         ),
       ],
     );
@@ -348,6 +353,7 @@ void main() {
           name: 'targets',
           syncPendingChanges: () async =>
               throw const NetworkSyncException('connection refused'),
+          pullRemoteChanges: (_, __) async {},
         ),
       ],
     );
@@ -372,6 +378,7 @@ void main() {
           name: 'targets',
           syncPendingChanges: () async =>
               throw const AuthSyncException('token expired'),
+          pullRemoteChanges: (_, __) async {},
         ),
       ],
     );
@@ -396,6 +403,7 @@ void main() {
           name: 'targets',
           syncPendingChanges: () async =>
               throw const RemoteSyncException('constraint violation'),
+          pullRemoteChanges: (_, __) async {},
         ),
       ],
     );

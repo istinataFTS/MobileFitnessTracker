@@ -12,4 +12,8 @@ abstract class WorkoutSetSyncCoordinator {
   Future<void> persistDeletedSet(String id);
 
   Future<void> syncPendingChanges();
+
+  /// Pulls remote workout sets modified after [since] into local storage.
+  /// Pass [since] = null for a full pull (e.g. on initial re-login).
+  Future<void> pullRemoteChanges({required String userId, DateTime? since});
 }

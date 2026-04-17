@@ -37,4 +37,10 @@ class NoopMealRemoteDataSource implements MealRemoteDataSource {
     required String localId,
     String? serverId,
   }) async {}
+
+  @override
+  Future<List<Meal>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) async => const <Meal>[];
 }

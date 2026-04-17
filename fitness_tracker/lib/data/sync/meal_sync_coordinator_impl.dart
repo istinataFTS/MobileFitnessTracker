@@ -153,6 +153,14 @@ class MealSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Meal>
   }
 
   @override
+  Future<List<Meal>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  @override
   Future<void> persistAddedMeal(Meal meal) {
     return persistAdded(meal);
   }

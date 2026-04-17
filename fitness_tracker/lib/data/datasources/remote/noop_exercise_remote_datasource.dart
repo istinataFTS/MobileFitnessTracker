@@ -37,4 +37,10 @@ class NoopExerciseRemoteDataSource implements ExerciseRemoteDataSource {
     required String localId,
     String? serverId,
   }) async {}
+
+  @override
+  Future<List<Exercise>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) async => const <Exercise>[];
 }

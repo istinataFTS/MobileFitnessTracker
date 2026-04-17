@@ -12,4 +12,8 @@ abstract class NutritionLogSyncCoordinator {
   Future<void> persistDeletedLog(String id);
 
   Future<void> syncPendingChanges();
+
+  /// Pulls remote nutrition logs modified after [since] into local storage.
+  /// Pass [since] = null for a full pull (e.g. on initial re-login).
+  Future<void> pullRemoteChanges({required String userId, DateTime? since});
 }

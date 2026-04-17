@@ -147,6 +147,14 @@ class WorkoutSetSyncCoordinatorImpl
   }
 
   @override
+  Future<List<WorkoutSet>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  @override
   Future<void> persistAddedSet(WorkoutSet set) {
     return persistAdded(set);
   }
