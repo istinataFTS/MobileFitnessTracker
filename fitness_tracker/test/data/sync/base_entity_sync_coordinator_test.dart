@@ -168,6 +168,16 @@ class TestEntitySyncCoordinator extends BaseEntitySyncCoordinator<TestSyncEntity
   }
 
   @override
+  Future<List<TestSyncEntity>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) async {
+    // Not exercised in base-coordinator unit tests; pull-path is tested
+    // separately via pullRemoteChanges integration tests.
+    return const <TestSyncEntity>[];
+  }
+
+  @override
   Future<void> deleteRemote({
     required String localId,
     required String? serverId,

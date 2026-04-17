@@ -182,6 +182,14 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   }
 
   @override
+  Future<List<Exercise>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  @override
   Future<void> persistAddedExercise(Exercise exercise) {
     return persistAdded(exercise);
   }

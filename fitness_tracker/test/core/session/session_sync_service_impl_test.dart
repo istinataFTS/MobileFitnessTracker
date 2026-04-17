@@ -17,6 +17,7 @@ import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.d
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -42,6 +43,9 @@ class MockWorkoutSetLocalDataSource extends Mock
 class MockMuscleStimulusLocalDataSource extends Mock
     implements MuscleStimulusLocalDataSource {}
 
+class MockRebuildMuscleStimulus extends Mock
+    implements RebuildMuscleStimulusFromWorkoutHistory {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const AppUser(id: '', email: ''));
@@ -57,6 +61,7 @@ void main() {
   late MockTargetLocalDataSource targetLocalDataSource;
   late MockWorkoutSetLocalDataSource workoutSetLocalDataSource;
   late MockMuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
+  late MockRebuildMuscleStimulus rebuildMuscleStimulus;
   late SessionSyncService service;
 
   const user = AppUser(
@@ -80,6 +85,11 @@ void main() {
     targetLocalDataSource = MockTargetLocalDataSource();
     workoutSetLocalDataSource = MockWorkoutSetLocalDataSource();
     muscleStimulusLocalDataSource = MockMuscleStimulusLocalDataSource();
+    rebuildMuscleStimulus = MockRebuildMuscleStimulus();
+
+    // Default stub: rebuild succeeds silently.
+    when(() => rebuildMuscleStimulus(any()))
+        .thenAnswer((_) async => const Right(null));
 
     when(() => repository.syncPolicy).thenReturn(AppSyncPolicy.productionDefault);
 
@@ -109,6 +119,7 @@ void main() {
       appSessionRepository: repository,
       authRemoteDataSource: authRemoteDataSource,
       syncOrchestrator: syncOrchestrator,
+      rebuildMuscleStimulus: rebuildMuscleStimulus,
       exerciseLocalDataSource: exerciseLocalDataSource,
       mealLocalDataSource: mealLocalDataSource,
       nutritionLogLocalDataSource: nutritionLogLocalDataSource,

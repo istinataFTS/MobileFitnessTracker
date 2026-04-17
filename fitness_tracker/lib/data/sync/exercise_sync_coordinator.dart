@@ -12,4 +12,8 @@ abstract class ExerciseSyncCoordinator {
   Future<void> persistDeletedExercise(String id);
 
   Future<void> syncPendingChanges();
+
+  /// Pulls remote exercises modified after [since] into local storage.
+  /// Pass [since] = null for a full pull (e.g. on initial re-login).
+  Future<void> pullRemoteChanges({required String userId, DateTime? since});
 }

@@ -153,6 +153,14 @@ class NutritionLogSyncCoordinatorImpl
   }
 
   @override
+  Future<List<NutritionLog>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  @override
   Future<void> persistAddedLog(NutritionLog log) {
     return persistAdded(log);
   }

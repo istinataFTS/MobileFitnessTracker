@@ -2,6 +2,7 @@ import '../config/app_sync_policy.dart';
 import '../enums/sync_trigger.dart';
 import '../errors/sync_exceptions.dart';
 import '../logging/app_logger.dart';
+import '../../domain/entities/app_session.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../data/sync/entity_sync_batch_failure.dart';
 import 'initial_cloud_migration_coordinator.dart';
@@ -90,7 +91,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
             return _runInitialMigration(trigger);
           }
 
-          return _runFeatureSync(trigger);
+          return _runFeatureSync(trigger, session);
         },
       );
     } finally {
@@ -139,16 +140,35 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     }
   }
 
-  Future<SyncRunResult> _runFeatureSync(SyncTrigger trigger) async {
+  /// Runs all registered features in FK order.
+  ///
+  /// Each feature **pulls first, then pushes**:
+  /// 1. Pull — download remote rows modified since [session.lastCloudSyncAt]
+  ///    (null on first login → full pull).  This repopulates local storage
+  ///    after a logout/re-login and keeps multi-device data in sync.
+  /// 2. Push — upload locally pending changes that accumulated while offline.
+  ///
+  /// Ordering is FK-safe: exercises → meals → workout_sets → nutrition_logs →
+  /// targets.
+  Future<SyncRunResult> _runFeatureSync(
+    SyncTrigger trigger,
+    AppSession session,
+  ) async {
     AppLogger.info(
       'Sync orchestration started for $trigger',
       category: 'sync',
     );
 
+    final userId = session.user?.id ?? '';
+    final since = session.lastCloudSyncAt;
+
     final List<SyncFeatureRunResult> featureResults = <SyncFeatureRunResult>[];
 
     for (final feature in features) {
       try {
+        // Pull before push: remote changes arrive first so that a subsequent
+        // push does not duplicate entities that were already on the server.
+        await feature.pullRemoteChanges(userId, since);
         await feature.syncPendingChanges();
 
         featureResults.add(

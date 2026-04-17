@@ -1,4 +1,5 @@
 import '../../core/enums/sync_status.dart';
+import '../../core/logging/app_logger.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/pending_sync_delete.dart';
 import '../datasources/local/pending_sync_delete_local_datasource.dart';
@@ -186,6 +187,90 @@ abstract class BaseEntitySyncCoordinator<T> {
     }
 
     await flushPendingDeletes();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pull (remote → local)
+  // ---------------------------------------------------------------------------
+
+  /// Fetches all remote rows for [userId] modified after [since] (or all rows
+  /// when [since] is null) and upserts them into the local store.
+  ///
+  /// **Conflict rule — local wins when dirty, remote wins otherwise:**
+  /// If the local copy of an entity has a pending sync modification
+  /// (`hasPendingSync == true`), that offline change is preserved and the
+  /// remote version is skipped.  This prevents a concurrent pull from
+  /// silently discarding work the user did while offline.
+  ///
+  /// > **Single-device limitation (pre-GA):** Conflict detection relies on
+  /// > matching the remote entity's ID to the local primary key.  When a
+  /// > local entity's primary key differs from its server ID (i.e. it was
+  /// > created offline and not yet pushed), a remote copy of the same entity
+  /// > arriving via pull would be inserted as a new row rather than merged.
+  /// > In practice this scenario only occurs during simultaneous multi-device
+  /// > edits, which are out of scope for the current release.
+  Future<List<T>> fetchSince({
+    required String userId,
+    DateTime? since,
+  });
+
+  Future<void> pullRemoteChanges({
+    required String userId,
+    DateTime? since,
+  }) async {
+    if (!isRemoteSyncEnabled) {
+      return;
+    }
+
+    final remoteEntities = await fetchSince(userId: userId, since: since);
+
+    if (remoteEntities.isEmpty) {
+      return;
+    }
+
+    AppLogger.info(
+      'Pull: fetched ${remoteEntities.length} ${descriptor.entityLabel}(s) '
+      'for userId=$userId since=${since?.toIso8601String() ?? 'epoch'}',
+      category: 'sync',
+    );
+
+    // Build a set of server IDs that have pending local modifications so we
+    // can skip them below (local wins over remote for dirty entities).
+    final pendingEntities = await getPendingSyncEntities();
+    final dirtyServerIds = pendingEntities
+        .map((e) => getSyncMetadata(e).serverId)
+        .whereType<String>()
+        .toSet();
+
+    int inserted = 0;
+    int updated = 0;
+    int skipped = 0;
+
+    for (final remoteEntity in remoteEntities) {
+      final remoteId = getEntityId(remoteEntity);
+
+      // Local wins: preserve pending offline edits.
+      if (dirtyServerIds.contains(remoteId)) {
+        skipped++;
+        continue;
+      }
+
+      final existing = await getLocalById(remoteId);
+
+      if (existing != null) {
+        await updateLocal(remoteEntity);
+        updated++;
+      } else {
+        await insertLocal(remoteEntity);
+        inserted++;
+      }
+    }
+
+    AppLogger.info(
+      'Pull complete for ${descriptor.entityLabel}: '
+      'inserted=$inserted updated=$updated skipped=$skipped',
+      category: 'sync',
+    );
   }
 
   Future<void> syncPendingChanges() async {

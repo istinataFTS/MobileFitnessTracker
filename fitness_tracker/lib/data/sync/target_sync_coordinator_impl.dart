@@ -147,6 +147,14 @@ class TargetSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Target>
   }
 
   @override
+  Future<List<Target>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  @override
   Future<void> persistAddedTarget(Target target) {
     return persistAdded(target);
   }

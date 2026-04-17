@@ -11,11 +11,13 @@ import '../sync/sync_orchestrator.dart';
 import 'session_sync_service.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/app_session_repository.dart';
+import '../../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 
 class SessionSyncServiceImpl implements SessionSyncService {
   final AppSessionRepository appSessionRepository;
   final AuthRemoteDataSource authRemoteDataSource;
   final SyncOrchestrator syncOrchestrator;
+  final RebuildMuscleStimulusFromWorkoutHistory rebuildMuscleStimulus;
   final ExerciseLocalDataSource exerciseLocalDataSource;
   final MealLocalDataSource mealLocalDataSource;
   final MuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
@@ -27,6 +29,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
     required this.appSessionRepository,
     required this.authRemoteDataSource,
     required this.syncOrchestrator,
+    required this.rebuildMuscleStimulus,
     required this.exerciseLocalDataSource,
     required this.mealLocalDataSource,
     required this.muscleStimulusLocalDataSource,
@@ -87,6 +90,12 @@ class SessionSyncServiceImpl implements SessionSyncService {
             syncResult: syncResult,
           );
         }
+
+        // After a successful pull, the workout_sets table is repopulated from
+        // Supabase.  Rebuild the muscle_stimulus projection so the body map
+        // and fatigue views immediately reflect the restored training history.
+        // muscle_stimulus is derived data — it is never synced remotely.
+        await _rebuildMuscleStimulus(user.id);
 
         return SessionSyncActionResult(
           status: SessionSyncActionStatus.completed,
@@ -176,6 +185,42 @@ class SessionSyncServiceImpl implements SessionSyncService {
         return const SessionSyncActionResult(
           status: SessionSyncActionStatus.completed,
           message: 'sign-out completed successfully',
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Rebuilds [muscle_stimulus] rows from [workout_sets] for [userId].
+  ///
+  /// Called after the initial sign-in pull so that the body map and fatigue
+  /// views immediately reflect training history restored from Supabase.
+  /// Failures are non-fatal — the user can still use the app; the map will
+  /// self-heal on the next workout log.
+  Future<void> _rebuildMuscleStimulus(String userId) async {
+    AppLogger.info(
+      'Rebuilding muscle stimulus from restored workout history...',
+      category: 'session',
+    );
+
+    final rebuildStart = DateTime.now();
+    final result = await rebuildMuscleStimulus(userId);
+    final elapsed = DateTime.now().difference(rebuildStart);
+
+    result.fold(
+      (failure) {
+        AppLogger.warning(
+          'Muscle stimulus rebuild failed after sign-in: ${failure.message}',
+          category: 'session',
+        );
+      },
+      (_) {
+        AppLogger.info(
+          'Muscle stimulus rebuilt in ${elapsed.inMilliseconds}ms',
+          category: 'session',
         );
       },
     );

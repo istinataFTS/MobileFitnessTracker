@@ -46,4 +46,10 @@ class NoopNutritionLogRemoteDataSource
     required String localId,
     String? serverId,
   }) async {}
+
+  @override
+  Future<List<NutritionLog>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) async => const <NutritionLog>[];
 }

@@ -36,4 +36,10 @@ class NoopTargetRemoteDataSource implements TargetRemoteDataSource {
     required String localId,
     String? serverId,
   }) async {}
+
+  @override
+  Future<List<Target>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) async => const <Target>[];
 }

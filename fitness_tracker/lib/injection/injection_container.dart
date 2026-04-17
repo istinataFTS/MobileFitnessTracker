@@ -124,22 +124,32 @@ void _registerAppComposition(GetIt sl) {
       SyncFeature(
         name: 'exercises',
         syncPendingChanges: sl<ExerciseSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) =>
+            sl<ExerciseSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'meals',
         syncPendingChanges: sl<MealSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) =>
+            sl<MealSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'workout_sets',
         syncPendingChanges: sl<WorkoutSetSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) =>
+            sl<WorkoutSetSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'nutrition_logs',
         syncPendingChanges: sl<NutritionLogSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) =>
+            sl<NutritionLogSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'targets',
         syncPendingChanges: sl<TargetSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) =>
+            sl<TargetSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
     ],
   );
@@ -159,6 +169,7 @@ void _registerAppComposition(GetIt sl) {
       appSessionRepository: sl(),
       authRemoteDataSource: sl(),
       syncOrchestrator: sl(),
+      rebuildMuscleStimulus: sl(),
       exerciseLocalDataSource: sl(),
       mealLocalDataSource: sl(),
       muscleStimulusLocalDataSource: sl(),

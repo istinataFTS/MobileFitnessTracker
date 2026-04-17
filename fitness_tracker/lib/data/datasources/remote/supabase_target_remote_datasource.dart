@@ -128,6 +128,27 @@ class SupabaseTargetRemoteDataSource implements TargetRemoteDataSource {
     });
   }
 
+  @override
+  Future<List<Target>> fetchSince({
+    required String userId,
+    DateTime? since,
+  }) {
+    return RemoteDatasourceGuard.run(() async {
+      var query = clientProvider.client
+          .from(_tableName)
+          .select()
+          .eq(_userIdColumn, userId);
+
+      if (since != null) {
+        query = query.gt('updated_at', since.toIso8601String());
+      }
+
+      final dynamic data = await query.order('updated_at', ascending: false);
+      final rows = _asMapList(data);
+      return rows.map(_mapRowToEntity).toList();
+    });
+  }
+
   Target _mapRowToEntity(Map<String, dynamic> row) {
     final dto = SupabaseTargetDto.fromMap(row);
     return dto.toEntity(
