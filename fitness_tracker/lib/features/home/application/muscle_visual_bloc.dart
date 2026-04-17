@@ -141,14 +141,22 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
   final CurrentUserIdResolver _userIdResolver;
 
-  final Map<TimePeriod, Map<String, MuscleVisualData>> _periodCache =
-      <TimePeriod, Map<String, MuscleVisualData>>{};
-  final Map<TimePeriod, DateTime> _cacheTimestamps = <TimePeriod, DateTime>{};
+  /// Cache key is a Dart 3 record `(TimePeriod, userId)` so that data from one
+  /// authenticated user is never served to a different user after a sign-out /
+  /// sign-in cycle, even when the BLoC instance is reused across sessions.
+  final Map<(TimePeriod, String), Map<String, MuscleVisualData>> _periodCache =
+      <(TimePeriod, String), Map<String, MuscleVisualData>>{};
+  final Map<(TimePeriod, String), DateTime> _cacheTimestamps =
+      <(TimePeriod, String), DateTime>{};
 
   TimePeriod _currentPeriod = TimePeriod.week;
   MuscleMapMode _currentMode = MuscleMapMode.volume;
 
-  static const Duration _cacheValidityDuration = Duration(minutes: 5);
+  /// Short TTL keeps the display reactive to changes that happen outside the
+  /// BLoC (e.g. a workout logged in another screen).  Explicit invalidation via
+  /// [ClearCacheEvent] is the primary freshness mechanism; the TTL is a safety
+  /// net for edge cases where the explicit signal is never sent.
+  static const Duration _cacheValidityDuration = Duration(seconds: 30);
 
   /// Resolves the current user id via the shared [CurrentUserIdResolver], so
   /// readers always see the same identifier that writers used.  Returns
@@ -161,12 +169,16 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   ) async {
     _currentPeriod = event.period;
 
-    if (_isCacheValid(event.period)) {
+    // Resolve userId upfront — required for the userId-scoped cache key and
+    // for forwarding to the use case.
+    final String userId = await _resolveUserId();
+
+    if (_isCacheValid(event.period, userId)) {
       emit(
         MuscleVisualLoaded(
-          muscleData: _periodCache[event.period]!,
+          muscleData: _periodCache[(event.period, userId)]!,
           currentPeriod: event.period,
-          loadedAt: _cacheTimestamps[event.period]!,
+          loadedAt: _cacheTimestamps[(event.period, userId)]!,
           mode: _currentMode,
         ),
       );
@@ -175,7 +187,6 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(event.period, mode: _currentMode));
 
-    final userId = await _resolveUserId();
     final result = await getMuscleVisualData(event.period, userId);
 
     result.fold(
@@ -188,8 +199,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       ),
       (visualData) {
         final DateTime now = DateTime.now();
-        _periodCache[event.period] = visualData;
-        _cacheTimestamps[event.period] = now;
+        final (TimePeriod, String) key = (event.period, userId);
+        _periodCache[key] = visualData;
+        _cacheTimestamps[key] = now;
 
         emit(
           MuscleVisualLoaded(
@@ -212,18 +224,22 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       _currentMode = MuscleMapMode.volume;
     }
 
+    // Same period + already loaded → no-op (avoid unnecessary resolution).
     if (event.newPeriod == _currentPeriod && state is MuscleVisualLoaded) {
       return;
     }
 
     _currentPeriod = event.newPeriod;
 
-    if (_isCacheValid(event.newPeriod)) {
+    // Resolve userId upfront for the userId-scoped cache key.
+    final String userId = await _resolveUserId();
+
+    if (_isCacheValid(event.newPeriod, userId)) {
       emit(
         MuscleVisualLoaded(
-          muscleData: _periodCache[event.newPeriod]!,
+          muscleData: _periodCache[(event.newPeriod, userId)]!,
           currentPeriod: event.newPeriod,
-          loadedAt: _cacheTimestamps[event.newPeriod]!,
+          loadedAt: _cacheTimestamps[(event.newPeriod, userId)]!,
           mode: _currentMode,
         ),
       );
@@ -232,7 +248,6 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(event.newPeriod, mode: _currentMode));
 
-    final userId = await _resolveUserId();
     final result = await getMuscleVisualData(event.newPeriod, userId);
 
     result.fold(
@@ -245,8 +260,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       ),
       (visualData) {
         final DateTime now = DateTime.now();
-        _periodCache[event.newPeriod] = visualData;
-        _cacheTimestamps[event.newPeriod] = now;
+        final (TimePeriod, String) key = (event.newPeriod, userId);
+        _periodCache[key] = visualData;
+        _cacheTimestamps[key] = now;
 
         emit(
           MuscleVisualLoaded(
@@ -269,6 +285,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     ChangeModeEvent event,
     Emitter<MuscleVisualState> emit,
   ) async {
+    // Same mode + already loaded → no-op (avoid unnecessary resolution).
     if (_currentMode == event.mode && state is MuscleVisualLoaded) return;
     _currentMode = event.mode;
 
@@ -276,12 +293,15 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     final TimePeriod periodToFetch =
         _currentMode == MuscleMapMode.fatigue ? TimePeriod.week : _currentPeriod;
 
-    if (_isCacheValid(periodToFetch)) {
+    // Resolve userId upfront for the userId-scoped cache key.
+    final String userId = await _resolveUserId();
+
+    if (_isCacheValid(periodToFetch, userId)) {
       emit(
         MuscleVisualLoaded(
-          muscleData: _periodCache[periodToFetch]!,
+          muscleData: _periodCache[(periodToFetch, userId)]!,
           currentPeriod: _currentPeriod,
-          loadedAt: _cacheTimestamps[periodToFetch]!,
+          loadedAt: _cacheTimestamps[(periodToFetch, userId)]!,
           mode: _currentMode,
         ),
       );
@@ -290,7 +310,6 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
     emit(MuscleVisualLoading(_currentPeriod, mode: _currentMode));
 
-    final userId = await _resolveUserId();
     final result = await getMuscleVisualData(periodToFetch, userId);
 
     result.fold(
@@ -303,8 +322,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       ),
       (visualData) {
         final DateTime now = DateTime.now();
-        _periodCache[periodToFetch] = visualData;
-        _cacheTimestamps[periodToFetch] = now;
+        final (TimePeriod, String) key = (periodToFetch, userId);
+        _periodCache[key] = visualData;
+        _cacheTimestamps[key] = now;
 
         emit(
           MuscleVisualLoaded(
@@ -325,12 +345,15 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     final TimePeriod periodToRefresh =
         _currentMode == MuscleMapMode.fatigue ? TimePeriod.week : _currentPeriod;
 
-    _periodCache.remove(periodToRefresh);
-    _cacheTimestamps.remove(periodToRefresh);
+    // Resolve userId to correctly identify and remove the right cache entry.
+    final String userId = await _resolveUserId();
+    final (TimePeriod, String) cacheKey = (periodToRefresh, userId);
+
+    _periodCache.remove(cacheKey);
+    _cacheTimestamps.remove(cacheKey);
 
     emit(MuscleVisualLoading(_currentPeriod, mode: _currentMode));
 
-    final userId = await _resolveUserId();
     final result = await getMuscleVisualData(periodToRefresh, userId);
 
     result.fold(
@@ -343,8 +366,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       ),
       (visualData) {
         final DateTime now = DateTime.now();
-        _periodCache[periodToRefresh] = visualData;
-        _cacheTimestamps[periodToRefresh] = now;
+        _periodCache[cacheKey] = visualData;
+        _cacheTimestamps[cacheKey] = now;
 
         emit(
           MuscleVisualLoaded(
@@ -367,15 +390,17 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     add(LoadMuscleVisualsEvent(_currentPeriod));
   }
 
-  bool _isCacheValid(TimePeriod period) {
-    if (!_periodCache.containsKey(period) ||
-        !_cacheTimestamps.containsKey(period)) {
+  /// Returns `true` when a valid, non-stale cache entry exists for [period]
+  /// scoped to [userId].  A separate entry per user prevents stale data from
+  /// being served after a sign-out / sign-in switch.
+  bool _isCacheValid(TimePeriod period, String userId) {
+    final (TimePeriod, String) key = (period, userId);
+
+    if (!_periodCache.containsKey(key) || !_cacheTimestamps.containsKey(key)) {
       return false;
     }
 
-    final Duration cacheAge = DateTime.now().difference(
-      _cacheTimestamps[period]!,
-    );
+    final Duration cacheAge = DateTime.now().difference(_cacheTimestamps[key]!);
 
     return cacheAge <= _cacheValidityDuration;
   }
