@@ -46,6 +46,16 @@ class RecordWorkoutSet {
         (failure) async => Left(failure),
         (muscleStimuli) async {
           if (muscleStimuli.isEmpty) {
+            // No factors matched this exercise — the workout_set is already
+            // persisted, but the body map will have nothing to highlight.
+            // `CalculateMuscleStimulus` has logged the root cause; we log
+            // here too so the call site (bloc + UI) is greppable.
+            AppLogger.warning(
+              'No muscle mapping applied for exerciseId=$exerciseId '
+              '(userId=$userId).  Check that muscle factors are seeded '
+              'for this exercise.',
+              category: 'stimulus',
+            );
             return const Right([]);
           }
 

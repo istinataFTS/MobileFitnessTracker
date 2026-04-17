@@ -38,9 +38,9 @@ class ExerciseModel extends Exercise {
       id: map[DatabaseTables.exerciseId] as String,
       ownerUserId: map[DatabaseTables.ownerUserId] as String?,
       name: map[DatabaseTables.exerciseName] as String,
-      muscleGroups: _decodeMuscleGroups(
+      muscleGroups: _normaliseMuscleGroups(_decodeMuscleGroups(
         map[DatabaseTables.exerciseMuscleGroups] as String,
-      ),
+      )),
       createdAt: createdAt,
       updatedAt:
           updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
@@ -81,7 +81,8 @@ class ExerciseModel extends Exercise {
       id: json['id'] as String,
       ownerUserId: json['ownerUserId'] as String?,
       name: json['name'] as String,
-      muscleGroups: (json['muscleGroups'] as List).cast<String>(),
+      muscleGroups:
+          _normaliseMuscleGroups((json['muscleGroups'] as List).cast<String>()),
       createdAt: createdAt,
       updatedAt:
           updatedAtRaw == null ? createdAt : DateTime.parse(updatedAtRaw),
@@ -110,7 +111,19 @@ class ExerciseModel extends Exercise {
   }
 
   static String _encodeMuscleGroups(List<String> muscleGroups) {
-    return jsonEncode(muscleGroups);
+    return jsonEncode(_normaliseMuscleGroups(muscleGroups));
+  }
+
+  /// Canonicalises muscle-group identifiers to lowercase + trimmed form.
+  ///
+  /// Applied at every ingestion point (DB read, JSON read, write-back) so
+  /// the rest of the codebase can assume groups are already in canonical
+  /// form.  Prevents case-mismatch drops in mappers like
+  /// `HomeViewDataMapper._buildMuscleBreakdown`.
+  static List<String> _normaliseMuscleGroups(List<String> raw) {
+    return raw
+        .map((m) => m.trim().toLowerCase())
+        .toList(growable: false);
   }
 
   static List<String> _decodeMuscleGroups(String json) {

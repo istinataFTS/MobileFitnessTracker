@@ -39,42 +39,15 @@ void main() {
 
   const AppSettings settings = AppSettings.defaults();
 
+  // No training targets — keeps showMuscleGroups: false so _MuscleGroupSection
+  // never renders a "Chest" title that would collide with muscle summary rows.
   final HomeLoaded loadedHomeState = HomeLoaded(
     data: HomeDashboardData(
-      targets: <Target>[
-        Target(
-          id: 'target-chest',
-          type: TargetType.muscleSets,
-          categoryKey: 'chest',
-          targetValue: 6,
-          unit: 'sets',
-          period: TargetPeriod.weekly,
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
-      weeklySets: <WorkoutSet>[
-        WorkoutSet(
-          id: 'set-1',
-          exerciseId: 'bench-press',
-          reps: 8,
-          weight: 80,
-          date: now,
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
+      targets: const <Target>[],
+      weeklySets: const <WorkoutSet>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
-      exercises: <Exercise>[
-        Exercise(
-          id: 'bench-press',
-          name: 'Bench Press',
-          muscleGroups: <String>['chest'],
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
+      exercises: const <Exercise>[],
     ),
   );
 
@@ -224,6 +197,11 @@ void main() {
     testWidgets('shows muscle summary rows only for trained muscles', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final MuscleVisualLoaded visualState = MuscleVisualLoaded(
         muscleData: <String, MuscleVisualData>{
           'chest': const MuscleVisualData(
@@ -267,7 +245,10 @@ void main() {
 
       expect(find.text('Chest'), findsOneWidget);
       expect(find.text('14 • Heavy'), findsOneWidget);
-      expect(find.text('Back'), findsNothing);
+      // 'Back' also appears as a figure label in BodyVisualWidget, so we
+      // assert on the stats row text instead — which only appears in summary
+      // rows and unambiguously proves no row was rendered for the back muscle.
+      expect(find.text('0 • Untrained'), findsNothing);
     });
   });
 }

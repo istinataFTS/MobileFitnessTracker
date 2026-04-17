@@ -231,7 +231,11 @@ void main() {
     expect(find.byKey(SettingsPage.savingIndicatorKey), findsOneWidget);
 
     await tester.tap(find.byKey(SettingsPage.weekStartTileKey));
-    await tester.pumpAndSettle();
+    // pump() instead of pumpAndSettle() — the saving CircularProgressIndicator
+    // animates indefinitely, so pumpAndSettle would never resolve. A single
+    // pump is enough to flush any tap response; we just need to assert that
+    // no bottom sheet opened.
+    await tester.pump();
 
     expect(find.text('Sunday'), findsNothing);
     verifyNever(() => cubit.setWeekStartDay(any()));
