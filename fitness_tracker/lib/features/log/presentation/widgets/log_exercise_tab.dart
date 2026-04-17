@@ -63,6 +63,10 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
 
       if (effect is WorkoutLoggedEffect) {
         if (widget.showSuccessFeedback) {
+          // The set persisted, but if no muscle groups were mapped we use an
+          // amber banner so users see *why* the body map did not light up
+          // instead of assuming it is broken.
+          final bool isWarning = effect.hadNoMuscleMapping;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Column(
@@ -82,10 +86,11 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
                   ],
                 ],
               ),
-              backgroundColor: AppTheme.successGreen,
+              backgroundColor:
+                  isWarning ? AppTheme.warningAmber : AppTheme.successGreen,
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(20),
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: isWarning ? 4 : 2),
             ),
           );
         }

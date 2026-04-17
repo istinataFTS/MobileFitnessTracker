@@ -107,6 +107,9 @@ class AppStrings {
 
   // ==================== Workout ====================
   static const String setLogged = 'Set logged!';
+  static const String setLoggedNoMuscleMapping =
+      "Set logged, but we couldn't map it to any muscle group. "
+      'Re-seed the exercise library from Settings to restore the muscle map.';
   static const String noExercisesAvailable = 'No exercises available';
   static const String createExercisesFirst =
       'Go to Library to create exercises first';

@@ -18,25 +18,20 @@ class AddExercise {
   });
 
   Future<Either<Failure, void>> call(Exercise exercise) async {
-    // Normalize muscle group names to lowercase at save time so the stored
-    // data is always consistent, regardless of how the exercise was built
-    // (UI chip selection, import, sync, etc.).
-    final normalizedExercise = exercise.copyWith(
-      muscleGroups: exercise.muscleGroups
-          .map((m) => m.toLowerCase().trim())
-          .toList(),
-    );
-
+    // Muscle-group canonicalisation (lowercase + trim) is handled at the
+    // model boundary in `ExerciseModel` and inside `SyncExerciseMuscleFactors`,
+    // so we do not pre-normalise here.  Adding the user id is the only
+    // decoration this use case owns.
     final sessionResult = await appSessionRepository.getCurrentSession();
 
     final preparedExercise = sessionResult.fold(
-      (_) => normalizedExercise,
+      (_) => exercise,
       (session) {
         if (!session.isAuthenticated || session.user == null) {
-          return normalizedExercise;
+          return exercise;
         }
 
-        return normalizedExercise.copyWith(ownerUserId: session.user!.id);
+        return exercise.copyWith(ownerUserId: session.user!.id);
       },
     );
 

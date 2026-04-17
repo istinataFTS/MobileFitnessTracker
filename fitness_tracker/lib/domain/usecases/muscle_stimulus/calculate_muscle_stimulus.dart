@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 
 import '../../../core/errors/failures.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../entities/stimulus_calculation_rules.dart';
 import '../../repositories/muscle_factor_repository.dart';
 
@@ -36,6 +37,19 @@ class CalculateMuscleStimulus {
         (failure) => Left(failure),
         (factors) {
           if (factors.isEmpty) {
+            // A valid exercise should always have at least one muscle factor.
+            // An empty result here means the seed for this exercise is missing
+            // (e.g. a user-created exercise that skipped `SyncExerciseMuscleFactors`,
+            // or a wiped factor table).  We keep returning `Right({})` so callers
+            // that iterate many sets — like `RebuildMuscleStimulusFromWorkoutHistory`
+            // — are not forced to abort the whole rebuild.  Instead we surface
+            // the situation as a warning so devs can spot it in production logs
+            // and callers can show a non-fatal UI banner.
+            AppLogger.warning(
+              'No muscle factors for exerciseId=$exerciseId — '
+              'the body map will not update for this set.',
+              category: 'stimulus',
+            );
             return const Right({});
           }
 

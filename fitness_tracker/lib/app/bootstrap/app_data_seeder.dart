@@ -1,20 +1,45 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../config/env_config.dart';
+import '../../core/session/current_user_id_resolver.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../domain/usecases/exercises/seed_exercises.dart';
 import '../../domain/usecases/muscle_factors/seed_exercise_factors.dart';
 import '../../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import '../../injection/injection_container.dart' as di;
 
+/// Coordinates startup data population.
+///
+/// There are two distinct responsibilities here, intentionally kept
+/// separate so that flipping `seedDefaultData` off in a production-like
+/// build does not silently disable the domain-data heal path:
+///
+/// 1. **Demo-data seeding** — exercises + their muscle factors.  Gated by
+///    [EnvConfig.seedDefaultData] because users in a production flow may
+///    want to start from a blank exercise library.
+/// 2. **Muscle-factor healing** — always runs.  Factors are biomechanical
+///    *domain data*, not demo content; if the table is empty we re-seed it
+///    from [ExerciseMuscleFactorsData] so the 2D muscle map and fatigue
+///    calculations keep working.  When factors actually get written, we
+///    also rebuild muscle stimulus from workout history so past sets show
+///    up in the map immediately.
 class AppDataSeeder {
   const AppDataSeeder();
 
   Future<void> seedIfEnabled() async {
-    if (!EnvConfig.seedDefaultData) {
-      return;
+    if (EnvConfig.seedDefaultData) {
+      await _seedDemoData();
+    } else {
+      debugPrint('Demo-data seeding disabled (EnvConfig.seedDefaultData=false)');
     }
 
+    // Always run the heal step — factors are domain data, not demo data.
+    // Safe no-op when factors are already present (the underlying use case
+    // short-circuits on `existingFactors.isNotEmpty && !forceReseed`).
+    await _healMuscleFactorsIfMissing();
+  }
+
+  Future<void> _seedDemoData() async {
     debugPrint('Seeding database...');
     final seedStart = DateTime.now();
 
@@ -49,34 +74,11 @@ class AppDataSeeder {
             );
 
             if (factorCount > 0) {
-              // Factors were freshly seeded (DB migration cleared the old ones).
-              // Rebuild muscle stimulus history so past workout sets are reflected
-              // in the fatigue map and weekly targets immediately on first launch.
-              debugPrint('🔄 Rebuilding muscle stimulus from workout history...');
-              final rebuildStart = DateTime.now();
-              final sessionRepo = di.sl<AppSessionRepository>();
-              final sessionResult = await sessionRepo.getCurrentSession();
-              final userId = sessionResult.fold(
-                (_) => '',
-                (session) => session.user?.id ?? '',
-              );
-              final rebuild =
-                  di.sl<RebuildMuscleStimulusFromWorkoutHistory>();
-              final rebuildResult = await rebuild(userId);
-              final rebuildDuration =
-                  DateTime.now().difference(rebuildStart);
-              rebuildResult.fold(
-                (failure) {
-                  debugPrint(
-                    '⚠️ Muscle stimulus rebuild failed: ${failure.message}',
-                  );
-                },
-                (_) {
-                  debugPrint(
-                    '✅ Muscle stimulus rebuilt in: ${rebuildDuration.inMilliseconds}ms',
-                  );
-                },
-              );
+              // Factors were freshly seeded (DB migration cleared the old
+              // ones).  Rebuild muscle stimulus history so past workout
+              // sets are reflected in the fatigue map and weekly targets
+              // immediately on first launch.
+              await _rebuildStimulus();
             }
           },
         );
@@ -86,6 +88,70 @@ class AppDataSeeder {
     final totalSeedDuration = DateTime.now().difference(seedStart);
     debugPrint(
       '✅ Database seeding completed in: ${totalSeedDuration.inMilliseconds}ms',
+    );
+  }
+
+  /// Re-runs [SeedExerciseFactors] with the healing flag.
+  ///
+  /// The use case itself checks whether the factor table is empty before
+  /// writing, so this is a cheap no-op when everything is healthy.  We do
+  /// pay one `getAllFactors` query on every launch — acceptable given the
+  /// table is tiny and the bug we are protecting against (silent empty-map
+  /// fatigue view) is user-visible.
+  Future<void> _healMuscleFactorsIfMissing() async {
+    final healStart = DateTime.now();
+    final seedFactors = di.sl<SeedExerciseFactors>();
+    final healResult = await seedFactors(allowHealingWhenEmpty: true);
+
+    await healResult.fold(
+      (failure) async {
+        debugPrint(
+          '⚠️ Muscle factor heal failed: ${failure.message}',
+        );
+      },
+      (factorCount) async {
+        if (factorCount <= 0) {
+          // Either already populated (healthy) or use case returned 0 for
+          // another benign reason.  Nothing to do.
+          return;
+        }
+
+        final healDuration = DateTime.now().difference(healStart);
+        debugPrint(
+          '🩹 Healed $factorCount muscle factors in: ${healDuration.inMilliseconds}ms',
+        );
+        await _rebuildStimulus();
+      },
+    );
+  }
+
+  Future<void> _rebuildStimulus() async {
+    debugPrint('🔄 Rebuilding muscle stimulus from workout history...');
+    final rebuildStart = DateTime.now();
+
+    // Use the shared resolver so the id we rebuild against matches the id
+    // used on write paths (WorkoutBloc / AddExercise) and read paths
+    // (MuscleVisualBloc).  Guest sessions resolve to [kGuestUserId].
+    final resolver = CurrentUserIdResolver(
+      appSessionRepository: di.sl<AppSessionRepository>(),
+    );
+    final userId = await resolver.resolve();
+
+    final rebuild = di.sl<RebuildMuscleStimulusFromWorkoutHistory>();
+    final rebuildResult = await rebuild(userId);
+    final rebuildDuration = DateTime.now().difference(rebuildStart);
+
+    rebuildResult.fold(
+      (failure) {
+        debugPrint(
+          '⚠️ Muscle stimulus rebuild failed: ${failure.message}',
+        );
+      },
+      (_) {
+        debugPrint(
+          '✅ Muscle stimulus rebuilt in: ${rebuildDuration.inMilliseconds}ms',
+        );
+      },
     );
   }
 }

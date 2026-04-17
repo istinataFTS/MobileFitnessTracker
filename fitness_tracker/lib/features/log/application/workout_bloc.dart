@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/bloc/bloc_effects_mixin.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/logging/app_logger.dart';
+import '../../../../core/session/current_user_id_resolver.dart';
 import '../../../../domain/entities/workout_set.dart';
 import '../../../../domain/repositories/app_session_repository.dart';
 import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
@@ -70,9 +72,16 @@ class WorkoutLoggedEffect extends WorkoutUiEffect {
   final String message;
   final List<String> affectedMuscles;
 
+  /// True when the set was persisted but no muscle-group mapping could be
+  /// applied (e.g. the exercise has no muscle factors seeded).  The UI
+  /// should surface this as a non-fatal warning so users know why the
+  /// body map did not light up for this set.
+  final bool hadNoMuscleMapping;
+
   const WorkoutLoggedEffect({
     required this.message,
     required this.affectedMuscles,
+    this.hadNoMuscleMapping = false,
   });
 }
 
@@ -90,11 +99,15 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     required this.getWeeklySets,
     required this.recordWorkoutSet,
     required this.appSessionRepository,
-  }) : super(WorkoutInitial()) {
+  })  : _userIdResolver =
+            CurrentUserIdResolver(appSessionRepository: appSessionRepository),
+        super(WorkoutInitial()) {
     on<AddWorkoutSetEvent>(_onAddWorkoutSet);
     on<LoadWeeklySetsEvent>(_onLoadWeeklySets);
     on<RefreshWeeklySetsEvent>(_onRefreshWeeklySets);
   }
+
+  final CurrentUserIdResolver _userIdResolver;
 
   Future<void> _onAddWorkoutSet(
     AddWorkoutSetEvent event,
@@ -107,11 +120,7 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     await addResult.fold(
       (failure) async => emit(WorkoutError(failure.message)),
       (_) async {
-        final sessionResult = await appSessionRepository.getCurrentSession();
-        final userId = sessionResult.fold(
-          (_) => '',
-          (session) => session.user?.id ?? '',
-        );
+        final userId = await _userIdResolver.resolve();
 
         final affectedMusclesResult = await recordWorkoutSet(
           userId: userId,
@@ -122,16 +131,28 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
         );
 
         final affectedMuscles = affectedMusclesResult.fold(
-          (_) => <String>[],
+          (failure) {
+            AppLogger.warning(
+              'recordWorkoutSet failed: ${failure.message}',
+              category: 'workout',
+            );
+            return <String>[];
+          },
           (muscles) => muscles,
         );
+
+        final hadNoMuscleMapping = affectedMuscles.isEmpty;
+        final message = hadNoMuscleMapping
+            ? AppStrings.setLoggedNoMuscleMapping
+            : AppStrings.setLogged;
 
         await _loadWeeklySetsData(emit);
 
         emitEffect(
           WorkoutLoggedEffect(
-            message: AppStrings.setLogged,
+            message: message,
             affectedMuscles: affectedMuscles,
+            hadNoMuscleMapping: hadNoMuscleMapping,
           ),
         );
       },

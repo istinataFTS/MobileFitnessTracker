@@ -23,10 +23,25 @@ class SeedExerciseFactors {
     required this.exerciseRepository,
   });
 
-  Future<Either<Failure, int>> call() async {
+  /// Seeds the `exercise_muscle_factors` table.
+  ///
+  /// Muscle factors are **domain data** (biomechanically-accurate muscle
+  /// mappings), not demo content.  Pass [allowHealingWhenEmpty] = true from
+  /// a "heal" path to bypass [EnvConfig.seedDefaultData] when the factor
+  /// table is empty — that way a production-like build (seeding disabled)
+  /// still self-heals if the factor table was lost or never populated.
+  ///
+  /// When the factor table already has rows, the existing
+  /// `existingFactors.isNotEmpty && !forceReseed` guard below still applies,
+  /// so healing is a no-op in the steady state.
+  Future<Either<Failure, int>> call({
+    bool allowHealingWhenEmpty = false,
+  }) async {
     try {
-      // Step 1: Check if seeding is enabled
-      if (!EnvConfig.seedDefaultData) {
+      // Step 1: Check if seeding is enabled.  Factors are domain data, so
+      // callers that *just* want to heal an empty table can bypass this gate
+      // via [allowHealingWhenEmpty].
+      if (!EnvConfig.seedDefaultData && !allowHealingWhenEmpty) {
         _log('Muscle factor seeding disabled in environment config');
         return const Right(0);
       }

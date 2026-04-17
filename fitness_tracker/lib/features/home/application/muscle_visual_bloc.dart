@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/session/current_user_id_resolver.dart';
 import '../../../domain/entities/muscle_visual_data.dart';
 import '../../../domain/entities/time_period.dart';
 import '../../../domain/repositories/app_session_repository.dart';
@@ -125,7 +126,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   MuscleVisualBloc({
     required this.getMuscleVisualData,
     required this.appSessionRepository,
-  }) : super(const MuscleVisualInitial()) {
+  })  : _userIdResolver =
+            CurrentUserIdResolver(appSessionRepository: appSessionRepository),
+        super(const MuscleVisualInitial()) {
     on<LoadMuscleVisualsEvent>(_onLoadMuscleVisuals);
     on<ChangePeriodEvent>(_onChangePeriod);
     on<ChangeModeEvent>(_onChangeMode);
@@ -136,6 +139,8 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   final GetMuscleVisualData getMuscleVisualData;
   final AppSessionRepository appSessionRepository;
 
+  final CurrentUserIdResolver _userIdResolver;
+
   final Map<TimePeriod, Map<String, MuscleVisualData>> _periodCache =
       <TimePeriod, Map<String, MuscleVisualData>>{};
   final Map<TimePeriod, DateTime> _cacheTimestamps = <TimePeriod, DateTime>{};
@@ -145,16 +150,10 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
 
   static const Duration _cacheValidityDuration = Duration(minutes: 5);
 
-  /// Resolves the current user's ID from the session.
-  /// Returns an empty string for the guest / unauthenticated state so that
-  /// stimulus queries are correctly scoped to the `owner_user_id = ''` rows.
-  Future<String> _resolveUserId() async {
-    final result = await appSessionRepository.getCurrentSession();
-    return result.fold(
-      (_) => '',
-      (session) => session.user?.id ?? '',
-    );
-  }
+  /// Resolves the current user id via the shared [CurrentUserIdResolver], so
+  /// readers always see the same identifier that writers used.  Returns
+  /// [kGuestUserId] for guest / unauthenticated sessions.
+  Future<String> _resolveUserId() => _userIdResolver.resolve();
 
   Future<void> _onLoadMuscleVisuals(
     LoadMuscleVisualsEvent event,
