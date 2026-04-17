@@ -192,7 +192,16 @@ class MuscleStimulus {
   }
 
   static String getDisplayName(String muscleGroup) {
-    return displayNames[muscleGroup.toLowerCase()] ?? muscleGroup;
+    final String key = muscleGroup.toLowerCase();
+    final String? mapped = displayNames[key];
+    if (mapped != null) return mapped;
+
+    // Fallback: title-case each word so unknown groups still render cleanly.
+    return key
+        .split(RegExp(r'[-\s]+'))
+        .where((String w) => w.isNotEmpty)
+        .map((String w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
   }
 
   static double getRecoveryRate(String muscleGroup) {
