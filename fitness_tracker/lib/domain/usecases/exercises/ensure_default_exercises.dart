@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/errors/failures.dart';
 import '../../repositories/app_session_repository.dart';
 import '../muscle_factors/seed_exercise_factors.dart';
+import '../muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import 'seed_exercises.dart';
 
 /// Ensures the current user always has a set of default exercises available.
@@ -30,11 +31,18 @@ class EnsureDefaultExercises {
     required this.appSessionRepository,
     required this.seedExercises,
     required this.seedExerciseFactors,
+    this.rebuildMuscleStimulusFromWorkoutHistory,
   });
 
   final AppSessionRepository appSessionRepository;
   final SeedExercises seedExercises;
   final SeedExerciseFactors seedExerciseFactors;
+
+  /// When provided, a fresh rebuild of [muscle_stimulus] is triggered after
+  /// factor healing so the body map reflects the newly seeded factors
+  /// immediately — without waiting for the user to log another set.
+  final RebuildMuscleStimulusFromWorkoutHistory?
+      rebuildMuscleStimulusFromWorkoutHistory;
 
   /// Ensures the current user has default exercises, seeding them if needed.
   ///
@@ -85,15 +93,44 @@ class EnsureDefaultExercises {
           // Seed muscle factors so stimulus / fatigue tracking works for the
           // freshly inserted exercises.
           final factorsResult = await seedExerciseFactors();
-          factorsResult.fold(
-            (failure) => debugPrint(
-              '[EnsureDefaultExercises] Factor seeding failed: '
-              '${failure.message}',
-            ),
-            (factorCount) => debugPrint(
-              '[EnsureDefaultExercises] Seeded $factorCount muscle factors.',
-            ),
+          final int factorCount = factorsResult.fold(
+            (failure) {
+              debugPrint(
+                '[EnsureDefaultExercises] Factor seeding failed: '
+                '${failure.message}',
+              );
+              return 0;
+            },
+            (count) {
+              debugPrint(
+                '[EnsureDefaultExercises] Seeded $count muscle factors.',
+              );
+              return count;
+            },
           );
+
+          // If factors were just healed and we have an authenticated user,
+          // rebuild muscle_stimulus so the body map reflects the new factors
+          // immediately without requiring the user to log another set.
+          if (factorCount > 0 &&
+              userId != null &&
+              rebuildMuscleStimulusFromWorkoutHistory != null) {
+            debugPrint(
+              '[EnsureDefaultExercises] Rebuilding muscle stimulus after '
+              'factor healing for user $userId...',
+            );
+            final rebuildResult =
+                await rebuildMuscleStimulusFromWorkoutHistory!(userId);
+            rebuildResult.fold(
+              (failure) => debugPrint(
+                '[EnsureDefaultExercises] Stimulus rebuild failed: '
+                '${failure.message}',
+              ),
+              (_) => debugPrint(
+                '[EnsureDefaultExercises] Muscle stimulus rebuilt successfully.',
+              ),
+            );
+          }
 
           return Right(seededCount);
         },
