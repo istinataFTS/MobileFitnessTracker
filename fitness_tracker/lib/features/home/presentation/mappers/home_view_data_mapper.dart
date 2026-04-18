@@ -2,6 +2,9 @@
 import '../../../../config/env_config.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_groups.dart';
+import '../../../../core/constants/muscle_stimulus_constants.dart'
+    show MuscleStimulus;
+import '../../../../core/logging/app_logger.dart';
 import '../../../../core/utils/week_range_label_formatter.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../domain/entities/exercise.dart';
@@ -17,49 +20,90 @@ import '../models/home_view_data.dart';
 class HomeViewDataMapper {
   const HomeViewDataMapper._();
 
+  /// Maps fine-grained muscle-group slugs (from [MuscleStimulus] constants) to
+  /// the front-side body overlay assets.  Keys are typed constants — any key
+  /// mismatch (slug changed, typo) fails at compile-time, not silently at
+  /// runtime.
   static const Map<String, List<String>> _frontBodyAssetMap =
       <String, List<String>>{
-        'front-delts': <String>['assets/images/body/front_delts.png'],
-        'side-delts': <String>[
+        MuscleStimulus.frontDelts: <String>[
+          'assets/images/body/front_delts.png',
+        ],
+        MuscleStimulus.sideDelts: <String>[
           'assets/images/body/front_delts.png',
           'assets/images/body/front_reardelt.png',
         ],
-        'upper-traps': <String>[
+        MuscleStimulus.upperTraps: <String>[
           'assets/images/body/front_uppertraps.png',
           'assets/images/body/front_neck.png',
         ],
-        'upper-chest': <String>['assets/images/body/front_chest.png'],
-        'mid-chest': <String>['assets/images/body/front_chest.png'],
-        'lower-chest': <String>['assets/images/body/front_chest.png'],
-        'biceps': <String>['assets/images/body/front_biceps.png'],
-        'forearms': <String>['assets/images/body/front_forearms.png'],
-        'abs': <String>['assets/images/body/front_abs.png'],
-        'obliques': <String>['assets/images/body/front_obliques.png'],
-        'lovehandles': <String>['assets/images/body/front_lovehandles.png'],
-        'hipadductors': <String>['assets/images/body/front_hipadductors.png'],
-        'quads': <String>['assets/images/body/front_quads.png'],
-        'calves': <String>['assets/images/body/front_calves.png'],
+        MuscleStimulus.upperChest: <String>[
+          'assets/images/body/front_chest.png',
+        ],
+        MuscleStimulus.midChest: <String>[
+          'assets/images/body/front_chest.png',
+        ],
+        MuscleStimulus.lowerChest: <String>[
+          'assets/images/body/front_chest.png',
+        ],
+        MuscleStimulus.biceps: <String>['assets/images/body/front_biceps.png'],
+        MuscleStimulus.forearms: <String>[
+          'assets/images/body/front_forearms.png',
+        ],
+        MuscleStimulus.abs: <String>['assets/images/body/front_abs.png'],
+        MuscleStimulus.obliques: <String>[
+          'assets/images/body/front_obliques.png',
+        ],
+        MuscleStimulus.lovehandles: <String>[
+          'assets/images/body/front_lovehandles.png',
+        ],
+        MuscleStimulus.hipadductors: <String>[
+          'assets/images/body/front_hipadductors.png',
+        ],
+        MuscleStimulus.quads: <String>['assets/images/body/front_quads.png'],
+        MuscleStimulus.calves: <String>['assets/images/body/front_calves.png'],
       };
 
+  /// Maps fine-grained muscle-group slugs to the back-side body overlay assets.
   static const Map<String, List<String>> _backBodyAssetMap =
       <String, List<String>>{
-        'rear-delts': <String>['assets/images/body/back_reardelt.png'],
-        'side-delts': <String>['assets/images/body/back_reardelt.png'],
-        'upper-traps': <String>['assets/images/body/back_uppertraps.png'],
-        'middle-traps': <String>['assets/images/body/back_middletraps.png'],
-        'lower-traps': <String>['assets/images/body/back_lowertraps.png'],
-        'lats': <String>[
+        MuscleStimulus.rearDelts: <String>[
+          'assets/images/body/back_reardelt.png',
+        ],
+        MuscleStimulus.sideDelts: <String>[
+          'assets/images/body/back_reardelt.png',
+        ],
+        MuscleStimulus.upperTraps: <String>[
+          'assets/images/body/back_uppertraps.png',
+        ],
+        MuscleStimulus.middleTraps: <String>[
+          'assets/images/body/back_middletraps.png',
+        ],
+        MuscleStimulus.lowerTraps: <String>[
+          'assets/images/body/back_lowertraps.png',
+        ],
+        MuscleStimulus.lats: <String>[
           'assets/images/body/back_lats.png',
           'assets/images/body/back_smalllats.png',
         ],
-        'triceps': <String>['assets/images/body/back_triceps.png'],
-        'forearms': <String>['assets/images/body/back_forearms.png'],
-        'lower-back': <String>['assets/images/body/back_lowerback.png'],
-        'glutes': <String>['assets/images/body/back_glutes.png'],
-        'hipadductors': <String>['assets/images/body/back_hipadductors.png'],
-        'quads': <String>['assets/images/body/back_quads.png'],
-        'hamstrings': <String>['assets/images/body/back_hamstring.png'],
-        'calves': <String>['assets/images/body/back_calves.png'],
+        MuscleStimulus.triceps: <String>[
+          'assets/images/body/back_triceps.png',
+        ],
+        MuscleStimulus.forearms: <String>[
+          'assets/images/body/back_forearms.png',
+        ],
+        MuscleStimulus.lowerBack: <String>[
+          'assets/images/body/back_lowerback.png',
+        ],
+        MuscleStimulus.glutes: <String>['assets/images/body/back_glutes.png'],
+        MuscleStimulus.hipadductors: <String>[
+          'assets/images/body/back_hipadductors.png',
+        ],
+        MuscleStimulus.quads: <String>['assets/images/body/back_quads.png'],
+        MuscleStimulus.hamstrings: <String>[
+          'assets/images/body/back_hamstring.png',
+        ],
+        MuscleStimulus.calves: <String>['assets/images/body/back_calves.png'],
       };
 
   static HomePageViewData map({
@@ -473,6 +517,11 @@ class HomeViewDataMapper {
         // (which always comes from MuscleGroups.all, which is all-lowercase).
         final String key = muscle.toLowerCase().trim();
         if (!MuscleGroups.isValid(key)) {
+          AppLogger.debug(
+            'Muscle group "$key" on exercise "${exercise.name}" is not a '
+            'valid MuscleGroups slug — skipping from weekly breakdown.',
+            category: 'home',
+          );
           continue;
         }
 
