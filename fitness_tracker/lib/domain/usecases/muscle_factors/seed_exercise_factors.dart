@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/exercise_muscle_factors_data.dart';
 import '../../../core/errors/failures.dart';
+import '../../entities/muscle_factor.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/muscle_factor_repository.dart';
 
@@ -23,24 +24,26 @@ class SeedExerciseFactors {
     required this.exerciseRepository,
   });
 
-  /// Seeds the `exercise_muscle_factors` table.
+  /// Seeds missing entries in the `exercise_muscle_factors` table.
   ///
   /// Muscle factors are **domain data** (biomechanically-accurate muscle
   /// mappings), not demo content.  Pass [allowHealingWhenEmpty] = true from
-  /// a "heal" path to bypass [EnvConfig.seedDefaultData] when the factor
-  /// table is empty — that way a production-like build (seeding disabled)
-  /// still self-heals if the factor table was lost or never populated.
+  /// a "heal" path to bypass [EnvConfig.seedDefaultData] when no factors
+  /// exist for the current exercises — that way a production-like build
+  /// (seeding disabled) still self-heals if factors were lost or never
+  /// populated.
   ///
-  /// When the factor table already has rows, the existing
-  /// `existingFactors.isNotEmpty && !forceReseed` guard below still applies,
-  /// so healing is a no-op in the steady state.
+  /// Each call is **per-exercise idempotent**: it only inserts factor rows for
+  /// exercises that currently have none.  Exercises that already have factors
+  /// are skipped without any writes.  This means calling this use-case after
+  /// every sign-in is safe and cheap in the steady state.
+  ///
+  /// Pass [forceReseed] via [EnvConfig] to wipe all factors and re-seed from
+  /// scratch (dev/debug only).
   Future<Either<Failure, int>> call({
     bool allowHealingWhenEmpty = false,
   }) async {
     try {
-      // Step 1: Check if seeding is enabled.  Factors are domain data, so
-      // callers that *just* want to heal an empty table can bypass this gate
-      // via [allowHealingWhenEmpty].
       if (!EnvConfig.seedDefaultData && !allowHealingWhenEmpty) {
         _log('Muscle factor seeding disabled in environment config');
         return const Right(0);
@@ -49,51 +52,30 @@ class SeedExerciseFactors {
       _log('Starting exercise muscle factors seeding...');
       _log('Seed data version: ${EnvConfig.seedDataVersion}');
 
-      // Step 2: Get all exercises from database
       final exercisesResult = await exerciseRepository.getAllExercises();
-      
+
       return await exercisesResult.fold(
-        // Error getting exercises
         (failure) async {
           _logError('Failed to get exercises: ${failure.message}');
           return Left(failure);
         },
-        // Successfully got exercises
         (exercises) async {
           if (exercises.isEmpty) {
             _logWarning('No exercises found in database. Seed exercises first.');
-            return const Left(DatabaseFailure('No exercises to assign factors to'));
+            return const Left(
+              DatabaseFailure('No exercises to assign factors to'),
+            );
           }
 
           _log('Found ${exercises.length} exercises in database');
 
-          // Step 3: Check if factors already exist
-          final existingFactorsResult = await muscleFactorRepository.getAllFactors();
-          
-          return await existingFactorsResult.fold(
-            (failure) async {
-              _logError('Failed to check existing factors: ${failure.message}');
-              return Left(failure);
-            },
-            (existingFactors) async {
-              final hasExistingData = existingFactors.isNotEmpty;
+          if (EnvConfig.forceReseed) {
+            _logWarning('Force reseed enabled - clearing existing factors');
+            await _clearExistingFactors();
+            return await _seedAllFactors(exercises);
+          }
 
-              // Step 4: Decide if we should seed
-              if (hasExistingData && !EnvConfig.forceReseed) {
-                _log('Database already has ${existingFactors.length} muscle factors');
-                _log('Skipping seeding (set FORCE_RESEED=true to override)');
-                return const Right(0);
-              }
-
-              if (hasExistingData && EnvConfig.forceReseed) {
-                _logWarning('Force reseed enabled - clearing existing factors');
-                await _clearExistingFactors();
-              }
-
-              // Step 5: Perform seeding
-              return await _seedFactors(exercises);
-            },
-          );
+          return await _seedMissingFactors(exercises);
         },
       );
     } catch (e) {
@@ -115,114 +97,170 @@ class SeedExerciseFactors {
     }
   }
 
-  /// Seed muscle factors for all exercises
-  Future<Either<Failure, int>> _seedFactors(List<dynamic> exercises) async {
+  /// Seeds factors only for exercises that currently have none.
+  ///
+  /// Uses a single [getAllFactors] query to determine which exercise IDs
+  /// already have at least one factor row, then batch-inserts only what is
+  /// missing.  O(1) DB reads regardless of exercise count.
+  Future<Either<Failure, int>> _seedMissingFactors(
+    List<dynamic> exercises,
+  ) async {
+    // One query — build the set of exercise IDs that already have factors.
+    final existingResult = await muscleFactorRepository.getAllFactors();
+    final existingExerciseIds = existingResult.fold(
+      (_) => <String>{},
+      (factors) => factors.map((f) => f.exerciseId).toSet(),
+    );
+
+    final allFactorsData = ExerciseMuscleFactorsData.getAllFactors();
+    final toInsert = <MuscleFactor>[];
+    int alreadyCovered = 0;
+    int noDataDefined = 0;
+
+    for (final exercise in exercises) {
+      if (existingExerciseIds.contains(exercise.id)) {
+        alreadyCovered++;
+        continue;
+      }
+
+      final factorsData = allFactorsData[exercise.name];
+      if (factorsData == null) {
+        noDataDefined++;
+        continue;
+      }
+
+      for (final factorData in factorsData) {
+        toInsert.add(
+          factorData.toEntity(id: _uuid.v4(), exerciseId: exercise.id),
+        );
+      }
+    }
+
+    if (alreadyCovered > 0) {
+      _log('$alreadyCovered exercises already have factors — skipped');
+    }
+    if (noDataDefined > 0) {
+      _logVerbose('$noDataDefined exercises have no factor data defined');
+    }
+
+    if (toInsert.isEmpty) {
+      _log('All exercises with defined factors are already covered.');
+      return const Right(0);
+    }
+
+    _log('Healing: inserting ${toInsert.length} missing factor assignments...');
+
+    final result = await muscleFactorRepository.addMuscleFactorsBatch(toInsert);
+    return result.fold(
+      (failure) {
+        _logError('Batch factor insert failed: ${failure.message}');
+        return Left(failure);
+      },
+      (_) {
+        _log('========== Factor Seeding Complete ==========');
+        _log('Successfully healed: ${toInsert.length} muscle factors');
+        _log('============================================');
+        if (EnvConfig.enableSeedingLogs) {
+          _validateSeeding(exercises);
+        }
+        return Right(toInsert.length);
+      },
+    );
+  }
+
+  /// Full re-seed used only when [EnvConfig.forceReseed] is true.
+  ///
+  /// Batch-inserts all factor assignments for every exercise in the database
+  /// that has a definition in [ExerciseMuscleFactorsData].
+  Future<Either<Failure, int>> _seedAllFactors(List<dynamic> exercises) async {
     _log('Seeding exercise muscle factors...');
-    
+
     final allFactorsData = ExerciseMuscleFactorsData.getAllFactors();
     _log('Total exercises with factors: ${allFactorsData.length}');
-    _log('Total factor assignments: ${ExerciseMuscleFactorsData.totalFactorAssignments}');
+    _log(
+      'Total factor assignments: ${ExerciseMuscleFactorsData.totalFactorAssignments}',
+    );
 
-    // Create a map of exercise name to exercise ID for quick lookup
     final exerciseNameToId = <String, String>{};
     for (final exercise in exercises) {
       exerciseNameToId[exercise.name] = exercise.id;
     }
 
-    int successCount = 0;
-    int failureCount = 0;
+    final toInsert = <MuscleFactor>[];
     int skippedCount = 0;
 
-    // Process each exercise
     for (final entry in allFactorsData.entries) {
       final exerciseName = entry.key;
-      final factorsData = entry.value;
+      final exerciseId = exerciseNameToId[exerciseName];
 
-      // Check if exercise exists in database
-      if (!exerciseNameToId.containsKey(exerciseName)) {
+      if (exerciseId == null) {
         _logWarning('Exercise "$exerciseName" not found in database, skipping');
         skippedCount++;
         continue;
       }
 
-      final exerciseId = exerciseNameToId[exerciseName]!;
-
-      // Insert factors for this exercise
-      try {
-        for (final factorData in factorsData) {
-          final factor = factorData.toEntity(
-            id: _uuid.v4(),
-            exerciseId: exerciseId,
-          );
-
-          final result = await muscleFactorRepository.addMuscleFactor(factor);
-          
-          result.fold(
-            (failure) {
-              failureCount++;
-              _logError('Failed to seed factor for "$exerciseName" - ${factorData.muscleGroup}: ${failure.message}');
-            },
-            (_) {
-              successCount++;
-              _logVerbose('✓ Seeded: $exerciseName → ${factorData.muscleGroup} (${factorData.factor})');
-            },
-          );
-        }
-      } catch (e) {
-        failureCount++;
-        _logError('Exception seeding factors for "$exerciseName": $e');
+      for (final factorData in entry.value) {
+        toInsert.add(
+          factorData.toEntity(id: _uuid.v4(), exerciseId: exerciseId),
+        );
       }
     }
 
-    // Step 6: Log results
-    _log('========== Factor Seeding Complete ==========');
-    _log('Successfully seeded: $successCount muscle factors');
     if (skippedCount > 0) {
       _logWarning('Skipped: $skippedCount exercises (not in database)');
     }
-    if (failureCount > 0) {
-      _logWarning('Failed to seed: $failureCount factors');
-    }
-    _log('============================================');
 
-    // Step 7: Validation
-    await _validateSeeding(exercises);
-
-    // Return success if at least some factors were seeded
-    if (successCount > 0) {
-      return Right(successCount);
-    } else {
+    if (toInsert.isEmpty) {
       return const Left(DatabaseFailure('Failed to seed any muscle factors'));
     }
+
+    final result = await muscleFactorRepository.addMuscleFactorsBatch(toInsert);
+    return result.fold(
+      (failure) {
+        _logError('Batch factor insert failed: ${failure.message}');
+        return Left(failure);
+      },
+      (_) {
+        _log('========== Factor Seeding Complete ==========');
+        _log('Successfully seeded: ${toInsert.length} muscle factors');
+        _log('============================================');
+        if (EnvConfig.enableSeedingLogs) {
+          _validateSeeding(exercises);
+        }
+        return Right(toInsert.length);
+      },
+    );
   }
 
-  /// Validate that all exercises have at least one muscle factor
-  Future<void> _validateSeeding(List<dynamic> exercises) async {
-    _log('Validating muscle factor seeding...');
+  /// Validates that all exercises have at least one factor.
+  ///
+  /// Uses a single [getAllFactors] query — O(1) DB reads — rather than one
+  /// query per exercise.  Runs only when [EnvConfig.enableSeedingLogs] is
+  /// true so it never executes in non-logging production builds.
+  void _validateSeeding(List<dynamic> exercises) {
+    muscleFactorRepository.getAllFactors().then((result) {
+      result.fold(
+        (failure) =>
+            _logError('Validation query failed: ${failure.message}'),
+        (allFactors) {
+          final coveredIds =
+              allFactors.map((f) => f.exerciseId).toSet();
+          final missing = exercises
+              .where((e) => !coveredIds.contains(e.id))
+              .map((e) => e.name)
+              .toList();
 
-    int exercisesWithoutFactors = 0;
-
-    for (final exercise in exercises) {
-      final factorsResult = await muscleFactorRepository.getFactorsForExercise(exercise.id);
-      
-      factorsResult.fold(
-        (failure) {
-          _logError('Failed to validate factors for "${exercise.name}": ${failure.message}');
-        },
-        (factors) {
-          if (factors.isEmpty) {
-            _logWarning('⚠️  Exercise "${exercise.name}" has no muscle factors!');
-            exercisesWithoutFactors++;
+          if (missing.isEmpty) {
+            _log('✅ All exercises have muscle factors assigned');
+          } else {
+            _logWarning(
+              '⚠️  ${missing.length} exercises missing factors: '
+              '${missing.join(', ')}',
+            );
           }
         },
       );
-    }
-
-    if (exercisesWithoutFactors == 0) {
-      _log('✅ All exercises have muscle factors assigned');
-    } else {
-      _logWarning('⚠️  $exercisesWithoutFactors exercises missing muscle factors');
-    }
+    });
   }
 
   /// Validate seeding environment (optional pre-check)
