@@ -29,6 +29,7 @@ import 'modules/register_core_module.dart';
 import 'modules/register_exercises_module.dart';
 import 'modules/register_history_module.dart';
 import 'modules/register_meals_nutrition_module.dart';
+import 'modules/register_muscle_load_module.dart';
 import 'modules/register_muscle_stimulus_module.dart';
 import 'modules/register_profile_module.dart';
 import 'modules/register_social_module.dart';
@@ -53,6 +54,7 @@ Future<void> init({
   registerExercisesModule(sl);
   registerMealsNutritionModule(sl);
   registerMuscleStimulusModule(sl);
+  registerMuscleLoadModule(sl);
   registerHistoryModule(sl);
   _registerAppComposition(sl);
 
