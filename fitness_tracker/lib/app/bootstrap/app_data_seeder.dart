@@ -34,8 +34,9 @@ class AppDataSeeder {
     }
 
     // Always run the heal step — factors are domain data, not demo data.
-    // Safe no-op when factors are already present (the underlying use case
-    // short-circuits on `existingFactors.isNotEmpty && !forceReseed`).
+    // Safe no-op when all exercises already have factors: the underlying use
+    // case performs a single getAllFactors() query and only inserts rows for
+    // exercises that currently have none (per-exercise idempotency).
     await _healMuscleFactorsIfMissing();
   }
 

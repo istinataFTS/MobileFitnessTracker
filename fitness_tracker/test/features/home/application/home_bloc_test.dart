@@ -2,7 +2,6 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
@@ -67,15 +66,6 @@ void main() {
     ),
   ];
 
-  final List<Exercise> exercises = <Exercise>[
-    Exercise(
-      id: 'bench-press',
-      name: 'Bench Press',
-      muscleGroups: <String>['chest'],
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-  ];
 
   final NutritionLog olderLog = NutritionLog(
     id: 'log-older',
@@ -117,7 +107,6 @@ void main() {
       weeklySets: weeklySets,
       todaysLogs: todaysLogs ?? <NutritionLog>[newerLog, olderLog],
       dailyMacros: macros ?? dailyMacros,
-      exercises: exercises,
     );
   }
 

@@ -1,5 +1,4 @@
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
@@ -95,7 +94,7 @@ void main() {
         'fats': 15,
         'calories': 660,
       },
-      exercises: const <Exercise>[],
+
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(
@@ -134,7 +133,7 @@ void main() {
         'fats': 0,
         'calories': 0,
       },
-      exercises: const <Exercise>[],
+
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(

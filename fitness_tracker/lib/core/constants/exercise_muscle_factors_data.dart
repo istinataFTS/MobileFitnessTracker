@@ -4,9 +4,10 @@ import 'muscle_stimulus_constants.dart';
 class ExerciseMuscleFactorsData {
   ExerciseMuscleFactorsData._();
 
-  /// Get all exercise muscle factor mappings
+  static Map<String, List<MuscleFactorData>>? _cachedFactors;
+
   static Map<String, List<MuscleFactorData>> getAllFactors() {
-    return {
+    return _cachedFactors ??= {
       // ==================== CHEST EXERCISES ====================
 
       'Bench Press': [

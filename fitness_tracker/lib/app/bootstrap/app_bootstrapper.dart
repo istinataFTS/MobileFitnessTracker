@@ -40,10 +40,12 @@ class AppBootstrapper {
       await _initializeRemoteBackend();
       await _initializeDependencies();
       _registerSyncLifecycleHooks();
-      await _seedDefaultDataIfNeeded();
       await _runInitialSync();
-      await _runDiagnosticsIfNeeded();
       _configureSystemUi();
+
+      // Seeding and diagnostics are non-critical — defer them until after the
+      // first frame so the app is visible before any DB work runs.
+      _schedulePostFrameTasks();
 
       final totalInitTimeMs = PerformanceMonitor.stopTimer(_startupTimerName);
       AppLogger.info(
@@ -167,6 +169,13 @@ class AppBootstrapper {
         category: 'sync',
       );
       unawaited(syncOrchestrator.run(SyncTrigger.appResume));
+    });
+  }
+
+  void _schedulePostFrameTasks() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_seedDefaultDataIfNeeded());
+      unawaited(_runDiagnosticsIfNeeded());
     });
   }
 

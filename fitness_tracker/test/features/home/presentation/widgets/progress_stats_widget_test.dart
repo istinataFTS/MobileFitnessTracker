@@ -1,7 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
@@ -68,15 +67,6 @@ void main() {
       ),
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
-      exercises: <Exercise>[
-        Exercise(
-          id: 'bench-press',
-          name: 'Bench Press',
-          muscleGroups: <String>['chest'],
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ],
     ),
   );
 
