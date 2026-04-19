@@ -1,11 +1,12 @@
+import '../../data/sync/entity_sync_batch_failure.dart';
+import '../../domain/entities/app_session.dart';
+import '../../domain/repositories/app_session_repository.dart';
 import '../config/app_sync_policy.dart';
 import '../enums/sync_trigger.dart';
 import '../errors/sync_exceptions.dart';
 import '../logging/app_logger.dart';
-import '../../domain/entities/app_session.dart';
-import '../../domain/repositories/app_session_repository.dart';
-import '../../data/sync/entity_sync_batch_failure.dart';
 import 'initial_cloud_migration_coordinator.dart';
+import 'post_sync_hook.dart';
 import 'remote_sync_availability.dart';
 import 'sync_feature.dart';
 import 'sync_orchestrator.dart';
@@ -16,6 +17,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
   final RemoteSyncAvailability remoteSyncAvailability;
   final InitialCloudMigrationCoordinator initialCloudMigrationCoordinator;
   final List<SyncFeature> features;
+  final List<PostSyncHook> postSyncHooks;
 
   bool _isSyncing = false;
 
@@ -25,6 +27,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     required this.remoteSyncAvailability,
     required this.initialCloudMigrationCoordinator,
     required this.features,
+    this.postSyncHooks = const <PostSyncHook>[],
   });
 
   @override
@@ -88,7 +91,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
           }
 
           if (session.requiresInitialCloudMigration) {
-            return _runInitialMigration(trigger);
+            return _runInitialMigration(trigger, session);
           }
 
           return _runFeatureSync(trigger, session);
@@ -99,7 +102,10 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     }
   }
 
-  Future<SyncRunResult> _runInitialMigration(SyncTrigger trigger) async {
+  Future<SyncRunResult> _runInitialMigration(
+    SyncTrigger trigger,
+    AppSession session,
+  ) async {
     AppLogger.info(
       'Initial cloud migration orchestration started for $trigger',
       category: 'sync',
@@ -110,6 +116,18 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     switch (migrationResult.status) {
       case InitialCloudMigrationStatus.completed:
         await _recordSuccessfulCloudSync();
+
+        // Every migration step pulls remote rows for its feature, so a
+        // completed migration is equivalent to a full pull across all
+        // registered sync features. Post-sync hooks that depend on
+        // exercises / workout_sets being fresh (factor heal, stimulus
+        // rebuild) need this signal.
+        final pulledFeatures = features.map((f) => f.name).toSet();
+        await _runPostSyncHooks(
+          trigger: trigger,
+          session: session,
+          pulledFeatures: pulledFeatures,
+        );
 
         return SyncRunResult(
           status: SyncRunStatus.completed,
@@ -163,12 +181,15 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     final since = session.lastCloudSyncAt;
 
     final List<SyncFeatureRunResult> featureResults = <SyncFeatureRunResult>[];
+    final Set<String> pulledFeatures = <String>{};
 
     for (final feature in features) {
       try {
         // Pull before push: remote changes arrive first so that a subsequent
         // push does not duplicate entities that were already on the server.
         await feature.pullRemoteChanges(userId, since);
+        pulledFeatures.add(feature.name);
+
         await feature.syncPendingChanges();
 
         featureResults.add(
@@ -212,6 +233,11 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     }
 
     await _recordSuccessfulCloudSync();
+    await _runPostSyncHooks(
+      trigger: trigger,
+      session: session,
+      pulledFeatures: pulledFeatures,
+    );
 
     return SyncRunResult(
       status: SyncRunStatus.completed,
@@ -219,6 +245,56 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
       message: 'sync orchestration completed successfully',
       featureResults: featureResults,
     );
+  }
+
+  /// Runs every registered [PostSyncHook] whose [PostSyncHook.triggeringFeatures]
+  /// intersect with [pulledFeatures], or that declare no triggering features
+  /// (always-run hooks).
+  ///
+  /// Hook failures are logged and swallowed so one misbehaving hook cannot
+  /// mark an otherwise-successful sync as failed. Hooks are invoked in
+  /// registration order, sequentially, because they may depend on each other
+  /// (e.g. the stimulus-rebuild hook assumes factors have been healed).
+  Future<void> _runPostSyncHooks({
+    required SyncTrigger trigger,
+    required AppSession session,
+    required Set<String> pulledFeatures,
+  }) async {
+    if (postSyncHooks.isEmpty) {
+      return;
+    }
+
+    final userId = session.user?.id;
+    if (userId == null || userId.isEmpty) {
+      // Hooks need a concrete user scope to operate on. A guest or
+      // unresolved session must never reach this code path, but guard
+      // defensively in case the session contract changes.
+      return;
+    }
+
+    final context = PostSyncContext(
+      userId: userId,
+      pulledFeatures: Set.unmodifiable(pulledFeatures),
+      trigger: trigger,
+    );
+
+    for (final hook in postSyncHooks) {
+      if (hook.triggeringFeatures.isNotEmpty &&
+          hook.triggeringFeatures.intersection(pulledFeatures).isEmpty) {
+        continue;
+      }
+
+      try {
+        await hook.run(context);
+      } catch (error, stackTrace) {
+        AppLogger.error(
+          'Post-sync hook "${hook.name}" threw; swallowing so sync remains successful',
+          category: 'sync',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
   }
 
   String _resolveFeatureErrorMessage(Object error) {
