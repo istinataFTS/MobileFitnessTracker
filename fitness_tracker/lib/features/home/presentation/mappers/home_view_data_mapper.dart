@@ -4,10 +4,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_groups.dart';
 import '../../../../core/constants/muscle_stimulus_constants.dart'
     show MuscleStimulus;
-import '../../../../core/logging/app_logger.dart';
 import '../../../../core/utils/week_range_label_formatter.dart';
 import '../../../../domain/entities/app_settings.dart';
-import '../../../../domain/entities/exercise.dart';
 import '../../../../domain/entities/muscle_visual_data.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/target.dart';
@@ -138,8 +136,7 @@ class HomeViewDataMapper {
       ),
       muscleGroups: _mapMuscleGroupProgress(
         targets: trainingTargets,
-        weeklySets: homeData.weeklySets,
-        exercises: homeData.exercises,
+        muscleSetCounts: homeData.muscleSetCounts,
       ),
       showMuscleGroups: trainingTargets.isNotEmpty,
     );
@@ -465,17 +462,11 @@ class HomeViewDataMapper {
 
   static List<HomeMuscleGroupProgressViewData> _mapMuscleGroupProgress({
     required List<Target> targets,
-    required List<WorkoutSet> weeklySets,
-    required List<Exercise> exercises,
+    required Map<String, int> muscleSetCounts,
   }) {
-    final Map<String, int> breakdown = _buildMuscleBreakdown(
-      weeklySets: weeklySets,
-      exercises: exercises,
-    );
-
     return targets
         .map((Target target) {
-          final int currentSets = breakdown[target.categoryKey] ?? 0;
+          final int currentSets = muscleSetCounts[target.categoryKey] ?? 0;
           final int targetSets = target.weeklyGoal;
           final double rawProgress = targetSets > 0
               ? currentSets / targetSets
@@ -494,42 +485,6 @@ class HomeViewDataMapper {
           );
         })
         .toList(growable: false);
-  }
-
-  static Map<String, int> _buildMuscleBreakdown({
-    required List<WorkoutSet> weeklySets,
-    required List<Exercise> exercises,
-  }) {
-    final Map<String, int> result = <String, int>{};
-    final Map<String, Exercise> exercisesById = <String, Exercise>{
-      for (final Exercise exercise in exercises) exercise.id: exercise,
-    };
-
-    for (final WorkoutSet set in weeklySets) {
-      final Exercise? exercise = exercisesById[set.exerciseId];
-      if (exercise == null) {
-        continue;
-      }
-
-      for (final String muscle in exercise.muscleGroups) {
-        // Normalize to lowercase so user-created exercises whose muscle groups
-        // were stored with any casing still match the target's categoryKey
-        // (which always comes from MuscleGroups.all, which is all-lowercase).
-        final String key = muscle.toLowerCase().trim();
-        if (!MuscleGroups.isValid(key)) {
-          AppLogger.debug(
-            'Muscle group "$key" on exercise "${exercise.name}" is not a '
-            'valid MuscleGroups slug — skipping from weekly breakdown.',
-            category: 'home',
-          );
-          continue;
-        }
-
-        result[key] = (result[key] ?? 0) + 1;
-      }
-    }
-
-    return result;
   }
 
   static String _periodLabel(TimePeriod period) {

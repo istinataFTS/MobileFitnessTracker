@@ -102,15 +102,7 @@ void main() {
           ],
           todaysLogs: const <NutritionLog>[],
           dailyMacros: const <String, double>{},
-          exercises: <Exercise>[
-            Exercise(
-              id: 'squat',
-              name: 'Squat',
-              muscleGroups: <String>['quads'],
-              createdAt: now,
-              syncMetadata: const EntitySyncMetadata(),
-            ),
-          ],
+          muscleSetCounts: const <String, int>{'quads': 1},
         ),
       );
 
@@ -175,15 +167,7 @@ void main() {
           ],
           todaysLogs: const <NutritionLog>[],
           dailyMacros: const <String, double>{},
-          exercises: <Exercise>[
-            Exercise(
-              id: 'bench',
-              name: 'Bench Press',
-              muscleGroups: <String>['chest'],
-              createdAt: now,
-              syncMetadata: const EntitySyncMetadata(),
-            ),
-          ],
+          muscleSetCounts: const <String, int>{'chest': 2},
         ),
       );
 

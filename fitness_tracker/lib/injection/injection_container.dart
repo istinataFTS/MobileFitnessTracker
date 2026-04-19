@@ -195,7 +195,8 @@ void _registerAppComposition(GetIt sl) {
       getWeeklySets: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
-      getAllExercises: sl(),
+      muscleLoadResolver: sl(),
+      appSessionRepository: sl(),
     ),
   );
 

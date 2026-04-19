@@ -11,13 +11,23 @@ class HomeDashboardData extends Equatable {
     required this.weeklySets,
     required this.todaysLogs,
     required this.dailyMacros,
-    required this.exercises,
+    this.muscleSetCounts = const <String, int>{},
+    this.exercises = const <Exercise>[],
   });
 
   final List<Target> targets;
   final List<WorkoutSet> weeklySets;
   final List<NutritionLog> todaysLogs;
   final Map<String, double> dailyMacros;
+
+  /// Weekly set counts per muscle group, resolved via [MuscleLoadResolver].
+  ///
+  /// Keyed by normalised muscle-group slug (lowercase, trimmed).  Empty when
+  /// the user is a guest or when the resolver is unavailable.
+  final Map<String, int> muscleSetCounts;
+
+  /// Kept for legacy test compatibility — not consumed by the presentation
+  /// layer after Phase 4.  Will be removed in a later cleanup phase.
   final List<Exercise> exercises;
 
   static const Map<String, double> emptyDailyMacros = <String, double>{
@@ -33,6 +43,7 @@ class HomeDashboardData extends Equatable {
         weeklySets,
         todaysLogs,
         dailyMacros,
+        muscleSetCounts,
         exercises,
       ];
 }
