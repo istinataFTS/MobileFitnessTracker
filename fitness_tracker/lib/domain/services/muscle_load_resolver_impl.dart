@@ -90,18 +90,28 @@ class MuscleLoadResolverImpl implements MuscleLoadResolver {
     }
   }
 
-  /// Batch-loads factors for every exercise in [exerciseIds].
+  /// Loads factors for every exercise in [exerciseIds] in parallel.
   ///
-  /// One repo call per unique exerciseId; exercises that return an error or
-  /// empty list are stored as an empty list so callers skip them safely.
+  /// All per-exercise queries are dispatched concurrently via [Future.wait],
+  /// reducing total latency from O(N × query_time) to O(1 × query_time).
+  /// Exercises that return an error or have no factors are stored as an empty
+  /// list so callers skip them safely without aborting the whole resolution.
   Future<Map<String, List<MuscleFactor>>> _loadFactors(
     Set<String> exerciseIds,
   ) async {
-    final cache = <String, List<MuscleFactor>>{};
-    for (final id in exerciseIds) {
-      final result = await muscleFactorRepository.getFactorsForExercise(id);
-      cache[id] = result.fold((_) => const [], (factors) => factors);
-    }
-    return cache;
+    final entries = await Future.wait(
+      exerciseIds.map((id) async {
+        final result =
+            await muscleFactorRepository.getFactorsForExercise(id);
+        return MapEntry(
+          id,
+          result.fold(
+            (_) => const <MuscleFactor>[],
+            (factors) => factors,
+          ),
+        );
+      }),
+    );
+    return Map.fromEntries(entries);
   }
 }
