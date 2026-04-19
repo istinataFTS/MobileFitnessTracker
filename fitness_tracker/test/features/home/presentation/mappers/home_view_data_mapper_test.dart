@@ -1,5 +1,4 @@
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
@@ -17,7 +16,7 @@ void main() {
         weeklySets: const [],
         todaysLogs: const [],
         dailyMacros: HomeDashboardData.emptyDailyMacros,
-        exercises: <Exercise>[],
+
       ),
       muscleVisualState: MuscleVisualLoaded(
         muscleData: <String, MuscleVisualData>{
