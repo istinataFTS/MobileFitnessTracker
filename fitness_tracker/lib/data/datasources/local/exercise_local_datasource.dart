@@ -78,16 +78,15 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   Future<ExerciseModel?> getExerciseByName(String name) async {
     try {
       final userId = await _getCurrentUserId();
+      final filter = _visibilityFilter(
+        userId,
+        extraPrefix: 'LOWER(${DatabaseTables.exerciseName}) = LOWER(?)',
+      );
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.exercises,
-        where:
-            'LOWER(${DatabaseTables.exerciseName}) = LOWER(?) AND '
-            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
-            '(${DatabaseTables.ownerUserId} IS NULL OR '
-            '${DatabaseTables.ownerUserId} = ?)',
-        whereArgs: [name, SyncStatus.pendingDelete.name, userId],
+        where: filter.where,
+        whereArgs: <Object?>[name, ...filter.whereArgs],
         limit: 1,
       );
 
@@ -105,16 +104,16 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup) async {
     try {
       final userId = await _getCurrentUserId();
+      final filter = _visibilityFilter(
+        userId,
+        extraPrefix:
+            '${DatabaseTables.exerciseMuscleGroups} LIKE ?',
+      );
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.exercises,
-        where:
-            '${DatabaseTables.exerciseMuscleGroups} LIKE ? AND '
-            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
-            '(${DatabaseTables.ownerUserId} IS NULL OR '
-            '${DatabaseTables.ownerUserId} = ?)',
-        whereArgs: ['%"$muscleGroup"%', SyncStatus.pendingDelete.name, userId],
+        where: filter.where,
+        whereArgs: <Object?>['%"$muscleGroup"%', ...filter.whereArgs],
         orderBy: '${DatabaseTables.exerciseName} ASC',
       );
       return maps.map(ExerciseModel.fromMap).toList();
@@ -390,24 +389,53 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     return result.fold((_) => null, (session) => session.user?.id);
   }
 
-  /// Exercises visible to the current user:
-  /// - Seeded/system exercises (owner_user_id IS NULL) are visible to everyone.
-  /// - User-created exercises (owner_user_id = currentUserId) are private.
-  /// - Soft-deleted exercises (sync_status = pendingDelete) are excluded.
+  /// Builds the WHERE clause and bound args for user-visibility filtering.
   ///
-  /// When [userId] is null (guest), the `= ?` branch evaluates to false, so
-  /// only seeded exercises are returned — correct guest behaviour.
-  Future<List<ExerciseModel>> _getVisibleExercises() async {
-    final userId = await _getCurrentUserId();
-    final db = await databaseHelper.database;
-    final maps = await db.query(
-      DatabaseTables.exercises,
-      where:
+  /// Rules:
+  /// - Soft-deleted exercises (sync_status = pendingDelete) are always excluded.
+  /// - NULL-owner (system/seeded) exercises are visible to everyone.
+  /// - User-owned exercises are visible only to that user.
+  ///
+  /// When [userId] is null (guest / signed-out), the second branch is omitted
+  /// entirely so we never pass a null value to sqflite's [whereArgs], which
+  /// would otherwise throw `Invalid argument null`.
+  ({String where, List<Object?> whereArgs}) _visibilityFilter(
+    String? userId, {
+    String? extraPrefix,
+  }) {
+    final prefix =
+        extraPrefix != null ? '$extraPrefix AND ' : '';
+    if (userId == null) {
+      return (
+        where: '${prefix}'
+            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+            '${DatabaseTables.ownerUserId} IS NULL',
+        whereArgs: <Object?>[SyncStatus.pendingDelete.name],
+      );
+    }
+    return (
+      where: '${prefix}'
           '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
           '${DatabaseTables.exerciseSyncStatus} != ?) AND '
           '(${DatabaseTables.ownerUserId} IS NULL OR '
           '${DatabaseTables.ownerUserId} = ?)',
       whereArgs: <Object?>[SyncStatus.pendingDelete.name, userId],
+    );
+  }
+
+  /// Exercises visible to the current user:
+  /// - Seeded/system exercises (owner_user_id IS NULL) are visible to everyone.
+  /// - User-created exercises (owner_user_id = currentUserId) are private.
+  /// - Soft-deleted exercises (sync_status = pendingDelete) are excluded.
+  Future<List<ExerciseModel>> _getVisibleExercises() async {
+    final userId = await _getCurrentUserId();
+    final filter = _visibilityFilter(userId);
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseTables.exercises,
+      where: filter.where,
+      whereArgs: filter.whereArgs,
       orderBy: '${DatabaseTables.exerciseName} ASC',
     );
     return maps.map(ExerciseModel.fromMap).toList();
@@ -415,16 +443,15 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
 
   Future<ExerciseModel?> _getVisibleExerciseById(String id) async {
     final userId = await _getCurrentUserId();
+    final filter = _visibilityFilter(
+      userId,
+      extraPrefix: '${DatabaseTables.exerciseId} = ?',
+    );
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.exercises,
-      where:
-          '${DatabaseTables.exerciseId} = ? AND '
-          '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-          '${DatabaseTables.exerciseSyncStatus} != ?) AND '
-          '(${DatabaseTables.ownerUserId} IS NULL OR '
-          '${DatabaseTables.ownerUserId} = ?)',
-      whereArgs: <Object?>[id, SyncStatus.pendingDelete.name, userId],
+      where: filter.where,
+      whereArgs: <Object?>[id, ...filter.whereArgs],
       limit: 1,
     );
 

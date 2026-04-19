@@ -1,5 +1,4 @@
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
@@ -10,7 +9,6 @@ import 'package:fitness_tracker/features/home/application/models/home_dashboard_
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
 import 'package:fitness_tracker/features/home/presentation/models/home_view_data.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -19,14 +17,14 @@ void main() {
   HomeDashboardData buildHomeData({
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
-    required List<Exercise> exercises,
+    Map<String, int> muscleSetCounts = const <String, int>{},
   }) {
     return HomeDashboardData(
       targets: targets,
       weeklySets: weeklySets,
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
-      exercises: exercises,
+      muscleSetCounts: muscleSetCounts,
     );
   }
 
@@ -56,18 +54,6 @@ void main() {
       reps: 10,
       weight: 80,
       date: createdAt,
-      createdAt: createdAt,
-    );
-  }
-
-  Exercise buildExercise({
-    required String id,
-    required List<String> muscleGroups,
-  }) {
-    return Exercise(
-      id: id,
-      name: 'Exercise $id',
-      muscleGroups: muscleGroups,
       createdAt: createdAt,
     );
   }
@@ -106,12 +92,7 @@ void main() {
             exerciseId: 'exercise-1',
           ),
         ),
-        exercises: <Exercise>[
-          buildExercise(
-            id: 'exercise-1',
-            muscleGroups: const <String>['chest'],
-          ),
-        ],
+        muscleSetCounts: const <String, int>{'chest': 9},
       );
 
       final MuscleVisualLoaded visualState = buildMuscleVisualState(
@@ -174,12 +155,7 @@ void main() {
             exerciseId: 'exercise-1',
           ),
         ),
-        exercises: <Exercise>[
-          buildExercise(
-            id: 'exercise-1',
-            muscleGroups: const <String>['chest'],
-          ),
-        ],
+        muscleSetCounts: const <String, int>{'chest': 9},
       );
 
       final MuscleVisualLoaded visualState = buildMuscleVisualState(
@@ -226,12 +202,7 @@ void main() {
             exerciseId: 'exercise-1',
           ),
         ),
-        exercises: <Exercise>[
-          buildExercise(
-            id: 'exercise-1',
-            muscleGroups: const <String>['chest'],
-          ),
-        ],
+        muscleSetCounts: const <String, int>{'chest': 12},
       );
 
       final MuscleVisualLoaded visualState = buildMuscleVisualState(
@@ -291,21 +262,8 @@ void main() {
             targetValue: 3,
           ),
         ],
-        weeklySets: <WorkoutSet>[
-          buildWorkoutSet(id: 'set-1', exerciseId: 'exercise-1'),
-          buildWorkoutSet(id: 'set-2', exerciseId: 'exercise-1'),
-          buildWorkoutSet(id: 'set-3', exerciseId: 'exercise-2'),
-        ],
-        exercises: <Exercise>[
-          buildExercise(
-            id: 'exercise-1',
-            muscleGroups: const <String>['chest'],
-          ),
-          buildExercise(
-            id: 'exercise-2',
-            muscleGroups: const <String>['quads'],
-          ),
-        ],
+        weeklySets: const <WorkoutSet>[],
+        muscleSetCounts: const <String, int>{'chest': 2, 'quads': 1},
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(

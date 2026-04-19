@@ -1,11 +1,14 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/domain/usecases/exercises/get_all_exercises.dart';
+import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
+import 'package:fitness_tracker/domain/services/muscle_load_resolver.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_daily_macros.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import 'package:fitness_tracker/domain/usecases/targets/get_all_targets.dart';
@@ -23,14 +26,17 @@ class MockGetLogsForDate extends Mock implements GetLogsForDate {}
 
 class MockGetDailyMacros extends Mock implements GetDailyMacros {}
 
-class MockGetAllExercises extends Mock implements GetAllExercises {}
+class MockMuscleLoadResolver extends Mock implements MuscleLoadResolver {}
+
+class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 void main() {
   late MockGetAllTargets mockGetAllTargets;
   late MockGetWeeklySets mockGetWeeklySets;
   late MockGetLogsForDate mockGetLogsForDate;
   late MockGetDailyMacros mockGetDailyMacros;
-  late MockGetAllExercises mockGetAllExercises;
+  late MockMuscleLoadResolver mockMuscleLoadResolver;
+  late MockAppSessionRepository mockAppSessionRepository;
 
   late LoadHomeDashboardData usecase;
 
@@ -62,15 +68,7 @@ void main() {
     ),
   ];
 
-  final List<Exercise> exercises = <Exercise>[
-    Exercise(
-      id: 'bench-press',
-      name: 'Bench Press',
-      muscleGroups: <String>['chest'],
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-  ];
+  const Map<String, int> muscleSetCounts = <String, int>{'chest': 1};
 
   final NutritionLog olderLog = NutritionLog(
     id: 'log-older',
@@ -103,26 +101,42 @@ void main() {
     'calories': 1600,
   };
 
+  const AppSession authenticatedSession = AppSession(
+    authMode: AuthMode.authenticated,
+    user: AppUser(id: 'user-1', email: 'test@example.com'),
+  );
+
   setUp(() {
     mockGetAllTargets = MockGetAllTargets();
     mockGetWeeklySets = MockGetWeeklySets();
     mockGetLogsForDate = MockGetLogsForDate();
     mockGetDailyMacros = MockGetDailyMacros();
-    mockGetAllExercises = MockGetAllExercises();
+    mockMuscleLoadResolver = MockMuscleLoadResolver();
+    mockAppSessionRepository = MockAppSessionRepository();
 
     usecase = LoadHomeDashboardData(
       getAllTargets: mockGetAllTargets,
       getWeeklySets: mockGetWeeklySets,
       getLogsForDate: mockGetLogsForDate,
       getDailyMacros: mockGetDailyMacros,
-      getAllExercises: mockGetAllExercises,
+      muscleLoadResolver: mockMuscleLoadResolver,
+      appSessionRepository: mockAppSessionRepository,
     );
   });
 
   void stubSuccessfulCoreLoads() {
     when(() => mockGetAllTargets()).thenAnswer((_) async => Right(targets));
     when(() => mockGetWeeklySets()).thenAnswer((_) async => Right(weeklySets));
-    when(() => mockGetAllExercises()).thenAnswer((_) async => Right(exercises));
+    when(() => mockAppSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(authenticatedSession),
+    );
+    when(
+      () => mockMuscleLoadResolver.getSetCountsByMuscle(
+        userId: any(named: 'userId'),
+        start: any(named: 'start'),
+        end: any(named: 'end'),
+      ),
+    ).thenAnswer((_) async => const Right(muscleSetCounts));
   }
 
   test('returns aggregated dashboard data when all core loads succeed', () async {
@@ -145,7 +159,7 @@ void main() {
           weeklySets: weeklySets,
           todaysLogs: <NutritionLog>[newerLog, olderLog],
           dailyMacros: dailyMacros,
-          exercises: exercises,
+          muscleSetCounts: muscleSetCounts,
         ),
       ),
     );
@@ -175,18 +189,39 @@ void main() {
     );
   });
 
-  test('returns failure when exercises loading fails', () async {
+  test('falls back to empty muscle counts for guest sessions', () async {
     when(() => mockGetAllTargets()).thenAnswer((_) async => Right(targets));
     when(() => mockGetWeeklySets()).thenAnswer((_) async => Right(weeklySets));
-    when(() => mockGetAllExercises()).thenAnswer(
-      (_) async => const Left(CacheFailure('exercises failed')),
+    when(() => mockAppSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+    when(() => mockGetLogsForDate(any())).thenAnswer(
+      (_) async => Right(<NutritionLog>[newerLog]),
+    );
+    when(() => mockGetDailyMacros(any())).thenAnswer(
+      (_) async => Right(dailyMacros),
     );
 
     final result = await usecase();
 
     expect(
       result,
-      const Left<Failure, HomeDashboardData>(CacheFailure('exercises failed')),
+      Right<Failure, HomeDashboardData>(
+        HomeDashboardData(
+          targets: targets,
+          weeklySets: weeklySets,
+          todaysLogs: <NutritionLog>[newerLog],
+          dailyMacros: dailyMacros,
+          muscleSetCounts: const <String, int>{},
+        ),
+      ),
+    );
+    verifyNever(
+      () => mockMuscleLoadResolver.getSetCountsByMuscle(
+        userId: any(named: 'userId'),
+        start: any(named: 'start'),
+        end: any(named: 'end'),
+      ),
     );
   });
 
@@ -210,7 +245,7 @@ void main() {
           weeklySets: weeklySets,
           todaysLogs: const <NutritionLog>[],
           dailyMacros: dailyMacros,
-          exercises: exercises,
+          muscleSetCounts: muscleSetCounts,
         ),
       ),
     );
@@ -236,7 +271,7 @@ void main() {
           weeklySets: weeklySets,
           todaysLogs: <NutritionLog>[newerLog],
           dailyMacros: HomeDashboardData.emptyDailyMacros,
-          exercises: exercises,
+          muscleSetCounts: muscleSetCounts,
         ),
       ),
     );
