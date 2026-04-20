@@ -69,6 +69,7 @@ void main() {
   ];
 
   const Map<String, int> muscleSetCounts = <String, int>{'chest': 1};
+  const int weeklySetCount = 1;
 
   final NutritionLog olderLog = NutritionLog(
     id: 'log-older',
@@ -137,6 +138,13 @@ void main() {
         end: any(named: 'end'),
       ),
     ).thenAnswer((_) async => const Right(muscleSetCounts));
+    when(
+      () => mockMuscleLoadResolver.getTotalSetCount(
+        userId: any(named: 'userId'),
+        start: any(named: 'start'),
+        end: any(named: 'end'),
+      ),
+    ).thenAnswer((_) async => const Right(weeklySetCount));
   }
 
   test('returns aggregated dashboard data when all core loads succeed', () async {
@@ -160,6 +168,7 @@ void main() {
           todaysLogs: <NutritionLog>[newerLog, olderLog],
           dailyMacros: dailyMacros,
           muscleSetCounts: muscleSetCounts,
+          weeklySetCount: weeklySetCount,
         ),
       ),
     );
@@ -246,6 +255,7 @@ void main() {
           todaysLogs: const <NutritionLog>[],
           dailyMacros: dailyMacros,
           muscleSetCounts: muscleSetCounts,
+          weeklySetCount: weeklySetCount,
         ),
       ),
     );
@@ -272,6 +282,7 @@ void main() {
           todaysLogs: <NutritionLog>[newerLog],
           dailyMacros: HomeDashboardData.emptyDailyMacros,
           muscleSetCounts: muscleSetCounts,
+          weeklySetCount: weeklySetCount,
         ),
       ),
     );

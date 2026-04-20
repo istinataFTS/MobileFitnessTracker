@@ -90,6 +90,40 @@ class MuscleLoadResolverImpl implements MuscleLoadResolver {
     }
   }
 
+  @override
+  Future<Either<Failure, int>> getTotalSetCount({
+    required String userId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    try {
+      final setsResult = await workoutSetRepository.getSetsByDateRange(start, end);
+      return await setsResult.fold(
+        (f) async => Left(f),
+        (allSets) async {
+          final userSets = allSets.where((s) => s.ownerUserId == userId).toList();
+          if (userSets.isEmpty) return const Right(0);
+
+          final factorCache = await _loadFactors(userSets.map((s) => s.exerciseId).toSet());
+
+          // A set counts once if it has at least one positive factor — we
+          // count sets, not muscle-mappings, so multi-muscle exercises do
+          // not inflate the total.
+          var count = 0;
+          for (final set in userSets) {
+            final factors = factorCache[set.exerciseId];
+            if (factors == null || factors.isEmpty) continue;
+            if (factors.any((f) => f.factor > 0)) count++;
+          }
+          return Right(count);
+        },
+      );
+    } catch (e) {
+      AppLogger.error('MuscleLoadResolver.getTotalSetCount failed: $e', category: 'resolver');
+      return Left(UnexpectedFailure('getTotalSetCount failed: $e'));
+    }
+  }
+
   /// Loads factors for every exercise in [exerciseIds] in parallel.
   ///
   /// All per-exercise queries are dispatched concurrently via [Future.wait],
