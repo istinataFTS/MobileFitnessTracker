@@ -67,6 +67,7 @@ void main() {
       ),
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
+      weeklySetCount: 9,
     ),
   );
 

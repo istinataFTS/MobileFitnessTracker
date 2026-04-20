@@ -30,4 +30,19 @@ abstract class MuscleLoadResolver {
     required DateTime start,
     required DateTime end,
   });
+
+  /// Returns the count of distinct sets in [start]–[end] that worked at
+  /// least one tracked muscle (i.e. the exercise resolved to ≥1 positive
+  /// factor). Intended for the "Sets" stat card above the body map, so
+  /// the card can never disagree with the map about whether training
+  /// actually registered.
+  ///
+  /// Sets logged for an exercise with no muscle factors are excluded —
+  /// they contribute nothing to the map and therefore must not contribute
+  /// to the card either.
+  Future<Either<Failure, int>> getTotalSetCount({
+    required String userId,
+    required DateTime start,
+    required DateTime end,
+  });
 }

@@ -295,6 +295,95 @@ void main() {
     });
   });
 
+  group('getTotalSetCount', () {
+    test('counts each set once regardless of how many muscles it hits', () async {
+      // benchSet has 2 positive factors (chest + triceps) but is still 1 set.
+      when(() => workoutSetRepo.getSetsByDateRange(start, end))
+          .thenAnswer((_) async => Right(<WorkoutSet>[benchSet, squatSet]));
+      when(() => muscleFactorRepo.getFactorsForExercise('bench-press'))
+          .thenAnswer((_) async => Right(benchFactors));
+      when(() => muscleFactorRepo.getFactorsForExercise('squat'))
+          .thenAnswer((_) async => Right(squatFactors));
+
+      final result = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      expect(result.getOrElse(() => -1), 2);
+    });
+
+    test('excludes sets belonging to other users', () async {
+      when(() => workoutSetRepo.getSetsByDateRange(start, end)).thenAnswer(
+        (_) async => Right(<WorkoutSet>[benchSet, otherUserSet]),
+      );
+      when(() => muscleFactorRepo.getFactorsForExercise('bench-press'))
+          .thenAnswer((_) async => Right(benchFactors));
+
+      final result = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      expect(result.getOrElse(() => -1), 1);
+    });
+
+    test('excludes sets whose exercise has no positive factor', () async {
+      // Regression guard for the Sets-card-disagrees-with-map bug: when an
+      // exercise's factors are missing or all zero, the map stays empty,
+      // so the Sets card must also read 0.
+      final List<MuscleFactor> zeroFactors = <MuscleFactor>[
+        const MuscleFactor(
+          id: 'mf-0',
+          exerciseId: 'bench-press',
+          muscleGroup: 'chest',
+          factor: 0.0,
+        ),
+      ];
+      when(() => workoutSetRepo.getSetsByDateRange(start, end))
+          .thenAnswer((_) async => Right(<WorkoutSet>[benchSet]));
+      when(() => muscleFactorRepo.getFactorsForExercise('bench-press'))
+          .thenAnswer((_) async => Right(zeroFactors));
+
+      final result = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      expect(result.getOrElse(() => -1), 0);
+    });
+
+    test('returns 0 when no sets in range', () async {
+      when(() => workoutSetRepo.getSetsByDateRange(start, end))
+          .thenAnswer((_) async => const Right(<WorkoutSet>[]));
+
+      final result = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      expect(result, const Right<Failure, int>(0));
+    });
+
+    test('propagates repository failure', () async {
+      when(() => workoutSetRepo.getSetsByDateRange(start, end)).thenAnswer(
+        (_) async => const Left(CacheFailure('db error')),
+      );
+
+      final result = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      expect(result.isLeft(), isTrue);
+    });
+  });
+
   group('parity', () {
     test('every muscle with count > 0 also has stimulus > 0', () async {
       when(() => workoutSetRepo.getSetsByDateRange(start, end))
@@ -323,6 +412,41 @@ void main() {
           stimulus[muscle],
           greaterThan(0),
           reason: '$muscle has count ${counts[muscle]} but no stimulus',
+        );
+      }
+    });
+
+    test('total set count stays consistent with per-muscle counts', () async {
+      // If any muscle has count>0, the total set count must also be >0 —
+      // otherwise the Sets stat card could read 0 while the map highlights
+      // muscles.
+      when(() => workoutSetRepo.getSetsByDateRange(start, end))
+          .thenAnswer((_) async => Right(<WorkoutSet>[benchSet, squatSet]));
+      when(() => muscleFactorRepo.getFactorsForExercise('bench-press'))
+          .thenAnswer((_) async => Right(benchFactors));
+      when(() => muscleFactorRepo.getFactorsForExercise('squat'))
+          .thenAnswer((_) async => Right(squatFactors));
+
+      final countsResult = await resolver.getSetCountsByMuscle(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+      final totalResult = await resolver.getTotalSetCount(
+        userId: userId,
+        start: start,
+        end: end,
+      );
+
+      final counts = countsResult.getOrElse(() => <String, int>{});
+      final total = totalResult.getOrElse(() => 0);
+
+      if (counts.values.any((c) => c > 0)) {
+        expect(
+          total,
+          greaterThan(0),
+          reason:
+              'Sets stat card would read 0 while body map highlights muscles',
         );
       }
     });

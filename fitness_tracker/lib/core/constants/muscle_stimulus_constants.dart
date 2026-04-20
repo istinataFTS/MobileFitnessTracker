@@ -136,8 +136,15 @@ class MuscleStimulus {
   /// Weekly rolling load decay factor applied each day
   static const double weeklyDecayFactor = 0.6;
 
-  /// Below this normalized load (rollingWeeklyLoad / weeklyThreshold) the
-  /// muscle is considered fully recovered and returns to the untrained (gray) state.
+  /// Recovery cutoff expressed on the **normalized** 0..1 scale
+  /// (`rawLoad / threshold`). When the normalized load drops below this
+  /// value the muscle is considered fully recovered and renders as
+  /// untrained (gray) again.
+  ///
+  /// IMPORTANT: never compare this constant against a raw load value —
+  /// the raw `rollingWeeklyLoad` is in stimulus units (~0–30+) while
+  /// this threshold is a ratio. All comparisons must go through
+  /// [NormalizedMuscleLoad.isRecovered] so the units cannot drift.
   static const double recoveredThreshold = 0.5;
 
   // ==================== INTENSITY LEVELS ====================

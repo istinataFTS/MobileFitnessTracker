@@ -10,7 +10,6 @@ import '../../../../domain/entities/muscle_visual_data.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/target.dart';
 import '../../../../domain/entities/time_period.dart';
-import '../../../../domain/entities/workout_set.dart';
 import '../../application/models/home_dashboard_data.dart';
 import '../../application/muscle_visual_bloc.dart';
 import '../models/home_view_data.dart';
@@ -128,7 +127,7 @@ class HomeViewDataMapper {
         todaysLogs: homeData.todaysLogs,
       ),
       progress: _mapProgress(
-        weeklySets: homeData.weeklySets,
+        weeklySetCount: homeData.weeklySetCount,
         trainingTargets: trainingTargets,
         muscleVisualState: muscleVisualState,
         currentPeriod: currentPeriod,
@@ -257,13 +256,16 @@ class HomeViewDataMapper {
   }
 
   static HomeProgressCardViewData _mapProgress({
-    required List<WorkoutSet> weeklySets,
+    required int weeklySetCount,
     required List<Target> trainingTargets,
     required MuscleVisualState muscleVisualState,
     required TimePeriod currentPeriod,
     required MuscleMapMode currentMode,
   }) {
-    final int totalSets = weeklySets.length;
+    // Resolver-sourced count so the stat card can never disagree with the
+    // body map — both now count only sets that resolved to ≥1 positive
+    // muscle factor.
+    final int totalSets = weeklySetCount;
     final int totalTarget = trainingTargets.fold<int>(
       0,
       (int sum, Target target) => sum + target.weeklyGoal,

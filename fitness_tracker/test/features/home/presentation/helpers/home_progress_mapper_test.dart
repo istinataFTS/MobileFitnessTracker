@@ -18,6 +18,7 @@ void main() {
     required List<Target> targets,
     required List<WorkoutSet> weeklySets,
     Map<String, int> muscleSetCounts = const <String, int>{},
+    int? weeklySetCount,
   }) {
     return HomeDashboardData(
       targets: targets,
@@ -25,6 +26,7 @@ void main() {
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       muscleSetCounts: muscleSetCounts,
+      weeklySetCount: weeklySetCount ?? weeklySets.length,
     );
   }
 

@@ -1,13 +1,12 @@
-import 'dart:math' show pow;
-
 import 'package:dartz/dartz.dart';
 
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../entities/muscle_visual_data.dart';
 import '../../entities/time_period.dart';
-import '../../repositories/muscle_stimulus_repository.dart';
 import '../../muscle_visual/muscle_visual_contract.dart';
+import '../../muscle_visual/normalized_muscle_load.dart';
+import '../../repositories/muscle_stimulus_repository.dart';
 
 class GetMuscleVisualData {
   final MuscleStimulusRepository muscleStimulusRepository;
@@ -293,11 +292,18 @@ class GetMuscleVisualData {
             )
             .inDays;
 
-        final decayedLoad = mostRecent.rollingWeeklyLoad *
-            pow(MuscleStimulus.weeklyDecayFactor, daysSince).toDouble();
+        // Route through [NormalizedMuscleLoad] so that both the decay and
+        // the recovery comparison happen in consistent units.  The raw
+        // rollingWeeklyLoad is ~1–30; [MuscleStimulus.recoveredThreshold]
+        // is expressed against the *normalized* 0..1 scale, so comparing
+        // raw to threshold directly would leave muscles "fatigued" for
+        // days after they have actually recovered.
+        final load = NormalizedMuscleLoad(
+          raw: mostRecent.rollingWeeklyLoad,
+          threshold: MuscleStimulus.weeklyThreshold,
+        ).decayed(daysSince);
 
-        // If the muscle has recovered below the threshold, show it as untrained.
-        if (decayedLoad < MuscleStimulus.recoveredThreshold) {
+        if (load.isRecovered) {
           return MuscleVisualData.untrained(
             muscleGroup,
             aggregationMode: aggregationMode,
@@ -306,8 +312,8 @@ class GetMuscleVisualData {
 
         return _buildVisualData(
           muscleGroup: muscleGroup,
-          stimulus: decayedLoad,
-          threshold: MuscleStimulus.weeklyThreshold,
+          stimulus: load.raw,
+          threshold: load.threshold,
           aggregationMode: aggregationMode,
         );
       },
