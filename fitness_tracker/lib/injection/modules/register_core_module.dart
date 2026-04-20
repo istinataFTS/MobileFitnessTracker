@@ -4,6 +4,8 @@ import '../../config/env_config.dart';
 import '../../core/config/app_sync_policy.dart';
 import '../../core/network/default_network_status_service.dart';
 import '../../core/network/network_status_service.dart';
+import '../../core/time/clock.dart';
+import '../../core/time/system_clock.dart';
 import '../../core/sync/remote_sync_availability.dart';
 import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/local/app_metadata_local_datasource.dart';
@@ -19,6 +21,8 @@ import '../../domain/repositories/app_settings_repository.dart';
 import '../../domain/services/authenticated_data_source_preference_resolver.dart';
 
 void registerCoreModule(GetIt sl) {
+  sl.registerLazySingleton<Clock>(() => const SystemClock());
+
   sl.registerLazySingleton<DatabaseHelper>(DatabaseHelper.new);
 
   sl.registerLazySingleton<AppMetadataLocalDataSource>(

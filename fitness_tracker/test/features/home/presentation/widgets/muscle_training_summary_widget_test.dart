@@ -43,7 +43,6 @@ void main() {
   final HomeLoaded loadedHomeState = HomeLoaded(
     data: HomeDashboardData(
       targets: const <Target>[],
-      weeklySets: const <WorkoutSet>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
 

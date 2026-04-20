@@ -4,7 +4,6 @@ import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
-import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/usecases/load_home_dashboard_data.dart';
@@ -43,30 +42,6 @@ void main() {
     ),
   ];
 
-  final List<WorkoutSet> weeklySets = <WorkoutSet>[
-    WorkoutSet(
-      id: 'set-1',
-      exerciseId: 'bench-press',
-      reps: 8,
-      weight: 80,
-      intensity: 8,
-      date: now,
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-    WorkoutSet(
-      id: 'set-2',
-      exerciseId: 'bench-press',
-      reps: 10,
-      weight: 75,
-      intensity: 7,
-      date: now.subtract(const Duration(days: 1)),
-      createdAt: now.subtract(const Duration(days: 1)),
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-  ];
-
-
   final NutritionLog olderLog = NutritionLog(
     id: 'log-older',
     mealName: 'Oats',
@@ -104,7 +79,6 @@ void main() {
   }) {
     return HomeDashboardData(
       targets: targets,
-      weeklySets: weeklySets,
       todaysLogs: todaysLogs ?? <NutritionLog>[newerLog, olderLog],
       dailyMacros: macros ?? dailyMacros,
     );

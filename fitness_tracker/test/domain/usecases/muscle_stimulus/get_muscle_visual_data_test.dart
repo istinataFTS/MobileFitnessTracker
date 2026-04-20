@@ -111,6 +111,89 @@ void main() {
     },
   );
 
+  test(
+    'week view classifies a week-old moderate load as recovered — '
+    'regression guard for the Lats-are-always-fatigued bug at the use-case level',
+    () async {
+      // This is the cross-layer counterpart to the NormalizedMuscleLoad unit
+      // test: it verifies the fix survives inside GetMuscleVisualData's
+      // _buildWeekDataWithoutToday codepath, where the bug originally lived.
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final yesterday = todayStart.subtract(const Duration(days: 1));
+      final lookbackStart = todayStart.subtract(const Duration(days: 30));
+      final staleRecordDate = todayStart.subtract(const Duration(days: 7));
+
+      // Today: no stimulus records for any muscle — forces every muscle
+      // through _buildWeekDataWithoutToday.
+      for (final String muscleGroup
+          in stimulus_constants.MuscleStimulus.allMuscleGroups) {
+        when(
+          () => repository.getStimulusByMuscleAndDate(
+            userId: testUserId,
+            muscleGroup: muscleGroup,
+            date: todayStart,
+          ),
+        ).thenAnswer((_) async => const Right(null));
+
+        // Past 30 days: lats has a 7-day-old moderate load (raw=20,
+        // threshold=25).  After `0.6^7 ≈ 0.028` decay the normalized load
+        // sits at ~0.022, well below the 0.5 recovery cutoff, so the map
+        // must render lats as untrained.  A raw-vs-normalized regression
+        // would compare the ~0.56 raw decayed value against 0.5 and
+        // incorrectly leave lats fatigued.
+        if (muscleGroup == stimulus_constants.MuscleStimulus.lats) {
+          when(
+            () => repository.getStimulusByDateRange(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              startDate: lookbackStart,
+              endDate: yesterday,
+            ),
+          ).thenAnswer(
+            (_) async => Right(<stimulus_entity.MuscleStimulus>[
+              stimulus_entity.MuscleStimulus(
+                id: 'lats-stale',
+                ownerUserId: testUserId,
+                muscleGroup: muscleGroup,
+                date: staleRecordDate,
+                dailyStimulus: 0,
+                rollingWeeklyLoad: 20.0,
+                createdAt: staleRecordDate,
+                updatedAt: staleRecordDate,
+              ),
+            ]),
+          );
+        } else {
+          when(
+            () => repository.getStimulusByDateRange(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              startDate: lookbackStart,
+              endDate: yesterday,
+            ),
+          ).thenAnswer(
+            (_) async => const Right(<stimulus_entity.MuscleStimulus>[]),
+          );
+        }
+      }
+
+      final result = await usecase(TimePeriod.week, testUserId);
+      final visualData = result.getOrElse(
+        () => throw StateError('expected data'),
+      );
+      final lats = visualData[stimulus_constants.MuscleStimulus.lats]!;
+
+      expect(
+        lats.hasTrained,
+        isFalse,
+        reason:
+            'a 7-day-old moderate load must decay below the recovery cutoff; '
+            'a unit-mismatch regression would leave lats permanently fatigued',
+      );
+    },
+  );
+
   test('userId is forwarded to every repository query', () async {
     const otherUserId = 'user-other';
     final today = DateTime.now();

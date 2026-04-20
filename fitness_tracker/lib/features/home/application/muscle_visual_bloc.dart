@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/session/current_user_id_resolver.dart';
+import '../../../core/time/clock.dart';
+import '../../../core/time/system_clock.dart';
 import '../../../domain/entities/muscle_visual_data.dart';
 import '../../../domain/entities/time_period.dart';
 import '../../../domain/repositories/app_session_repository.dart';
@@ -126,8 +128,10 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   MuscleVisualBloc({
     required this.getMuscleVisualData,
     required this.appSessionRepository,
+    Clock clock = const SystemClock(),
   })  : _userIdResolver =
             CurrentUserIdResolver(appSessionRepository: appSessionRepository),
+        _clock = clock,
         super(const MuscleVisualInitial()) {
     on<LoadMuscleVisualsEvent>(_onLoadMuscleVisuals);
     on<ChangePeriodEvent>(_onChangePeriod);
@@ -140,6 +144,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   final AppSessionRepository appSessionRepository;
 
   final CurrentUserIdResolver _userIdResolver;
+  final Clock _clock;
 
   /// Cache key is a Dart 3 record `(TimePeriod, userId)` so that data from one
   /// authenticated user is never served to a different user after a sign-out /
@@ -198,7 +203,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
         ),
       ),
       (visualData) {
-        final DateTime now = DateTime.now();
+        final DateTime now = _clock.now();
         final (TimePeriod, String) key = (event.period, userId);
         _periodCache[key] = visualData;
         _cacheTimestamps[key] = now;
@@ -259,7 +264,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
         ),
       ),
       (visualData) {
-        final DateTime now = DateTime.now();
+        final DateTime now = _clock.now();
         final (TimePeriod, String) key = (event.newPeriod, userId);
         _periodCache[key] = visualData;
         _cacheTimestamps[key] = now;
@@ -321,7 +326,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
         ),
       ),
       (visualData) {
-        final DateTime now = DateTime.now();
+        final DateTime now = _clock.now();
         final (TimePeriod, String) key = (periodToFetch, userId);
         _periodCache[key] = visualData;
         _cacheTimestamps[key] = now;
@@ -365,7 +370,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
         ),
       ),
       (visualData) {
-        final DateTime now = DateTime.now();
+        final DateTime now = _clock.now();
         _periodCache[cacheKey] = visualData;
         _cacheTimestamps[cacheKey] = now;
 
@@ -400,7 +405,7 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
       return false;
     }
 
-    final Duration cacheAge = DateTime.now().difference(_cacheTimestamps[key]!);
+    final Duration cacheAge = _clock.now().difference(_cacheTimestamps[key]!);
 
     return cacheAge <= _cacheValidityDuration;
   }

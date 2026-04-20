@@ -3,13 +3,19 @@ import 'package:flutter/foundation.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/time/clock.dart';
+import '../../../core/time/system_clock.dart';
 import '../../repositories/muscle_stimulus_repository.dart';
 
 /// Use case for applying daily decay to rolling weekly loads.
 class ApplyDailyDecay {
   final MuscleStimulusRepository muscleStimulusRepository;
+  final Clock _clock;
 
-  const ApplyDailyDecay(this.muscleStimulusRepository);
+  const ApplyDailyDecay(
+    this.muscleStimulusRepository, {
+    Clock clock = const SystemClock(),
+  }) : _clock = clock;
 
   Future<Either<Failure, int>> call(String userId) async {
     try {
@@ -98,7 +104,7 @@ class ApplyDailyDecay {
   /// Check if decay should be applied today for [userId].
   Future<Either<Failure, bool>> shouldApplyDecayToday(String userId) async {
     try {
-      final today = DateTime.now();
+      final today = _clock.now();
       final todayStart = DateTime(today.year, today.month, today.day);
 
       final recordsResult = await muscleStimulusRepository.getAllStimulusForDate(

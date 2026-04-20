@@ -228,11 +228,11 @@ void _registerAppComposition(GetIt sl) {
   sl.registerLazySingleton(
     () => LoadHomeDashboardData(
       getAllTargets: sl(),
-      getWeeklySets: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
       muscleLoadResolver: sl(),
       appSessionRepository: sl(),
+      clock: sl(),
     ),
   );
 
