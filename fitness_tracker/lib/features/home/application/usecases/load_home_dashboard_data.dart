@@ -7,26 +7,22 @@ import '../../../../domain/services/muscle_load_resolver.dart';
 import '../../../../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../../../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../../../domain/usecases/targets/get_all_targets.dart';
-import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../models/home_dashboard_data.dart';
 
 class LoadHomeDashboardData {
   const LoadHomeDashboardData({
     required GetAllTargets getAllTargets,
-    required GetWeeklySets getWeeklySets,
     required GetLogsForDate getLogsForDate,
     required GetDailyMacros getDailyMacros,
     required MuscleLoadResolver muscleLoadResolver,
     required AppSessionRepository appSessionRepository,
   })  : _getAllTargets = getAllTargets,
-        _getWeeklySets = getWeeklySets,
         _getLogsForDate = getLogsForDate,
         _getDailyMacros = getDailyMacros,
         _muscleLoadResolver = muscleLoadResolver,
         _appSessionRepository = appSessionRepository;
 
   final GetAllTargets _getAllTargets;
-  final GetWeeklySets _getWeeklySets;
   final GetLogsForDate _getLogsForDate;
   final GetDailyMacros _getDailyMacros;
   final MuscleLoadResolver _muscleLoadResolver;
@@ -38,27 +34,18 @@ class LoadHomeDashboardData {
     return targetsResult.fold(
       (Failure failure) async => Left<Failure, HomeDashboardData>(failure),
       (targets) async {
-        final weeklySetsResult = await _getWeeklySets();
+        final List<NutritionLog> todaysLogs = await _loadTodayLogs();
+        final Map<String, double> dailyMacros = await _loadDailyMacros();
+        final _WeeklyMuscleLoad muscleLoad = await _loadWeeklyMuscleLoad();
 
-        return weeklySetsResult.fold(
-          (Failure failure) async => Left<Failure, HomeDashboardData>(failure),
-          (weeklySets) async {
-            final List<NutritionLog> todaysLogs = await _loadTodayLogs();
-            final Map<String, double> dailyMacros = await _loadDailyMacros();
-            final _WeeklyMuscleLoad muscleLoad =
-                await _loadWeeklyMuscleLoad();
-
-            return Right<Failure, HomeDashboardData>(
-              HomeDashboardData(
-                targets: targets,
-                weeklySets: weeklySets,
-                todaysLogs: todaysLogs,
-                dailyMacros: dailyMacros,
-                muscleSetCounts: muscleLoad.countsByMuscle,
-                weeklySetCount: muscleLoad.totalSetCount,
-              ),
-            );
-          },
+        return Right<Failure, HomeDashboardData>(
+          HomeDashboardData(
+            targets: targets,
+            todaysLogs: todaysLogs,
+            dailyMacros: dailyMacros,
+            muscleSetCounts: muscleLoad.countsByMuscle,
+            weeklySetCount: muscleLoad.totalSetCount,
+          ),
         );
       },
     );

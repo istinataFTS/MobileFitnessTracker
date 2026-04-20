@@ -13,7 +13,6 @@ void main() {
     final viewData = HomeViewDataMapper.map(
       homeData: HomeDashboardData(
         targets: <Target>[],
-        weeklySets: const [],
         todaysLogs: const [],
         dailyMacros: HomeDashboardData.emptyDailyMacros,
 

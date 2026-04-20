@@ -4,7 +4,6 @@ import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
-import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
@@ -16,17 +15,15 @@ void main() {
 
   HomeDashboardData buildHomeData({
     required List<Target> targets,
-    required List<WorkoutSet> weeklySets,
+    int weeklySetCount = 0,
     Map<String, int> muscleSetCounts = const <String, int>{},
-    int? weeklySetCount,
   }) {
     return HomeDashboardData(
       targets: targets,
-      weeklySets: weeklySets,
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       muscleSetCounts: muscleSetCounts,
-      weeklySetCount: weeklySetCount ?? weeklySets.length,
+      weeklySetCount: weeklySetCount,
     );
   }
 
@@ -42,20 +39,6 @@ void main() {
       targetValue: targetValue,
       unit: 'sets',
       period: TargetPeriod.weekly,
-      createdAt: createdAt,
-    );
-  }
-
-  WorkoutSet buildWorkoutSet({
-    required String id,
-    required String exerciseId,
-  }) {
-    return WorkoutSet(
-      id: id,
-      exerciseId: exerciseId,
-      reps: 10,
-      weight: 80,
-      date: createdAt,
       createdAt: createdAt,
     );
   }
@@ -87,13 +70,7 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: List<WorkoutSet>.generate(
-          9,
-          (int index) => buildWorkoutSet(
-            id: 'set-$index',
-            exerciseId: 'exercise-1',
-          ),
-        ),
+        weeklySetCount: 9,
         muscleSetCounts: const <String, int>{'chest': 9},
       );
 
@@ -150,13 +127,7 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: List<WorkoutSet>.generate(
-          9,
-          (int index) => buildWorkoutSet(
-            id: 'set-$index',
-            exerciseId: 'exercise-1',
-          ),
-        ),
+        weeklySetCount: 9,
         muscleSetCounts: const <String, int>{'chest': 9},
       );
 
@@ -197,13 +168,7 @@ void main() {
             targetValue: 12,
           ),
         ],
-        weeklySets: List<WorkoutSet>.generate(
-          12,
-          (int index) => buildWorkoutSet(
-            id: 'set-$index',
-            exerciseId: 'exercise-1',
-          ),
-        ),
+        weeklySetCount: 12,
         muscleSetCounts: const <String, int>{'chest': 12},
       );
 
@@ -264,7 +229,6 @@ void main() {
             targetValue: 3,
           ),
         ],
-        weeklySets: const <WorkoutSet>[],
         muscleSetCounts: const <String, int>{'chest': 2, 'quads': 1},
       );
 

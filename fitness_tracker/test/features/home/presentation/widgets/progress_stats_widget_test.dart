@@ -5,7 +5,6 @@ import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
-import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
@@ -52,19 +51,6 @@ void main() {
           syncMetadata: const EntitySyncMetadata(),
         ),
       ],
-      weeklySets: List<WorkoutSet>.generate(
-        9,
-        (int index) => WorkoutSet(
-          id: 'set-$index',
-          exerciseId: 'bench-press',
-          reps: 8,
-          weight: 80,
-          intensity: 8,
-          date: now,
-          createdAt: now,
-          syncMetadata: const EntitySyncMetadata(),
-        ),
-      ),
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       weeklySetCount: 9,

@@ -68,7 +68,6 @@ void main() {
           targetValue: 250,
         ),
       ],
-      weeklySets: const [],
       todaysLogs: <NutritionLog>[
         buildLog(
           id: '1',
@@ -125,7 +124,6 @@ void main() {
   test('maps empty nutrition state without logs', () {
     final HomeDashboardData homeData = HomeDashboardData(
       targets: const <Target>[],
-      weeklySets: const [],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{
         'protein': 0,

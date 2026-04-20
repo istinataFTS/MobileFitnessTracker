@@ -4,7 +4,6 @@ import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
-import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
@@ -89,17 +88,6 @@ void main() {
               syncMetadata: const EntitySyncMetadata(),
             ),
           ],
-          weeklySets: <WorkoutSet>[
-            WorkoutSet(
-              id: 'set-1',
-              exerciseId: 'squat',
-              reps: 8,
-              weight: 100,
-              date: now,
-              createdAt: now,
-              syncMetadata: const EntitySyncMetadata(),
-            ),
-          ],
           todaysLogs: const <NutritionLog>[],
           dailyMacros: const <String, double>{},
           muscleSetCounts: const <String, int>{'quads': 1},
@@ -141,26 +129,6 @@ void main() {
               targetValue: 2,
               unit: 'sets',
               period: TargetPeriod.weekly,
-              createdAt: now,
-              syncMetadata: const EntitySyncMetadata(),
-            ),
-          ],
-          weeklySets: <WorkoutSet>[
-            WorkoutSet(
-              id: 'set-1',
-              exerciseId: 'bench',
-              reps: 8,
-              weight: 80,
-              date: now,
-              createdAt: now,
-              syncMetadata: const EntitySyncMetadata(),
-            ),
-            WorkoutSet(
-              id: 'set-2',
-              exerciseId: 'bench',
-              reps: 8,
-              weight: 80,
-              date: now,
               createdAt: now,
               syncMetadata: const EntitySyncMetadata(),
             ),
