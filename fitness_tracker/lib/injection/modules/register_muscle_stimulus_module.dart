@@ -19,6 +19,7 @@ void registerMuscleStimulusModule(GetIt sl) {
     () => MuscleVisualBloc(
       getMuscleVisualData: sl(),
       appSessionRepository: sl(),
+      clock: sl(),
     ),
   );
 
@@ -38,6 +39,7 @@ void registerMuscleStimulusModule(GetIt sl) {
       muscleFactorRepository: sl(),
       muscleStimulusRepository: sl(),
       calculateMuscleStimulus: sl(),
+      clock: sl(),
     ),
   );
 
@@ -46,11 +48,12 @@ void registerMuscleStimulusModule(GetIt sl) {
       workoutSetRepository: sl(),
       muscleStimulusRepository: sl(),
       calculateMuscleStimulus: sl(),
+      clock: sl(),
     ),
   );
 
-  sl.registerLazySingleton(() => GetMuscleVisualData(sl()));
-  sl.registerLazySingleton(() => ApplyDailyDecay(sl()));
+  sl.registerLazySingleton(() => GetMuscleVisualData(sl(), clock: sl()));
+  sl.registerLazySingleton(() => ApplyDailyDecay(sl(), clock: sl()));
 
   sl.registerLazySingleton<MuscleFactorRepository>(
     () => MuscleFactorRepositoryImpl(localDataSource: sl()),

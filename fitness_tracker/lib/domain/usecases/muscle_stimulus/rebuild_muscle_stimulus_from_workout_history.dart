@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/enums/data_source_preference.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/time/clock.dart';
+import '../../../core/time/system_clock.dart';
 import '../../entities/muscle_stimulus.dart';
 import '../../entities/stimulus_calculation_rules.dart';
 import '../../entities/workout_set.dart';
@@ -15,11 +17,13 @@ class RebuildMuscleStimulusFromWorkoutHistory {
     required this.workoutSetRepository,
     required this.muscleStimulusRepository,
     required this.calculateMuscleStimulus,
-  });
+    Clock clock = const SystemClock(),
+  }) : _clock = clock;
 
   final WorkoutSetRepository workoutSetRepository;
   final MuscleStimulusRepository muscleStimulusRepository;
   final CalculateMuscleStimulus calculateMuscleStimulus;
+  final Clock _clock;
   final Uuid _uuid = const Uuid();
 
   /// Rebuilds all muscle stimulus records for [userId] from their full workout
@@ -123,7 +127,7 @@ class RebuildMuscleStimulusFromWorkoutHistory {
 
     final earliestDay = _startOfDay(sortedSets.first.date);
     final latestWorkoutDay = _startOfDay(sortedSets.last.date);
-    final today = _startOfDay(DateTime.now());
+    final today = _startOfDay(_clock.now());
     final finalDay = latestWorkoutDay.isAfter(today) ? latestWorkoutDay : today;
 
     final records = <MuscleStimulus>[];

@@ -232,6 +232,7 @@ void _registerAppComposition(GetIt sl) {
       getDailyMacros: sl(),
       muscleLoadResolver: sl(),
       appSessionRepository: sl(),
+      clock: sl(),
     ),
   );
 

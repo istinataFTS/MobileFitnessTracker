@@ -1,6 +1,8 @@
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/time/clock.dart';
+import '../../../../core/time/system_clock.dart';
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/repositories/app_session_repository.dart';
 import '../../../../domain/services/muscle_load_resolver.dart';
@@ -16,17 +18,20 @@ class LoadHomeDashboardData {
     required GetDailyMacros getDailyMacros,
     required MuscleLoadResolver muscleLoadResolver,
     required AppSessionRepository appSessionRepository,
+    Clock clock = const SystemClock(),
   })  : _getAllTargets = getAllTargets,
         _getLogsForDate = getLogsForDate,
         _getDailyMacros = getDailyMacros,
         _muscleLoadResolver = muscleLoadResolver,
-        _appSessionRepository = appSessionRepository;
+        _appSessionRepository = appSessionRepository,
+        _clock = clock;
 
   final GetAllTargets _getAllTargets;
   final GetLogsForDate _getLogsForDate;
   final GetDailyMacros _getDailyMacros;
   final MuscleLoadResolver _muscleLoadResolver;
   final AppSessionRepository _appSessionRepository;
+  final Clock _clock;
 
   Future<Either<Failure, HomeDashboardData>> call() async {
     final targetsResult = await _getAllTargets();
@@ -52,7 +57,7 @@ class LoadHomeDashboardData {
   }
 
   Future<List<NutritionLog>> _loadTodayLogs() async {
-    final DateTime today = DateTime.now();
+    final DateTime today = _clock.now();
     final logsResult = await _getLogsForDate(today);
 
     return logsResult.fold<List<NutritionLog>>(
@@ -69,7 +74,7 @@ class LoadHomeDashboardData {
   }
 
   Future<Map<String, double>> _loadDailyMacros() async {
-    final DateTime today = DateTime.now();
+    final DateTime today = _clock.now();
     final macrosResult = await _getDailyMacros(today);
 
     return macrosResult.fold<Map<String, double>>(
@@ -88,7 +93,7 @@ class LoadHomeDashboardData {
     final String? userId = sessionResult.fold((_) => null, (s) => s.user?.id);
     if (userId == null) return const _WeeklyMuscleLoad.empty();
 
-    final now = DateTime.now();
+    final now = _clock.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
     final startDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
 

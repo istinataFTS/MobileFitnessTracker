@@ -60,12 +60,19 @@ class DatabaseHelper {
     return openDatabase(
       path,
       version: EnvConfig.databaseVersion,
-      onCreate: _onCreate,
+      onCreate: (db, version) => createSchema(db),
       onUpgrade: _onUpgrade,
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
+  /// Creates the full application schema on [db].
+  ///
+  /// Exposed as a static entry point so integration tests can bootstrap an
+  /// in-memory `sqflite_common_ffi` database with the identical schema the
+  /// production app runs against — duplicating ~900 lines of DDL in tests
+  /// would otherwise drift the test fixture from production on every
+  /// schema change.
+  static Future<void> createSchema(Database db) async {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.targets} (
         ${DatabaseTables.targetId} TEXT PRIMARY KEY,
@@ -763,7 +770,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> _createIndexes(Database db) async {
+  static Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
       ON ${DatabaseTables.targets}(

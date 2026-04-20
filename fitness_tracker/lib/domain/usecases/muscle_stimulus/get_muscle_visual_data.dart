@@ -2,6 +2,8 @@ import 'package:dartz/dartz.dart';
 
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/time/clock.dart';
+import '../../../core/time/system_clock.dart';
 import '../../entities/muscle_visual_data.dart';
 import '../../entities/time_period.dart';
 import '../../muscle_visual/muscle_visual_contract.dart';
@@ -10,8 +12,12 @@ import '../../repositories/muscle_stimulus_repository.dart';
 
 class GetMuscleVisualData {
   final MuscleStimulusRepository muscleStimulusRepository;
+  final Clock _clock;
 
-  const GetMuscleVisualData(this.muscleStimulusRepository);
+  const GetMuscleVisualData(
+    this.muscleStimulusRepository, {
+    Clock clock = const SystemClock(),
+  }) : _clock = clock;
 
   Future<Either<Failure, Map<String, MuscleVisualData>>> call(
     TimePeriod period,
@@ -37,7 +43,7 @@ class GetMuscleVisualData {
     String userId,
   ) async {
     try {
-      final today = DateTime.now();
+      final today = _clock.now();
       final todayStart = DateTime(today.year, today.month, today.day);
       final aggregationMode = MuscleVisualContract.aggregationModeForPeriod(
         TimePeriod.today,
@@ -86,7 +92,7 @@ class GetMuscleVisualData {
     String userId,
   ) async {
     try {
-      final today = DateTime.now();
+      final today = _clock.now();
       final todayStart = DateTime(today.year, today.month, today.day);
       final aggregationMode = MuscleVisualContract.aggregationModeForPeriod(
         TimePeriod.week,
@@ -139,7 +145,7 @@ class GetMuscleVisualData {
     String userId,
   ) async {
     try {
-      final today = DateTime.now();
+      final today = _clock.now();
       final todayStart = DateTime(today.year, today.month, today.day);
       final monthAgo = todayStart.subtract(const Duration(days: 30));
       final aggregationMode = MuscleVisualContract.aggregationModeForPeriod(

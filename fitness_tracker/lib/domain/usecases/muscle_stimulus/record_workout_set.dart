@@ -7,6 +7,8 @@ import '../../../config/env_config.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/time/clock.dart';
+import '../../../core/time/system_clock.dart';
 import '../../entities/muscle_stimulus.dart' as muscle_stimulus_entity;
 import '../../repositories/muscle_factor_repository.dart';
 import '../../repositories/muscle_stimulus_repository.dart';
@@ -17,13 +19,15 @@ class RecordWorkoutSet {
   final MuscleFactorRepository muscleFactorRepository;
   final MuscleStimulusRepository muscleStimulusRepository;
   final CalculateMuscleStimulus calculateMuscleStimulus;
+  final Clock _clock;
   final _uuid = const Uuid();
 
-  const RecordWorkoutSet({
+  RecordWorkoutSet({
     required this.muscleFactorRepository,
     required this.muscleStimulusRepository,
     required this.calculateMuscleStimulus,
-  });
+    Clock clock = const SystemClock(),
+  }) : _clock = clock;
 
   Future<Either<Failure, List<String>>> call({
     required String userId,
@@ -33,8 +37,8 @@ class RecordWorkoutSet {
     DateTime? timestamp,
   }) async {
     try {
-      final setTimestamp = timestamp ?? DateTime.now();
-      final now = DateTime.now();
+      final setTimestamp = timestamp ?? _clock.now();
+      final now = _clock.now();
 
       final stimulusResult = await calculateMuscleStimulus.calculateForSet(
         exerciseId: exerciseId,
@@ -191,8 +195,8 @@ class RecordWorkoutSet {
         rollingWeeklyLoad: newWeeklyLoad,
         lastSetTimestamp: setTimestamp,
         lastSetStimulus: setStimulus,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        createdAt: _clock.now(),
+        updatedAt: _clock.now(),
       );
 
       return await muscleStimulusRepository.upsertStimulus(stimulus);
