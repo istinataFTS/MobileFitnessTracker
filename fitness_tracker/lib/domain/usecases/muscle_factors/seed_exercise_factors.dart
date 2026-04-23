@@ -112,7 +112,6 @@ class SeedExerciseFactors {
       (factors) => factors.map((f) => f.exerciseId).toSet(),
     );
 
-    final allFactorsData = ExerciseMuscleFactorsData.getAllFactors();
     final toInsert = <MuscleFactor>[];
     int alreadyCovered = 0;
     int noDataDefined = 0;
@@ -123,7 +122,10 @@ class SeedExerciseFactors {
         continue;
       }
 
-      final factorsData = allFactorsData[exercise.name];
+      // Name-normalized lookup — tolerates "Sit Ups" vs "Sit-ups" etc.
+      // See [ExerciseMuscleFactorsData._normalizeName].
+      final factorsData =
+          ExerciseMuscleFactorsData.getFactorsForExercise(exercise.name);
       if (factorsData == null) {
         noDataDefined++;
         continue;
@@ -175,33 +177,33 @@ class SeedExerciseFactors {
   Future<Either<Failure, int>> _seedAllFactors(List<dynamic> exercises) async {
     _log('Seeding exercise muscle factors...');
 
-    final allFactorsData = ExerciseMuscleFactorsData.getAllFactors();
-    _log('Total exercises with factors: ${allFactorsData.length}');
+    _log(
+      'Total exercises with factors: ${ExerciseMuscleFactorsData.totalExercises}',
+    );
     _log(
       'Total factor assignments: ${ExerciseMuscleFactorsData.totalFactorAssignments}',
     );
 
-    final exerciseNameToId = <String, String>{};
-    for (final exercise in exercises) {
-      exerciseNameToId[exercise.name] = exercise.id;
-    }
-
     final toInsert = <MuscleFactor>[];
     int skippedCount = 0;
 
-    for (final entry in allFactorsData.entries) {
-      final exerciseName = entry.key;
-      final exerciseId = exerciseNameToId[exerciseName];
-
-      if (exerciseId == null) {
-        _logWarning('Exercise "$exerciseName" not found in database, skipping');
+    // Iterate DB exercises and look up factors by normalized name — keeps
+    // the force-reseed path tolerant of the same spelling drift handled in
+    // [_seedMissingFactors] (e.g. "Sit Ups" vs seed key "Sit-ups").
+    for (final exercise in exercises) {
+      final factorsData =
+          ExerciseMuscleFactorsData.getFactorsForExercise(exercise.name);
+      if (factorsData == null) {
+        _logWarning(
+          'No factor data defined for exercise "${exercise.name}", skipping',
+        );
         skippedCount++;
         continue;
       }
 
-      for (final factorData in entry.value) {
+      for (final factorData in factorsData) {
         toInsert.add(
-          factorData.toEntity(id: _uuid.v4(), exerciseId: exerciseId),
+          factorData.toEntity(id: _uuid.v4(), exerciseId: exercise.id),
         );
       }
     }

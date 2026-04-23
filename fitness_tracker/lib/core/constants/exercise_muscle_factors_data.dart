@@ -5,6 +5,41 @@ class ExerciseMuscleFactorsData {
   ExerciseMuscleFactorsData._();
 
   static Map<String, List<MuscleFactorData>>? _cachedFactors;
+  static Map<String, List<MuscleFactorData>>? _cachedFactorsByNormalizedName;
+
+  /// Normalizes an exercise name for lookup: lowercases and strips every
+  /// non-alphanumeric character.
+  ///
+  /// Why: exercise names flow in from three sources — the local seed
+  /// ([getAllFactors] keys), the default-exercises seed
+  /// ([default_exercises_data.dart]), and Supabase pulls (which may have
+  /// been edited by other devices or older app versions). Spelling drift
+  /// between "Sit-ups" / "Sit Ups" / "Push-Ups" / "pushups" would leave an
+  /// exercise with no factors and trigger the "couldn't map it to any
+  /// muscle group" banner even though biomechanically identical seed data
+  /// exists. Normalizing both sides collapses all those variants onto a
+  /// single key.
+  static String _normalizeName(String name) {
+    final buffer = StringBuffer();
+    for (final codeUnit in name.toLowerCase().codeUnits) {
+      final isLower = codeUnit >= 0x61 && codeUnit <= 0x7a;
+      final isDigit = codeUnit >= 0x30 && codeUnit <= 0x39;
+      if (isLower || isDigit) {
+        buffer.writeCharCode(codeUnit);
+      }
+    }
+    return buffer.toString();
+  }
+
+  static Map<String, List<MuscleFactorData>> _factorsByNormalizedName() {
+    final cached = _cachedFactorsByNormalizedName;
+    if (cached != null) return cached;
+    final built = <String, List<MuscleFactorData>>{};
+    for (final entry in getAllFactors().entries) {
+      built[_normalizeName(entry.key)] = entry.value;
+    }
+    return _cachedFactorsByNormalizedName = built;
+  }
 
   static Map<String, List<MuscleFactorData>> getAllFactors() {
     return _cachedFactors ??= {
@@ -376,14 +411,17 @@ class ExerciseMuscleFactorsData {
     return count;
   }
 
-  /// Validate that an exercise has factors defined
+  /// Validate that an exercise has factors defined.
+  ///
+  /// Lookup is name-normalized — see [_normalizeName] — so "Sit-ups",
+  /// "Sit Ups", and "sit ups" all resolve to the same seed entry.
   static bool hasFactors(String exerciseName) {
-    return getAllFactors().containsKey(exerciseName);
+    return _factorsByNormalizedName().containsKey(_normalizeName(exerciseName));
   }
 
-  /// Get factors for a specific exercise
+  /// Get factors for a specific exercise (name-normalized lookup).
   static List<MuscleFactorData>? getFactorsForExercise(String exerciseName) {
-    return getAllFactors()[exerciseName];
+    return _factorsByNormalizedName()[_normalizeName(exerciseName)];
   }
 
   /// Get all exercises that target a specific muscle group
