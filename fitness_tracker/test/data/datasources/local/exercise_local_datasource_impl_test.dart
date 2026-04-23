@@ -70,6 +70,19 @@ void main() {
         ${DatabaseTables.exerciseLastSyncError} TEXT
       )
     ''');
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.exerciseMuscleFactors} (
+        ${DatabaseTables.factorId} TEXT PRIMARY KEY,
+        ${DatabaseTables.factorExerciseId} TEXT NOT NULL,
+        ${DatabaseTables.factorMuscleGroup} TEXT NOT NULL,
+        ${DatabaseTables.factorValue} REAL NOT NULL,
+        ${DatabaseTables.factorCreatedAt} TEXT NOT NULL,
+        FOREIGN KEY (${DatabaseTables.factorExerciseId})
+          REFERENCES ${DatabaseTables.exercises}(${DatabaseTables.exerciseId})
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   setUp(() async {
@@ -775,5 +788,85 @@ void main() {
       expect(exercise!.syncMetadata.status, SyncStatus.synced);
       expect(exercise.syncMetadata.serverId, 'server-1');
     });
+  });
+
+  group('factor preservation during sync', () {
+    // Regression: `mergeRemoteExercises` previously did
+    // `DELETE FROM exercises` + `INSERT OR REPLACE`, which cascaded via
+    // `ON DELETE CASCADE` on `exercise_muscle_factors.exerciseId` and
+    // wiped every muscle factor on every sync. The user then saw
+    // "Set logged, but we couldn't map it to any muscle group" because
+    // stimulus calculation ran before the heal hook reseeded factors.
+    Future<void> seedFactor(String exerciseId, String muscle) async {
+      await database.insert(DatabaseTables.exerciseMuscleFactors, {
+        DatabaseTables.factorId: 'factor-$exerciseId-$muscle',
+        DatabaseTables.factorExerciseId: exerciseId,
+        DatabaseTables.factorMuscleGroup: muscle,
+        DatabaseTables.factorValue: 1.0,
+        DatabaseTables.factorCreatedAt: baseDate.toIso8601String(),
+      });
+    }
+
+    Future<int> factorCountFor(String exerciseId) async {
+      final rows = await database.query(
+        DatabaseTables.exerciseMuscleFactors,
+        where: '${DatabaseTables.factorExerciseId} = ?',
+        whereArgs: <Object?>[exerciseId],
+      );
+      return rows.length;
+    }
+
+    test(
+      'mergeRemoteExercises preserves factors for unchanged exercises',
+      () async {
+        await database.insert(
+          DatabaseTables.exercises,
+          buildExercise(
+            id: 'exercise-1',
+            name: 'Cable Crossover',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.synced,
+              serverId: 'server-1',
+            ),
+          ).toMap(),
+        );
+        await seedFactor('exercise-1', 'mid_chest');
+        await seedFactor('exercise-1', 'front_delts');
+
+        await dataSource.mergeRemoteExercises(<ExerciseModel>[
+          buildExercise(
+            id: 'exercise-1',
+            name: 'Cable Crossover',
+            updatedAt: baseDate.add(const Duration(minutes: 1)),
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.synced,
+              serverId: 'server-1',
+            ),
+          ),
+        ]);
+
+        expect(await factorCountFor('exercise-1'), 2);
+      },
+    );
+
+    test(
+      'insertExercise throws on duplicate id instead of cascading factors',
+      () async {
+        await database.insert(
+          DatabaseTables.exercises,
+          buildExercise(id: 'exercise-1', name: 'Original').toMap(),
+        );
+        await seedFactor('exercise-1', 'mid_chest');
+
+        await expectLater(
+          dataSource.insertExercise(
+            buildExercise(id: 'exercise-1', name: 'Duplicate'),
+          ),
+          throwsA(isA<Object>()),
+        );
+
+        expect(await factorCountFor('exercise-1'), 1);
+      },
+    );
   });
 }

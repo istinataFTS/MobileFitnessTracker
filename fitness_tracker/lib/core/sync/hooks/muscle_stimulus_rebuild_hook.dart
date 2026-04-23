@@ -3,7 +3,7 @@ import '../../logging/app_logger.dart';
 import '../post_sync_hook.dart';
 
 /// Rebuilds the per-day `muscle_stimulus` projection for the current user
-/// after new exercises or workout sets arrive from the cloud.
+/// after every successful sync run.
 ///
 /// The 2D muscle map and fatigue widgets read exclusively from
 /// `muscle_stimulus`; a freshly-pulled workout set stays invisible to the
@@ -11,8 +11,16 @@ import '../post_sync_hook.dart';
 /// [MuscleFactorHealHook] so that any freshly-pulled exercises already
 /// have factors by the time the projection is built.
 ///
-/// The rebuild is scoped to [PostSyncContext.userId] — other profiles'
-/// records are never touched.
+/// Why always-run (no [triggeringFeatures] gating): stale rows can end up
+/// in `muscle_stimulus` from prior sessions (historic bug where factors
+/// were wiped by `INSERT OR REPLACE` cascades, or rows owned by a
+/// previous account). Gating the rebuild on "exercises or workout_sets
+/// was pulled" meant a clean sync with no remote deltas could not clean
+/// them up — users saw phantom muscles (e.g. lats highlighted despite
+/// never training lats) until a remote change forced a rebuild. The
+/// underlying use case wipes-then-rebuilds scoped to
+/// [PostSyncContext.userId], so running it every sync is idempotent and
+/// cheap; other profiles' records are never touched.
 class MuscleStimulusRebuildHook implements PostSyncHook {
   final RebuildMuscleStimulusFromWorkoutHistory rebuild;
 
@@ -22,7 +30,7 @@ class MuscleStimulusRebuildHook implements PostSyncHook {
   String get name => 'muscle_stimulus_rebuild';
 
   @override
-  Set<String> get triggeringFeatures => const {'exercises', 'workout_sets'};
+  Set<String> get triggeringFeatures => const <String>{};
 
   @override
   Future<void> run(PostSyncContext context) async {

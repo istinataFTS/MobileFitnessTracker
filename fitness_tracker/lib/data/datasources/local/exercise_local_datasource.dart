@@ -155,7 +155,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       await db.insert(
         DatabaseTables.exercises,
         exercise.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: ConflictAlgorithm.abort,
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to insert exercise: $e');
@@ -487,20 +487,61 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     return ExerciseModel.fromMap(maps.first);
   }
 
+  /// Reconciles the local `exercises` table with [exercises] without
+  /// nuking unchanged rows.
+  ///
+  /// Why this matters: `exercise_muscle_factors` has `ON DELETE CASCADE` on
+  /// `exerciseId`. The previous implementation did `DELETE FROM exercises`
+  /// followed by `INSERT OR REPLACE` for every row, which cascaded — wiping
+  /// every muscle factor on every sync. The heal hook would reinsert them
+  /// afterwards, but any stimulus calculation that ran in the gap silently
+  /// produced no muscle mapping (see "couldn't map it to any muscle group"
+  /// banner).
+  ///
+  /// New behaviour: UPDATE existing rows in place, INSERT genuinely new rows,
+  /// and DELETE only rows absent from [exercises]. Real deletions still
+  /// cascade correctly; unchanged rows keep their factor children intact.
   Future<void> _replaceStoredExercises(List<ExerciseModel> exercises) async {
     final db = await databaseHelper.database;
 
     await db.transaction((txn) async {
-      await txn.delete(DatabaseTables.exercises);
+      final existingRows = await txn.query(
+        DatabaseTables.exercises,
+        columns: <String>[DatabaseTables.exerciseId],
+      );
+      final existingIds = existingRows
+          .map((row) => row[DatabaseTables.exerciseId] as String)
+          .toSet();
 
+      final incomingIds = <String>{};
       final batch = txn.batch();
+
       for (final exercise in exercises) {
-        batch.insert(
+        incomingIds.add(exercise.id);
+        if (existingIds.contains(exercise.id)) {
+          batch.update(
+            DatabaseTables.exercises,
+            exercise.toMap(),
+            where: '${DatabaseTables.exerciseId} = ?',
+            whereArgs: <Object?>[exercise.id],
+          );
+        } else {
+          batch.insert(
+            DatabaseTables.exercises,
+            exercise.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.abort,
+          );
+        }
+      }
+
+      for (final staleId in existingIds.difference(incomingIds)) {
+        batch.delete(
           DatabaseTables.exercises,
-          exercise.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
+          where: '${DatabaseTables.exerciseId} = ?',
+          whereArgs: <Object?>[staleId],
         );
       }
+
       await batch.commit(noResult: true);
     });
   }

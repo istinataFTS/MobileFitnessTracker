@@ -29,11 +29,15 @@ void main() {
     hook = MuscleStimulusRebuildHook(rebuild: rebuild);
   });
 
-  test('declares itself as triggering on exercises or workout_sets pulls', () {
-    expect(
-      hook.triggeringFeatures,
-      equals(<String>{'exercises', 'workout_sets'}),
-    );
+  test('declares itself as always-running (no triggering features)', () {
+    // Regression: previously gated on {exercises, workout_sets}. That meant
+    // a clean sync with no remote deltas never cleared stale rows (e.g. a
+    // phantom "lats" stimulus left over from a historic factor-wipe bug),
+    // so the 2D muscle map kept highlighting muscles the user never
+    // trained until a remote change happened to force a rebuild. Empty
+    // set = runs on every successful sync; the rebuild is idempotent and
+    // user-scoped.
+    expect(hook.triggeringFeatures, isEmpty);
   });
 
   test('rebuilds for the context user — other profiles are never touched',
