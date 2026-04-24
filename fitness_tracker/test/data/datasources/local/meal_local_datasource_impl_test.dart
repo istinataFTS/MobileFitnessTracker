@@ -54,8 +54,8 @@ void main() {
     await db.execute('''
       CREATE TABLE ${DatabaseTables.meals} (
         ${DatabaseTables.mealId} TEXT PRIMARY KEY,
-        owner_user_id TEXT,
-        ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.ownerUserId} TEXT,
+        ${DatabaseTables.mealName} TEXT NOT NULL,
         ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
         ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
         ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
@@ -69,6 +69,40 @@ void main() {
         ${DatabaseTables.mealLastSyncError} TEXT
       )
     ''');
+
+    // Per-owner uniqueness — mirrors the production idx_meals_name_owner.
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_meals_name_owner
+      ON ${DatabaseTables.meals}(
+        ${DatabaseTables.mealName},
+        COALESCE(${DatabaseTables.ownerUserId}, '')
+      )
+    ''');
+
+    // nutrition_logs is needed to verify that _replaceStoredMeals does not
+    // cascade-delete food diary entries when meals are updated in place.
+    await db.execute('''
+      CREATE TABLE ${DatabaseTables.nutritionLogs} (
+        ${DatabaseTables.nutritionLogId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
+        ${DatabaseTables.nutritionLogMealId} TEXT,
+        ${DatabaseTables.nutritionLogMealName} TEXT NOT NULL DEFAULT '',
+        ${DatabaseTables.nutritionLogGrams} REAL,
+        ${DatabaseTables.nutritionLogCarbs} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogProtein} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogFat} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogCalories} REAL NOT NULL,
+        ${DatabaseTables.nutritionLogDate} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.nutritionLogSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        FOREIGN KEY (${DatabaseTables.nutritionLogMealId})
+          REFERENCES ${DatabaseTables.meals}(${DatabaseTables.mealId})
+          ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   setUp(() async {
@@ -448,5 +482,147 @@ void main() {
       expect(meal.syncMetadata.status, SyncStatus.pendingUpload);
       expect(meal.syncMetadata.lastSyncError, isNull);
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multi-owner name coexistence (regression for v18 schema migration)
+  // ---------------------------------------------------------------------------
+  // Before v18 the schema had UNIQUE(name) globally on meals. If two different
+  // users each had a meal called "Chicken Rice", a remote sync for the second
+  // user would throw UNIQUE constraint failed. After v18 the constraint is
+  // UNIQUE(name, COALESCE(owner_user_id, '')) — each user's meals are an
+  // independent uniqueness scope.
+
+  group('MealLocalDataSourceImpl multi-owner name coexistence', () {
+    test(
+      'two users can each have a meal with the same name — '
+      'mergeRemoteMeals stores both rows without UNIQUE violation',
+      () async {
+        // User-1's meal is already stored locally.
+        await dataSource.insertMeal(
+          buildMeal(
+            id: 'meal-u1',
+            name: 'Chicken Rice',
+            ownerUserId: 'user-1',
+            syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+          ),
+        );
+
+        // Remote pull brings user-2's meal with the same name (different ID,
+        // different owner — should not conflict).
+        await dataSource.mergeRemoteMeals(<MealModel>[
+          buildMeal(
+            id: 'meal-u2',
+            name: 'Chicken Rice',
+            ownerUserId: 'user-2',
+            syncMetadata: const EntitySyncMetadata(status: SyncStatus.synced),
+          ),
+        ]);
+
+        final rawRows = await database.query(DatabaseTables.meals);
+        expect(rawRows, hasLength(2));
+        expect(
+          rawRows.map((r) => r[DatabaseTables.mealId]).toSet(),
+          {'meal-u1', 'meal-u2'},
+        );
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // nutrition_logs preservation (regression for _replaceStoredMeals rewrite)
+  // ---------------------------------------------------------------------------
+  // The previous _replaceStoredMeals did DELETE FROM meals + INSERT, which
+  // cascade-deleted every nutrition_log via the ON DELETE CASCADE FK on
+  // nutrition_logs.meal_id — silently wiping the user's food diary on every
+  // remote sync. The rewrite uses UPDATE-in-place so nutrition_logs survive.
+
+  group('MealLocalDataSourceImpl nutrition_logs preservation', () {
+    test(
+      'mergeRemoteMeals does not cascade-delete nutrition_logs '
+      'for a meal that is updated in place',
+      () async {
+        // Seed a meal and a nutrition log referencing it.
+        await dataSource.insertMeal(
+          buildMeal(
+            id: 'meal-1',
+            name: 'Oats',
+            ownerUserId: 'user-1',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.synced,
+              serverId: 'server-meal-1',
+            ),
+          ),
+        );
+        await database.insert(DatabaseTables.nutritionLogs, {
+          DatabaseTables.nutritionLogId: 'log-1',
+          DatabaseTables.ownerUserId: 'user-1',
+          DatabaseTables.nutritionLogMealId: 'meal-1',
+          DatabaseTables.nutritionLogMealName: 'Oats',
+          DatabaseTables.nutritionLogCarbs: 30.0,
+          DatabaseTables.nutritionLogProtein: 5.0,
+          DatabaseTables.nutritionLogFat: 3.0,
+          DatabaseTables.nutritionLogCalories: 167.0,
+          DatabaseTables.nutritionLogDate: '2026-01-01',
+          DatabaseTables.nutritionLogCreatedAt: '2026-01-01T09:00:00.000',
+          DatabaseTables.nutritionLogUpdatedAt: '2026-01-01T09:00:00.000',
+          DatabaseTables.nutritionLogSyncStatus: 'localOnly',
+        });
+
+        // Remote sync brings back the same meal with an updated name.
+        await dataSource.mergeRemoteMeals(<MealModel>[
+          buildMeal(
+            id: 'meal-1',
+            name: 'Rolled Oats',
+            ownerUserId: 'user-1',
+            updatedAt: baseDate.add(const Duration(hours: 1)),
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.synced,
+              serverId: 'server-meal-1',
+            ),
+          ),
+        ]);
+
+        // The nutrition log must still exist — it was not cascade-deleted.
+        final logs = await database.query(
+          DatabaseTables.nutritionLogs,
+          where: '${DatabaseTables.nutritionLogMealId} = ?',
+          whereArgs: <Object?>['meal-1'],
+        );
+        expect(logs, hasLength(1));
+        expect(logs.first[DatabaseTables.nutritionLogId], 'log-1');
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Incoming-list deduplication (regression for _deduplicateByNameAndOwner)
+  // ---------------------------------------------------------------------------
+
+  group('MealLocalDataSourceImpl incoming duplicate deduplication', () {
+    test(
+      'replaceAllMeals with duplicate (name, owner) in the incoming list '
+      'keeps only the most-recently-updated row',
+      () async {
+        final older = buildMeal(
+          id: 'm-old',
+          name: 'Oats',
+          ownerUserId: 'user-1',
+          updatedAt: baseDate,
+        );
+        final newer = buildMeal(
+          id: 'm-new',
+          name: 'Oats',
+          ownerUserId: 'user-1',
+          updatedAt: baseDate.add(const Duration(hours: 1)),
+        );
+
+        await dataSource.replaceAllMeals(<MealModel>[older, newer]);
+
+        final rawRows = await database.query(DatabaseTables.meals);
+        expect(rawRows, hasLength(1));
+        expect(rawRows.first[DatabaseTables.mealId], 'm-new');
+      },
+    );
   });
 }

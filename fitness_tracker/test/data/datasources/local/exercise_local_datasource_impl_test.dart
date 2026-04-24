@@ -82,6 +82,14 @@ void main() {
           ON DELETE CASCADE
       )
     ''');
+    // Per-owner uniqueness — mirrors the production idx_exercises_name_owner.
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_exercises_name_owner
+      ON ${DatabaseTables.exercises}(
+        ${DatabaseTables.exerciseName},
+        COALESCE(${DatabaseTables.ownerUserId}, '')
+      )
+    ''');
     await db.execute('PRAGMA foreign_keys = ON');
   }
 
@@ -866,6 +874,144 @@ void main() {
         );
 
         expect(await factorCountFor('exercise-1'), 1);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multi-owner name coexistence (regression for v18 schema migration)
+  // ---------------------------------------------------------------------------
+  // Before v18 the schema had UNIQUE(name) globally, so a sign-in sync that
+  // pulled user-owned exercises whose names collided with system-seeded ones
+  // would throw "UNIQUE constraint failed: exercises.name" and block the user.
+  // After v18 the constraint is UNIQUE(name, COALESCE(owner_user_id, '')):
+  // the system row (owner = NULL → '') and the user row live in separate
+  // uniqueness buckets and can coexist.
+
+  group('ExerciseLocalDataSourceImpl multi-owner name coexistence', () {
+    test(
+      'system (owner=null) and user-owned exercise with the same name coexist '
+      'and are both visible to an authenticated user',
+      () async {
+        // System exercise seeded at install time.
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'sys-barbell-row',
+            ownerUserId: null,
+            name: 'Barbell Row',
+          ),
+        );
+
+        // Remote pull brings the same exercise owned by the current user.
+        await dataSource.mergeRemoteExercises(<ExerciseModel>[
+          buildExercise(
+            id: 'usr-barbell-row',
+            ownerUserId: currentUserId,
+            name: 'Barbell Row',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.synced,
+              serverId: 'server-barbell',
+            ),
+          ),
+        ]);
+
+        // Raw DB should contain exactly two rows.
+        final rawRows = await database.query(DatabaseTables.exercises);
+        expect(rawRows, hasLength(2));
+
+        // Both must be visible to the authenticated user.
+        final visible = await dataSource.getAllExercises();
+        expect(
+          visible.map((e) => e.id).toSet(),
+          {'sys-barbell-row', 'usr-barbell-row'},
+        );
+      },
+    );
+
+    test(
+      'insertExercise rejects a duplicate (name, owner) pair '
+      'while allowing same name for a different owner',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'sys-squat',
+            ownerUserId: null,
+            name: 'Squat',
+          ),
+        );
+
+        // Different owner — must succeed.
+        await expectLater(
+          dataSource.insertExercise(
+            buildExercise(
+              id: 'usr-squat',
+              ownerUserId: currentUserId,
+              name: 'Squat',
+            ),
+          ),
+          completes,
+        );
+
+        // Same owner as the first insert (null) — must fail.
+        await expectLater(
+          dataSource.insertExercise(
+            buildExercise(
+              id: 'sys-squat-dup',
+              ownerUserId: null,
+              name: 'Squat',
+            ),
+          ),
+          throwsA(isA<Object>()),
+        );
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Incoming-list deduplication (regression for _deduplicateByNameAndOwner)
+  // ---------------------------------------------------------------------------
+  // If the remote sends two rows with the same (name, owner) in one batch —
+  // possible during edge-case remote bugs — the datasource should keep only
+  // the most-recently-updated entry and not trip the UNIQUE index.
+
+  group('ExerciseLocalDataSourceImpl incoming duplicate deduplication', () {
+    test(
+      'replaceAllExercises with duplicate (name, owner) in the incoming list '
+      'keeps only the most-recently-updated row',
+      () async {
+        final older = buildExercise(
+          id: 'e-old',
+          ownerUserId: currentUserId,
+          name: 'Squat',
+          updatedAt: baseDate,
+        );
+        final newer = buildExercise(
+          id: 'e-new',
+          ownerUserId: currentUserId,
+          name: 'Squat',
+          updatedAt: baseDate.add(const Duration(hours: 1)),
+        );
+
+        // Both share (name='Squat', owner=currentUserId) — only 'e-new' survives.
+        await dataSource.replaceAllExercises(<ExerciseModel>[older, newer]);
+
+        final rawRows = await database.query(DatabaseTables.exercises);
+        expect(rawRows, hasLength(1));
+        expect(rawRows.first[DatabaseTables.exerciseId], 'e-new');
+      },
+    );
+
+    test(
+      'replaceAllExercises with different (name, owner) pairs inserts all rows',
+      () async {
+        await dataSource.replaceAllExercises(<ExerciseModel>[
+          buildExercise(id: 'e1', ownerUserId: currentUserId, name: 'Squat'),
+          buildExercise(id: 'e2', ownerUserId: null, name: 'Squat'),
+          buildExercise(id: 'e3', ownerUserId: currentUserId, name: 'Deadlift'),
+        ]);
+
+        final rawRows = await database.query(DatabaseTables.exercises);
+        expect(rawRows, hasLength(3));
       },
     );
   });
