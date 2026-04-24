@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../config/env_config.dart';
 import '../../../core/constants/database_tables.dart';
 import '../../../core/constants/muscle_stimulus_constants.dart';
+import '../../../core/logging/app_logger.dart';
 
 class UnsupportedDatabaseVersionException implements Exception {
   const UnsupportedDatabaseVersionException({
@@ -118,7 +119,7 @@ class DatabaseHelper {
       CREATE TABLE ${DatabaseTables.exercises} (
         ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
         ${DatabaseTables.ownerUserId} TEXT,
-        ${DatabaseTables.exerciseName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.exerciseName} TEXT NOT NULL,
         ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
         ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL,
         ${DatabaseTables.exerciseUpdatedAt} TEXT NOT NULL,
@@ -133,7 +134,7 @@ class DatabaseHelper {
       CREATE TABLE ${DatabaseTables.meals} (
         ${DatabaseTables.mealId} TEXT PRIMARY KEY,
         ${DatabaseTables.ownerUserId} TEXT,
-        ${DatabaseTables.mealName} TEXT NOT NULL UNIQUE,
+        ${DatabaseTables.mealName} TEXT NOT NULL,
         ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
         ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
         ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
@@ -469,6 +470,22 @@ class DatabaseHelper {
       );
     }
 
+    if (oldVersion < 18) {
+      // Replace the global UNIQUE(name) on exercises and meals with a
+      // per-owner expression index UNIQUE(name, COALESCE(owner_user_id, '')).
+      //
+      // The old global constraint was wrong: a system-seeded exercise (owner
+      // IS NULL) and a user-owned exercise can legitimately share the same
+      // name. The global UNIQUE caused sign-in sync to fail with
+      // "UNIQUE constraint failed: exercises.name" whenever the remote
+      // returned user-owned exercises whose names collided with seeded ones.
+      //
+      // SQLite does not support DROP CONSTRAINT, so both tables are
+      // recreated following the same pattern as migration v17.
+      await _migrateExercisesForMultiOwnerUniqueness(db);
+      await _migrateMealsForMultiOwnerUniqueness(db);
+    }
+
     await _createIndexes(db);
   }
 
@@ -770,6 +787,194 @@ class DatabaseHelper {
     );
   }
 
+  /// Migrates [exercises] to use per-owner uniqueness.
+  ///
+  /// Before v18 the schema had `exerciseName TEXT NOT NULL UNIQUE` — a global
+  /// uniqueness constraint that conflicted with multi-owner scenarios (e.g. a
+  /// system-seeded "Barbell Row" and a user-owned "Barbell Row" cannot coexist).
+  ///
+  /// After v18 the constraint lives in the expression index
+  /// `idx_exercises_name_owner` — `UNIQUE(name, COALESCE(owner_user_id, ''))`.
+  /// That allows one system row (owner = NULL → '') and one row per user to
+  /// share the same name. [_createIndexes] builds the index after migration.
+  ///
+  /// The table is fully recreated because SQLite has no `DROP CONSTRAINT`.
+  /// A defensive dedup pass runs first in case pre-migration rows somehow
+  /// violate the incoming constraint (the old global UNIQUE should prevent
+  /// this in practice, but guard against corrupt / manually-edited databases).
+  Future<void> _migrateExercisesForMultiOwnerUniqueness(Database db) async {
+    final rows = await db.query(DatabaseTables.exercises);
+
+    final keepIds = _keepNewestPerGroup(
+      rows,
+      groupKey: (row) =>
+          '${row[DatabaseTables.exerciseName]}|'
+          '${row[DatabaseTables.ownerUserId] ?? ''}',
+      updatedAtKey: DatabaseTables.exerciseUpdatedAt,
+      createdAtKey: DatabaseTables.exerciseCreatedAt,
+      idKey: DatabaseTables.exerciseId,
+    );
+
+    final dropIds = rows
+        .map((r) => r[DatabaseTables.exerciseId] as String)
+        .where((id) => !keepIds.contains(id))
+        .toList();
+
+    if (dropIds.isNotEmpty) {
+      AppLogger.warning(
+        'v18 migration: dropping ${dropIds.length} duplicate exercise '
+        'row(s) — ids: ${dropIds.join(', ')}',
+        category: 'db_migration',
+      );
+      for (final id in dropIds) {
+        await db.delete(
+          DatabaseTables.exercises,
+          where: '${DatabaseTables.exerciseId} = ?',
+          whereArgs: [id],
+        );
+      }
+    }
+
+    await db.execute('''
+      CREATE TABLE exercises_v18 (
+        ${DatabaseTables.exerciseId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
+        ${DatabaseTables.exerciseName} TEXT NOT NULL,
+        ${DatabaseTables.exerciseMuscleGroups} TEXT NOT NULL,
+        ${DatabaseTables.exerciseCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.exerciseUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.exerciseServerId} TEXT,
+        ${DatabaseTables.exerciseSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.exerciseLastSyncedAt} TEXT,
+        ${DatabaseTables.exerciseLastSyncError} TEXT
+      )
+    ''');
+
+    await db.execute(
+      'INSERT INTO exercises_v18 SELECT * FROM ${DatabaseTables.exercises}',
+    );
+    await db.execute('DROP TABLE ${DatabaseTables.exercises}');
+    await db.execute(
+      'ALTER TABLE exercises_v18 RENAME TO ${DatabaseTables.exercises}',
+    );
+  }
+
+  /// Migrates [meals] to use per-owner uniqueness.
+  ///
+  /// Identical rationale to [_migrateExercisesForMultiOwnerUniqueness].
+  /// After migration, uniqueness is enforced by `idx_meals_name_owner`
+  /// (`UNIQUE(name, COALESCE(owner_user_id, ''))`).
+  Future<void> _migrateMealsForMultiOwnerUniqueness(Database db) async {
+    final rows = await db.query(DatabaseTables.meals);
+
+    final keepIds = _keepNewestPerGroup(
+      rows,
+      groupKey: (row) =>
+          '${row[DatabaseTables.mealName]}|'
+          '${row[DatabaseTables.ownerUserId] ?? ''}',
+      updatedAtKey: DatabaseTables.mealUpdatedAt,
+      createdAtKey: DatabaseTables.mealCreatedAt,
+      idKey: DatabaseTables.mealId,
+    );
+
+    final dropIds = rows
+        .map((r) => r[DatabaseTables.mealId] as String)
+        .where((id) => !keepIds.contains(id))
+        .toList();
+
+    if (dropIds.isNotEmpty) {
+      AppLogger.warning(
+        'v18 migration: dropping ${dropIds.length} duplicate meal '
+        'row(s) — ids: ${dropIds.join(', ')}',
+        category: 'db_migration',
+      );
+      for (final id in dropIds) {
+        await db.delete(
+          DatabaseTables.meals,
+          where: '${DatabaseTables.mealId} = ?',
+          whereArgs: [id],
+        );
+      }
+    }
+
+    await db.execute('''
+      CREATE TABLE meals_v18 (
+        ${DatabaseTables.mealId} TEXT PRIMARY KEY,
+        ${DatabaseTables.ownerUserId} TEXT,
+        ${DatabaseTables.mealName} TEXT NOT NULL,
+        ${DatabaseTables.mealServingSize} REAL NOT NULL DEFAULT 100.0,
+        ${DatabaseTables.mealCarbsPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealProteinPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealFatPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealCaloriesPer100g} REAL NOT NULL,
+        ${DatabaseTables.mealCreatedAt} TEXT NOT NULL,
+        ${DatabaseTables.mealUpdatedAt} TEXT NOT NULL,
+        ${DatabaseTables.mealServerId} TEXT,
+        ${DatabaseTables.mealSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
+        ${DatabaseTables.mealLastSyncedAt} TEXT,
+        ${DatabaseTables.mealLastSyncError} TEXT
+      )
+    ''');
+
+    await db.execute(
+      'INSERT INTO meals_v18 SELECT * FROM ${DatabaseTables.meals}',
+    );
+    await db.execute('DROP TABLE ${DatabaseTables.meals}');
+    await db.execute(
+      'ALTER TABLE meals_v18 RENAME TO ${DatabaseTables.meals}',
+    );
+  }
+
+  /// Returns the set of IDs that should be retained when deduplicating
+  /// [rows] by [groupKey].
+  ///
+  /// For each group the row with the lexicographically greatest
+  /// [updatedAtKey] timestamp is kept. [createdAtKey] is the fallback when
+  /// [updatedAtKey] is absent, and [idKey] (lexicographic max) is the final
+  /// deterministic tie-breaker.
+  static Set<String> _keepNewestPerGroup(
+    List<Map<String, Object?>> rows, {
+    required String Function(Map<String, Object?> row) groupKey,
+    required String updatedAtKey,
+    required String createdAtKey,
+    required String idKey,
+  }) {
+    final best = <String, Map<String, Object?>>{};
+
+    for (final row in rows) {
+      final key = groupKey(row);
+      final existing = best[key];
+      if (existing == null ||
+          _rowIsNewer(row, existing, updatedAtKey, createdAtKey, idKey)) {
+        best[key] = row;
+      }
+    }
+
+    return {for (final row in best.values) row[idKey] as String};
+  }
+
+  /// Returns `true` when [candidate] is strictly newer than [current].
+  static bool _rowIsNewer(
+    Map<String, Object?> candidate,
+    Map<String, Object?> current,
+    String updatedAtKey,
+    String createdAtKey,
+    String idKey,
+  ) {
+    final tA = (candidate[updatedAtKey] as String?) ??
+        (candidate[createdAtKey] as String?) ??
+        '';
+    final tB = (current[updatedAtKey] as String?) ??
+        (current[createdAtKey] as String?) ??
+        '';
+    final cmp = tA.compareTo(tB);
+    if (cmp != 0) return cmp > 0;
+    // Deterministic tie-breaker: lexicographically greater ID wins.
+    final idA = candidate[idKey] as String? ?? '';
+    final idB = current[idKey] as String? ?? '';
+    return idA.compareTo(idB) > 0;
+  }
+
   static Future<void> _createIndexes(Database db) async {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_targets_type_period
@@ -844,6 +1049,17 @@ class DatabaseHelper {
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseName})
     ''');
 
+    // Per-owner uniqueness: a system exercise and a user exercise may share
+    // the same name. NULL owner_user_id (system) is normalised to '' so the
+    // index treats all system rows as one owner group.
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name_owner
+      ON ${DatabaseTables.exercises}(
+        ${DatabaseTables.exerciseName},
+        COALESCE(${DatabaseTables.ownerUserId}, '')
+      )
+    ''');
+
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_exercises_updated_at
       ON ${DatabaseTables.exercises}(${DatabaseTables.exerciseUpdatedAt})
@@ -867,6 +1083,15 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_meals_name
       ON ${DatabaseTables.meals}(${DatabaseTables.mealName})
+    ''');
+
+    // Per-owner uniqueness: same rationale as idx_exercises_name_owner.
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_meals_name_owner
+      ON ${DatabaseTables.meals}(
+        ${DatabaseTables.mealName},
+        COALESCE(${DatabaseTables.ownerUserId}, '')
+      )
     ''');
 
     await db.execute('''
