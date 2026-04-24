@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/meal_model.dart';
@@ -148,10 +149,18 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       await db.insert(
         DatabaseTables.meals,
         meal.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        // abort — never silently replace an existing row. The schema enforces
+        // UNIQUE(name, COALESCE(owner_user_id, '')) so legitimate same-name
+        // pairs from different owners are fine; same-owner duplicates are a
+        // caller bug. Using replace here could cascade-delete nutrition_logs
+        // via the ON DELETE CASCADE FK on nutrition_logs.meal_id.
+        conflictAlgorithm: ConflictAlgorithm.abort,
       );
     } catch (e) {
-      throw CacheDatabaseException('Failed to insert meal: $e');
+      throw CacheDatabaseException(
+        'Failed to insert meal "${meal.name}" '
+        '(owner: ${meal.ownerUserId ?? 'system'}): $e',
+      );
     }
   }
 
@@ -436,22 +445,95 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
     return MealModel.fromMap(maps.first);
   }
 
+  /// Reconciles the local `meals` table with [meals] without nuking unchanged
+  /// rows.
+  ///
+  /// The previous implementation did `DELETE FROM meals` + batch INSERT, which
+  /// cascade-deleted every `nutrition_logs` row via the `ON DELETE CASCADE` FK
+  /// on `nutrition_logs.meal_id` — silently wiping the user's food diary on
+  /// every remote sync.
+  ///
+  /// New behaviour (mirrors [ExerciseLocalDataSourceImpl._replaceStoredExercises]):
+  /// 1. Dedup the incoming list by (name, owner) — keeps most-recently-updated.
+  /// 2. UPDATE existing rows in place, INSERT genuinely new rows, DELETE only
+  ///    rows absent from [meals].
+  ///
+  /// Real deletions still cascade to nutrition_logs correctly; unchanged meal
+  /// rows keep their log children intact.
   Future<void> _replaceStoredMeals(List<MealModel> meals) async {
+    // Defensive dedup: if the incoming list contains (name, owner) duplicates
+    // keep only the most-recently-updated to avoid tripping UNIQUE(name, owner).
+    final deduped = _deduplicateByNameAndOwner(meals);
+    if (deduped.length < meals.length) {
+      AppLogger.warning(
+        '_replaceStoredMeals: dropped '
+        '${meals.length - deduped.length} duplicate (name, owner) '
+        'row(s) from incoming list',
+        category: 'datasource',
+      );
+    }
+
     final db = await databaseHelper.database;
 
     await db.transaction((txn) async {
-      await txn.delete(DatabaseTables.meals);
+      final existingRows = await txn.query(
+        DatabaseTables.meals,
+        columns: <String>[DatabaseTables.mealId],
+      );
+      final existingIds = existingRows
+          .map((row) => row[DatabaseTables.mealId] as String)
+          .toSet();
 
+      final incomingIds = <String>{};
       final batch = txn.batch();
-      for (final meal in meals) {
-        batch.insert(
+
+      for (final meal in deduped) {
+        incomingIds.add(meal.id);
+        if (existingIds.contains(meal.id)) {
+          batch.update(
+            DatabaseTables.meals,
+            meal.toMap(),
+            where: '${DatabaseTables.mealId} = ?',
+            whereArgs: <Object?>[meal.id],
+          );
+        } else {
+          batch.insert(
+            DatabaseTables.meals,
+            meal.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.abort,
+          );
+        }
+      }
+
+      for (final staleId in existingIds.difference(incomingIds)) {
+        batch.delete(
           DatabaseTables.meals,
-          meal.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
+          where: '${DatabaseTables.mealId} = ?',
+          whereArgs: <Object?>[staleId],
         );
       }
+
       await batch.commit(noResult: true);
     });
+  }
+
+  /// Removes duplicate `(name, ownerUserId)` entries from [meals], keeping
+  /// the entry with the latest [MealModel.updatedAt].
+  ///
+  /// Belt-and-suspenders guard: the DB schema enforces
+  /// `UNIQUE(name, COALESCE(owner_user_id, ''))`, so two rows with the same
+  /// (name, owner) in one batch would trip the constraint. Deduping here keeps
+  /// the batch clean and surfaces nothing to the user.
+  List<MealModel> _deduplicateByNameAndOwner(List<MealModel> meals) {
+    final seen = <String, MealModel>{};
+    for (final meal in meals) {
+      final key = '${meal.name.toLowerCase()}|${meal.ownerUserId ?? ''}';
+      final existing = seen[key];
+      if (existing == null || meal.updatedAt.isAfter(existing.updatedAt)) {
+        seen[key] = meal;
+      }
+    }
+    return seen.values.toList();
   }
 
   MealModel _prepareMealForInitialCloudMigration(

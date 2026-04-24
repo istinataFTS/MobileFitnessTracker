@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/exercise_model.dart';
@@ -155,10 +156,17 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       await db.insert(
         DatabaseTables.exercises,
         exercise.toMap(),
+        // abort — never silently replace an existing row. The schema enforces
+        // UNIQUE(name, COALESCE(owner_user_id, '')) so legitimate same-name
+        // pairs from different owners are fine; same-owner duplicates are a
+        // caller bug and must surface as an exception.
         conflictAlgorithm: ConflictAlgorithm.abort,
       );
     } catch (e) {
-      throw CacheDatabaseException('Failed to insert exercise: $e');
+      throw CacheDatabaseException(
+        'Failed to insert exercise "${exercise.name}" '
+        '(owner: ${exercise.ownerUserId ?? 'system'}): $e',
+      );
     }
   }
 
@@ -498,10 +506,27 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   /// produced no muscle mapping (see "couldn't map it to any muscle group"
   /// banner).
   ///
-  /// New behaviour: UPDATE existing rows in place, INSERT genuinely new rows,
-  /// and DELETE only rows absent from [exercises]. Real deletions still
-  /// cascade correctly; unchanged rows keep their factor children intact.
+  /// New behaviour:
+  /// 1. Dedup the incoming list by (name, owner) — keeps most-recently-updated.
+  /// 2. UPDATE existing rows in place, INSERT genuinely new rows, DELETE only
+  ///    rows absent from [exercises].
+  ///
+  /// Real deletions still cascade correctly; unchanged rows keep their factor
+  /// children intact.
   Future<void> _replaceStoredExercises(List<ExerciseModel> exercises) async {
+    // Defensive dedup: if the incoming list contains (name, owner) duplicates
+    // — possible if the remote returns the same exercise twice — keep only the
+    // most-recently-updated to avoid tripping UNIQUE(name, owner).
+    final deduped = _deduplicateByNameAndOwner(exercises);
+    if (deduped.length < exercises.length) {
+      AppLogger.warning(
+        '_replaceStoredExercises: dropped '
+        '${exercises.length - deduped.length} duplicate (name, owner) '
+        'row(s) from incoming list',
+        category: 'datasource',
+      );
+    }
+
     final db = await databaseHelper.database;
 
     await db.transaction((txn) async {
@@ -516,7 +541,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       final incomingIds = <String>{};
       final batch = txn.batch();
 
-      for (final exercise in exercises) {
+      for (final exercise in deduped) {
         incomingIds.add(exercise.id);
         if (existingIds.contains(exercise.id)) {
           batch.update(
@@ -544,6 +569,29 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
 
       await batch.commit(noResult: true);
     });
+  }
+
+  /// Removes duplicate `(name, ownerUserId)` entries from [exercises],
+  /// keeping the entry with the latest [ExerciseModel.updatedAt].
+  ///
+  /// This is a belt-and-suspenders guard for `_replaceStoredExercises`:
+  /// the DB schema enforces `UNIQUE(name, COALESCE(owner_user_id, ''))`, so
+  /// passing two rows with the same (name, owner) in one batch would trip the
+  /// constraint. Deduping here means the batch always succeeds and the only
+  /// data lost is a genuinely redundant row.
+  List<ExerciseModel> _deduplicateByNameAndOwner(
+    List<ExerciseModel> exercises,
+  ) {
+    final seen = <String, ExerciseModel>{};
+    for (final exercise in exercises) {
+      final key = '${exercise.name.toLowerCase()}|${exercise.ownerUserId ?? ''}';
+      final existing = seen[key];
+      if (existing == null ||
+          exercise.updatedAt.isAfter(existing.updatedAt)) {
+        seen[key] = exercise;
+      }
+    }
+    return seen.values.toList();
   }
 
   ExerciseModel _prepareExerciseForInitialCloudMigration(

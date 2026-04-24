@@ -76,9 +76,12 @@ class EnvConfig {
   /// Version 14: Added app metadata storage for session and migration state.
   /// Version 15: Replaced destructive legacy upgrade behavior with explicit compatibility failure.
   /// Version 16: Clear stale exercise_muscle_factors and muscle_stimulus to force reseed with corrected factor names.
+  /// Version 17: Added owner_user_id to muscle_stimulus; updated UNIQUE to (owner_user_id, muscle_group, date).
+  /// Version 18: Replaced global UNIQUE(name) on exercises and meals with per-owner expression index
+  ///             UNIQUE(name, COALESCE(owner_user_id, '')) so system and user rows may share a name.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 17,
+    defaultValue: 18,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(
