@@ -137,7 +137,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
             }
 
             if (exerciseState is ExerciseError) {
-              return _buildErrorState(context);
+              return _buildErrorState(context, exerciseState.message);
             }
 
             final List<Exercise> exercises = exerciseState is ExercisesLoaded
@@ -182,7 +182,7 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
     );
   }
 
-  Widget _buildErrorState(BuildContext context) {
+  Widget _buildErrorState(BuildContext context, String errorMessage) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -199,6 +199,14 @@ class _LogExerciseTabState extends State<LogExerciseTab> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textMedium,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
                 context.read<ExerciseBloc>().add(LoadExercisesEvent());
