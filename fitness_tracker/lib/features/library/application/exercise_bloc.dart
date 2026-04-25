@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/errors/failures.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../domain/entities/exercise.dart';
 import '../../../domain/usecases/exercises/add_exercise.dart';
 import '../../../domain/usecases/exercises/delete_exercise.dart';
@@ -150,7 +152,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     final result = await getAllExercises();
 
     await result.fold(
-      (failure) async => emit(ExerciseError(failure.message)),
+      (failure) async {
+        _logFailure('LoadExercisesEvent', failure);
+        emit(ExerciseError(failure.message));
+      },
       (exercises) async {
         // If the user has no exercises and we haven't seeded yet this session,
         // run the per-user default-exercise seeding as a safety-net fallback
@@ -163,7 +168,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
           // Reload after seeding so the UI shows the freshly inserted exercises.
           final reloadResult = await getAllExercises();
           reloadResult.fold(
-            (failure) => emit(ExerciseError(failure.message)),
+            (failure) {
+              _logFailure('LoadExercisesEvent (post-seed reload)', failure);
+              emit(ExerciseError(failure.message));
+            },
             (seeded) => emit(ExercisesLoaded(seeded)),
           );
           return;
@@ -181,9 +189,16 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     emit(ExerciseLoading());
     final result = await getExerciseById(event.id);
     result.fold(
-      (failure) => emit(ExerciseError(failure.message)),
+      (failure) {
+        _logFailure('LoadExerciseByIdEvent(${event.id})', failure);
+        emit(ExerciseError(failure.message));
+      },
       (exercise) {
         if (exercise == null) {
+          AppLogger.warning(
+            'LoadExerciseByIdEvent(${event.id}): exercise not found',
+            category: 'exercise_bloc',
+          );
           emit(const ExerciseError('Exercise not found'));
         } else {
           emit(ExerciseLoaded(exercise));
@@ -199,7 +214,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     emit(ExerciseLoading());
     final result = await getExercisesForMuscle(event.muscleGroup);
     result.fold(
-      (failure) => emit(ExerciseError(failure.message)),
+      (failure) {
+        _logFailure('LoadExercisesForMuscleEvent(${event.muscleGroup})', failure);
+        emit(ExerciseError(failure.message));
+      },
       (exercises) => emit(ExercisesLoaded(exercises)),
     );
   }
@@ -210,7 +228,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   ) async {
     final result = await addExercise(event.exercise);
     await result.fold(
-      (failure) async => emit(ExerciseError(failure.message)),
+      (failure) async {
+        _logFailure('AddExerciseEvent(${event.exercise.name})', failure);
+        emit(ExerciseError(failure.message));
+      },
       (_) async {
         emit(const ExerciseOperationSuccess('Exercise added successfully'));
         add(LoadExercisesEvent());
@@ -224,7 +245,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   ) async {
     final result = await updateExercise(event.exercise);
     await result.fold(
-      (failure) async => emit(ExerciseError(failure.message)),
+      (failure) async {
+        _logFailure('UpdateExerciseEvent(${event.exercise.name})', failure);
+        emit(ExerciseError(failure.message));
+      },
       (_) async {
         emit(const ExerciseOperationSuccess('Exercise updated successfully'));
         add(LoadExercisesEvent());
@@ -238,11 +262,21 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   ) async {
     final result = await deleteExercise(event.id);
     await result.fold(
-      (failure) async => emit(ExerciseError(failure.message)),
+      (failure) async {
+        _logFailure('DeleteExerciseEvent(${event.id})', failure);
+        emit(ExerciseError(failure.message));
+      },
       (_) async {
         emit(const ExerciseOperationSuccess('Exercise deleted successfully'));
         add(LoadExercisesEvent());
       },
+    );
+  }
+
+  void _logFailure(String operation, Failure failure) {
+    AppLogger.error(
+      '$operation failed — ${failure.runtimeType}: ${failure.message}',
+      category: 'exercise_bloc',
     );
   }
 }
