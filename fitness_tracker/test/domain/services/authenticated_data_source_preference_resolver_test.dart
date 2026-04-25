@@ -42,6 +42,12 @@ const _authenticatedSession = AppSession(
   user: AppUser(id: 'user-1', email: 'test@example.com'),
 );
 
+const _migrationPendingSession = AppSession(
+  authMode: AuthMode.authenticated,
+  user: AppUser(id: 'user-1', email: 'test@example.com'),
+  requiresInitialCloudMigration: true,
+);
+
 void main() {
   late MockAppSessionRepository mockRepository;
   late AuthenticatedDataSourcePreferenceResolver resolver;
@@ -98,6 +104,21 @@ void main() {
 
         final result = await resolver.resolveReadPreference();
 
+        expect(result, DataSourcePreference.localOnly);
+      });
+
+      test(
+          'returns localOnly when initial cloud migration is pending, '
+          'even if syncPolicy enables remote', () async {
+        when(() => mockRepository.getCurrentSession()).thenAnswer(
+          (_) async => const Right(_migrationPendingSession),
+        );
+        when(() => mockRepository.syncPolicy).thenReturn(_remoteOnPolicy);
+
+        final result = await resolver.resolveReadPreference();
+
+        // Remote is not usable until migration completes — serving local avoids
+        // a doomed Supabase round-trip that would surface as an error.
         expect(result, DataSourcePreference.localOnly);
       });
     });

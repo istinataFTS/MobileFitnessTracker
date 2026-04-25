@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../config/env_config.dart';
 import '../../core/session/current_user_id_resolver.dart';
+import '../../data/datasources/local/app_metadata_local_datasource.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../domain/usecases/exercises/seed_exercises.dart';
 import '../../domain/usecases/muscle_factors/seed_exercise_factors.dart';
@@ -38,6 +39,11 @@ class AppDataSeeder {
     // case performs a single getAllFactors() query and only inserts rows for
     // exercises that currently have none (per-exercise idempotency).
     await _healMuscleFactorsIfMissing();
+
+    // One-time fix: stimulus rows written before the set-date bug fix were
+    // stamped with today's date instead of the set's actual date.  Run a
+    // full rebuild once, then set the flag so this never runs again.
+    await _healStimulusDatesIfNeeded();
   }
 
   Future<void> _seedDemoData() async {
@@ -124,6 +130,19 @@ class AppDataSeeder {
         await _rebuildStimulus();
       },
     );
+  }
+
+  Future<void> _healStimulusDatesIfNeeded() async {
+    const flagKey = 'stimulus_set_date_fix_v1';
+    final metadata = di.sl<AppMetadataLocalDataSource>();
+
+    final alreadyApplied = await metadata.readBool(flagKey);
+    if (alreadyApplied == true) return;
+
+    debugPrint('🩹 Applying one-time stimulus date fix...');
+    await _rebuildStimulus();
+    await metadata.writeBool(flagKey, true);
+    debugPrint('✅ Stimulus date fix applied and flagged.');
   }
 
   Future<void> _rebuildStimulus() async {

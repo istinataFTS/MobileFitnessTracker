@@ -108,7 +108,11 @@ class RecordWorkoutSet {
     required DateTime now,
   }) async {
     try {
-      final today = DateTime(now.year, now.month, now.day);
+      // Derive the stimulus date from the set's own timestamp so that
+      // back-filled historical sets (logged via the History page) land on
+      // the correct date instead of today's date.
+      final setDate = DateTime.fromMillisecondsSinceEpoch(setTimestamp);
+      final today = DateTime(setDate.year, setDate.month, setDate.day);
 
       final existingResult =
           await muscleStimulusRepository.getStimulusByMuscleAndDate(

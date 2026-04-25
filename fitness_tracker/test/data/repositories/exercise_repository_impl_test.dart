@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/enums/data_source_preference.dart';
 import 'package:fitness_tracker/core/enums/sync_status.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/errors/sync_exceptions.dart';
 import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/exercise_remote_datasource.dart';
 import 'package:fitness_tracker/data/models/exercise_model.dart';
@@ -104,6 +105,126 @@ void main() {
       verify(() => localDataSource.getAllExercises()).called(1);
       verifyNever(() => remoteDataSource.getAllExercises());
       verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+    });
+
+    group('remoteThenLocal falls back to local cache on remote failure', () {
+      // Helper: stubs local to return [localExercises] and remote to throw [error].
+      void stubRemoteThrows(
+        List<ExerciseModel> localExercises,
+        Object error,
+      ) {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+        when(() => localDataSource.getAllExercises()).thenAnswer(
+          (_) async => localExercises,
+        );
+        when(() => remoteDataSource.getAllExercises()).thenThrow(error);
+      }
+
+      final List<ExerciseModel> localCache = <ExerciseModel>[
+        ExerciseModel(
+          id: 'ex-1',
+          name: 'Bench Press',
+          muscleGroups: const <String>['chest'],
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ),
+      ];
+
+      test('serves local cache when remote throws AuthSyncException', () async {
+        stubRemoteThrows(
+          localCache,
+          const AuthSyncException('token expired'),
+        );
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.remoteThenLocal,
+        );
+
+        expect(result, Right<Failure, List<Exercise>>(localCache));
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
+
+      test('serves local cache when remote throws NetworkSyncException',
+          () async {
+        stubRemoteThrows(
+          localCache,
+          const NetworkSyncException('no internet'),
+        );
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.remoteThenLocal,
+        );
+
+        expect(result, Right<Failure, List<Exercise>>(localCache));
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
+
+      test('serves local cache when remote throws RemoteSyncException',
+          () async {
+        stubRemoteThrows(
+          localCache,
+          const RemoteSyncException('postgrest error'),
+        );
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.remoteThenLocal,
+        );
+
+        expect(result, Right<Failure, List<Exercise>>(localCache));
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
+    });
+
+    group('localThenRemote skips merge and returns local on remote failure', () {
+      // Remote is only reached when local cache is empty. The branch calls
+      // getAllExercises twice (pre-check + final return), so the mock answers
+      // both calls. List equality in Dart is referential, so we assert on
+      // isRight() + isEmpty rather than comparing list instances.
+      void stubEmptyLocalRemoteThrows(Object error) {
+        when(() => remoteDataSource.isConfigured).thenReturn(true);
+        when(() => localDataSource.getAllExercises()).thenAnswer(
+          (_) async => <ExerciseModel>[],
+        );
+        when(() => remoteDataSource.getAllExercises()).thenThrow(error);
+      }
+
+      test('returns empty local when remote throws AuthSyncException', () async {
+        stubEmptyLocalRemoteThrows(const AuthSyncException('not signed in'));
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.localThenRemote,
+        );
+
+        expect(result.isRight(), isTrue);
+        expect(result.getOrElse(() => throw Exception()), isEmpty);
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
+
+      test('returns empty local when remote throws NetworkSyncException',
+          () async {
+        stubEmptyLocalRemoteThrows(const NetworkSyncException('timeout'));
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.localThenRemote,
+        );
+
+        expect(result.isRight(), isTrue);
+        expect(result.getOrElse(() => throw Exception()), isEmpty);
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
+
+      test('returns empty local when remote throws RemoteSyncException',
+          () async {
+        stubEmptyLocalRemoteThrows(const RemoteSyncException('server error'));
+
+        final result = await repository.getAllExercises(
+          sourcePreference: DataSourcePreference.localThenRemote,
+        );
+
+        expect(result.isRight(), isTrue);
+        expect(result.getOrElse(() => throw Exception()), isEmpty);
+        verifyNever(() => localDataSource.mergeRemoteExercises(any()));
+      });
     });
 
     test('merges remote cache for remoteThenLocal instead of replaceAll',

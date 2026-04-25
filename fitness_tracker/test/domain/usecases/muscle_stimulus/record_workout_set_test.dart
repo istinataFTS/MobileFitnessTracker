@@ -159,6 +159,60 @@ void main() {
         verify(() => mockStimulusRepo.upsertStimulus(any())).called(1);
       });
 
+      test('new record date matches the set timestamp, not the current time',
+          () async {
+        // Simulates back-filling a historical set from the History page.
+        // If the impl used DateTime.now() the captured date would be today
+        // instead of the set's actual date.
+        final historicalDate = DateTime(2025, 1, 15);
+        MuscleStimulus? capturedStimulus;
+
+        when(
+          () => mockCalculate.calculateForSet(
+            exerciseId: 'ex-1',
+            sets: 1,
+            intensity: 5,
+          ),
+        ).thenAnswer(
+          (_) async => const Right(<String, double>{'chest': 1.0}),
+        );
+
+        when(
+          () => mockStimulusRepo.getStimulusByMuscleAndDate(
+            userId: _testUserId,
+            muscleGroup: any(named: 'muscleGroup'),
+            date: any(named: 'date'),
+          ),
+        ).thenAnswer((_) async => const Right(null));
+
+        when(
+          () => mockStimulusRepo.getStimulusByDateRange(
+            userId: _testUserId,
+            muscleGroup: any(named: 'muscleGroup'),
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+          ),
+        ).thenAnswer((_) async => const Right([]));
+
+        when(() => mockStimulusRepo.upsertStimulus(any())).thenAnswer(
+          (inv) async {
+            capturedStimulus =
+                inv.positionalArguments.first as MuscleStimulus;
+            return const Right(null);
+          },
+        );
+
+        await useCase(
+          userId: _testUserId,
+          exerciseId: 'ex-1',
+          sets: 1,
+          intensity: 5,
+          timestamp: historicalDate,
+        );
+
+        expect(capturedStimulus?.date, DateTime(2025, 1, 15));
+      });
+
       test('new record is stamped with the provided userId', () async {
         MuscleStimulus? capturedStimulus;
 
