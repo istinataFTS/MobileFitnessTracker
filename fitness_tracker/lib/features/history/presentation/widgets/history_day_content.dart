@@ -283,32 +283,21 @@ class _WorkoutHistorySection extends StatelessWidget {
                     exercise.id: exercise,
                 };
 
-                final List<WorkoutSet> visibleSets = sets
-                    .where((WorkoutSet set) =>
-                        exerciseMap.containsKey(set.exerciseId))
-                    .toList();
-
-                if (visibleSets.isEmpty) {
-                  return const _InlineEmptyHint(
-                    icon: Icons.search_off,
-                    title: 'Workout details unavailable',
-                    message:
-                        'The exercise metadata for these sets could not be loaded.',
-                  );
-                }
-
                 return Column(
                   children: <Widget>[
-                    for (int index = 0;
-                        index < visibleSets.length;
-                        index++) ...<Widget>[
-                      _WorkoutSetCard(
-                        set: visibleSets[index],
-                        exercise: exerciseMap[visibleSets[index].exerciseId]!,
-                        weightUnit: weightUnit,
-                      ),
-                      if (index < visibleSets.length - 1)
-                        const SizedBox(height: 12),
+                    for (int index = 0; index < sets.length; index++) ...<Widget>[
+                      if (exerciseMap.containsKey(sets[index].exerciseId))
+                        _WorkoutSetCard(
+                          set: sets[index],
+                          exercise: exerciseMap[sets[index].exerciseId]!,
+                          weightUnit: weightUnit,
+                        )
+                      else
+                        _OrphanedWorkoutSetCard(
+                          set: sets[index],
+                          weightUnit: weightUnit,
+                        ),
+                      if (index < sets.length - 1) const SizedBox(height: 12),
                     ],
                   ],
                 );
@@ -416,7 +405,6 @@ class _WorkoutSetCard extends StatelessWidget {
     );
   }
 
-
   void _confirmDelete(
     BuildContext context,
     String displayWeight,
@@ -428,6 +416,101 @@ class _WorkoutSetCard extends StatelessWidget {
         title: const Text('Delete Set?'),
         content: Text(
           'Remove ${exercise.name} - ${set.reps} reps @ $displayWeight?',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<HistoryBloc>().add(DeleteSetEvent(set.id));
+              Navigator.pop(dialogContext);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.errorRed,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrphanedWorkoutSetCard extends StatelessWidget {
+  final WorkoutSet set;
+  final WeightUnit weightUnit;
+
+  const _OrphanedWorkoutSetCard({
+    required this.set,
+    required this.weightUnit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayWeight = WeightUnitUtils.formatForDisplay(
+      set.weight,
+      weightUnit,
+    );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.link_off,
+                  size: 16,
+                  color: AppTheme.textMedium,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Unknown exercise',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textMedium,
+                          fontStyle: FontStyle.italic,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: () => _confirmDelete(context, displayWeight),
+                  tooltip: 'Delete set',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _MetricChip(icon: Icons.repeat, label: '${set.reps} reps'),
+                _MetricChip(icon: Icons.fitness_center, label: displayWeight),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String displayWeight) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title: const Text('Delete Set?'),
+        content: Text(
+          'Remove ${set.reps} reps @ $displayWeight?',
         ),
         actions: <Widget>[
           TextButton(
