@@ -3,6 +3,8 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/errors/sync_exceptions.dart';
+import '../../core/logging/app_logger.dart';
 import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/repositories/exercise_repository.dart';
@@ -50,10 +52,13 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
             return localExercises;
           }
 
-          final remoteExercises = await remoteDataSource.getAllExercises();
-          if (remoteExercises.isNotEmpty) {
+          final remoteForLocal = await _tryRemoteFetch(
+            remoteDataSource.getAllExercises,
+            context: 'getAllExercises(localThenRemote)',
+          );
+          if (remoteForLocal != null && remoteForLocal.isNotEmpty) {
             await localDataSource.mergeRemoteExercises(
-              remoteExercises.map(ExerciseModel.fromEntity).toList(),
+              remoteForLocal.map(ExerciseModel.fromEntity).toList(),
             );
           }
           return localDataSource.getAllExercises();
@@ -64,9 +69,12 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
           }
 
           final localExercises = await localDataSource.getAllExercises();
-          final remoteExercises = await remoteDataSource.getAllExercises();
+          final remoteExercises = await _tryRemoteFetch(
+            remoteDataSource.getAllExercises,
+            context: 'getAllExercises(remoteThenLocal)',
+          );
 
-          if (remoteExercises.isEmpty) {
+          if (remoteExercises == null || remoteExercises.isEmpty) {
             return localExercises;
           }
 
@@ -279,5 +287,35 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
     return RepositoryGuard.run(() async {
       await syncCoordinator.syncPendingChanges();
     });
+  }
+
+  /// Runs [fetch] and returns `null` on any transient remote failure
+  /// (auth, network, or backend error), logging a warning with [context].
+  /// Local DB exceptions propagate unchanged so they surface as real errors.
+  static Future<List<Exercise>?> _tryRemoteFetch(
+    Future<List<Exercise>> Function() fetch, {
+    required String context,
+  }) async {
+    try {
+      return await fetch();
+    } on AuthSyncException catch (e) {
+      AppLogger.warning(
+        '$context: auth failure, will use local cache — $e',
+        category: 'exercise_repository',
+      );
+      return null;
+    } on NetworkSyncException catch (e) {
+      AppLogger.warning(
+        '$context: network failure, will use local cache — $e',
+        category: 'exercise_repository',
+      );
+      return null;
+    } on RemoteSyncException catch (e) {
+      AppLogger.warning(
+        '$context: remote failure, will use local cache — $e',
+        category: 'exercise_repository',
+      );
+      return null;
+    }
   }
 }
