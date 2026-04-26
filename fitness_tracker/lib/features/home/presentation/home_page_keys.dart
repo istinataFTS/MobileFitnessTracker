@@ -26,12 +26,8 @@ class HomePageKeys {
   static const Key muscleGroupsSectionKey = ValueKey<String>(
     'home_muscle_groups_section',
   );
-  static const Key totalSetsValueKey = ValueKey<String>(
-    'home_total_sets_value',
-  );
-  static const Key targetValueKey = ValueKey<String>('home_target_value');
-  static const Key trainedMusclesValueKey = ValueKey<String>(
-    'home_trained_muscles_value',
-  );
   static const Key bodyVisualKey = ValueKey<String>('home_body_visual');
+  static const Key bodyVisualFlipButtonKey = ValueKey<String>(
+    'home_body_visual_flip_button',
+  );
 }

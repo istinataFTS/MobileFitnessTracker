@@ -395,8 +395,6 @@ class _ProgressCard extends StatelessWidget {
                 ],
               )
             else ...<Widget>[
-              _ProgressStatsRow(viewData: viewData),
-              const SizedBox(height: 16),
               BodyVisualWidget(viewData: viewData.bodyVisual),
               const SizedBox(height: 16),
               ...viewData.muscleSummary.map(
@@ -439,91 +437,6 @@ class _ProgressCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ProgressStatsRow extends StatelessWidget {
-  const _ProgressStatsRow({required this.viewData});
-
-  final HomeProgressCardViewData viewData;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color targetColor = switch (viewData.targetTone) {
-      HomeTone.success => AppTheme.successGreen,
-      HomeTone.warning => AppTheme.warningAmber,
-      HomeTone.primary => AppTheme.primaryOrange,
-      HomeTone.muted => AppTheme.textDim,
-    };
-
-    Widget stat({
-      required Key valueKey,
-      required IconData icon,
-      required String value,
-      required String label,
-      required Color color,
-    }) {
-      return Expanded(
-        child: Column(
-          children: <Widget>[
-            Icon(icon, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              key: valueKey,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textMedium),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderDark),
-      ),
-      child: Row(
-        children: <Widget>[
-          stat(
-            valueKey: HomePageKeys.totalSetsValueKey,
-            icon: Icons.fitness_center,
-            value: viewData.totalSetsLabel,
-            label: AppStrings.sets,
-            color: AppTheme.primaryOrange,
-          ),
-          Container(width: 1, height: 60, color: AppTheme.borderDark),
-          stat(
-            valueKey: HomePageKeys.targetValueKey,
-            icon: Icons.flag_outlined,
-            value: viewData.remainingTargetLabel,
-            label: AppStrings.target,
-            color: targetColor,
-          ),
-          Container(width: 1, height: 60, color: AppTheme.borderDark),
-          stat(
-            valueKey: HomePageKeys.trainedMusclesValueKey,
-            icon: Icons.auto_awesome,
-            value: viewData.trainedMusclesLabel,
-            label: AppStrings.muscles,
-            color: AppTheme.primaryOrange,
-          ),
-        ],
       ),
     );
   }

@@ -34,10 +34,6 @@ class HomePage extends StatelessWidget {
       HomePageKeys.latestEntriesSectionKey;
   static const Key muscleGroupsSectionKey =
       HomePageKeys.muscleGroupsSectionKey;
-  static const Key totalSetsValueKey = HomePageKeys.totalSetsValueKey;
-  static const Key targetValueKey = HomePageKeys.targetValueKey;
-  static const Key trainedMusclesValueKey =
-      HomePageKeys.trainedMusclesValueKey;
 
   @override
   Widget build(BuildContext context) {
