@@ -104,5 +104,41 @@ void main() {
       expect(load.raw, 10.0);
       expect(identical(decayed, load), isFalse);
     });
+
+    test(
+      'hard-zeros raw at MuscleStimulus.maxFatigueDays regardless of load',
+      () {
+        const load = NormalizedMuscleLoad(
+          raw: 1e9,
+          threshold: MuscleStimulus.weeklyThreshold,
+        );
+        final capped = load.decayed(MuscleStimulus.maxFatigueDays);
+        expect(capped.raw, 0.0);
+        expect(capped.isRecovered, isTrue);
+        expect(capped.threshold, MuscleStimulus.weeklyThreshold);
+      },
+    );
+
+    test(
+      'stays zero past the fatigue-day cap',
+      () {
+        const load = NormalizedMuscleLoad(
+          raw: 1e9,
+          threshold: MuscleStimulus.weeklyThreshold,
+        );
+        final capped = load.decayed(MuscleStimulus.maxFatigueDays + 5);
+        expect(capped.raw, 0.0);
+        expect(capped.isRecovered, isTrue);
+      },
+    );
+
+    test(
+      'still applies normal decay one day before the cap',
+      () {
+        const load = NormalizedMuscleLoad(raw: 10.0, threshold: 25.0);
+        final beforeCap = load.decayed(MuscleStimulus.maxFatigueDays - 1);
+        expect(beforeCap.raw, greaterThan(0.0));
+      },
+    );
   });
 }

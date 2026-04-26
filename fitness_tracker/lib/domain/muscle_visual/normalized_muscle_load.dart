@@ -57,8 +57,18 @@ class NormalizedMuscleLoad {
 
   /// Applies the per-day passive decay [MuscleStimulus.weeklyDecayFactor]
   /// [daysSince] times to [raw]. Non-positive [daysSince] is a no-op.
+  ///
+  /// Once [daysSince] reaches [MuscleStimulus.maxFatigueDays] the load is
+  /// hard-zeroed regardless of how heavy the original session was. This
+  /// matches the product invariant — *no muscle stays fatigued for more
+  /// than [MuscleStimulus.maxFatigueDays] days* — and protects against
+  /// future tuning of the decay/recovery constants drifting outside that
+  /// envelope.
   NormalizedMuscleLoad decayed(int daysSince) {
     if (daysSince <= 0) return this;
+    if (daysSince >= MuscleStimulus.maxFatigueDays) {
+      return NormalizedMuscleLoad(raw: 0.0, threshold: threshold);
+    }
     final decayedRaw =
         raw * pow(MuscleStimulus.weeklyDecayFactor, daysSince).toDouble();
     return NormalizedMuscleLoad(raw: decayedRaw, threshold: threshold);

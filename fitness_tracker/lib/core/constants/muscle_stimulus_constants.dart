@@ -136,6 +136,16 @@ class MuscleStimulus {
   /// Weekly rolling load decay factor applied each day
   static const double weeklyDecayFactor = 0.6;
 
+  /// Hard ceiling on how many days of accumulated stimulus can still register
+  /// as fatigue. Even with the heaviest possible session, a muscle must be
+  /// shown as fully recovered (gray) by this many days after the last set.
+  ///
+  /// With [weeklyDecayFactor] = 0.6 and a normalized [recoveredThreshold] of
+  /// 0.5 the math already crosses the recovery cutoff well before this point
+  /// (`30/25 * 0.6^6 ≈ 0.056`); this cap is a belt-and-suspenders guarantee
+  /// in case decay/threshold constants are tuned later.
+  static const int maxFatigueDays = 6;
+
   /// Recovery cutoff expressed on the **normalized** 0..1 scale
   /// (`rawLoad / threshold`). When the normalized load drops below this
   /// value the muscle is considered fully recovered and renders as

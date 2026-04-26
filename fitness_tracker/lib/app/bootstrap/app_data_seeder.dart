@@ -133,16 +133,21 @@ class AppDataSeeder {
   }
 
   Future<void> _healStimulusDatesIfNeeded() async {
-    const flagKey = 'stimulus_set_date_fix_v1';
+    // v2 bump: re-runs the rebuild so any pre-existing stimulus rows derived
+    // from now-orphaned WorkoutSets (deleted exercises) — which the rebuild
+    // skips because their factor lookup returns empty — get cleared and the
+    // muscle map stops painting muscles that have no resolvable training
+    // behind them.
+    const flagKey = 'stimulus_set_date_fix_v2';
     final metadata = di.sl<AppMetadataLocalDataSource>();
 
     final alreadyApplied = await metadata.readBool(flagKey);
     if (alreadyApplied == true) return;
 
-    debugPrint('🩹 Applying one-time stimulus date fix...');
+    debugPrint('🩹 Applying one-time stimulus rebuild (date + orphan fix)...');
     await _rebuildStimulus();
     await metadata.writeBool(flagKey, true);
-    debugPrint('✅ Stimulus date fix applied and flagged.');
+    debugPrint('✅ Stimulus rebuild applied and flagged.');
   }
 
   Future<void> _rebuildStimulus() async {
