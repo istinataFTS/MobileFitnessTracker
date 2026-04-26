@@ -5,12 +5,13 @@ import '../../../../core/themes/app_theme.dart';
 import '../../../../core/utils/week_date_utils.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../history_strings.dart';
+import '../models/day_activity.dart';
 
 class HistoryCalendarWidget extends StatelessWidget {
   final DateTime displayedMonth;
   final DateTime? selectedDate;
   final DateTime today;
-  final Map<DateTime, int> dateActivityCount;
+  final Map<DateTime, DayActivity> dayActivity;
   final WeekStartDay weekStartDay;
   final ValueChanged<DateTime> onDateSelected;
   final VoidCallback onPreviousMonth;
@@ -22,7 +23,7 @@ class HistoryCalendarWidget extends StatelessWidget {
     required this.displayedMonth,
     required this.selectedDate,
     required this.today,
-    required this.dateActivityCount,
+    required this.dayActivity,
     required this.weekStartDay,
     required this.onDateSelected,
     required this.onPreviousMonth,
@@ -35,6 +36,9 @@ class HistoryCalendarWidget extends StatelessWidget {
   static const double _dayItemHeight = 36;
   static const double _todayBorderWidth = 1.5;
   static const double _indicatorSize = 5;
+  static const double _indicatorSpacing = 3;
+  static const Color _exerciseDotColor = AppTheme.warningAmber;
+  static const Color _nutritionDotColor = AppTheme.successGreen;
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +183,8 @@ class HistoryCalendarWidget extends StatelessWidget {
     final bool isSelected = selectedDate != null &&
         WeekDateUtils.isSameDay(date, selectedDate!);
     final DateTime normalizedDate = WeekDateUtils.normalizeDate(date);
-    final int activityCount = dateActivityCount[normalizedDate] ?? 0;
-    final bool hasActivity = activityCount > 0;
+    final DayActivity activity = dayActivity[normalizedDate] ?? DayActivity.none;
+    final bool hasActivity = activity.hasAny;
 
     final DateTime normalizedToday = WeekDateUtils.normalizeDate(today);
     final bool isFutureDate = normalizedDate.isAfter(normalizedToday);
@@ -236,19 +240,54 @@ class HistoryCalendarWidget extends StatelessWidget {
                 bottom: 3,
                 left: 0,
                 right: 0,
-                child: Center(
-                  child: Container(
-                    width: _indicatorSize,
-                    height: _indicatorSize,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryOrange,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
+                child: _ActivityIndicators(activity: activity),
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ActivityIndicators extends StatelessWidget {
+  const _ActivityIndicators({required this.activity});
+
+  final DayActivity activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> dots = <Widget>[];
+    if (activity.hasExercise) {
+      dots.add(const _Dot(color: HistoryCalendarWidget._exerciseDotColor));
+    }
+    if (activity.hasNutrition) {
+      if (dots.isNotEmpty) {
+        dots.add(const SizedBox(width: HistoryCalendarWidget._indicatorSpacing));
+      }
+      dots.add(const _Dot(color: HistoryCalendarWidget._nutritionDotColor));
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: dots,
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: HistoryCalendarWidget._indicatorSize,
+      height: HistoryCalendarWidget._indicatorSize,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
       ),
     );
   }

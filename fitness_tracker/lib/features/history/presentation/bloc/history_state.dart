@@ -2,7 +2,6 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../domain/entities/nutrition_log.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../helpers/history_activity_aggregator.dart';
 
 abstract class HistoryState extends Equatable {
   const HistoryState();
@@ -35,14 +34,6 @@ class HistoryLoaded extends HistoryState {
     this.selectedDateSets = const <WorkoutSet>[],
     this.selectedDateNutritionLogs = const <NutritionLog>[],
   });
-
-  int getActivityCountForDate(DateTime date) {
-    return HistoryActivityAggregator.getActivityCountForDate(
-      monthSets: monthSets,
-      monthNutritionLogs: monthNutritionLogs,
-      date: date,
-    );
-  }
 
   @override
   List<Object?> get props => <Object?>[

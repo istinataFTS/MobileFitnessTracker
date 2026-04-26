@@ -8,12 +8,15 @@ import '../../../core/themes/app_theme.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/utils/week_date_utils.dart';
 import '../../../domain/entities/app_settings.dart';
+import '../../../domain/entities/exercise.dart';
+import '../../library/application/exercise_bloc.dart';
 import 'bloc/history_bloc.dart';
 import 'bloc/history_effect.dart';
 import 'bloc/history_event.dart';
 import 'bloc/history_state.dart';
 import 'helpers/history_activity_aggregator.dart';
 import 'history_strings.dart';
+import 'models/day_activity.dart';
 import 'widgets/history_calendar_widget.dart';
 import 'widgets/history_day_content.dart';
 
@@ -134,12 +137,6 @@ class _HistoryPageState extends State<HistoryPage> {
     HistoryLoaded state,
     AppSettings settings,
   ) {
-    final Map<DateTime, int> activityCounts =
-        HistoryActivityAggregator.buildActivityCounts(
-      monthSets: state.monthSets,
-      monthNutritionLogs: state.monthNutritionLogs,
-    );
-
     return GestureDetector(
       onHorizontalDragEnd: (DragEndDetails details) {
         if (details.primaryVelocity != null &&
@@ -162,25 +159,48 @@ class _HistoryPageState extends State<HistoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              HistoryCalendarWidget(
-                displayedMonth: state.currentMonth,
-                selectedDate: state.selectedDate,
-                today: DateTime.now(),
-                dateActivityCount: activityCounts,
-                weekStartDay: settings.weekStartDay,
-                onDateSelected: (DateTime date) {
-                  context.read<HistoryBloc>().add(SelectDateEvent(date));
-                },
-                onPreviousMonth: () {
-                  _navigateToPreviousMonth(context, state.currentMonth);
-                },
-                onNextMonth: () {
-                  _navigateToNextMonth(context, state.currentMonth);
-                },
-                onTodayTapped: () {
-                  context.read<HistoryBloc>().add(
-                        NavigateToMonthEvent(DateTime.now()),
-                      );
+              BlocBuilder<ExerciseBloc, ExerciseState>(
+                buildWhen: (ExerciseState previous, ExerciseState current) =>
+                    previous is! ExercisesLoaded ||
+                    current is ExercisesLoaded,
+                builder: (BuildContext context, ExerciseState exerciseState) {
+                  final Set<String>? resolvableExerciseIds =
+                      exerciseState is ExercisesLoaded
+                          ? <String>{
+                              for (final Exercise exercise
+                                  in exerciseState.exercises)
+                                exercise.id,
+                            }
+                          : null;
+
+                  final Map<DateTime, DayActivity> dayActivity =
+                      HistoryActivityAggregator.buildActivityCounts(
+                    monthSets: state.monthSets,
+                    monthNutritionLogs: state.monthNutritionLogs,
+                    resolvableExerciseIds: resolvableExerciseIds,
+                  );
+
+                  return HistoryCalendarWidget(
+                    displayedMonth: state.currentMonth,
+                    selectedDate: state.selectedDate,
+                    today: DateTime.now(),
+                    dayActivity: dayActivity,
+                    weekStartDay: settings.weekStartDay,
+                    onDateSelected: (DateTime date) {
+                      context.read<HistoryBloc>().add(SelectDateEvent(date));
+                    },
+                    onPreviousMonth: () {
+                      _navigateToPreviousMonth(context, state.currentMonth);
+                    },
+                    onNextMonth: () {
+                      _navigateToNextMonth(context, state.currentMonth);
+                    },
+                    onTodayTapped: () {
+                      context.read<HistoryBloc>().add(
+                            NavigateToMonthEvent(DateTime.now()),
+                          );
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 24),
