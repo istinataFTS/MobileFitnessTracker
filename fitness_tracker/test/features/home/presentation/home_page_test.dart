@@ -10,6 +10,7 @@ import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
+import 'package:fitness_tracker/features/home/presentation/home_page_keys.dart';
 import 'package:fitness_tracker/features/home/presentation/widgets/period_selector_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -209,9 +210,12 @@ void main() {
     expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
     expect(find.byKey(HomePage.latestEntriesSectionKey), findsOneWidget);
     expect(find.byKey(HomePage.muscleGroupsSectionKey), findsOneWidget);
-    expect(find.byKey(HomePage.totalSetsValueKey), findsOneWidget);
-    expect(find.byKey(HomePage.targetValueKey), findsOneWidget);
-    expect(find.byKey(HomePage.trainedMusclesValueKey), findsOneWidget);
+    expect(find.byKey(HomePageKeys.bodyVisualKey), findsOneWidget);
+
+    // The Sets / Target / Muscles stat row was removed in favour of a cleaner
+    // muscle-map card; assert the labels are gone so the row can't sneak back.
+    expect(find.text('Sets'), findsNothing);
+    expect(find.text('Muscles'), findsNothing);
 
     expect(find.text('Chicken and Rice'), findsOneWidget);
     expect(find.text('Progress • Week'), findsOneWidget);
@@ -337,8 +341,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Progress • Month'), findsOneWidget);
-    expect(find.byKey(HomePage.targetValueKey), findsOneWidget);
-    expect(find.text('-'), findsWidgets);
+    // No weekly target row remains — this assertion just ensures the card
+    // still renders cleanly under non-week periods.
+    expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
   });
 
   testWidgets('pull to refresh dispatches both refresh events from refresh list', (
