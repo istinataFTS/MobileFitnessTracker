@@ -194,6 +194,151 @@ void main() {
     },
   );
 
+  test(
+    'week view classifies a stale today-row whose rolling load has decayed '
+    'below the recovery cutoff as untrained — guards the today-branch path',
+    () async {
+      // The original bug: when the rebuild propagates a row forward to today
+      // for every day in the workout history, _getWeekVisualData's today
+      // branch returned `rollingWeeklyLoad` raw and asked the contract to
+      // classify it. The contract treats any positive stimulus as
+      // `hasTrained`, so a fully-decayed muscle still painted on the body
+      // map. This test pins the today-branch through the same isRecovered
+      // check the without-today branch already used.
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+
+      for (final String muscleGroup
+          in stimulus_constants.MuscleStimulus.allMuscleGroups) {
+        if (muscleGroup == stimulus_constants.MuscleStimulus.lats) {
+          when(
+            () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              date: todayStart,
+            ),
+          ).thenAnswer(
+            (_) async => Right(
+              stimulus_entity.MuscleStimulus(
+                id: 'lats-today-decayed',
+                ownerUserId: testUserId,
+                muscleGroup: muscleGroup,
+                date: todayStart,
+                dailyStimulus: 0.0,
+                // Below 0.5 * weeklyThreshold (12.5) → already recovered.
+                rollingWeeklyLoad: 1.0,
+                createdAt: todayStart,
+                updatedAt: todayStart,
+              ),
+            ),
+          );
+        } else {
+          when(
+            () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              date: todayStart,
+            ),
+          ).thenAnswer((_) async => const Right(null));
+          when(
+            () => repository.getStimulusByDateRange(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              startDate: any(named: 'startDate'),
+              endDate: any(named: 'endDate'),
+            ),
+          ).thenAnswer(
+            (_) async => const Right(<stimulus_entity.MuscleStimulus>[]),
+          );
+        }
+      }
+
+      final result = await usecase(TimePeriod.week, testUserId);
+      final visualData = result.getOrElse(
+        () => throw StateError('expected data'),
+      );
+
+      expect(
+        visualData[stimulus_constants.MuscleStimulus.lats]!.hasTrained,
+        isFalse,
+        reason:
+            'a today-row with a fully-decayed rolling load must render as '
+            'untrained, otherwise muscles stay coloured forever once a row '
+            'has been propagated to today by the rebuild',
+      );
+    },
+  );
+
+  test(
+    'week view applies decay to a stale-dated today-branch row using '
+    'days-since-the-row-date',
+    () async {
+      // If a stimulus row is dated several days in the past (e.g. the rebuild
+      // never ran or a future regression stops propagating rows forward),
+      // the today-branch must still age the load by `today - row.date` and
+      // hand off to isRecovered. With raw=20 and 5 days of decay
+      // (0.6^5 ≈ 0.0778) the normalized load drops to ~0.062 — well under
+      // the 0.5 cutoff.
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final fiveDaysAgo = todayStart.subtract(const Duration(days: 5));
+
+      for (final String muscleGroup
+          in stimulus_constants.MuscleStimulus.allMuscleGroups) {
+        if (muscleGroup == stimulus_constants.MuscleStimulus.midChest) {
+          when(
+            () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              date: todayStart,
+            ),
+          ).thenAnswer(
+            (_) async => Right(
+              stimulus_entity.MuscleStimulus(
+                id: 'chest-stale-today',
+                ownerUserId: testUserId,
+                muscleGroup: muscleGroup,
+                date: fiveDaysAgo,
+                dailyStimulus: 0.0,
+                rollingWeeklyLoad: 20.0,
+                createdAt: fiveDaysAgo,
+                updatedAt: fiveDaysAgo,
+              ),
+            ),
+          );
+        } else {
+          when(
+            () => repository.getStimulusByMuscleAndDate(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              date: todayStart,
+            ),
+          ).thenAnswer((_) async => const Right(null));
+          when(
+            () => repository.getStimulusByDateRange(
+              userId: testUserId,
+              muscleGroup: muscleGroup,
+              startDate: any(named: 'startDate'),
+              endDate: any(named: 'endDate'),
+            ),
+          ).thenAnswer(
+            (_) async => const Right(<stimulus_entity.MuscleStimulus>[]),
+          );
+        }
+      }
+
+      final result = await usecase(TimePeriod.week, testUserId);
+      final visualData = result.getOrElse(
+        () => throw StateError('expected data'),
+      );
+
+      expect(
+        visualData[stimulus_constants.MuscleStimulus.midChest]!.hasTrained,
+        isFalse,
+      );
+    },
+  );
+
   test('userId is forwarded to every repository query', () async {
     const otherUserId = 'user-other';
     final today = DateTime.now();

@@ -127,10 +127,38 @@ class GetMuscleVisualData {
           continue;
         }
 
+        // Route through [NormalizedMuscleLoad] so the recovery cutoff is the
+        // single source of truth — the contract's [classify] only checks
+        // `stimulus > 0`, which would paint a muscle that decayed nearly to
+        // zero as still trained. Days-since is computed against the row's
+        // own date so a stale row dated in the past (e.g. carried forward
+        // by the rebuild but never refreshed) still decays correctly.
+        final daysSince = todayStart
+            .difference(
+              DateTime(
+                stimulus.date.year,
+                stimulus.date.month,
+                stimulus.date.day,
+              ),
+            )
+            .inDays;
+        final load = NormalizedMuscleLoad(
+          raw: stimulus.rollingWeeklyLoad,
+          threshold: MuscleStimulus.weeklyThreshold,
+        ).decayed(daysSince);
+
+        if (load.isRecovered) {
+          visualData[muscleGroup] = MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          );
+          continue;
+        }
+
         visualData[muscleGroup] = _buildVisualData(
           muscleGroup: muscleGroup,
-          stimulus: stimulus.rollingWeeklyLoad,
-          threshold: MuscleStimulus.weeklyThreshold,
+          stimulus: load.raw,
+          threshold: load.threshold,
           aggregationMode: aggregationMode,
         );
       }
