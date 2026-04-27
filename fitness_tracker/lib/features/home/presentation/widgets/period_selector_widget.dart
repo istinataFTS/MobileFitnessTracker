@@ -63,19 +63,13 @@ class PeriodSelectorWidget extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: enabled ? AppTheme.textLight : AppTheme.textDim,
               ),
+          // Today and Week are intentionally omitted from the user-facing
+          // selector. The Fatigue toggle already exposes the live "right
+          // now" rolling-weekly view, so neither a Week nor a Today volume
+          // option earns its slot. Both enum members still exist because
+          // the use case + bloc use them internally (Fatigue → Week,
+          // GetMuscleVisualData → Today for daily-stimulus reads).
           items: <DropdownMenuItem<TimePeriod>>[
-            _buildMenuItem(
-              context,
-              value: TimePeriod.today,
-              label: AppStrings.periodToday,
-              icon: Icons.today,
-            ),
-            _buildMenuItem(
-              context,
-              value: TimePeriod.week,
-              label: AppStrings.periodWeek,
-              icon: Icons.date_range,
-            ),
             _buildMenuItem(
               context,
               value: TimePeriod.month,
@@ -146,16 +140,6 @@ class PeriodSegmentedControl extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          _buildSegment(
-            context,
-            period: TimePeriod.today,
-            label: AppStrings.periodToday,
-          ),
-          _buildSegment(
-            context,
-            period: TimePeriod.week,
-            label: AppStrings.periodWeek,
-          ),
           _buildSegment(
             context,
             period: TimePeriod.month,

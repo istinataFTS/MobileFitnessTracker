@@ -166,7 +166,7 @@ class HomeViewDataMapper {
       return muscleVisualState.period;
     }
 
-    return TimePeriod.week;
+    return TimePeriod.month;
   }
 
   static MuscleMapMode _resolveCurrentMode(MuscleVisualState muscleVisualState) {
@@ -255,6 +255,26 @@ class HomeViewDataMapper {
     );
   }
 
+  /// Collapses any non-user-facing [TimePeriod] to a value the period
+  /// dropdown can render. The enum still carries [TimePeriod.today] (used
+  /// by the use case for the daily-stimulus read path) and [TimePeriod.week]
+  /// (used by the bloc to source Fatigue data), but neither is one of the
+  /// dropdown's items — passing them through to [DropdownButton.value]
+  /// would crash the build.
+  ///
+  /// Anything outside the visible set falls back to [TimePeriod.month], the
+  /// dropdown's default landing option.
+  static TimePeriod _coerceToVisiblePeriod(TimePeriod period) {
+    switch (period) {
+      case TimePeriod.month:
+      case TimePeriod.allTime:
+        return period;
+      case TimePeriod.today:
+      case TimePeriod.week:
+        return TimePeriod.month;
+    }
+  }
+
   static HomeProgressCardViewData _mapProgress({
     required int weeklySetCount,
     required List<Target> trainingTargets,
@@ -262,6 +282,10 @@ class HomeViewDataMapper {
     required TimePeriod currentPeriod,
     required MuscleMapMode currentMode,
   }) {
+    // Display period is what the dropdown sees; internal period (e.g. week
+    // for fatigue) never leaks into the UI.
+    final TimePeriod displayPeriod = _coerceToVisiblePeriod(currentPeriod);
+
     // Resolver-sourced count so the stat card can never disagree with the
     // body map — both now count only sets that resolved to ≥1 positive
     // muscle factor.
@@ -278,7 +302,7 @@ class HomeViewDataMapper {
 
     final String cardTitle = currentMode == MuscleMapMode.fatigue
         ? 'Muscle Fatigue'
-        : '${AppStrings.progress} • ${_periodLabel(currentPeriod)}';
+        : '${AppStrings.progress} • ${_periodLabel(displayPeriod)}';
 
     final HomeBodyVisualViewData emptyVisual = HomeBodyVisualViewData(
       frontLayers: const <HomeBodyOverlayViewData>[],
@@ -293,7 +317,7 @@ class HomeViewDataMapper {
         muscleVisualState is MuscleVisualInitial) {
       return HomeProgressCardViewData(
         title: cardTitle,
-        selectedPeriod: currentPeriod,
+        selectedPeriod: displayPeriod,
         selectorEnabled: selectorEnabled,
         showPeriodSelector: showPeriodSelector,
         muscleMapMode: currentMode,
@@ -314,7 +338,7 @@ class HomeViewDataMapper {
     if (muscleVisualState is MuscleVisualError) {
       return HomeProgressCardViewData(
         title: cardTitle,
-        selectedPeriod: currentPeriod,
+        selectedPeriod: displayPeriod,
         selectorEnabled: selectorEnabled,
         showPeriodSelector: showPeriodSelector,
         muscleMapMode: currentMode,
@@ -358,7 +382,7 @@ class HomeViewDataMapper {
 
     return HomeProgressCardViewData(
       title: cardTitle,
-      selectedPeriod: currentPeriod,
+      selectedPeriod: displayPeriod,
       selectorEnabled: selectorEnabled,
       showPeriodSelector: showPeriodSelector,
       muscleMapMode: currentMode,

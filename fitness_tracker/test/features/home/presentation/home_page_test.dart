@@ -104,7 +104,7 @@ void main() {
         hasTrained: true,
       ),
     },
-    currentPeriod: TimePeriod.week,
+    currentPeriod: TimePeriod.month,
     loadedAt: now,
   );
 
@@ -218,7 +218,7 @@ void main() {
     expect(find.text('Muscles'), findsNothing);
 
     expect(find.text('Chicken and Rice'), findsOneWidget);
-    expect(find.text('Progress • Week'), findsOneWidget);
+    expect(find.text('Progress • Month'), findsOneWidget);
   });
 
   testWidgets('period selector exposes stable key and dispatches month change', (
@@ -256,7 +256,7 @@ void main() {
     when(() => muscleVisualBloc.state).thenReturn(
       const MuscleVisualError(
         message: 'visual load failed',
-        period: TimePeriod.week,
+        period: TimePeriod.today,
       ),
     );
     whenListen<MuscleVisualState>(

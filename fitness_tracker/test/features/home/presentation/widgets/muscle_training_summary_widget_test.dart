@@ -90,7 +90,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final MuscleVisualLoaded emptyState = MuscleVisualLoaded(
         muscleData: const <String, MuscleVisualData>{},
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 
@@ -156,7 +156,7 @@ void main() {
             hasTrained: true,
           ),
         },
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 
@@ -227,7 +227,7 @@ void main() {
             hasTrained: false,
           ),
         },
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 

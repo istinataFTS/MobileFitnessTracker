@@ -127,13 +127,19 @@ class GetMuscleVisualData {
           continue;
         }
 
-        // Route through [NormalizedMuscleLoad] so the recovery cutoff is the
-        // single source of truth — the contract's [classify] only checks
-        // `stimulus > 0`, which would paint a muscle that decayed nearly to
-        // zero as still trained. Days-since is computed against the row's
-        // own date so a stale row dated in the past (e.g. carried forward
-        // by the rebuild but never refreshed) still decays correctly.
-        final daysSince = todayStart
+        // For stale rows (row dated in the past — e.g. carried forward by
+        // the rebuild but never refreshed), route through
+        // [NormalizedMuscleLoad] so the recovery cutoff is the single
+        // source of truth. The contract's [classify] only checks
+        // `stimulus > 0`, which would paint a muscle whose decayed load
+        // had dropped to ~zero as still trained.
+        //
+        // Fresh same-day rows render directly. The recovery cutoff is
+        // calibrated for *aged* loads (~50 % of the weekly threshold);
+        // applying it to a brand-new single-set row would hide the
+        // muscle the user just trained, because a single set produces a
+        // rolling load well below the cutoff at day 0.
+        final int daysSince = todayStart
             .difference(
               DateTime(
                 stimulus.date.year,
@@ -142,14 +148,25 @@ class GetMuscleVisualData {
               ),
             )
             .inDays;
-        final load = NormalizedMuscleLoad(
-          raw: stimulus.rollingWeeklyLoad,
-          threshold: MuscleStimulus.weeklyThreshold,
-        ).decayed(daysSince);
 
-        if (load.isRecovered) {
-          visualData[muscleGroup] = MuscleVisualData.untrained(
-            muscleGroup,
+        if (daysSince > 0) {
+          final NormalizedMuscleLoad load = NormalizedMuscleLoad(
+            raw: stimulus.rollingWeeklyLoad,
+            threshold: MuscleStimulus.weeklyThreshold,
+          ).decayed(daysSince);
+
+          if (load.isRecovered) {
+            visualData[muscleGroup] = MuscleVisualData.untrained(
+              muscleGroup,
+              aggregationMode: aggregationMode,
+            );
+            continue;
+          }
+
+          visualData[muscleGroup] = _buildVisualData(
+            muscleGroup: muscleGroup,
+            stimulus: load.raw,
+            threshold: load.threshold,
             aggregationMode: aggregationMode,
           );
           continue;
@@ -157,8 +174,8 @@ class GetMuscleVisualData {
 
         visualData[muscleGroup] = _buildVisualData(
           muscleGroup: muscleGroup,
-          stimulus: load.raw,
-          threshold: load.threshold,
+          stimulus: stimulus.rollingWeeklyLoad,
+          threshold: MuscleStimulus.weeklyThreshold,
           aggregationMode: aggregationMode,
         );
       }

@@ -180,11 +180,11 @@ void main() {
         build: buildBloc,
         seed: () => MuscleVisualLoaded(
           muscleData: _weekData,
-          currentPeriod: TimePeriod.week,
+          currentPeriod: TimePeriod.month,
           loadedAt: DateTime(2026, 4, 7),
         ),
-        // _currentPeriod defaults to week; state is Loaded → no-op
-        act: (bloc) => bloc.add(const ChangePeriodEvent(TimePeriod.week)),
+        // _currentPeriod defaults to month; state is Loaded → no-op
+        act: (bloc) => bloc.add(const ChangePeriodEvent(TimePeriod.month)),
         expect: () => <MuscleVisualState>[],
       );
 
@@ -282,7 +282,7 @@ void main() {
         build: buildBloc,
         seed: () => MuscleVisualLoaded(
           muscleData: _weekData,
-          currentPeriod: TimePeriod.week,
+          currentPeriod: TimePeriod.month,
           loadedAt: DateTime(2026, 4, 7),
         ),
         act: (bloc) => bloc.add(const ChangeModeEvent(MuscleMapMode.volume)),
@@ -321,13 +321,13 @@ void main() {
         'clears cache and triggers a fresh load of the current period',
         build: buildBloc,
         setUp: () {
-          when(() => mockGet(TimePeriod.week, _testUserId))
+          when(() => mockGet(TimePeriod.month, _testUserId))
               .thenAnswer((_) async => const Right(_weekData));
         },
         act: (bloc) => bloc.add(const ClearCacheEvent()),
         expect: () => [
-          const MuscleVisualLoading(TimePeriod.week),
-          _isLoaded(period: TimePeriod.week),
+          const MuscleVisualLoading(TimePeriod.month),
+          _isLoaded(period: TimePeriod.month),
         ],
       );
     });
