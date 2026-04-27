@@ -96,9 +96,43 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
     );
   }
 
+  /// Inserts a remote-pulled exercise locally, reconciling against the
+  /// `UNIQUE(name, COALESCE(owner_user_id, ''))` constraint.
+  ///
+  /// The base coordinator already checked `getLocalById(remoteId)` and
+  /// found nothing — but a different local row may still own the
+  /// `(name, ownerUserId)` slot. That happens when the same logical
+  /// exercise was created on another device (or seeded server-side) with
+  /// a different `id` than the one we minted locally. A blind insert
+  /// trips the UNIQUE index and aborts the entire feature pull.
+  ///
+  /// Reconciliation strategy: when a name+owner conflict is detected we
+  /// adopt the remote payload **on top of the existing local id**. Keeping
+  /// the local id preserves referential integrity for child rows
+  /// (`workout_sets.exercise_id`, `exercise_muscle_factors.exercise_id`)
+  /// that already point at it; the cloud's id is captured separately as
+  /// `serverId` via the standard sync metadata.
   @override
-  Future<void> insertLocal(Exercise entity) {
-    return localDataSource.insertExercise(
+  Future<void> insertLocal(Exercise entity) async {
+    final existing = await localDataSource.getByNameAndOwner(
+      name: entity.name,
+      ownerUserId: entity.ownerUserId,
+    );
+
+    if (existing != null && existing.id != entity.id) {
+      final reconciled = entity.copyWith(
+        id: existing.id,
+        syncMetadata: entity.syncMetadata.copyWith(
+          serverId: entity.syncMetadata.serverId ?? entity.id,
+        ),
+      );
+      await localDataSource.updateExercise(
+        ExerciseModel.fromEntity(reconciled),
+      );
+      return;
+    }
+
+    await localDataSource.insertExercise(
       ExerciseModel.fromEntity(entity),
     );
   }
