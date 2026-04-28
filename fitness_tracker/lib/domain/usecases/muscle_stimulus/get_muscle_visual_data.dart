@@ -172,6 +172,28 @@ class GetMuscleVisualData {
           continue;
         }
 
+        // daysSince == 0: today's record exists.
+        //
+        // The rebuild creates carry-forward rows for every muscle through
+        // today, even when the last actual set was many days ago. Those rows
+        // have a correctly-decayed rollingWeeklyLoad, but without a guard
+        // they render as light-green fatigue indefinitely.
+        //
+        // Use lastSetTimestamp to detect carry-forward rows. If the last
+        // actual workout for this muscle was ≥ maxFatigueDays ago, hard-zero
+        // it — the same cutoff applied by NormalizedMuscleLoad.decayed().
+        // Fresh sets logged today (lastSetTimestamp == today) bypass this
+        // check so newly-trained muscles still light up immediately.
+        final int daysSinceLastSet =
+            _daysSinceLastSet(stimulus.lastSetTimestamp, stimulus.date, todayStart);
+        if (daysSinceLastSet >= MuscleStimulus.maxFatigueDays) {
+          visualData[muscleGroup] = MuscleVisualData.untrained(
+            muscleGroup,
+            aggregationMode: aggregationMode,
+          );
+          continue;
+        }
+
         visualData[muscleGroup] = _buildVisualData(
           muscleGroup: muscleGroup,
           stimulus: stimulus.rollingWeeklyLoad,
@@ -383,6 +405,26 @@ class GetMuscleVisualData {
       threshold: threshold,
       aggregationMode: aggregationMode,
     );
+  }
+
+  /// Returns how many full calendar days have elapsed between [todayStart] and
+  /// the date of the last actual set for this muscle, using [lastSetTimestamp]
+  /// when available and falling back to [stimulusDate] otherwise.
+  static int _daysSinceLastSet(
+    int? lastSetTimestamp,
+    DateTime stimulusDate,
+    DateTime todayStart,
+  ) {
+    final DateTime lastSetDay;
+    if (lastSetTimestamp != null) {
+      final raw = DateTime.fromMillisecondsSinceEpoch(lastSetTimestamp);
+      lastSetDay = DateTime(raw.year, raw.month, raw.day);
+    } else {
+      lastSetDay =
+          DateTime(stimulusDate.year, stimulusDate.month, stimulusDate.day);
+    }
+    final int days = todayStart.difference(lastSetDay).inDays;
+    return days < 0 ? 0 : days;
   }
 
   Future<Either<Failure, Map<String, MuscleVisualData>>>

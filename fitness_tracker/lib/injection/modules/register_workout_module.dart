@@ -25,13 +25,16 @@ void registerWorkoutModule(GetIt sl) {
     () => WorkoutBloc(
       addWorkoutSet: sl(),
       getWeeklySets: sl(),
-      recordWorkoutSet: sl(),
-      appSessionRepository: sl(),
+      calculateMuscleStimulus: sl(),
     ),
   );
 
   sl.registerLazySingleton(
-    () => AddWorkoutSet(sl(), appSessionRepository: sl()),
+    () => AddWorkoutSet(
+      sl(),
+      appSessionRepository: sl(),
+      rebuildMuscleStimulusFromWorkoutHistory: sl(),
+    ),
   );
   sl.registerLazySingleton(
     () => GetAllWorkoutSets(sl(), sourcePreferenceResolver: sl()),

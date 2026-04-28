@@ -7,6 +7,7 @@ import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:fitness_tracker/domain/repositories/workout_set_repository.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/add_workout_set.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -14,6 +15,9 @@ import 'package:mocktail/mocktail.dart';
 class MockWorkoutSetRepository extends Mock implements WorkoutSetRepository {}
 
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+
+class MockRebuildMuscleStimulusFromWorkoutHistory extends Mock
+    implements RebuildMuscleStimulusFromWorkoutHistory {}
 
 void main() {
   setUpAll(() {
@@ -31,6 +35,7 @@ void main() {
 
   late MockWorkoutSetRepository workoutSetRepository;
   late MockAppSessionRepository appSessionRepository;
+  late MockRebuildMuscleStimulusFromWorkoutHistory mockRebuild;
   late AddWorkoutSet usecase;
 
   final baseSet = WorkoutSet(
@@ -45,6 +50,7 @@ void main() {
   setUp(() {
     workoutSetRepository = MockWorkoutSetRepository();
     appSessionRepository = MockAppSessionRepository();
+    mockRebuild = MockRebuildMuscleStimulusFromWorkoutHistory();
 
     when(() => appSessionRepository.syncPolicy)
         .thenReturn(AppSyncPolicy.productionDefault);
@@ -52,9 +58,14 @@ void main() {
     usecase = AddWorkoutSet(
       workoutSetRepository,
       appSessionRepository: appSessionRepository,
+      rebuildMuscleStimulusFromWorkoutHistory: mockRebuild,
     );
 
     when(() => workoutSetRepository.addSet(any())).thenAnswer(
+      (_) async => const Right(null),
+    );
+
+    when(() => mockRebuild(any())).thenAnswer(
       (_) async => const Right(null),
     );
   });
@@ -104,5 +115,33 @@ void main() {
     ).captured.single as WorkoutSet;
 
     expect(captured.ownerUserId, isNull);
+  });
+
+  test('triggers full muscle stimulus rebuild after successful add', () async {
+    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => Right(
+        AppSession(
+          authMode: AuthMode.authenticated,
+          user: const AppUser(id: 'user-123', email: 'user@test.com'),
+        ),
+      ),
+    );
+
+    await usecase(baseSet);
+
+    verify(() => mockRebuild('user-123')).called(1);
+  });
+
+  test('does not trigger rebuild when repository add fails', () async {
+    when(() => workoutSetRepository.addSet(any())).thenAnswer(
+      (_) async => const Left(DatabaseFailure('write failed')),
+    );
+    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+      (_) async => const Right(AppSession.guest()),
+    );
+
+    await usecase(baseSet);
+
+    verifyNever(() => mockRebuild(any()));
   });
 }
