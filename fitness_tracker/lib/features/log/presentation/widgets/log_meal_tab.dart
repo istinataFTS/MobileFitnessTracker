@@ -37,6 +37,8 @@ class _LogMealTabState extends State<LogMealTab> {
   String _searchQuery = '';
   final _uuid = const Uuid();
   late DateTime _selectedDate;
+  bool _logCooldownActive = false;
+  Timer? _logCooldownTimer;
 
   StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
 
@@ -63,7 +65,13 @@ class _LogMealTabState extends State<LogMealTab> {
         }
 
         widget.onLoggedSuccess?.call(_selectedDate);
-        _clearForm();
+
+        // Retain form values — short cooldown prevents accidental double-log.
+        setState(() => _logCooldownActive = true);
+        _logCooldownTimer?.cancel();
+        _logCooldownTimer = Timer(const Duration(milliseconds: 1200), () {
+          if (mounted) setState(() => _logCooldownActive = false);
+        });
       }
     });
   }
@@ -71,6 +79,7 @@ class _LogMealTabState extends State<LogMealTab> {
   @override
   void dispose() {
     _nutritionEffectsSub?.cancel();
+    _logCooldownTimer?.cancel();
     _gramsController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -113,7 +122,7 @@ class _LogMealTabState extends State<LogMealTab> {
                 ),
               ),
             ),
-            if (_selectedMeal != null) _buildLogButton(nutritionState),
+            _buildLogButton(nutritionState),
           ],
         );
       },
@@ -580,7 +589,8 @@ class _LogMealTabState extends State<LogMealTab> {
     final canLog =
         _selectedMeal != null &&
         _gramsController.text.isNotEmpty &&
-        (int.tryParse(_gramsController.text) ?? 0) > 0;
+        (int.tryParse(_gramsController.text) ?? 0) > 0 &&
+        !_logCooldownActive;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -686,9 +696,4 @@ class _LogMealTabState extends State<LogMealTab> {
     );
   }
 
-  void _clearForm() {
-    setState(() {
-      _gramsController.clear();
-    });
-  }
 }

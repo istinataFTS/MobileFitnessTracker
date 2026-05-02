@@ -34,6 +34,8 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   final _fatsController = TextEditingController();
   final _uuid = const Uuid();
   late DateTime _selectedDate;
+  bool _logCooldownActive = false;
+  Timer? _logCooldownTimer;
 
   StreamSubscription<NutritionLogUiEffect>? _nutritionEffectsSub;
 
@@ -60,7 +62,13 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
         }
 
         widget.onLoggedSuccess?.call(_selectedDate);
-        _clearForm();
+
+        // Retain macro values — short cooldown prevents accidental double-log.
+        setState(() => _logCooldownActive = true);
+        _logCooldownTimer?.cancel();
+        _logCooldownTimer = Timer(const Duration(milliseconds: 1200), () {
+          if (mounted) setState(() => _logCooldownActive = false);
+        });
       }
     });
   }
@@ -68,6 +76,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
   @override
   void dispose() {
     _nutritionEffectsSub?.cancel();
+    _logCooldownTimer?.cancel();
     _proteinController.dispose();
     _carbsController.dispose();
     _fatsController.dispose();
@@ -520,7 +529,7 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
     final protein = double.tryParse(_proteinController.text) ?? 0.0;
     final carbs = double.tryParse(_carbsController.text) ?? 0.0;
     final fats = double.tryParse(_fatsController.text) ?? 0.0;
-    final canLog = protein > 0 || carbs > 0 || fats > 0;
+    final canLog = (protein > 0 || carbs > 0 || fats > 0) && !_logCooldownActive;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -630,11 +639,4 @@ class _LogMacrosTabState extends State<LogMacrosTab> {
     );
   }
 
-  void _clearForm() {
-    setState(() {
-      _proteinController.clear();
-      _carbsController.clear();
-      _fatsController.clear();
-    });
-  }
 }

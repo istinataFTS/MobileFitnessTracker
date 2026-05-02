@@ -98,6 +98,9 @@ class AppStrings {
   static const String logMealTab = 'Meal';
   static const String logMacrosTab = 'Macros';
   static const String selectExerciseFirst = 'Select an exercise first';
+  static const String searchExercisesHint = 'Search exercises...';
+  static const String pickerRecents = 'Recents';
+  static const String pickerAllExercises = 'All Exercises';
   static const String enterReps = 'Enter reps';
   static const String enterWeight = 'Enter weight';
   static const String selectIntensity = 'Select intensity';
