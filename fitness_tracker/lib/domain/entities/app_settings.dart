@@ -15,27 +15,35 @@ class AppSettings extends Equatable {
   final WeekStartDay weekStartDay;
   final WeightUnit weightUnit;
 
+  /// Stores collapsed/expanded state keyed by stable section IDs.
+  /// Missing keys fall back to each section's `initiallyExpanded` default.
+  final Map<String, bool> uiExpansionState;
+
   const AppSettings({
     required this.notificationsEnabled,
     required this.weekStartDay,
     required this.weightUnit,
+    this.uiExpansionState = const <String, bool>{},
   });
 
   const AppSettings.defaults()
       : notificationsEnabled = true,
         weekStartDay = WeekStartDay.monday,
-        weightUnit = WeightUnit.kilograms;
+        weightUnit = WeightUnit.kilograms,
+        uiExpansionState = const <String, bool>{};
 
   AppSettings copyWith({
     bool? notificationsEnabled,
     WeekStartDay? weekStartDay,
     WeightUnit? weightUnit,
+    Map<String, bool>? uiExpansionState,
   }) {
     return AppSettings(
       notificationsEnabled:
           notificationsEnabled ?? this.notificationsEnabled,
       weekStartDay: weekStartDay ?? this.weekStartDay,
       weightUnit: weightUnit ?? this.weightUnit,
+      uiExpansionState: uiExpansionState ?? this.uiExpansionState,
     );
   }
 
@@ -62,5 +70,6 @@ class AppSettings extends Equatable {
         notificationsEnabled,
         weekStartDay,
         weightUnit,
+        uiExpansionState,
       ];
 }
