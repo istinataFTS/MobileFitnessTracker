@@ -13,11 +13,36 @@ abstract class ExerciseLocalDataSource {
   Future<List<ExerciseModel>> getAllExercises();
   Future<ExerciseModel?> getExerciseById(String id);
   Future<ExerciseModel?> getExerciseByName(String name);
+
+  /// Looks up the unique row that owns the `(name, ownerUserId)` slot
+  /// enforced by the schema's `UNIQUE(name, COALESCE(owner_user_id, ''))`
+  /// constraint.
+  ///
+  /// Use this from sync code paths that need to reconcile a remote payload
+  /// against an existing local row carrying the same name + owner under a
+  /// different `id` (e.g. a row created offline with a locally-generated
+  /// UUID before the device first synced). Without the lookup the pull
+  /// would trip the UNIQUE constraint and abort the whole feature sync.
+  ///
+  /// Pass `ownerUserId == null` to find seeded/system rows.
+  Future<ExerciseModel?> getByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  });
+
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup);
   Future<List<ExerciseModel>> getPendingSyncExercises();
   Future<void> insertExercise(ExerciseModel exercise);
   Future<void> updateExercise(ExerciseModel exercise);
   Future<void> upsertExercise(ExerciseModel exercise);
+
+  /// Returns the raw stored exercise row matching [name] + owner key
+  /// `COALESCE(owner_user_id, '')`, bypassing the visibility filter.
+  /// Used by sync to detect (name, owner) collisions before insert/update.
+  Future<ExerciseModel?> findStoredExerciseByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  });
   Future<void> prepareForInitialCloudMigration({required String userId});
   Future<void> mergeRemoteExercises(List<ExerciseModel> exercises);
   Future<void> markAsSynced({
@@ -102,6 +127,35 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   }
 
   @override
+  Future<ExerciseModel?> getByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      // Mirror the UNIQUE constraint: COALESCE the owner so a NULL system
+      // owner matches the empty-string sentinel used in the index.
+      final maps = await db.query(
+        DatabaseTables.exercises,
+        where:
+            'LOWER(${DatabaseTables.exerciseName}) = LOWER(?) '
+            "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
+        whereArgs: <Object?>[name, ownerUserId ?? ''],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        return null;
+      }
+      return ExerciseModel.fromMap(maps.first);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to get exercise by name+owner: $e',
+      );
+    }
+  }
+
+  @override
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup) async {
     try {
       final userId = await _getCurrentUserId();
@@ -182,6 +236,32 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to update exercise: $e');
+    }
+  }
+
+  @override
+  Future<ExerciseModel?> findStoredExerciseByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      final ownerKey = ownerUserId ?? '';
+      final maps = await db.query(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseName} = ? '
+            "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
+        whereArgs: <Object?>[name, ownerKey],
+        limit: 1,
+      );
+      if (maps.isEmpty) {
+        return null;
+      }
+      return ExerciseModel.fromMap(maps.first);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to look up exercise by (name, owner): $e',
+      );
     }
   }
 

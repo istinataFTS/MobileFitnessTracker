@@ -1,4 +1,5 @@
 import '../../core/enums/sync_entity_type.dart';
+import '../../core/logging/app_logger.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/meal.dart';
 import '../datasources/local/meal_local_datasource.dart';
@@ -158,6 +159,56 @@ class MealSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Meal>
     DateTime? since,
   }) {
     return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  /// See [ExerciseSyncCoordinatorImpl.persistRemotePulledRow] for the full
+  /// rationale. The local schema enforces
+  /// `UNIQUE(name, COALESCE(owner_user_id, ''))` on meals as well, and the
+  /// cloud has no equivalent constraint, so the same `(name, owner)`
+  /// collision can break the meals migration step.
+  @override
+  Future<bool> persistRemotePulledRow(Meal remote) async {
+    final byId = await localDataSource.getMealById(remote.id);
+    final byNameOwner = await localDataSource.findStoredMealByNameAndOwner(
+      name: remote.name,
+      ownerUserId: remote.ownerUserId,
+    );
+
+    final model = MealModel.fromEntity(remote);
+    model.validateMacros();
+    model.validateAndLogCalories();
+
+    if (byNameOwner == null) {
+      if (byId != null) {
+        await localDataSource.updateMeal(model);
+        return false;
+      }
+      await localDataSource.insertMeal(model);
+      return true;
+    }
+
+    if (byId != null && byId.id == byNameOwner.id) {
+      await localDataSource.updateMeal(model);
+      return false;
+    }
+
+    final mergedId = byNameOwner.id;
+    final mergedModel = MealModel.fromEntity(remote.copyWith(id: mergedId));
+    mergedModel.validateMacros();
+    mergedModel.validateAndLogCalories();
+    await localDataSource.updateMeal(mergedModel);
+
+    if (byId != null && byId.id != mergedId) {
+      await localDataSource.deleteMeal(byId.id);
+    }
+
+    AppLogger.warning(
+      'Reconciled (name, owner) collision during meal pull: '
+      'kept local id $mergedId for "${remote.name}" '
+      '(remote id ${remote.id})',
+      category: 'sync',
+    );
+    return false;
   }
 
   @override
