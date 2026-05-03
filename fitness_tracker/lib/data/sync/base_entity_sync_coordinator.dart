@@ -255,14 +255,11 @@ abstract class BaseEntitySyncCoordinator<T> {
         continue;
       }
 
-      final existing = await getLocalById(remoteId);
-
-      if (existing != null) {
-        await updateLocal(remoteEntity);
-        updated++;
-      } else {
-        await insertLocal(remoteEntity);
+      final wasInserted = await persistRemotePulledRow(remoteEntity);
+      if (wasInserted) {
         inserted++;
+      } else {
+        updated++;
       }
     }
 
@@ -271,6 +268,24 @@ abstract class BaseEntitySyncCoordinator<T> {
       'inserted=$inserted updated=$updated skipped=$skipped',
       category: 'sync',
     );
+  }
+
+  /// Persists a single remote-pulled entity into local storage.
+  ///
+  /// Default behaviour: insert if no local row matches by id, otherwise
+  /// update by id. Returns `true` when a row was inserted.
+  ///
+  /// Subclasses can override this hook to add reconciliation for secondary
+  /// uniqueness constraints (e.g. `UNIQUE(name, owner)` on exercises and
+  /// meals) that the by-id lookup does not detect.
+  Future<bool> persistRemotePulledRow(T remote) async {
+    final existing = await getLocalById(getEntityId(remote));
+    if (existing != null) {
+      await updateLocal(remote);
+      return false;
+    }
+    await insertLocal(remote);
+    return true;
   }
 
   Future<void> syncPendingChanges() async {

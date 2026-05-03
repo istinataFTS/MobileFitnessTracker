@@ -1,5 +1,6 @@
 import '../../core/enums/sync_entity_type.dart';
 import '../../core/enums/sync_status.dart';
+import '../../core/logging/app_logger.dart';
 import '../../domain/entities/entity_sync_metadata.dart';
 import '../../domain/entities/exercise.dart';
 import '../datasources/local/exercise_local_datasource.dart';
@@ -221,6 +222,64 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
     DateTime? since,
   }) {
     return remoteDataSource.fetchSince(userId: userId, since: since);
+  }
+
+  /// Reconciles `(name, owner)` collisions during pull.
+  ///
+  /// The local schema enforces `UNIQUE(name, COALESCE(owner_user_id, ''))`.
+  /// The cloud has no equivalent constraint, and historical data can contain
+  /// multiple rows for the same logical exercise — for example because an
+  /// earlier app version uploaded seeded system exercises with their seed
+  /// ids alongside the user's own copy of the same name. A naive id-keyed
+  /// pull would either fail the `UNIQUE` index directly (when no local row
+  /// matches the remote id but a different local row already owns the
+  /// `(name, owner)` slot) or fail later in the same pull when a second
+  /// remote row tries to claim the same slot. Either failure aborts the
+  /// initial cloud migration step and breaks sign-in.
+  ///
+  /// Resolution: keep whichever local row already owns the `(name, owner)`
+  /// slot (children stay attached to its id), overwrite its content with
+  /// the remote payload, and adopt the remote id as `serverId`. If a stale
+  /// local alias exists under the remote id, drop it. Muscle factors are
+  /// reattached by the post-sync heal hook.
+  @override
+  Future<bool> persistRemotePulledRow(Exercise remote) async {
+    final byId = await localDataSource.getExerciseById(remote.id);
+    final byNameOwner = await localDataSource
+        .findStoredExerciseByNameAndOwner(
+      name: remote.name,
+      ownerUserId: remote.ownerUserId,
+    );
+
+    if (byNameOwner == null) {
+      if (byId != null) {
+        await localDataSource.updateExercise(ExerciseModel.fromEntity(remote));
+        return false;
+      }
+      await localDataSource.insertExercise(ExerciseModel.fromEntity(remote));
+      return true;
+    }
+
+    if (byId != null && byId.id == byNameOwner.id) {
+      await localDataSource.updateExercise(ExerciseModel.fromEntity(remote));
+      return false;
+    }
+
+    final mergedId = byNameOwner.id;
+    final merged = remote.copyWith(id: mergedId);
+    await localDataSource.updateExercise(ExerciseModel.fromEntity(merged));
+
+    if (byId != null && byId.id != mergedId) {
+      await localDataSource.deleteExercise(byId.id);
+    }
+
+    AppLogger.warning(
+      'Reconciled (name, owner) collision during exercise pull: '
+      'kept local id $mergedId for "${remote.name}" '
+      '(remote id ${remote.id})',
+      category: 'sync',
+    );
+    return false;
   }
 
   @override

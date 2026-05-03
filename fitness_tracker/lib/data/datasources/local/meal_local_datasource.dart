@@ -21,6 +21,14 @@ abstract class MealLocalDataSource {
 
   Future<void> upsertMeal(MealModel meal);
 
+  /// Returns the raw stored meal row matching [name] + owner key
+  /// `COALESCE(owner_user_id, '')`, bypassing the visibility filter.
+  /// Used by sync to detect (name, owner) collisions before insert/update.
+  Future<MealModel?> findStoredMealByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  });
+
   Future<void> prepareForInitialCloudMigration({
     required String userId,
   });

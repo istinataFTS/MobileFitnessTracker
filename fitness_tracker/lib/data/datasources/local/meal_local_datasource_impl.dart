@@ -180,6 +180,32 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   @override
+  Future<MealModel?> findStoredMealByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      final ownerKey = ownerUserId ?? '';
+      final maps = await db.query(
+        DatabaseTables.meals,
+        where: '${DatabaseTables.mealName} = ? '
+            "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
+        whereArgs: <Object?>[name, ownerKey],
+        limit: 1,
+      );
+      if (maps.isEmpty) {
+        return null;
+      }
+      return MealModel.fromMap(maps.first);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to look up meal by (name, owner): $e',
+      );
+    }
+  }
+
+  @override
   Future<void> upsertMeal(MealModel meal) async {
     final existing = await _getStoredMealById(meal.id);
     if (existing == null) {

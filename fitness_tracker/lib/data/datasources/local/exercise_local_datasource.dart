@@ -35,6 +35,14 @@ abstract class ExerciseLocalDataSource {
   Future<void> insertExercise(ExerciseModel exercise);
   Future<void> updateExercise(ExerciseModel exercise);
   Future<void> upsertExercise(ExerciseModel exercise);
+
+  /// Returns the raw stored exercise row matching [name] + owner key
+  /// `COALESCE(owner_user_id, '')`, bypassing the visibility filter.
+  /// Used by sync to detect (name, owner) collisions before insert/update.
+  Future<ExerciseModel?> findStoredExerciseByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  });
   Future<void> prepareForInitialCloudMigration({required String userId});
   Future<void> mergeRemoteExercises(List<ExerciseModel> exercises);
   Future<void> markAsSynced({
@@ -228,6 +236,32 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       );
     } catch (e) {
       throw CacheDatabaseException('Failed to update exercise: $e');
+    }
+  }
+
+  @override
+  Future<ExerciseModel?> findStoredExerciseByNameAndOwner({
+    required String name,
+    required String? ownerUserId,
+  }) async {
+    try {
+      final db = await databaseHelper.database;
+      final ownerKey = ownerUserId ?? '';
+      final maps = await db.query(
+        DatabaseTables.exercises,
+        where: '${DatabaseTables.exerciseName} = ? '
+            "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
+        whereArgs: <Object?>[name, ownerKey],
+        limit: 1,
+      );
+      if (maps.isEmpty) {
+        return null;
+      }
+      return ExerciseModel.fromMap(maps.first);
+    } catch (e) {
+      throw CacheDatabaseException(
+        'Failed to look up exercise by (name, owner): $e',
+      );
     }
   }
 
