@@ -14,32 +14,15 @@ void main() {
   final DateTime createdAt = DateTime(2024, 1, 1);
 
   HomeDashboardData buildHomeData({
-    required List<Target> targets,
     int weeklySetCount = 0,
     Map<String, int> muscleSetCounts = const <String, int>{},
   }) {
     return HomeDashboardData(
-      targets: targets,
+      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       muscleSetCounts: muscleSetCounts,
       weeklySetCount: weeklySetCount,
-    );
-  }
-
-  Target buildTrainingTarget({
-    required String id,
-    required String categoryKey,
-    required double targetValue,
-  }) {
-    return Target(
-      id: id,
-      type: TargetType.muscleSets,
-      categoryKey: categoryKey,
-      targetValue: targetValue,
-      unit: 'sets',
-      period: TargetPeriod.weekly,
-      createdAt: createdAt,
     );
   }
 
@@ -61,21 +44,42 @@ void main() {
   );
 
   group('HomeViewDataMapper progress mapping', () {
-    test('builds weekly progress card with warning tone when target is nearly met', () {
-      final HomeDashboardData homeData = buildHomeData(
-        targets: <Target>[
-          buildTrainingTarget(
-            id: 'target-1',
-            categoryKey: 'chest',
-            targetValue: 12,
-          ),
-        ],
-        weeklySetCount: 9,
-        muscleSetCounts: const <String, int>{'chest': 9},
+    test('loading state produces isLoading=true with empty muscle summary', () {
+      final HomeDashboardData homeData = buildHomeData(weeklySetCount: 5);
+
+      final HomePageViewData result = HomeViewDataMapper.map(
+        homeData: homeData,
+        muscleVisualState: const MuscleVisualLoading(TimePeriod.month),
+        settings: settings,
       );
 
+      expect(result.progress.isLoading, isTrue);
+      expect(result.progress.errorMessage, isNull);
+      expect(result.progress.muscleSummary, isEmpty);
+    });
+
+    test('error state carries message and is not loading', () {
+      final HomeDashboardData homeData = buildHomeData();
+
+      final HomePageViewData result = HomeViewDataMapper.map(
+        homeData: homeData,
+        muscleVisualState: const MuscleVisualError(
+          message: 'network failure',
+          period: TimePeriod.month,
+        ),
+        settings: settings,
+      );
+
+      expect(result.progress.isLoading, isFalse);
+      expect(result.progress.errorMessage, 'network failure');
+      expect(result.progress.muscleSummary, isEmpty);
+    });
+
+    test('loaded state populates muscle summary for hasTrained muscles only', () {
+      final HomeDashboardData homeData = buildHomeData(weeklySetCount: 9);
+
       final MuscleVisualLoaded visualState = buildMuscleVisualState(
-        period: TimePeriod.week,
+        period: TimePeriod.month,
         muscleData: <String, MuscleVisualData>{
           'chest': const MuscleVisualData(
             muscleGroup: 'chest',
@@ -85,7 +89,7 @@ void main() {
             bucket: MuscleVisualBucket.heavy,
             coverageState: MuscleVisualCoverageState.partial,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
+            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -97,7 +101,7 @@ void main() {
             bucket: MuscleVisualBucket.empty,
             coverageState: MuscleVisualCoverageState.empty,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.back},
+            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.back},
             overflowAmount: 0,
             hasTrained: false,
           ),
@@ -110,126 +114,49 @@ void main() {
         settings: settings,
       );
 
-      expect(result.progress.totalSetsLabel, '9');
-      expect(result.progress.remainingTargetLabel, '3');
-      expect(result.progress.trainedMusclesLabel, '1');
-      expect(result.progress.targetTone, HomeTone.warning);
       expect(result.progress.isLoading, isFalse);
       expect(result.progress.errorMessage, isNull);
+      // Only hasTrained=true muscles with totalStimulus > 0 appear.
+      expect(result.progress.muscleSummary, hasLength(1));
     });
 
-    test('hides target value for non-week periods', () {
-      final HomeDashboardData homeData = buildHomeData(
-        targets: <Target>[
-          buildTrainingTarget(
-            id: 'target-1',
-            categoryKey: 'chest',
-            targetValue: 12,
-          ),
-        ],
-        weeklySetCount: 9,
-        muscleSetCounts: const <String, int>{'chest': 9},
-      );
-
-      final MuscleVisualLoaded visualState = buildMuscleVisualState(
-        period: TimePeriod.allTime,
-        muscleData: <String, MuscleVisualData>{
-          'chest': const MuscleVisualData(
-            muscleGroup: 'chest',
-            totalStimulus: 30,
-            threshold: 20,
-            visualIntensity: 1,
-            bucket: MuscleVisualBucket.maximum,
-            coverageState: MuscleVisualCoverageState.full,
-            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
-            overflowAmount: 10,
-            hasTrained: true,
-          ),
-        },
-      );
+    test('volume mode shows period selector; initial state defaults to volume', () {
+      final HomeDashboardData homeData = buildHomeData();
 
       final HomePageViewData result = HomeViewDataMapper.map(
         homeData: homeData,
-        muscleVisualState: visualState,
+        muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
       );
 
-      expect(result.progress.remainingTargetLabel, '-');
-      expect(result.progress.targetTone, HomeTone.muted);
+      expect(result.progress.showPeriodSelector, isTrue);
     });
 
-    test('uses success tone when remaining target is zero', () {
-      final HomeDashboardData homeData = buildHomeData(
-        targets: <Target>[
-          buildTrainingTarget(
-            id: 'target-1',
-            categoryKey: 'chest',
-            targetValue: 12,
-          ),
-        ],
-        weeklySetCount: 12,
-        muscleSetCounts: const <String, int>{'chest': 12},
-      );
-
-      final MuscleVisualLoaded visualState = buildMuscleVisualState(
-        period: TimePeriod.week,
-        muscleData: <String, MuscleVisualData>{
-          'chest': const MuscleVisualData(
-            muscleGroup: 'chest',
-            totalStimulus: 22,
-            threshold: 20,
-            visualIntensity: 0.8,
-            bucket: MuscleVisualBucket.maximum,
-            coverageState: MuscleVisualCoverageState.full,
-            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
-            overflowAmount: 2,
-            hasTrained: true,
-          ),
-          'triceps': const MuscleVisualData(
-            muscleGroup: 'triceps',
-            totalStimulus: 14,
-            threshold: 20,
-            visualIntensity: 0.5,
-            bucket: MuscleVisualBucket.heavy,
-            coverageState: MuscleVisualCoverageState.partial,
-            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{
-              MuscleVisualSurface.front,
-              MuscleVisualSurface.back,
-            },
-            overflowAmount: 0,
-            hasTrained: true,
-          ),
-        },
-      );
+    test('macro strip shows dash when all macro values are zero', () {
+      final HomeDashboardData homeData = buildHomeData();
 
       final HomePageViewData result = HomeViewDataMapper.map(
         homeData: homeData,
-        muscleVisualState: visualState,
+        muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
       );
 
-      expect(result.progress.remainingTargetLabel, '0');
-      expect(result.progress.targetTone, HomeTone.success);
+      expect(result.nutrition.caloriesLabel, '–');
+      expect(result.nutrition.proteinLabel, '–');
+      expect(result.nutrition.carbsLabel, '–');
+      expect(result.nutrition.fatsLabel, '–');
     });
 
-    test('builds muscle group progress items with completion state', () {
-      final HomeDashboardData homeData = buildHomeData(
-        targets: <Target>[
-          buildTrainingTarget(
-            id: 'target-1',
-            categoryKey: 'chest',
-            targetValue: 2,
-          ),
-          buildTrainingTarget(
-            id: 'target-2',
-            categoryKey: 'quads',
-            targetValue: 3,
-          ),
-        ],
-        muscleSetCounts: const <String, int>{'chest': 2, 'quads': 1},
+    test('macro strip renders non-zero values with correct units', () {
+      final HomeDashboardData homeData = HomeDashboardData(
+        targets: const <Target>[],
+        todaysLogs: const <NutritionLog>[],
+        dailyMacros: const <String, double>{
+          'calories': 1840,
+          'protein': 150,
+          'carbs': 200,
+          'fats': 60,
+        },
       );
 
       final HomePageViewData result = HomeViewDataMapper.map(
@@ -238,29 +165,10 @@ void main() {
         settings: settings,
       );
 
-      expect(result.muscleGroups, hasLength(2));
-
-      final HomeMuscleGroupProgressViewData chest =
-          result.muscleGroups.firstWhere((HomeMuscleGroupProgressViewData item) {
-        return item.title == 'Chest';
-      });
-
-      expect(chest.progressLabel, '2 / 2 sets');
-      expect(chest.percentageLabel, '100%');
-      expect(chest.progressValue, 1.0);
-      expect(chest.isComplete, isTrue);
-      expect(chest.tone, HomeTone.success);
-
-      final HomeMuscleGroupProgressViewData quads =
-          result.muscleGroups.firstWhere((HomeMuscleGroupProgressViewData item) {
-        return item.title == 'Quads';
-      });
-
-      expect(quads.progressLabel, '1 / 3 sets');
-      expect(quads.percentageLabel, '33%');
-      expect(quads.progressValue, closeTo(0.3333, 0.001));
-      expect(quads.isComplete, isFalse);
-      expect(quads.tone, HomeTone.primary);
+      expect(result.nutrition.caloriesLabel, '1840 kcal');
+      expect(result.nutrition.proteinLabel, '150 g');
+      expect(result.nutrition.carbsLabel, '200 g');
+      expect(result.nutrition.fatsLabel, '60 g');
     });
   });
 }

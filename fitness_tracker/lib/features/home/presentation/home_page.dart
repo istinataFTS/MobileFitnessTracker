@@ -28,12 +28,7 @@ class HomePage extends StatelessWidget {
   static const Key progressRetryButtonKey =
       HomePageKeys.progressRetryButtonKey;
   static const Key homeRetryButtonKey = HomePageKeys.homeRetryButtonKey;
-  static const Key nutritionEmptyStateKey =
-      HomePageKeys.nutritionEmptyStateKey;
-  static const Key latestEntriesSectionKey =
-      HomePageKeys.latestEntriesSectionKey;
-  static const Key muscleGroupsSectionKey =
-      HomePageKeys.muscleGroupsSectionKey;
+  static const Key macroStripKey = HomePageKeys.macroStripKey;
 
   @override
   Widget build(BuildContext context) {

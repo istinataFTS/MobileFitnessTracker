@@ -1,6 +1,5 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
-import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/target.dart';
@@ -40,28 +39,7 @@ void main() {
   const AppSettings settings = AppSettings.defaults();
 
   final HomeDashboardData loadedHomeData = HomeDashboardData(
-    targets: <Target>[
-      Target(
-        id: 'target-chest',
-        type: TargetType.muscleSets,
-        categoryKey: 'chest',
-        targetValue: 6,
-        unit: 'sets',
-        period: TargetPeriod.weekly,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-      Target(
-        id: 'target-protein',
-        type: TargetType.macro,
-        categoryKey: 'protein',
-        targetValue: 180,
-        unit: 'g',
-        period: TargetPeriod.daily,
-        createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
-      ),
-    ],
+    targets: const <Target>[],
     todaysLogs: <NutritionLog>[
       NutritionLog(
         id: 'log-1',
@@ -72,7 +50,6 @@ void main() {
         calories: 528,
         loggedAt: now,
         createdAt: now,
-        syncMetadata: const EntitySyncMetadata(),
       ),
     ],
     dailyMacros: const <String, double>{
@@ -208,16 +185,15 @@ void main() {
 
     expect(find.byKey(HomePage.refreshListKey), findsOneWidget);
     expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
-    expect(find.byKey(HomePage.latestEntriesSectionKey), findsOneWidget);
-    expect(find.byKey(HomePage.muscleGroupsSectionKey), findsOneWidget);
+    expect(find.byKey(HomePageKeys.macroStripKey), findsOneWidget);
     expect(find.byKey(HomePageKeys.bodyVisualKey), findsOneWidget);
 
-    // The Sets / Target / Muscles stat row was removed in favour of a cleaner
-    // muscle-map card; assert the labels are gone so the row can't sneak back.
-    expect(find.text('Sets'), findsNothing);
-    expect(find.text('Muscles'), findsNothing);
+    // Macro strip shows four tiles.
+    expect(find.text('Calories'), findsOneWidget);
+    expect(find.text('Protein'), findsOneWidget);
+    expect(find.text('Carbs'), findsOneWidget);
+    expect(find.text('Fats'), findsOneWidget);
 
-    expect(find.text('Chicken and Rice'), findsOneWidget);
     expect(find.text('Progress • Month'), findsOneWidget);
   });
 
@@ -302,7 +278,7 @@ void main() {
     expect(find.byKey(PeriodSelectorWidget.dropdownKey), findsOneWidget);
   });
 
-  testWidgets('month period hides weekly target in stable target value field', (
+  testWidgets('month period renders progress card cleanly', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(800, 2000);
@@ -341,8 +317,6 @@ void main() {
     await tester.pump();
 
     expect(find.text('Progress • Month'), findsOneWidget);
-    // No weekly target row remains — this assertion just ensures the card
-    // still renders cleanly under non-week periods.
     expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
   });
 
@@ -361,70 +335,5 @@ void main() {
 
     verify(() => homeBloc.add(const RefreshHomeDataEvent())).called(1);
     verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
-  });
-
-  testWidgets('muscle group section disappears when there are no training targets', (
-    WidgetTester tester,
-  ) async {
-    final HomeLoaded noTrainingTargetsState = HomeLoaded(
-      data: HomeDashboardData(
-        targets: <Target>[
-          Target(
-            id: 'target-protein',
-            type: TargetType.macro,
-            categoryKey: 'protein',
-            targetValue: 180,
-            unit: 'g',
-            period: TargetPeriod.daily,
-            createdAt: now,
-            syncMetadata: const EntitySyncMetadata(),
-          ),
-        ],
-        todaysLogs: const <NutritionLog>[],
-        dailyMacros: const <String, double>{
-          'protein': 0,
-          'carbs': 0,
-          'fats': 0,
-          'calories': 0,
-        },
-      ),
-    );
-
-    when(() => homeBloc.state).thenReturn(noTrainingTargetsState);
-    whenListen<HomeState>(
-      homeBloc,
-      const Stream<HomeState>.empty(),
-      initialState: noTrainingTargetsState,
-    );
-
-    await tester.pumpWidget(buildSubject());
-    await tester.pump();
-
-    expect(find.byKey(HomePage.muscleGroupsSectionKey), findsNothing);
-  });
-
-  testWidgets('nutrition empty state is shown when there are no logs', (
-    WidgetTester tester,
-  ) async {
-    final HomeLoaded noLogsState = HomeLoaded(
-      data: HomeDashboardData(
-        targets: loadedHomeData.targets,
-        todaysLogs: const <NutritionLog>[],
-        dailyMacros: loadedHomeData.dailyMacros,
-      ),
-    );
-
-    when(() => homeBloc.state).thenReturn(noLogsState);
-    whenListen<HomeState>(
-      homeBloc,
-      const Stream<HomeState>.empty(),
-      initialState: noLogsState,
-    );
-
-    await tester.pumpWidget(buildSubject());
-    await tester.pump();
-
-    expect(find.byKey(HomePage.nutritionEmptyStateKey), findsOneWidget);
-    expect(find.byKey(HomePage.latestEntriesSectionKey), findsNothing);
   });
 }
