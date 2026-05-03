@@ -90,7 +90,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final MuscleVisualLoaded emptyState = MuscleVisualLoaded(
         muscleData: const <String, MuscleVisualData>{},
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 
@@ -156,7 +156,7 @@ void main() {
             hasTrained: true,
           ),
         },
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 
@@ -227,7 +227,7 @@ void main() {
             hasTrained: false,
           ),
         },
-        currentPeriod: TimePeriod.week,
+        currentPeriod: TimePeriod.today,
         loadedAt: now,
       );
 
@@ -243,9 +243,10 @@ void main() {
 
       expect(find.text('Chest'), findsOneWidget);
       expect(find.text('14 • Heavy'), findsOneWidget);
-      // 'Back' also appears as a figure label in BodyVisualWidget, so we
-      // assert on the stats row text instead — which only appears in summary
-      // rows and unambiguously proves no row was rendered for the back muscle.
+      // 'Back' may appear as the BodyVisualWidget figure label when that side
+      // is shown, so we assert on the summary-row stat text instead — it only
+      // appears in summary rows and unambiguously proves no row was rendered
+      // for the back muscle.
       expect(find.text('0 • Untrained'), findsNothing);
     });
   });

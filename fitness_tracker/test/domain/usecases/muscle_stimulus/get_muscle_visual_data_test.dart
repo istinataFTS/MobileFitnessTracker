@@ -195,16 +195,16 @@ void main() {
   );
 
   test(
-    'week view classifies a stale today-row whose rolling load has decayed '
-    'below the recovery cutoff as untrained — guards the today-branch path',
+    'week view renders a fresh today-row directly without applying the '
+    'recovery short-circuit — guards against hiding muscles the user just '
+    'trained',
     () async {
-      // The original bug: when the rebuild propagates a row forward to today
-      // for every day in the workout history, _getWeekVisualData's today
-      // branch returned `rollingWeeklyLoad` raw and asked the contract to
-      // classify it. The contract treats any positive stimulus as
-      // `hasTrained`, so a fully-decayed muscle still painted on the body
-      // map. This test pins the today-branch through the same isRecovered
-      // check the without-today branch already used.
+      // Regression for the "Volume/Week + Fatigue both empty after logging"
+      // bug: a single fresh set produces a rolling weekly load well below
+      // 0.5 * weeklyThreshold (12.5). If the today-branch applies the
+      // recovery cutoff to *fresh* rows it hides the muscle the user just
+      // trained. The cutoff is meant for aged rows only, so a row dated
+      // today (daysSince == 0) must render directly.
       final today = DateTime.now();
       final todayStart = DateTime(today.year, today.month, today.day);
 
@@ -220,13 +220,14 @@ void main() {
           ).thenAnswer(
             (_) async => Right(
               stimulus_entity.MuscleStimulus(
-                id: 'lats-today-decayed',
+                id: 'lats-today-fresh',
                 ownerUserId: testUserId,
                 muscleGroup: muscleGroup,
                 date: todayStart,
-                dailyStimulus: 0.0,
-                // Below 0.5 * weeklyThreshold (12.5) → already recovered.
-                rollingWeeklyLoad: 1.0,
+                dailyStimulus: 4.0,
+                // Below 0.5 * weeklyThreshold (12.5). Old behaviour would
+                // hide this; the fix renders it because daysSince == 0.
+                rollingWeeklyLoad: 4.0,
                 createdAt: todayStart,
                 updatedAt: todayStart,
               ),
@@ -258,14 +259,16 @@ void main() {
         () => throw StateError('expected data'),
       );
 
+      final lats = visualData[stimulus_constants.MuscleStimulus.lats]!;
       expect(
-        visualData[stimulus_constants.MuscleStimulus.lats]!.hasTrained,
-        isFalse,
+        lats.hasTrained,
+        isTrue,
         reason:
-            'a today-row with a fully-decayed rolling load must render as '
-            'untrained, otherwise muscles stay coloured forever once a row '
-            'has been propagated to today by the rebuild',
+            'a fresh today-row must render even when its rolling load is '
+            'below the recovery cutoff — the cutoff is calibrated for aged '
+            'loads, not for the first set of the day',
       );
+      expect(lats.totalStimulus, 4.0);
     },
   );
 

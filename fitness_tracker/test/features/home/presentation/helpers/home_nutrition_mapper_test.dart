@@ -10,22 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final DateTime createdAt = DateTime(2024, 1, 1);
 
-  Target buildMacroTarget({
-    required String id,
-    required String categoryKey,
-    required double targetValue,
-  }) {
-    return Target(
-      id: id,
-      type: TargetType.macro,
-      categoryKey: categoryKey,
-      targetValue: targetValue,
-      unit: 'g',
-      period: TargetPeriod.daily,
-      createdAt: createdAt,
-    );
-  }
-
   NutritionLog buildLog({
     required String id,
     required String mealName,
@@ -54,20 +38,9 @@ void main() {
     weightUnit: WeightUnit.kilograms,
   );
 
-  test('maps nutrition summary with macro targets and recent logs', () {
+  test('macro strip shows rounded non-zero values with correct units', () {
     final HomeDashboardData homeData = HomeDashboardData(
-      targets: <Target>[
-        buildMacroTarget(
-          id: 'protein-target',
-          categoryKey: 'protein',
-          targetValue: 150,
-        ),
-        buildMacroTarget(
-          id: 'carbs-target',
-          categoryKey: 'carbs',
-          targetValue: 250,
-        ),
-      ],
+      targets: const <Target>[],
       todaysLogs: <NutritionLog>[
         buildLog(
           id: '1',
@@ -77,15 +50,6 @@ void main() {
           fats: 10,
           calories: 490,
         ),
-        buildLog(
-          id: '2',
-          mealName: 'Yogurt',
-          protein: 20,
-          carbs: 12,
-          fats: 5,
-          calories: 170,
-          isMealLog: false,
-        ),
       ],
       dailyMacros: const <String, double>{
         'protein': 60,
@@ -93,7 +57,6 @@ void main() {
         'fats': 15,
         'calories': 660,
       },
-
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(
@@ -102,26 +65,13 @@ void main() {
       settings: settings,
     );
 
-    expect(viewData.nutrition.totalCaloriesLabel, '660 kcal');
-    expect(viewData.nutrition.hasEntries, isTrue);
-    expect(viewData.nutrition.macros, hasLength(3));
-    expect(viewData.nutrition.recentEntries, hasLength(2));
-
-    expect(viewData.nutrition.macros[0].label, 'Protein');
-    expect(viewData.nutrition.macros[0].progressLabel, '60 / 150 g');
-    expect(viewData.nutrition.macros[0].trailingLabel, '90 g left');
-    expect(viewData.nutrition.macros[0].hasTarget, isTrue);
-
-    expect(viewData.nutrition.macros[2].label, 'Fats');
-    expect(viewData.nutrition.macros[2].hasTarget, isFalse);
-    expect(viewData.nutrition.macros[2].trailingLabel, 'No target');
-
-    expect(viewData.nutrition.recentEntries[0].title, 'Chicken Rice');
-    expect(viewData.nutrition.recentEntries[0].isMealLog, isTrue);
-    expect(viewData.nutrition.recentEntries[1].isMealLog, isFalse);
+    expect(viewData.nutrition.caloriesLabel, '660 kcal');
+    expect(viewData.nutrition.proteinLabel, '60 g');
+    expect(viewData.nutrition.carbsLabel, '72 g');
+    expect(viewData.nutrition.fatsLabel, '15 g');
   });
 
-  test('maps empty nutrition state without logs', () {
+  test('macro strip shows dash for zero macro values', () {
     final HomeDashboardData homeData = HomeDashboardData(
       targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
@@ -131,7 +81,6 @@ void main() {
         'fats': 0,
         'calories': 0,
       },
-
     );
 
     final HomePageViewData viewData = HomeViewDataMapper.map(
@@ -140,9 +89,34 @@ void main() {
       settings: settings,
     );
 
-    expect(viewData.nutrition.totalCaloriesLabel, '0 kcal');
-    expect(viewData.nutrition.hasEntries, isFalse);
-    expect(viewData.nutrition.recentEntries, isEmpty);
-    expect(viewData.nutrition.macros, hasLength(3));
+    expect(viewData.nutrition.caloriesLabel, '–');
+    expect(viewData.nutrition.proteinLabel, '–');
+    expect(viewData.nutrition.carbsLabel, '–');
+    expect(viewData.nutrition.fatsLabel, '–');
+  });
+
+  test('targets field in HomeDashboardData is unused by nutrition mapping', () {
+    // Targets were used by the old _NutritionCard for progress bars.
+    // The new MacroStrip ignores targets entirely.
+    final HomeDashboardData homeData = HomeDashboardData(
+      targets: const <Target>[],
+      todaysLogs: const <NutritionLog>[],
+      dailyMacros: const <String, double>{
+        'protein': 100,
+        'carbs': 200,
+        'fats': 50,
+        'calories': 1640,
+      },
+    );
+
+    final HomePageViewData viewData = HomeViewDataMapper.map(
+      homeData: homeData,
+      muscleVisualState: const MuscleVisualInitial(),
+      settings: settings,
+    );
+
+    // Regardless of whether targets exist, labels show raw totals.
+    expect(viewData.nutrition.proteinLabel, '100 g');
+    expect(viewData.nutrition.caloriesLabel, '1640 kcal');
   });
 }

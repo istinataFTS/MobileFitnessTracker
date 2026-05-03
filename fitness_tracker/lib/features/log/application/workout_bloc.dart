@@ -4,10 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/bloc/bloc_effects_mixin.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/logging/app_logger.dart';
-import '../../../../core/session/current_user_id_resolver.dart';
 import '../../../../domain/entities/workout_set.dart';
-import '../../../../domain/repositories/app_session_repository.dart';
-import '../../../../domain/usecases/muscle_stimulus/record_workout_set.dart';
+import '../../../../domain/usecases/muscle_stimulus/calculate_muscle_stimulus.dart';
 import '../../../../domain/usecases/workout_sets/add_workout_set.dart';
 import '../../../../domain/usecases/workout_sets/get_weekly_sets.dart';
 
@@ -89,25 +87,19 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
     with BlocEffectsMixin<WorkoutState, WorkoutUiEffect> {
   final AddWorkoutSet addWorkoutSet;
   final GetWeeklySets getWeeklySets;
-  final RecordWorkoutSet recordWorkoutSet;
-  final AppSessionRepository appSessionRepository;
+  final CalculateMuscleStimulus calculateMuscleStimulus;
 
   List<WorkoutSet> _cachedWeeklySets = [];
 
   WorkoutBloc({
     required this.addWorkoutSet,
     required this.getWeeklySets,
-    required this.recordWorkoutSet,
-    required this.appSessionRepository,
-  })  : _userIdResolver =
-            CurrentUserIdResolver(appSessionRepository: appSessionRepository),
-        super(WorkoutInitial()) {
+    required this.calculateMuscleStimulus,
+  }) : super(WorkoutInitial()) {
     on<AddWorkoutSetEvent>(_onAddWorkoutSet);
     on<LoadWeeklySetsEvent>(_onLoadWeeklySets);
     on<RefreshWeeklySetsEvent>(_onRefreshWeeklySets);
   }
-
-  final CurrentUserIdResolver _userIdResolver;
 
   Future<void> _onAddWorkoutSet(
     AddWorkoutSetEvent event,
@@ -115,30 +107,32 @@ class WorkoutBloc extends Bloc<WorkoutEvent, WorkoutState>
   ) async {
     emit(WorkoutLoading());
 
+    // addWorkoutSet saves the set and runs a full muscle-stimulus rebuild so
+    // that every date's rolling weekly load (including today's) reflects the
+    // newly-logged set, regardless of which date it was logged to.
     final addResult = await addWorkoutSet(event.workoutSet);
 
     await addResult.fold(
       (failure) async => emit(WorkoutError(failure.message)),
       (_) async {
-        final userId = await _userIdResolver.resolve();
-
-        final affectedMusclesResult = await recordWorkoutSet(
-          userId: userId,
+        // Derive which muscles the exercise targets for the UI notification.
+        // The actual stimulus update is handled by the rebuild inside
+        // AddWorkoutSet, so no separate DB write is needed here.
+        final stimulusResult = await calculateMuscleStimulus.calculateForSet(
           exerciseId: event.workoutSet.exerciseId,
           sets: 1,
           intensity: event.workoutSet.intensity,
-          timestamp: event.workoutSet.date,
         );
 
-        final affectedMuscles = affectedMusclesResult.fold(
+        final affectedMuscles = stimulusResult.fold(
           (failure) {
             AppLogger.warning(
-              'recordWorkoutSet failed: ${failure.message}',
+              'calculateMuscleStimulus failed: ${failure.message}',
               category: 'workout',
             );
             return <String>[];
           },
-          (muscles) => muscles,
+          (muscleStimuli) => muscleStimuli.keys.toList(),
         );
 
         final hadNoMuscleMapping = affectedMuscles.isEmpty;

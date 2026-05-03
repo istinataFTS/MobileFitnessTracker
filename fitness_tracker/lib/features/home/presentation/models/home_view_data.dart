@@ -12,16 +12,12 @@ class HomePageViewData extends Equatable {
     required this.weekRangeLabel,
     required this.nutrition,
     required this.progress,
-    required this.muscleGroups,
-    required this.showMuscleGroups,
   });
 
   final String greeting;
   final String weekRangeLabel;
-  final HomeNutritionCardViewData nutrition;
+  final HomeMacroStripViewData nutrition;
   final HomeProgressCardViewData progress;
-  final List<HomeMuscleGroupProgressViewData> muscleGroups;
-  final bool showMuscleGroups;
 
   @override
   List<Object?> get props => <Object?>[
@@ -29,74 +25,30 @@ class HomePageViewData extends Equatable {
     weekRangeLabel,
     nutrition,
     progress,
-    muscleGroups,
-    showMuscleGroups,
   ];
 }
 
-class HomeNutritionCardViewData extends Equatable {
-  const HomeNutritionCardViewData({
-    required this.totalCaloriesLabel,
-    required this.macros,
-    required this.recentEntries,
-    required this.hasEntries,
+/// Minimal four-tile macro summary: current totals only, no targets.
+class HomeMacroStripViewData extends Equatable {
+  const HomeMacroStripViewData({
+    required this.caloriesLabel,
+    required this.proteinLabel,
+    required this.carbsLabel,
+    required this.fatsLabel,
   });
 
-  final String totalCaloriesLabel;
-  final List<HomeMacroProgressViewData> macros;
-  final List<HomeRecentNutritionEntryViewData> recentEntries;
-  final bool hasEntries;
+  final String caloriesLabel;
+  final String proteinLabel;
+  final String carbsLabel;
+  final String fatsLabel;
 
   @override
   List<Object?> get props => <Object?>[
-    totalCaloriesLabel,
-    macros,
-    recentEntries,
-    hasEntries,
+    caloriesLabel,
+    proteinLabel,
+    carbsLabel,
+    fatsLabel,
   ];
-}
-
-class HomeMacroProgressViewData extends Equatable {
-  const HomeMacroProgressViewData({
-    required this.label,
-    required this.progressLabel,
-    required this.trailingLabel,
-    required this.progressValue,
-    required this.hasTarget,
-    required this.isComplete,
-  });
-
-  final String label;
-  final String progressLabel;
-  final String trailingLabel;
-  final double progressValue;
-  final bool hasTarget;
-  final bool isComplete;
-
-  @override
-  List<Object?> get props => <Object?>[
-    label,
-    progressLabel,
-    trailingLabel,
-    progressValue,
-    hasTarget,
-    isComplete,
-  ];
-}
-
-class HomeRecentNutritionEntryViewData extends Equatable {
-  const HomeRecentNutritionEntryViewData({
-    required this.title,
-    required this.subtitle,
-    required this.isMealLog,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool isMealLog;
-
-  @override
-  List<Object?> get props => <Object?>[title, subtitle, isMealLog];
 }
 
 class HomeProgressCardViewData extends Equatable {
@@ -106,10 +58,6 @@ class HomeProgressCardViewData extends Equatable {
     required this.selectorEnabled,
     required this.showPeriodSelector,
     required this.muscleMapMode,
-    required this.totalSetsLabel,
-    required this.remainingTargetLabel,
-    required this.trainedMusclesLabel,
-    required this.targetTone,
     required this.bodyVisual,
     required this.muscleSummary,
     required this.isLoading,
@@ -129,10 +77,6 @@ class HomeProgressCardViewData extends Equatable {
   /// Which visualisation lens is active.
   final MuscleMapMode muscleMapMode;
 
-  final String totalSetsLabel;
-  final String remainingTargetLabel;
-  final String trainedMusclesLabel;
-  final HomeTone targetTone;
   final HomeBodyVisualViewData bodyVisual;
   final List<HomeMuscleSummaryItemViewData> muscleSummary;
   final bool isLoading;
@@ -145,10 +89,6 @@ class HomeProgressCardViewData extends Equatable {
     selectorEnabled,
     showPeriodSelector,
     muscleMapMode,
-    totalSetsLabel,
-    remainingTargetLabel,
-    trainedMusclesLabel,
-    targetTone,
     bodyVisual,
     muscleSummary,
     isLoading,
@@ -211,33 +151,5 @@ class HomeMuscleSummaryItemViewData extends Equatable {
     stimulusLabel,
     intensityLabel,
     color,
-  ];
-}
-
-class HomeMuscleGroupProgressViewData extends Equatable {
-  const HomeMuscleGroupProgressViewData({
-    required this.title,
-    required this.progressLabel,
-    required this.percentageLabel,
-    required this.progressValue,
-    required this.isComplete,
-    required this.tone,
-  });
-
-  final String title;
-  final String progressLabel;
-  final String percentageLabel;
-  final double progressValue;
-  final bool isComplete;
-  final HomeTone tone;
-
-  @override
-  List<Object?> get props => <Object?>[
-    title,
-    progressLabel,
-    percentageLabel,
-    progressValue,
-    isComplete,
-    tone,
   ];
 }

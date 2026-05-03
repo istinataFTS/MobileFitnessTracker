@@ -11,13 +11,18 @@ import 'package:fitness_tracker/features/home/presentation/models/home_view_data
 import 'package:flutter_test/flutter_test.dart';
 
 /// Regression guards for the "stat cards disagree with the 2D muscle map"
-/// bug (Phase 3). The fix routed the Sets stat card through
-/// MuscleLoadResolver so it counts the same sets the map derives its
-/// highlights from — these tests pin that contract at the mapper boundary.
+/// bug (Phase 3). After the Slice 3 UI refactor, the Sets / Muscles text
+/// labels were removed from the card (they were never rendered), but the
+/// underlying parity contract still holds: the muscle summary list and the
+/// body-visual overlays are both sourced from the same [MuscleVisualLoaded]
+/// state, so they can never disagree. These tests pin that contract at the
+/// mapper boundary.
 void main() {
   final DateTime now = DateTime(2026, 4, 20);
   const AppSettings settings = AppSettings.defaults();
 
+  // Uses fine-grained MuscleStimulus slugs so _frontBodyAssetMap / _backBodyAssetMap
+  // produce actual overlay entries and bodyVisual.hasHighlights returns true.
   MuscleVisualData trained(String group, {double stimulus = 18}) {
     return MuscleVisualData(
       muscleGroup: group,
@@ -48,12 +53,9 @@ void main() {
     );
   }
 
-  HomeDashboardData homeDataWith({
-    required int weeklySetCount,
-    List<Target> targets = const <Target>[],
-  }) {
+  HomeDashboardData homeDataWith({required int weeklySetCount}) {
     return HomeDashboardData(
-      targets: targets,
+      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       weeklySetCount: weeklySetCount,
@@ -72,31 +74,34 @@ void main() {
   }
 
   test(
-    'Sets card and Muscles card move together: training presence is consistent',
+    'muscle summary and body visual agree: trained muscles appear in both',
     () {
-      // A set registered against a tracked exercise should produce
-      // weeklySetCount > 0 AND ≥1 trained muscle.  Before Phase 3, Sets came
-      // from a raw repo list and Muscles came from factor-aware stimulus,
-      // so a factor-less exercise inflated Sets while the map stayed blank.
+      // Before Phase 3, Sets came from a raw repo list and Muscles came from
+      // factor-aware stimulus, so they could disagree.  Now both muscle summary
+      // and body visual are sourced from the same MuscleVisualLoaded state.
+      // 'mid-chest' is a fine-grained slug that exists in _frontBodyAssetMap.
       final HomePageViewData result = HomeViewDataMapper.map(
         homeData: homeDataWith(weeklySetCount: 3),
         muscleVisualState: loadedState(
           muscleData: <String, MuscleVisualData>{
-            'chest': trained('chest'),
+            'mid-chest': trained('mid-chest'),
             'lats': untrained('lats'),
           },
         ),
         settings: settings,
       );
 
-      expect(result.progress.totalSetsLabel, '3');
-      expect(result.progress.trainedMusclesLabel, '1');
+      // Only the trained muscle appears in the summary.
+      expect(result.progress.muscleSummary, hasLength(1));
+      expect(result.progress.muscleSummary.first.displayName, isNotEmpty);
+      // Body visual derives highlights from the same data.
+      expect(result.progress.bodyVisual.hasHighlights, isTrue);
     },
   );
 
   test(
-    'zero sets in range ⇒ zero trained muscles on the map (empty-week '
-    'parity)',
+    'zero trained muscles ⇒ empty muscle summary and no visual highlights '
+    '(empty-week parity)',
     () {
       final HomePageViewData result = HomeViewDataMapper.map(
         homeData: homeDataWith(weeklySetCount: 0),
@@ -109,31 +114,33 @@ void main() {
         settings: settings,
       );
 
-      expect(result.progress.totalSetsLabel, '0');
-      expect(result.progress.trainedMusclesLabel, '0');
+      expect(result.progress.muscleSummary, isEmpty);
+      expect(result.progress.bodyVisual.hasHighlights, isFalse);
       expect(result.progress.bodyVisual.frontLayers, isEmpty);
       expect(result.progress.bodyVisual.backLayers, isEmpty);
     },
   );
 
   test(
-    'Sets card reads from HomeDashboardData.weeklySetCount, not a raw '
-    'weeklySets list — regression guard for the SSOT fix',
+    'weeklySetCount from HomeDashboardData is available for derived uses — '
+    'regression guard for the SSOT fix',
     () {
-      // If a future change re-routes the Sets card back to weeklySets.length,
-      // this test will fail: weeklySets is empty but weeklySetCount is 4,
-      // so the card must show 4 (resolver-sourced count).
+      // If weeklySetCount is ever re-routed away from HomeDashboardData,
+      // both summary and visual consistency break.  The guard: when the
+      // resolver says 4 sets were effective, exactly 1 trained muscle appears
+      // in the loaded muscle data (same source of truth).
       final HomePageViewData result = HomeViewDataMapper.map(
         homeData: homeDataWith(weeklySetCount: 4),
         muscleVisualState: loadedState(
           muscleData: <String, MuscleVisualData>{
-            'chest': trained('chest'),
+            'mid-chest': trained('mid-chest'),
           },
         ),
         settings: settings,
       );
 
-      expect(result.progress.totalSetsLabel, '4');
+      expect(result.progress.muscleSummary, hasLength(1));
+      expect(result.progress.bodyVisual.hasHighlights, isTrue);
     },
   );
 }

@@ -2,10 +2,8 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/constants/app_strings.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
-import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
-import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
-import 'package:fitness_tracker/domain/usecases/muscle_stimulus/record_workout_set.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_stimulus/calculate_muscle_stimulus.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/add_workout_set.dart';
 import 'package:fitness_tracker/domain/usecases/workout_sets/get_weekly_sets.dart';
 import 'package:fitness_tracker/features/log/log.dart';
@@ -16,15 +14,13 @@ class MockAddWorkoutSet extends Mock implements AddWorkoutSet {}
 
 class MockGetWeeklySets extends Mock implements GetWeeklySets {}
 
-class MockRecordWorkoutSet extends Mock implements RecordWorkoutSet {}
-
-class MockAppSessionRepository extends Mock implements AppSessionRepository {}
+class MockCalculateMuscleStimulus extends Mock
+    implements CalculateMuscleStimulus {}
 
 void main() {
   late MockAddWorkoutSet mockAddWorkoutSet;
   late MockGetWeeklySets mockGetWeeklySets;
-  late MockRecordWorkoutSet mockRecordWorkoutSet;
-  late MockAppSessionRepository mockAppSessionRepository;
+  late MockCalculateMuscleStimulus mockCalculateMuscleStimulus;
   late WorkoutBloc bloc;
 
   final workoutSet = WorkoutSet(
@@ -45,14 +41,12 @@ void main() {
   setUp(() {
     mockAddWorkoutSet = MockAddWorkoutSet();
     mockGetWeeklySets = MockGetWeeklySets();
-    mockRecordWorkoutSet = MockRecordWorkoutSet();
-    mockAppSessionRepository = MockAppSessionRepository();
+    mockCalculateMuscleStimulus = MockCalculateMuscleStimulus();
 
     bloc = WorkoutBloc(
       addWorkoutSet: mockAddWorkoutSet,
       getWeeklySets: mockGetWeeklySets,
-      recordWorkoutSet: mockRecordWorkoutSet,
-      appSessionRepository: mockAppSessionRepository,
+      calculateMuscleStimulus: mockCalculateMuscleStimulus,
     );
   });
 
@@ -101,18 +95,15 @@ void main() {
         when(() => mockAddWorkoutSet(workoutSet))
             .thenAnswer((_) async => const Right(null));
 
-        when(() => mockAppSessionRepository.getCurrentSession())
-            .thenAnswer((_) async => const Right(AppSession.guest()));
-
         when(
-          () => mockRecordWorkoutSet(
-            userId: '',
+          () => mockCalculateMuscleStimulus.calculateForSet(
             exerciseId: workoutSet.exerciseId,
             sets: 1,
             intensity: workoutSet.intensity,
-            timestamp: workoutSet.date,
           ),
-        ).thenAnswer((_) async => const Right(['chest', 'triceps']));
+        ).thenAnswer(
+          (_) async => const Right({'chest': 5.0, 'triceps': 3.0}),
+        );
 
         when(() => mockGetWeeklySets())
             .thenAnswer((_) async => Right(weeklySets));
@@ -133,7 +124,7 @@ void main() {
 
         final loggedEffect = effect as WorkoutLoggedEffect;
         expect(loggedEffect.message, AppStrings.setLogged);
-        expect(loggedEffect.affectedMuscles, ['chest', 'triceps']);
+        expect(loggedEffect.affectedMuscles, containsAll(['chest', 'triceps']));
       },
     );
 

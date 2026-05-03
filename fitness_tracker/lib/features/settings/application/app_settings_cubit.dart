@@ -181,6 +181,15 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
     );
   }
 
+  Future<bool> setSectionExpanded(String sectionId, {required bool expanded}) {
+    final Map<String, bool> updated =
+        Map<String, bool>.from(state.settings.uiExpansionState)
+          ..[sectionId] = expanded;
+    return saveSettings(
+      state.settings.copyWith(uiExpansionState: updated),
+    );
+  }
+
   void clearError() {
     if (state.errorMessage == null) {
       return;

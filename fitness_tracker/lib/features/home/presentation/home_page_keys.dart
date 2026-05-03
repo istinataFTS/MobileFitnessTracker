@@ -17,21 +17,9 @@ class HomePageKeys {
   static const Key homeRetryButtonKey = ValueKey<String>(
     'home_page_retry_button',
   );
-  static const Key nutritionEmptyStateKey = ValueKey<String>(
-    'home_nutrition_empty_state',
-  );
-  static const Key latestEntriesSectionKey = ValueKey<String>(
-    'home_latest_entries_section',
-  );
-  static const Key muscleGroupsSectionKey = ValueKey<String>(
-    'home_muscle_groups_section',
-  );
-  static const Key totalSetsValueKey = ValueKey<String>(
-    'home_total_sets_value',
-  );
-  static const Key targetValueKey = ValueKey<String>('home_target_value');
-  static const Key trainedMusclesValueKey = ValueKey<String>(
-    'home_trained_muscles_value',
-  );
+  static const Key macroStripKey = ValueKey<String>('home_macro_strip');
   static const Key bodyVisualKey = ValueKey<String>('home_body_visual');
+  static const Key bodyVisualFlipButtonKey = ValueKey<String>(
+    'home_body_visual_flip_button',
+  );
 }

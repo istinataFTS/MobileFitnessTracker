@@ -11,6 +11,7 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
       'settings.notifications_enabled';
   static const String _weekStartDayKey = 'settings.week_start_day';
   static const String _weightUnitKey = 'settings.weight_unit';
+  static const String _uiExpansionStateKey = 'settings.ui_expansion_state';
 
   final AppMetadataLocalDataSource localDataSource;
 
@@ -27,11 +28,14 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
           await localDataSource.readString(_weekStartDayKey);
       final weightUnitRaw =
           await localDataSource.readString(_weightUnitKey);
+      final uiExpansionRaw =
+          await localDataSource.readJsonObject(_uiExpansionStateKey);
 
       return AppSettings(
         notificationsEnabled: notificationsEnabled ?? true,
         weekStartDay: _parseWeekStartDay(weekStartDayRaw),
         weightUnit: _parseWeightUnit(weightUnitRaw),
+        uiExpansionState: _parseUiExpansionState(uiExpansionRaw),
       );
     });
   }
@@ -51,7 +55,22 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
         _weightUnitKey,
         settings.weightUnit.name,
       );
+      await localDataSource.writeJsonObject(
+        _uiExpansionStateKey,
+        settings.uiExpansionState.cast<String, dynamic>(),
+      );
     });
+  }
+
+  Map<String, bool> _parseUiExpansionState(Map<String, dynamic>? raw) {
+    if (raw == null) return const <String, bool>{};
+    try {
+      return raw.map(
+        (String k, dynamic v) => MapEntry(k, v == true),
+      );
+    } catch (_) {
+      return const <String, bool>{};
+    }
   }
 
   WeekStartDay _parseWeekStartDay(String? rawValue) {

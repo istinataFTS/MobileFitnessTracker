@@ -35,18 +35,15 @@ class HomeContent extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: <Widget>[
           _GreetingSection(viewData: viewData),
-          const SizedBox(height: 24),
-          _NutritionCard(viewData: viewData.nutrition),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _ProgressCard(
             viewData: viewData.progress,
             onPeriodChanged: onPeriodChanged,
             onRetryVisuals: onRetryVisuals,
             onModeChanged: onModeChanged,
           ),
-          const SizedBox(height: 24),
-          if (viewData.showMuscleGroups)
-            _MuscleGroupSection(items: viewData.muscleGroups),
+          const SizedBox(height: 16),
+          _MacroStrip(viewData: viewData.nutrition),
         ],
       ),
     );
@@ -81,215 +78,119 @@ class _GreetingSection extends StatelessWidget {
   }
 }
 
-class _NutritionCard extends StatelessWidget {
-  const _NutritionCard({required this.viewData});
+/// Four-tile macro summary card.
+///
+/// ≥ 360 dp wide  → single `Row` of four `Expanded` tiles.
+/// < 360 dp wide  → 2×2 grid (Calories + Protein on row one, Carbs + Fats
+///                  on row two) so values stay readable on very narrow screens.
+class _MacroStrip extends StatelessWidget {
+  const _MacroStrip({required this.viewData});
 
-  final HomeNutritionCardViewData viewData;
+  final HomeMacroStripViewData viewData;
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      key: HomePageKeys.macroStripKey,
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryOrange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.restaurant_menu,
-                    color: AppTheme.primaryOrange,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Today’s Nutrition',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: Row(
-                children: <Widget>[
-                  const Icon(
-                    Icons.local_fire_department,
-                    color: AppTheme.primaryOrange,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Total Calories',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textMedium,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        viewData.totalCaloriesLabel,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryOrange,
-                            ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            ...viewData.macros.map(
-              (HomeMacroProgressViewData item) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _MacroRow(item: item),
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (!viewData.hasEntries)
-              Container(
-                key: HomePageKeys.nutritionEmptyStateKey,
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceDark,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: Text(
-                  'No meals or macro entries logged today yet.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
-                ),
-              )
-            else ...<Widget>[
-              Text(
-                'Latest Entries',
-                key: HomePageKeys.latestEntriesSectionKey,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              ...viewData.recentEntries.map(
-                (HomeRecentNutritionEntryViewData entry) => Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceDark,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.borderDark),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Icon(
-                        entry.isMealLog ? Icons.restaurant : Icons.calculate,
-                        color: AppTheme.primaryOrange,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              entry.title,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              entry.subtitle,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: AppTheme.textMedium),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            if (constraints.maxWidth >= 360) {
+              return _buildWideRow(context);
+            }
+            return _buildNarrowGrid(context);
+          },
         ),
       ),
     );
   }
-}
 
-class _MacroRow extends StatelessWidget {
-  const _MacroRow({required this.item});
+  Widget _buildWideRow(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: _MacroTile(label: AppStrings.calories, value: viewData.caloriesLabel),
+          ),
+          const VerticalDivider(color: AppTheme.borderDark, width: 1),
+          Expanded(
+            child: _MacroTile(label: AppStrings.protein, value: viewData.proteinLabel),
+          ),
+          const VerticalDivider(color: AppTheme.borderDark, width: 1),
+          Expanded(
+            child: _MacroTile(label: AppStrings.carbs, value: viewData.carbsLabel),
+          ),
+          const VerticalDivider(color: AppTheme.borderDark, width: 1),
+          Expanded(
+            child: _MacroTile(label: AppStrings.fats, value: viewData.fatsLabel),
+          ),
+        ],
+      ),
+    );
+  }
 
-  final HomeMacroProgressViewData item;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color progressColor = item.isComplete
-        ? AppTheme.successGreen
-        : AppTheme.primaryOrange;
-
+  Widget _buildNarrowGrid(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
           children: <Widget>[
             Expanded(
-              child: Text(
-                item.label,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
+              child: _MacroTile(label: AppStrings.calories, value: viewData.caloriesLabel),
             ),
-            Text(
-              item.trailingLabel,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: item.hasTarget ? progressColor : AppTheme.textDim,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(width: 1),
+            Expanded(
+              child: _MacroTile(label: AppStrings.protein, value: viewData.proteinLabel),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          item.progressLabel,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: item.hasTarget ? item.progressValue : 0,
-            minHeight: 8,
-            backgroundColor: AppTheme.surfaceDark,
-            color: progressColor,
-          ),
+        const Divider(color: AppTheme.borderDark, height: 1),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _MacroTile(label: AppStrings.carbs, value: viewData.carbsLabel),
+            ),
+            const SizedBox(width: 1),
+            Expanded(
+              child: _MacroTile(label: AppStrings.fats, value: viewData.fatsLabel),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _MacroTile extends StatelessWidget {
+  const _MacroTile({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppTheme.textMedium,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppTheme.primaryOrange,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -323,7 +224,7 @@ class _ProgressCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryOrange.withOpacity(0.1),
+                    color: AppTheme.primaryOrange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -395,8 +296,6 @@ class _ProgressCard extends StatelessWidget {
                 ],
               )
             else ...<Widget>[
-              _ProgressStatsRow(viewData: viewData),
-              const SizedBox(height: 16),
               BodyVisualWidget(viewData: viewData.bodyVisual),
               const SizedBox(height: 16),
               ...viewData.muscleSummary.map(
@@ -439,91 +338,6 @@ class _ProgressCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ProgressStatsRow extends StatelessWidget {
-  const _ProgressStatsRow({required this.viewData});
-
-  final HomeProgressCardViewData viewData;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color targetColor = switch (viewData.targetTone) {
-      HomeTone.success => AppTheme.successGreen,
-      HomeTone.warning => AppTheme.warningAmber,
-      HomeTone.primary => AppTheme.primaryOrange,
-      HomeTone.muted => AppTheme.textDim,
-    };
-
-    Widget stat({
-      required Key valueKey,
-      required IconData icon,
-      required String value,
-      required String label,
-      required Color color,
-    }) {
-      return Expanded(
-        child: Column(
-          children: <Widget>[
-            Icon(icon, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              key: valueKey,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textMedium),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderDark),
-      ),
-      child: Row(
-        children: <Widget>[
-          stat(
-            valueKey: HomePageKeys.totalSetsValueKey,
-            icon: Icons.fitness_center,
-            value: viewData.totalSetsLabel,
-            label: AppStrings.sets,
-            color: AppTheme.primaryOrange,
-          ),
-          Container(width: 1, height: 60, color: AppTheme.borderDark),
-          stat(
-            valueKey: HomePageKeys.targetValueKey,
-            icon: Icons.flag_outlined,
-            value: viewData.remainingTargetLabel,
-            label: AppStrings.target,
-            color: targetColor,
-          ),
-          Container(width: 1, height: 60, color: AppTheme.borderDark),
-          stat(
-            valueKey: HomePageKeys.trainedMusclesValueKey,
-            icon: Icons.auto_awesome,
-            value: viewData.trainedMusclesLabel,
-            label: AppStrings.muscles,
-            color: AppTheme.primaryOrange,
-          ),
-        ],
       ),
     );
   }
@@ -608,106 +422,6 @@ class _MuscleMapModeToggle extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MuscleGroupSection extends StatelessWidget {
-  const _MuscleGroupSection({required this.items});
-
-  final List<HomeMuscleGroupProgressViewData> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: HomePageKeys.muscleGroupsSectionKey,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          AppStrings.muscleGroups,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 12),
-        ...items.map(
-          (HomeMuscleGroupProgressViewData item) => Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (item.isComplete)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.successGreen.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            AppStrings.complete,
-                            style: TextStyle(
-                              color: AppTheme.successGreen,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        item.progressLabel,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.textMedium,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        item.percentageLabel,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: item.tone == HomeTone.success
-                                  ? AppTheme.successGreen
-                                  : AppTheme.primaryOrange,
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: item.progressValue,
-                      minHeight: 6,
-                      backgroundColor: AppTheme.surfaceDark,
-                      color: item.tone == HomeTone.success
-                          ? AppTheme.successGreen
-                          : AppTheme.primaryOrange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
