@@ -297,4 +297,110 @@ void main() {
     verifyNever(() => localDataSource.markAsPendingDelete(any()));
     verify(() => localDataSource.deleteExercise('exercise-1')).called(1);
   });
+
+  // ---------------------------------------------------------------------------
+  // insertLocal name+owner reconciliation
+  //
+  // Regression cover for the "initial migration step failed: exercises" pull
+  // bug: when the remote payload's id differs from the local row that
+  // already owns the (name, owner) UNIQUE slot, a blind INSERT trips the
+  // constraint and aborts the entire feature pull. The coordinator must
+  // detect this and update the existing local row in place.
+  // ---------------------------------------------------------------------------
+
+  group('ExerciseSyncCoordinatorImpl.insertLocal reconciliation', () {
+    test(
+      'falls back to updateExercise when a different local row owns the '
+      'same (name, owner) slot — preserves the local id so child rows '
+      "(workout_sets, factors) keep resolving",
+      () async {
+        final Exercise remote = buildExercise(
+          id: 'remote-id',
+          serverId: 'remote-id',
+        );
+        final Exercise localCollision = buildExercise(
+          id: 'local-id',
+          serverId: null,
+        );
+
+        when(
+          () => localDataSource.getByNameAndOwner(
+            name: remote.name,
+            ownerUserId: remote.ownerUserId,
+          ),
+        ).thenAnswer((_) async => ExerciseModel.fromEntity(localCollision));
+        when(() => localDataSource.updateExercise(any())).thenAnswer(
+          (_) async {},
+        );
+
+        await coordinator.insertLocal(remote);
+
+        final captured = verify(
+          () => localDataSource.updateExercise(captureAny()),
+        ).captured.single as ExerciseModel;
+
+        expect(
+          captured.id,
+          'local-id',
+          reason:
+              'must adopt the remote payload onto the existing local id; '
+              'changing the id would orphan workout_sets.exercise_id',
+        );
+        expect(
+          captured.syncMetadata.serverId,
+          'remote-id',
+          reason: 'remote id is captured as serverId for future pulls',
+        );
+        verifyNever(() => localDataSource.insertExercise(any()));
+      },
+    );
+
+    test(
+      'inserts when no name+owner collision exists',
+      () async {
+        final Exercise remote = buildExercise(id: 'remote-id');
+
+        when(
+          () => localDataSource.getByNameAndOwner(
+            name: remote.name,
+            ownerUserId: remote.ownerUserId,
+          ),
+        ).thenAnswer((_) async => null);
+        when(() => localDataSource.insertExercise(any())).thenAnswer(
+          (_) async {},
+        );
+
+        await coordinator.insertLocal(remote);
+
+        verify(() => localDataSource.insertExercise(any())).called(1);
+        verifyNever(() => localDataSource.updateExercise(any()));
+      },
+    );
+
+    test(
+      'is a no-op-style insert when the name+owner row found is the same id '
+      "(should never happen in practice, but proves the guard doesn't "
+      'spuriously rewrite valid rows)',
+      () async {
+        final Exercise remote = buildExercise(id: 'same-id');
+
+        when(
+          () => localDataSource.getByNameAndOwner(
+            name: remote.name,
+            ownerUserId: remote.ownerUserId,
+          ),
+        ).thenAnswer(
+          (_) async => ExerciseModel.fromEntity(remote),
+        );
+        when(() => localDataSource.insertExercise(any())).thenAnswer(
+          (_) async {},
+        );
+
+        await coordinator.insertLocal(remote);
+
+        verify(() => localDataSource.insertExercise(any())).called(1);
+        verifyNever(() => localDataSource.updateExercise(any()));
+      },
+    );
+  });
 }

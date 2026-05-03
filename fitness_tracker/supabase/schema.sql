@@ -29,7 +29,11 @@ create table public.exercises (
   name          text        not null,
   muscle_groups text[]      not null default '{}',
   created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now(),
+  -- Mirrors the local sqlite UNIQUE(name, COALESCE(owner_user_id, '')).
+  -- Without this, the client's pull step trips its local UNIQUE index when
+  -- two cloud rows share (user_id, name).
+  constraint exercises_user_id_name_key unique (user_id, name)
 );
 
 create index idx_exercises_user_id   on public.exercises(user_id);
@@ -75,7 +79,9 @@ create table public.meals (
   fat_per_100g       double precision not null,
   calories_per_100g  double precision not null,
   created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now()
+  updated_at         timestamptz not null default now(),
+  -- See note on public.exercises.exercises_user_id_name_key.
+  constraint meals_user_id_name_key unique (user_id, name)
 );
 
 create index idx_meals_user_id    on public.meals(user_id);

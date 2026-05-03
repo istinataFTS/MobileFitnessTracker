@@ -104,3 +104,4 @@ assets/large_files/
 *.tmp
 *.temp
 *~
+.claude/settings.local.json
