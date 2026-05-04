@@ -11,6 +11,11 @@ import '../../../domain/usecases/exercises/get_all_exercises.dart';
 import '../../../domain/usecases/exercises/get_exercise_by_id.dart';
 import '../../../domain/usecases/exercises/get_exercises_for_muscle.dart';
 import '../../../domain/usecases/exercises/update_exercise.dart';
+import '../../../domain/usecases/muscle_factors/get_muscle_factors_for_exercise.dart';
+
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
 
 abstract class ExerciseEvent extends Equatable {
   const ExerciseEvent();
@@ -39,22 +44,44 @@ class LoadExercisesForMuscleEvent extends ExerciseEvent {
   List<Object?> get props => <Object?>[muscleGroup];
 }
 
+/// Dispatched by the exercise dialog when opened for editing.
+/// The bloc responds with [ExerciseFactorsLoaded] so the dialog can populate
+/// its per-muscle factor sliders with the previously saved weights.
+class LoadExerciseFactorsEvent extends ExerciseEvent {
+  const LoadExerciseFactorsEvent(this.exerciseId);
+
+  final String exerciseId;
+
+  @override
+  List<Object?> get props => <Object?>[exerciseId];
+}
+
 class AddExerciseEvent extends ExerciseEvent {
-  const AddExerciseEvent(this.exercise);
+  const AddExerciseEvent(this.exercise, {this.muscleFactors});
 
   final Exercise exercise;
 
+  /// Optional per-muscle factor map (simple-key → factor ∈ [0,1]).
+  /// When provided, the factors are persisted alongside the exercise.
+  /// When null, every selected muscle receives factor 1.0 (default behaviour).
+  final Map<String, double>? muscleFactors;
+
   @override
-  List<Object?> get props => <Object?>[exercise];
+  List<Object?> get props => <Object?>[exercise, muscleFactors];
 }
 
 class UpdateExerciseEvent extends ExerciseEvent {
-  const UpdateExerciseEvent(this.exercise);
+  const UpdateExerciseEvent(this.exercise, {this.muscleFactors});
 
   final Exercise exercise;
 
+  /// Optional per-muscle factor map (simple-key → factor ∈ [0,1]).
+  /// When provided, the factors are persisted alongside the exercise.
+  /// When null, every selected muscle receives factor 1.0 (default behaviour).
+  final Map<String, double>? muscleFactors;
+
   @override
-  List<Object?> get props => <Object?>[exercise];
+  List<Object?> get props => <Object?>[exercise, muscleFactors];
 }
 
 class DeleteExerciseEvent extends ExerciseEvent {
@@ -65,6 +92,10 @@ class DeleteExerciseEvent extends ExerciseEvent {
   @override
   List<Object?> get props => <Object?>[id];
 }
+
+// ---------------------------------------------------------------------------
+// States
+// ---------------------------------------------------------------------------
 
 abstract class ExerciseState extends Equatable {
   const ExerciseState();
@@ -95,6 +126,28 @@ class ExerciseLoaded extends ExerciseState {
   List<Object?> get props => <Object?>[exercise];
 }
 
+/// Emitted in response to [LoadExerciseFactorsEvent].
+///
+/// Intentionally a separate state from [ExercisesLoaded] so the exercises list
+/// can remain visible while the dialog populates its sliders.  The exercises
+/// tab caches the last-loaded exercise list and uses it as a fallback when
+/// this state is active.
+class ExerciseFactorsLoaded extends ExerciseState {
+  const ExerciseFactorsLoaded({
+    required this.exerciseId,
+    required this.factors,
+  });
+
+  final String exerciseId;
+
+  /// Muscle-group key → factor value as stored in the database.
+  /// Keys may be granular (seed data) or simple (user-created exercises).
+  final Map<String, double> factors;
+
+  @override
+  List<Object?> get props => <Object?>[exerciseId, factors];
+}
+
 class ExerciseError extends ExerciseState {
   const ExerciseError(this.message);
 
@@ -113,6 +166,10 @@ class ExerciseOperationSuccess extends ExerciseState {
   List<Object?> get props => <Object?>[message];
 }
 
+// ---------------------------------------------------------------------------
+// Bloc
+// ---------------------------------------------------------------------------
+
 class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   ExerciseBloc({
     required this.getAllExercises,
@@ -122,10 +179,12 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     required this.updateExercise,
     required this.deleteExercise,
     required this.ensureDefaultExercises,
+    required this.getMuscleFactorsForExercise,
   }) : super(ExerciseInitial()) {
     on<LoadExercisesEvent>(_onLoadExercises);
     on<LoadExerciseByIdEvent>(_onLoadExerciseById);
     on<LoadExercisesForMuscleEvent>(_onLoadExercisesForMuscle);
+    on<LoadExerciseFactorsEvent>(_onLoadExerciseFactors);
     on<AddExerciseEvent>(_onAddExercise);
     on<UpdateExerciseEvent>(_onUpdateExercise);
     on<DeleteExerciseEvent>(_onDeleteExercise);
@@ -138,6 +197,7 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
   final UpdateExercise updateExercise;
   final DeleteExercise deleteExercise;
   final EnsureDefaultExercises ensureDefaultExercises;
+  final GetMuscleFactorsForExercise getMuscleFactorsForExercise;
 
   /// Guards against running the default-exercise seeding more than once per
   /// bloc instance (= per user session, since [AuthSessionShell] recreates
@@ -222,11 +282,45 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     );
   }
 
+  /// Loads the saved [MuscleFactor] rows for an exercise and emits
+  /// [ExerciseFactorsLoaded].  Failures are logged but do not change state —
+  /// the dialog gracefully falls back to default 1.0 weights.
+  Future<void> _onLoadExerciseFactors(
+    LoadExerciseFactorsEvent event,
+    Emitter<ExerciseState> emit,
+  ) async {
+    final result = await getMuscleFactorsForExercise(event.exerciseId);
+    result.fold(
+      (failure) {
+        AppLogger.warning(
+          'LoadExerciseFactorsEvent(${event.exerciseId}) failed — '
+          '${failure.message}',
+          category: 'exercise_bloc',
+        );
+        // Fail silently: the dialog retains default 1.0 weights.
+      },
+      (factors) {
+        final factorMap = <String, double>{
+          for (final f in factors) f.muscleGroup: f.factor,
+        };
+        emit(
+          ExerciseFactorsLoaded(
+            exerciseId: event.exerciseId,
+            factors: factorMap,
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _onAddExercise(
     AddExerciseEvent event,
     Emitter<ExerciseState> emit,
   ) async {
-    final result = await addExercise(event.exercise);
+    final result = await addExercise(
+      event.exercise,
+      muscleFactors: event.muscleFactors,
+    );
     await result.fold(
       (failure) async {
         _logFailure('AddExerciseEvent(${event.exercise.name})', failure);
@@ -243,7 +337,10 @@ class ExerciseBloc extends Bloc<ExerciseEvent, ExerciseState> {
     UpdateExerciseEvent event,
     Emitter<ExerciseState> emit,
   ) async {
-    final result = await updateExercise(event.exercise);
+    final result = await updateExercise(
+      event.exercise,
+      muscleFactors: event.muscleFactors,
+    );
     await result.fold(
       (failure) async {
         _logFailure('UpdateExerciseEvent(${event.exercise.name})', failure);

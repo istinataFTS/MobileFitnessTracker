@@ -17,7 +17,10 @@ class AddExercise {
     required this.syncExerciseMuscleFactors,
   });
 
-  Future<Either<Failure, void>> call(Exercise exercise) async {
+  Future<Either<Failure, void>> call(
+    Exercise exercise, {
+    Map<String, double>? muscleFactors,
+  }) async {
     // Muscle-group canonicalisation (lowercase + trim) is handled at the
     // model boundary in `ExerciseModel` and inside `SyncExerciseMuscleFactors`,
     // so we do not pre-normalise here.  Adding the user id is the only
@@ -39,7 +42,10 @@ class AddExercise {
 
     return addResult.fold(
       (failure) async => Left(failure),
-      (_) async => syncExerciseMuscleFactors(preparedExercise),
+      (_) async => syncExerciseMuscleFactors(
+        preparedExercise,
+        muscleFactors: muscleFactors,
+      ),
     );
   }
 }

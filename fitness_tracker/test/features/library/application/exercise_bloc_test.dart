@@ -2,6 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/exercise.dart';
+import 'package:fitness_tracker/domain/entities/muscle_factor.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/add_exercise.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/delete_exercise.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/ensure_default_exercises.dart';
@@ -9,6 +10,7 @@ import 'package:fitness_tracker/domain/usecases/exercises/get_all_exercises.dart
 import 'package:fitness_tracker/domain/usecases/exercises/get_exercise_by_id.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/get_exercises_for_muscle.dart';
 import 'package:fitness_tracker/domain/usecases/exercises/update_exercise.dart';
+import 'package:fitness_tracker/domain/usecases/muscle_factors/get_muscle_factors_for_exercise.dart';
 import 'package:fitness_tracker/features/library/application/exercise_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -27,6 +29,9 @@ class MockDeleteExercise extends Mock implements DeleteExercise {}
 
 class MockEnsureDefaultExercises extends Mock
     implements EnsureDefaultExercises {}
+
+class MockGetMuscleFactorsForExercise extends Mock
+    implements GetMuscleFactorsForExercise {}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -49,6 +54,7 @@ void main() {
   late MockUpdateExercise mockUpdate;
   late MockDeleteExercise mockDelete;
   late MockEnsureDefaultExercises mockEnsureDefaultExercises;
+  late MockGetMuscleFactorsForExercise mockGetFactors;
 
   ExerciseBloc buildBloc() => ExerciseBloc(
         getAllExercises: mockGetAll,
@@ -58,6 +64,7 @@ void main() {
         updateExercise: mockUpdate,
         deleteExercise: mockDelete,
         ensureDefaultExercises: mockEnsureDefaultExercises,
+        getMuscleFactorsForExercise: mockGetFactors,
       );
 
   setUpAll(() {
@@ -72,6 +79,7 @@ void main() {
     mockUpdate = MockUpdateExercise();
     mockDelete = MockDeleteExercise();
     mockEnsureDefaultExercises = MockEnsureDefaultExercises();
+    mockGetFactors = MockGetMuscleFactorsForExercise();
   });
 
   group('ExerciseBloc', () {
@@ -271,6 +279,52 @@ void main() {
         act: (bloc) => bloc.add(const DeleteExerciseEvent('ex-1')),
         expect: () => [const ExerciseError('db error')],
         verify: (_) => verifyNever(() => mockGetAll()),
+      );
+    });
+
+    group('LoadExerciseFactorsEvent', () {
+      final factors = [
+        MuscleFactor(
+          id: 'f-1',
+          exerciseId: 'ex-1',
+          muscleGroup: 'chest',
+          factor: 0.8,
+        ),
+        MuscleFactor(
+          id: 'f-2',
+          exerciseId: 'ex-1',
+          muscleGroup: 'triceps',
+          factor: 0.5,
+        ),
+      ];
+
+      blocTest<ExerciseBloc, ExerciseState>(
+        'emits ExerciseFactorsLoaded with a factor map on success',
+        build: buildBloc,
+        setUp: () {
+          when(() => mockGetFactors('ex-1'))
+              .thenAnswer((_) async => Right(factors));
+        },
+        act: (bloc) =>
+            bloc.add(const LoadExerciseFactorsEvent('ex-1')),
+        expect: () => [
+          ExerciseFactorsLoaded(
+            exerciseId: 'ex-1',
+            factors: const <String, double>{'chest': 0.8, 'triceps': 0.5},
+          ),
+        ],
+      );
+
+      blocTest<ExerciseBloc, ExerciseState>(
+        'emits nothing (silent fail) when repository returns a failure',
+        build: buildBloc,
+        setUp: () {
+          when(() => mockGetFactors('ex-1'))
+              .thenAnswer((_) async => const Left(_dbFailure));
+        },
+        act: (bloc) =>
+            bloc.add(const LoadExerciseFactorsEvent('ex-1')),
+        expect: () => <ExerciseState>[],
       );
     });
   });
