@@ -3,7 +3,6 @@ import '../../data/datasources/local/exercise_local_datasource.dart';
 import '../../data/datasources/local/meal_local_datasource.dart';
 import '../../data/datasources/local/muscle_stimulus_local_datasource.dart';
 import '../../data/datasources/local/nutrition_log_local_datasource.dart';
-import '../../data/datasources/local/target_local_datasource.dart';
 import '../../data/datasources/local/workout_set_local_datasource.dart';
 import '../../data/datasources/remote/auth_remote_datasource.dart';
 import '../enums/sync_trigger.dart';
@@ -22,7 +21,6 @@ class SessionSyncServiceImpl implements SessionSyncService {
   final MealLocalDataSource mealLocalDataSource;
   final MuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
   final NutritionLogLocalDataSource nutritionLogLocalDataSource;
-  final TargetLocalDataSource targetLocalDataSource;
   final WorkoutSetLocalDataSource workoutSetLocalDataSource;
 
   const SessionSyncServiceImpl({
@@ -34,7 +32,6 @@ class SessionSyncServiceImpl implements SessionSyncService {
     required this.mealLocalDataSource,
     required this.muscleStimulusLocalDataSource,
     required this.nutritionLogLocalDataSource,
-    required this.targetLocalDataSource,
     required this.workoutSetLocalDataSource,
   });
 
@@ -230,7 +227,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
   ///
   /// Ordering matters for FK integrity:
   /// - meals before nutrition_logs (nutrition_logs.meal_id → meals.id)
-  /// - targets, workout_sets, and muscle_stimulus are independent and run in parallel
+  /// - workout_sets and muscle_stimulus are independent of the above
   /// - exercises: only user-owned rows; seeded exercises (owner_user_id IS NULL)
   ///   are never deleted
   Future<void> _clearAllLocalUserData(String? userId) async {
@@ -239,11 +236,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
       await mealLocalDataSource.clearAllMeals();
       await nutritionLogLocalDataSource.clearAllLogs();
 
-      // independent tables — safe to clear in parallel
-      await Future.wait(<Future<void>>[
-        targetLocalDataSource.clearAllTargets(),
-        workoutSetLocalDataSource.clearAllSets(),
-      ]);
+      await workoutSetLocalDataSource.clearAllSets();
 
       // User-scoped tables: only clear when a real authenticated userId is
       // present.  Guest sessions have no owned rows to remove.

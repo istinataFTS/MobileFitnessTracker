@@ -2,7 +2,6 @@ import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
-import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
@@ -18,7 +17,6 @@ void main() {
     Map<String, int> muscleSetCounts = const <String, int>{},
   }) {
     return HomeDashboardData(
-      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
       muscleSetCounts: muscleSetCounts,
@@ -149,7 +147,6 @@ void main() {
 
     test('macro strip renders non-zero values with correct units', () {
       final HomeDashboardData homeData = HomeDashboardData(
-        targets: const <Target>[],
         todaysLogs: const <NutritionLog>[],
         dailyMacros: const <String, double>{
           'calories': 1840,

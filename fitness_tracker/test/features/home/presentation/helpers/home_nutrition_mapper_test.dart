@@ -1,6 +1,5 @@
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
-import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/home/presentation/mappers/home_view_data_mapper.dart';
@@ -40,7 +39,6 @@ void main() {
 
   test('macro strip shows rounded non-zero values with correct units', () {
     final HomeDashboardData homeData = HomeDashboardData(
-      targets: const <Target>[],
       todaysLogs: <NutritionLog>[
         buildLog(
           id: '1',
@@ -73,7 +71,6 @@ void main() {
 
   test('macro strip shows dash for zero macro values', () {
     final HomeDashboardData homeData = HomeDashboardData(
-      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{
         'protein': 0,
@@ -95,11 +92,8 @@ void main() {
     expect(viewData.nutrition.fatsLabel, '–');
   });
 
-  test('targets field in HomeDashboardData is unused by nutrition mapping', () {
-    // Targets were used by the old _NutritionCard for progress bars.
-    // The new MacroStrip ignores targets entirely.
+  test('macro strip renders non-zero values with correct units — smoke', () {
     final HomeDashboardData homeData = HomeDashboardData(
-      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{
         'protein': 100,
@@ -115,7 +109,6 @@ void main() {
       settings: settings,
     );
 
-    // Regardless of whether targets exist, labels show raw totals.
     expect(viewData.nutrition.proteinLabel, '100 g');
     expect(viewData.nutrition.caloriesLabel, '1640 kcal');
   });

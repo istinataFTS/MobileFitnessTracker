@@ -20,12 +20,10 @@ import '../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_
 import '../data/datasources/local/database_helper.dart';
 import '../data/datasources/local/meal_local_datasource.dart';
 import '../data/datasources/local/nutrition_log_local_datasource.dart';
-import '../data/datasources/local/target_local_datasource.dart';
 import '../data/datasources/local/workout_set_local_datasource.dart';
 import '../data/sync/exercise_sync_coordinator.dart';
 import '../data/sync/meal_sync_coordinator.dart';
 import '../data/sync/nutrition_log_sync_coordinator.dart';
-import '../data/sync/target_sync_coordinator.dart';
 import '../data/sync/workout_set_sync_coordinator.dart';
 import '../domain/repositories/user_profile_repository.dart';
 import '../features/home/application/home_bloc.dart';
@@ -38,7 +36,6 @@ import 'modules/register_muscle_load_module.dart';
 import 'modules/register_muscle_stimulus_module.dart';
 import 'modules/register_profile_module.dart';
 import 'modules/register_social_module.dart';
-import 'modules/register_targets_module.dart';
 import 'modules/register_workout_module.dart';
 
 final sl = GetIt.instance;
@@ -54,7 +51,6 @@ Future<void> init({
   registerCoreModule(sl);
   registerProfileModule(sl);
   registerSocialModule(sl);
-  registerTargetsModule(sl);
   registerWorkoutModule(sl);
   registerExercisesModule(sl);
   registerMealsNutritionModule(sl);
@@ -78,7 +74,7 @@ Future<void> resetDependencies() {
 
 void _registerAppComposition(GetIt sl) {
   // Migration and sync order must respect FK dependencies in the remote schema:
-  //   exercises → meals → workout_sets → nutrition_logs → targets
+  //   exercises → meals → workout_sets → nutrition_logs
   // Every migration step follows the same prepare → push → pull shape:
   //   1. prepare: reassign any guest-owned rows to this authenticated user.
   //   2. push:    upload the local (now user-scoped) rows to the cloud.
@@ -126,15 +122,6 @@ void _registerAppComposition(GetIt sl) {
           await coordinator.pullRemoteChanges(userId: userId, since: null);
         },
       ),
-      InitialCloudMigrationStep(
-        key: 'targets',
-        run: (userId) async {
-          final coordinator = sl<TargetSyncCoordinator>();
-          await coordinator.prepareForInitialCloudMigration(userId);
-          await coordinator.syncPendingChanges();
-          await coordinator.pullRemoteChanges(userId: userId, since: null);
-        },
-      ),
     ],
   );
 
@@ -171,12 +158,6 @@ void _registerAppComposition(GetIt sl) {
         pullRemoteChanges: (userId, since) =>
             sl<NutritionLogSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
       ),
-      SyncFeature(
-        name: 'targets',
-        syncPendingChanges: sl<TargetSyncCoordinator>().syncPendingChanges,
-        pullRemoteChanges: (userId, since) =>
-            sl<TargetSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
-      ),
     ],
   );
 
@@ -212,7 +193,6 @@ void _registerAppComposition(GetIt sl) {
       mealLocalDataSource: sl(),
       muscleStimulusLocalDataSource: sl(),
       nutritionLogLocalDataSource: sl(),
-      targetLocalDataSource: sl(),
       workoutSetLocalDataSource: sl(),
     ),
   );
@@ -227,7 +207,6 @@ void _registerAppComposition(GetIt sl) {
 
   sl.registerLazySingleton(
     () => LoadHomeDashboardData(
-      getAllTargets: sl(),
       getLogsForDate: sl(),
       getDailyMacros: sl(),
       muscleLoadResolver: sl(),

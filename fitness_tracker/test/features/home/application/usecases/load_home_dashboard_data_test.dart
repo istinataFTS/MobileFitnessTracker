@@ -5,18 +5,14 @@ import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
-import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/repositories/app_session_repository.dart';
 import 'package:fitness_tracker/domain/services/muscle_load_resolver.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_daily_macros.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_logs_for_date.dart';
-import 'package:fitness_tracker/domain/usecases/targets/get_all_targets.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/usecases/load_home_dashboard_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-
-class MockGetAllTargets extends Mock implements GetAllTargets {}
 
 class MockGetLogsForDate extends Mock implements GetLogsForDate {}
 
@@ -27,7 +23,6 @@ class MockMuscleLoadResolver extends Mock implements MuscleLoadResolver {}
 class MockAppSessionRepository extends Mock implements AppSessionRepository {}
 
 void main() {
-  late MockGetAllTargets mockGetAllTargets;
   late MockGetLogsForDate mockGetLogsForDate;
   late MockGetDailyMacros mockGetDailyMacros;
   late MockMuscleLoadResolver mockMuscleLoadResolver;
@@ -36,19 +31,6 @@ void main() {
   late LoadHomeDashboardData usecase;
 
   final DateTime now = DateTime(2026, 3, 19, 10, 0);
-
-  final List<Target> targets = <Target>[
-    Target(
-      id: 'target-chest',
-      type: TargetType.muscleSets,
-      categoryKey: 'chest',
-      targetValue: 6,
-      unit: 'sets',
-      period: TargetPeriod.weekly,
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-  ];
 
   const Map<String, int> muscleSetCounts = <String, int>{'chest': 1};
   const int weeklySetCount = 1;
@@ -90,14 +72,12 @@ void main() {
   );
 
   setUp(() {
-    mockGetAllTargets = MockGetAllTargets();
     mockGetLogsForDate = MockGetLogsForDate();
     mockGetDailyMacros = MockGetDailyMacros();
     mockMuscleLoadResolver = MockMuscleLoadResolver();
     mockAppSessionRepository = MockAppSessionRepository();
 
     usecase = LoadHomeDashboardData(
-      getAllTargets: mockGetAllTargets,
       getLogsForDate: mockGetLogsForDate,
       getDailyMacros: mockGetDailyMacros,
       muscleLoadResolver: mockMuscleLoadResolver,
@@ -106,7 +86,6 @@ void main() {
   });
 
   void stubSuccessfulCoreLoads() {
-    when(() => mockGetAllTargets()).thenAnswer((_) async => Right(targets));
     when(() => mockAppSessionRepository.getCurrentSession()).thenAnswer(
       (_) async => const Right(authenticatedSession),
     );
@@ -142,7 +121,6 @@ void main() {
       result,
       Right<Failure, HomeDashboardData>(
         HomeDashboardData(
-          targets: targets,
           todaysLogs: <NutritionLog>[newerLog, olderLog],
           dailyMacros: dailyMacros,
           muscleSetCounts: muscleSetCounts,
@@ -152,18 +130,7 @@ void main() {
     );
   });
 
-  test('returns failure when targets loading fails', () async {
-    when(() => mockGetAllTargets()).thenAnswer(
-      (_) async => const Left(CacheFailure('targets failed')),
-    );
-
-    final result = await usecase();
-
-    expect(result, const Left<Failure, HomeDashboardData>(CacheFailure('targets failed')));
-  });
-
   test('falls back to empty muscle counts for guest sessions', () async {
-    when(() => mockGetAllTargets()).thenAnswer((_) async => Right(targets));
     when(() => mockAppSessionRepository.getCurrentSession()).thenAnswer(
       (_) async => const Right(AppSession.guest()),
     );
@@ -180,7 +147,6 @@ void main() {
       result,
       Right<Failure, HomeDashboardData>(
         HomeDashboardData(
-          targets: targets,
           todaysLogs: <NutritionLog>[newerLog],
           dailyMacros: dailyMacros,
           muscleSetCounts: const <String, int>{},
@@ -212,7 +178,6 @@ void main() {
       result,
       Right<Failure, HomeDashboardData>(
         HomeDashboardData(
-          targets: targets,
           todaysLogs: const <NutritionLog>[],
           dailyMacros: dailyMacros,
           muscleSetCounts: muscleSetCounts,
@@ -238,7 +203,6 @@ void main() {
       result,
       Right<Failure, HomeDashboardData>(
         HomeDashboardData(
-          targets: targets,
           todaysLogs: <NutritionLog>[newerLog],
           dailyMacros: HomeDashboardData.emptyDailyMacros,
           muscleSetCounts: muscleSetCounts,
