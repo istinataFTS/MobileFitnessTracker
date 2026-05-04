@@ -75,29 +75,6 @@ class DatabaseHelper {
   /// schema change.
   static Future<void> createSchema(Database db) async {
     await db.execute('''
-      CREATE TABLE ${DatabaseTables.targets} (
-        ${DatabaseTables.targetId} TEXT PRIMARY KEY,
-        ${DatabaseTables.ownerUserId} TEXT,
-        ${DatabaseTables.targetType} TEXT NOT NULL,
-        ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
-        ${DatabaseTables.targetValue} REAL NOT NULL,
-        ${DatabaseTables.targetUnit} TEXT NOT NULL,
-        ${DatabaseTables.targetPeriod} TEXT NOT NULL,
-        ${DatabaseTables.targetCreatedAt} TEXT NOT NULL,
-        ${DatabaseTables.targetUpdatedAt} TEXT NOT NULL,
-        ${DatabaseTables.targetServerId} TEXT,
-        ${DatabaseTables.targetSyncStatus} TEXT NOT NULL DEFAULT 'localOnly',
-        ${DatabaseTables.targetLastSyncedAt} TEXT,
-        ${DatabaseTables.targetLastSyncError} TEXT,
-        UNIQUE(
-          ${DatabaseTables.targetType},
-          ${DatabaseTables.targetCategoryKey},
-          ${DatabaseTables.targetPeriod}
-        )
-      )
-    ''');
-
-    await db.execute('''
       CREATE TABLE ${DatabaseTables.workoutSets} (
         ${DatabaseTables.setId} TEXT PRIMARY KEY,
         ${DatabaseTables.ownerUserId} TEXT,
@@ -486,6 +463,21 @@ class DatabaseHelper {
       await _migrateMealsForMultiOwnerUniqueness(db);
     }
 
+    if (oldVersion < 19) {
+      // The Targets feature has been removed from the app.
+      // Drop the table so the schema stays in sync on existing devices.
+      // IF NOT EXISTS is not valid for DROP TABLE in SQLite; use IF EXISTS (sqflite
+      // wraps the standard syntax). Any installation that never created the
+      // targets table (e.g., fresh installs between v18 and v19) will skip
+      // silently via the try/ignore pattern handled by sqflite.
+      try {
+        await db.execute('DROP TABLE IF EXISTS targets');
+      } catch (_) {
+        // Table may not exist on installations that skipped older versions
+        // via a non-standard upgrade path — safe to ignore.
+      }
+    }
+
     await _createIndexes(db);
   }
 
@@ -501,26 +493,21 @@ class DatabaseHelper {
     );
   }
 
+  // ignore: unused_element — kept for upgrade path from db versions < 8.
   Future<void> _migrateTargetsToTypedGoals(Database db) async {
-    await db.execute(
-      'ALTER TABLE ${DatabaseTables.targets} RENAME TO targets_legacy',
-    );
+    await db.execute('ALTER TABLE targets RENAME TO targets_legacy');
 
     await db.execute('''
-      CREATE TABLE ${DatabaseTables.targets} (
-        ${DatabaseTables.targetId} TEXT PRIMARY KEY,
+      CREATE TABLE targets (
+        id TEXT PRIMARY KEY,
         ${DatabaseTables.ownerUserId} TEXT,
-        ${DatabaseTables.targetType} TEXT NOT NULL,
-        ${DatabaseTables.targetCategoryKey} TEXT NOT NULL,
-        ${DatabaseTables.targetValue} REAL NOT NULL,
-        ${DatabaseTables.targetUnit} TEXT NOT NULL,
-        ${DatabaseTables.targetPeriod} TEXT NOT NULL,
-        ${DatabaseTables.targetCreatedAt} TEXT NOT NULL,
-        UNIQUE(
-          ${DatabaseTables.targetType},
-          ${DatabaseTables.targetCategoryKey},
-          ${DatabaseTables.targetPeriod}
-        )
+        type TEXT NOT NULL,
+        category_key TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        unit TEXT NOT NULL,
+        period TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(type, category_key, period)
       )
     ''');
 
@@ -528,21 +515,17 @@ class DatabaseHelper {
 
     for (final legacyTarget in legacyTargets) {
       await db.insert(
-        DatabaseTables.targets,
+        'targets',
         <String, Object?>{
-          DatabaseTables.targetId:
-              legacyTarget[DatabaseTables.targetId] as String,
+          'id': legacyTarget['id'] as String,
           DatabaseTables.ownerUserId: null,
-          DatabaseTables.targetType: 'muscle_sets',
-          DatabaseTables.targetCategoryKey:
-              legacyTarget[DatabaseTables.legacyTargetMuscleGroup] as String,
-          DatabaseTables.targetValue:
-              (legacyTarget[DatabaseTables.legacyTargetWeeklyGoal] as num)
-                  .toDouble(),
-          DatabaseTables.targetUnit: 'sets',
-          DatabaseTables.targetPeriod: 'weekly',
-          DatabaseTables.targetCreatedAt:
-              legacyTarget[DatabaseTables.targetCreatedAt] as String,
+          'type': 'muscle_sets',
+          'category_key': legacyTarget['muscle_group'] as String,
+          'target_value':
+              (legacyTarget['weekly_goal'] as num).toDouble(),
+          'unit': 'sets',
+          'period': 'weekly',
+          'created_at': legacyTarget['created_at'] as String,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -598,37 +581,26 @@ class DatabaseHelper {
     ''');
   }
 
+  // ignore: unused_element — kept for upgrade path from db versions < 11.
   Future<void> _migrateTargetsForRemoteReadiness(Database db) async {
-    await db.execute('''
-      ALTER TABLE ${DatabaseTables.targets}
-      ADD COLUMN ${DatabaseTables.targetUpdatedAt} TEXT
-    ''');
-
-    await db.execute('''
-      UPDATE ${DatabaseTables.targets}
-      SET ${DatabaseTables.targetUpdatedAt} = ${DatabaseTables.targetCreatedAt}
-      WHERE ${DatabaseTables.targetUpdatedAt} IS NULL
-    ''');
-
-    await db.execute('''
-      ALTER TABLE ${DatabaseTables.targets}
-      ADD COLUMN ${DatabaseTables.targetServerId} TEXT
-    ''');
-
-    await db.execute('''
-      ALTER TABLE ${DatabaseTables.targets}
-      ADD COLUMN ${DatabaseTables.targetSyncStatus} TEXT NOT NULL DEFAULT 'localOnly'
-    ''');
-
-    await db.execute('''
-      ALTER TABLE ${DatabaseTables.targets}
-      ADD COLUMN ${DatabaseTables.targetLastSyncedAt} TEXT
-    ''');
-
-    await db.execute('''
-      ALTER TABLE ${DatabaseTables.targets}
-      ADD COLUMN ${DatabaseTables.targetLastSyncError} TEXT
-    ''');
+    await db.execute(
+      'ALTER TABLE targets ADD COLUMN updated_at TEXT',
+    );
+    await db.execute(
+      'UPDATE targets SET updated_at = created_at WHERE updated_at IS NULL',
+    );
+    await db.execute(
+      'ALTER TABLE targets ADD COLUMN server_id TEXT',
+    );
+    await db.execute(
+      "ALTER TABLE targets ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'localOnly'",
+    );
+    await db.execute(
+      'ALTER TABLE targets ADD COLUMN last_synced_at TEXT',
+    );
+    await db.execute(
+      'ALTER TABLE targets ADD COLUMN last_sync_error TEXT',
+    );
   }
 
   Future<void> _migrateExercisesForRemoteReadiness(Database db) async {
@@ -741,9 +713,11 @@ class DatabaseHelper {
   }
 
   Future<void> _migrateOwnershipColumns(Database db) async {
+    // targets table still exists at this point in the upgrade path (v15);
+    // owner_user_id is added here and the table itself is dropped in v19.
     await _addNullableTextColumnIfMissing(
       db,
-      tableName: DatabaseTables.targets,
+      tableName: 'targets',
       columnName: DatabaseTables.ownerUserId,
     );
     await _addNullableTextColumnIfMissing(
@@ -976,39 +950,6 @@ class DatabaseHelper {
   }
 
   static Future<void> _createIndexes(Database db) async {
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_type_period
-      ON ${DatabaseTables.targets}(
-        ${DatabaseTables.targetType},
-        ${DatabaseTables.targetPeriod}
-      )
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_category_key
-      ON ${DatabaseTables.targets}(${DatabaseTables.targetCategoryKey})
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_updated_at
-      ON ${DatabaseTables.targets}(${DatabaseTables.targetUpdatedAt})
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_sync_status
-      ON ${DatabaseTables.targets}(${DatabaseTables.targetSyncStatus})
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_server_id
-      ON ${DatabaseTables.targets}(${DatabaseTables.targetServerId})
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_targets_owner_user_id
-      ON ${DatabaseTables.targets}(${DatabaseTables.ownerUserId})
-    ''');
-
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_workout_sets_exercise_id
       ON ${DatabaseTables.workoutSets}(${DatabaseTables.setExerciseId})

@@ -1,10 +1,11 @@
-// Regression suite for the v18 schema migration.
+// Regression suite for schema migrations v18 and v19.
 //
-// Two things are verified:
+// Three things are verified:
 //   1. Fresh-install path (`DatabaseHelper.createSchema`): the per-owner
 //      expression index `UNIQUE(name, COALESCE(owner_user_id, ''))` correctly
 //      allows a system exercise/meal (owner = NULL) and a user exercise/meal
 //      to share the same name, while still rejecting same-owner duplicates.
+//      The targets table must NOT be present in a fresh v19 install.
 //
 //   2. Upgrade path (v17 → v18 DDL): the DDL steps that production runs inside
 //      `_migrateExercisesForMultiOwnerUniqueness` and
@@ -12,6 +13,9 @@
 //      so the migration can be exercised without accessing private methods.
 //      After the DDL runs, the per-owner uniqueness contract is enforced and
 //      all pre-migration rows are preserved intact.
+//
+//   3. Upgrade path (v18 → v19 DDL): the targets table is dropped so existing
+//      devices no longer carry a schema artefact for the removed feature.
 import 'package:fitness_tracker/core/constants/database_tables.dart';
 import 'package:fitness_tracker/data/datasources/local/database_helper.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -180,7 +184,7 @@ void main() {
   // 1. Fresh-install schema (DatabaseHelper.createSchema)
   // =========================================================================
 
-  group('DatabaseHelper.createSchema — per-owner uniqueness (fresh v18 install)',
+  group('DatabaseHelper.createSchema — per-owner uniqueness (fresh v19 install)',
       () {
     late Database db;
 
@@ -295,6 +299,16 @@ void main() {
           ),
           throwsException,
         );
+      },
+    );
+
+    test(
+      'targets table is absent from fresh v19 schema',
+      () async {
+        final tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+        );
+        expect(tables, isEmpty);
       },
     );
   });
@@ -447,5 +461,89 @@ void main() {
         },
       );
     });
+  });
+
+  // =========================================================================
+  // 3. v18 → v19 upgrade path — targets table dropped
+  // =========================================================================
+
+  group('v18 to v19 migration DDL — targets table removed', () {
+    late Database db;
+
+    setUp(() async {
+      db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+    });
+
+    tearDown(() async => db.close());
+
+    Future<void> createV18TargetsTable(Database db) => db.execute('''
+      CREATE TABLE targets (
+        id TEXT PRIMARY KEY,
+        owner_user_id TEXT,
+        type TEXT NOT NULL,
+        category_key TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        unit TEXT NOT NULL,
+        period TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        server_id TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'localOnly',
+        last_synced_at TEXT,
+        last_sync_error TEXT,
+        UNIQUE(type, category_key, period)
+      )
+    ''');
+
+    test(
+      'targets table is dropped when it exists on a v18 device',
+      () async {
+        await createV18TargetsTable(db);
+        await db.insert('targets', {
+          'id': 'target-1',
+          'owner_user_id': null,
+          'type': 'macro',
+          'category_key': 'protein',
+          'target_value': 180.0,
+          'unit': 'grams',
+          'period': 'daily',
+          'created_at': '2026-01-01T09:00:00.000',
+          'updated_at': '2026-01-01T09:00:00.000',
+          'sync_status': 'localOnly',
+        });
+
+        // Verify the table exists before migration.
+        var tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+        );
+        expect(tables, hasLength(1));
+
+        // Apply v19 migration.
+        await db.execute('DROP TABLE IF EXISTS targets');
+
+        // Verify the table no longer exists.
+        tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+        );
+        expect(tables, isEmpty);
+      },
+    );
+
+    test(
+      'DROP TABLE IF EXISTS is a no-op when targets table is absent',
+      () async {
+        // Don't create the targets table — simulates a device that somehow
+        // skipped older versions.
+        await expectLater(
+          db.execute('DROP TABLE IF EXISTS targets'),
+          completes,
+        );
+
+        final tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+        );
+        expect(tables, isEmpty);
+      },
+    );
   });
 }

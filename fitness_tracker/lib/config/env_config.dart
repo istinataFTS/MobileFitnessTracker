@@ -79,9 +79,10 @@ class EnvConfig {
   /// Version 17: Added owner_user_id to muscle_stimulus; updated UNIQUE to (owner_user_id, muscle_group, date).
   /// Version 18: Replaced global UNIQUE(name) on exercises and meals with per-owner expression index
   ///             UNIQUE(name, COALESCE(owner_user_id, '')) so system and user rows may share a name.
+  /// Version 19: Dropped the targets table — the Targets feature has been removed from the app.
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 18,
+    defaultValue: 19,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(
