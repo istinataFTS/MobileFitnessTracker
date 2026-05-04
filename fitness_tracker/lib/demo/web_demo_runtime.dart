@@ -23,7 +23,6 @@ import '../domain/entities/muscle_factor.dart';
 import '../domain/entities/muscle_stimulus.dart';
 import '../domain/entities/nutrition_log.dart';
 import '../domain/entities/stimulus_calculation_rules.dart';
-import '../domain/entities/target.dart';
 import '../domain/entities/workout_set.dart';
 import '../domain/repositories/app_session_repository.dart';
 import '../domain/repositories/app_settings_repository.dart';
@@ -32,7 +31,6 @@ import '../domain/repositories/meal_repository.dart';
 import '../domain/repositories/muscle_factor_repository.dart';
 import '../domain/repositories/muscle_stimulus_repository.dart';
 import '../domain/repositories/nutrition_log_repository.dart';
-import '../domain/repositories/target_repository.dart';
 import '../domain/repositories/workout_set_repository.dart';
 
 bool get isWebDemoMode => kIsWeb;
@@ -51,10 +49,6 @@ Future<void> registerWebDemoOverrides(GetIt sl) async {
   await _replaceRegistration<AppSettingsRepository>(
     sl,
     () => WebDemoAppSettingsRepository(store),
-  );
-  await _replaceRegistration<TargetRepository>(
-    sl,
-    () => WebDemoTargetRepository(store),
   );
   await _replaceRegistration<WorkoutSetRepository>(
     sl,
@@ -108,7 +102,6 @@ class WebDemoStore {
   WebDemoStore({
     required this.session,
     required this.settings,
-    required this.targets,
     required this.workoutSets,
     required this.exercises,
     required this.meals,
@@ -122,7 +115,6 @@ class WebDemoStore {
   AppSettings settings;
   InitialCloudMigrationState? migrationState;
 
-  List<Target> targets;
   List<WorkoutSet> workoutSets;
   List<Exercise> exercises;
   List<Meal> meals;
@@ -306,54 +298,6 @@ class WebDemoStore {
       ),
     ];
 
-    final targets = <Target>[
-      Target(
-        id: 'target-1',
-        type: TargetType.macro,
-        categoryKey: 'protein',
-        targetValue: 180,
-        unit: 'grams',
-        period: TargetPeriod.daily,
-        createdAt: threeDaysAgo,
-      ),
-      Target(
-        id: 'target-2',
-        type: TargetType.macro,
-        categoryKey: 'carbs',
-        targetValue: 260,
-        unit: 'grams',
-        period: TargetPeriod.daily,
-        createdAt: threeDaysAgo,
-      ),
-      Target(
-        id: 'target-3',
-        type: TargetType.macro,
-        categoryKey: 'fats',
-        targetValue: 70,
-        unit: 'grams',
-        period: TargetPeriod.daily,
-        createdAt: threeDaysAgo,
-      ),
-      Target(
-        id: 'target-4',
-        type: TargetType.muscleSets,
-        categoryKey: 'mid-chest',
-        targetValue: 12,
-        unit: 'sets',
-        period: TargetPeriod.weekly,
-        createdAt: yesterday,
-      ),
-      Target(
-        id: 'target-5',
-        type: TargetType.muscleSets,
-        categoryKey: 'quads',
-        targetValue: 10,
-        unit: 'sets',
-        period: TargetPeriod.weekly,
-        createdAt: yesterday,
-      ),
-    ];
-
     final muscleFactors = <MuscleFactor>[
       const MuscleFactor(
         id: 'factor-1',
@@ -456,7 +400,6 @@ class WebDemoStore {
     return WebDemoStore(
       session: const AppSession(authMode: AuthMode.guest),
       settings: const AppSettings.defaults(),
-      targets: targets,
       workoutSets: workoutSets,
       exercises: exercises,
       meals: meals,
@@ -467,13 +410,6 @@ class WebDemoStore {
   }
 
   void claimGuestData(String userId) {
-    targets = targets
-        .map(
-          (target) => target.ownerUserId == null
-              ? target.copyWith(ownerUserId: userId)
-              : target,
-        )
-        .toList();
     workoutSets = workoutSets
         .map(
           (set) =>
@@ -594,90 +530,6 @@ class WebDemoAppSettingsRepository implements AppSettingsRepository {
   @override
   Future<Either<Failure, void>> saveSettings(AppSettings settings) async {
     _store.settings = settings;
-    return const Right(null);
-  }
-}
-
-class WebDemoTargetRepository implements TargetRepository {
-  WebDemoTargetRepository(this._store);
-
-  final WebDemoStore _store;
-
-  @override
-  Future<Either<Failure, List<Target>>> getAllTargets({
-    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
-  }) async {
-    final items = [..._store.targets]
-      ..sort((a, b) => a.categoryKey.compareTo(b.categoryKey));
-    return Right(items);
-  }
-
-  @override
-  Future<Either<Failure, Target?>> getTargetById(
-    String id, {
-    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
-  }) async {
-    return Right(
-      _firstWhereOrNull(_store.targets, (target) => target.id == id),
-    );
-  }
-
-  @override
-  Future<Either<Failure, Target?>> getTargetByTypeAndCategory(
-    TargetType type,
-    String categoryKey,
-    TargetPeriod period, {
-    DataSourcePreference sourcePreference = DataSourcePreference.localOnly,
-  }) async {
-    return Right(
-      _firstWhereOrNull(
-        _store.targets,
-        (target) =>
-            target.type == type &&
-            target.period == period &&
-            target.categoryKey == categoryKey,
-      ),
-    );
-  }
-
-  @override
-  Future<Either<Failure, void>> addTarget(Target target) async {
-    _store.targets.removeWhere(
-      (item) =>
-          item.id == target.id ||
-          (item.type == target.type &&
-              item.categoryKey == target.categoryKey &&
-              item.period == target.period),
-    );
-    _store.targets.add(target);
-    return const Right(null);
-  }
-
-  @override
-  Future<Either<Failure, void>> updateTarget(Target target) async {
-    final index = _store.targets.indexWhere((item) => item.id == target.id);
-    if (index < 0) {
-      return const Left(ValidationFailure('Target not found'));
-    }
-
-    _store.targets[index] = target;
-    return const Right(null);
-  }
-
-  @override
-  Future<Either<Failure, void>> deleteTarget(String targetId) async {
-    _store.targets.removeWhere((target) => target.id == targetId);
-    return const Right(null);
-  }
-
-  @override
-  Future<Either<Failure, void>> clearAllTargets() async {
-    _store.targets.clear();
-    return const Right(null);
-  }
-
-  @override
-  Future<Either<Failure, void>> syncPendingTargets() async {
     return const Right(null);
   }
 }
