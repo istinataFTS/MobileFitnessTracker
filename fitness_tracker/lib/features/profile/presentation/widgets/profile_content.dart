@@ -10,14 +10,12 @@ class ProfileContent extends StatelessWidget {
     required this.viewData,
     required this.onRefresh,
     required this.onOpenSettings,
-    required this.onOpenTargets,
     required this.onOpenHistory,
   });
 
   final ProfilePageViewData viewData;
   final Future<void> Function() onRefresh;
   final VoidCallback onOpenSettings;
-  final VoidCallback onOpenTargets;
   final VoidCallback onOpenHistory;
 
   @override
@@ -57,13 +55,6 @@ class ProfileContent extends StatelessWidget {
                 title: 'Settings',
                 subtitle: 'App preferences and local configuration',
                 onTap: onOpenSettings,
-              ),
-              _NavigationTile(
-                tileKey: ProfilePageKeys.targetsTileKey,
-                icon: Icons.flag_outlined,
-                title: 'Targets',
-                subtitle: 'Manage your weekly muscle group goals',
-                onTap: onOpenTargets,
               ),
               _NavigationTile(
                 tileKey: ProfilePageKeys.historyTileKey,

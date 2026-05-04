@@ -21,9 +21,6 @@ class ProfilePageKeys {
   static const Key settingsTileKey = ValueKey<String>(
     'profile_settings_tile',
   );
-  static const Key targetsTileKey = ValueKey<String>(
-    'profile_targets_tile',
-  );
   static const Key historyTileKey = ValueKey<String>(
     'profile_history_tile',
   );

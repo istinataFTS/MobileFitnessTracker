@@ -9,7 +9,6 @@ import '../features/library/application/meal_bloc.dart';
 import '../features/log/application/nutrition_log_bloc.dart';
 import '../features/log/log.dart';
 import '../features/profile/application/profile_cubit.dart';
-import '../features/targets/application/targets_bloc.dart';
 import '../injection/injection_container.dart' as di;
 
 /// Establishes the authentication boundary in the widget tree.
@@ -58,9 +57,6 @@ class AuthSessionShell extends StatelessWidget {
           key: ValueKey<String>(sessionKey),
           child: MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
-              BlocProvider<TargetsBloc>(
-                create: (_) => di.sl<TargetsBloc>(),
-              ),
               BlocProvider<WorkoutBloc>(
                 create: (_) => di.sl<WorkoutBloc>(),
               ),
