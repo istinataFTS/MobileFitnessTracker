@@ -10,7 +10,6 @@ import 'package:fitness_tracker/core/sync/sync_orchestrator.dart';
 import 'package:fitness_tracker/data/datasources/local/exercise_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/meal_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/nutrition_log_local_datasource.dart';
-import 'package:fitness_tracker/data/datasources/local/target_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/muscle_stimulus_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/local/workout_set_local_datasource.dart';
 import 'package:fitness_tracker/data/datasources/remote/auth_remote_datasource.dart';
@@ -35,8 +34,6 @@ class MockMealLocalDataSource extends Mock implements MealLocalDataSource {}
 class MockNutritionLogLocalDataSource extends Mock
     implements NutritionLogLocalDataSource {}
 
-class MockTargetLocalDataSource extends Mock implements TargetLocalDataSource {}
-
 class MockWorkoutSetLocalDataSource extends Mock
     implements WorkoutSetLocalDataSource {}
 
@@ -58,7 +55,6 @@ void main() {
   late MockExerciseLocalDataSource exerciseLocalDataSource;
   late MockMealLocalDataSource mealLocalDataSource;
   late MockNutritionLogLocalDataSource nutritionLogLocalDataSource;
-  late MockTargetLocalDataSource targetLocalDataSource;
   late MockWorkoutSetLocalDataSource workoutSetLocalDataSource;
   late MockMuscleStimulusLocalDataSource muscleStimulusLocalDataSource;
   late MockRebuildMuscleStimulus rebuildMuscleStimulus;
@@ -82,7 +78,6 @@ void main() {
     exerciseLocalDataSource = MockExerciseLocalDataSource();
     mealLocalDataSource = MockMealLocalDataSource();
     nutritionLogLocalDataSource = MockNutritionLogLocalDataSource();
-    targetLocalDataSource = MockTargetLocalDataSource();
     workoutSetLocalDataSource = MockWorkoutSetLocalDataSource();
     muscleStimulusLocalDataSource = MockMuscleStimulusLocalDataSource();
     rebuildMuscleStimulus = MockRebuildMuscleStimulus();
@@ -108,8 +103,6 @@ void main() {
     when(() => mealLocalDataSource.clearAllMeals()).thenAnswer((_) async {});
     when(() => nutritionLogLocalDataSource.clearAllLogs())
         .thenAnswer((_) async {});
-    when(() => targetLocalDataSource.clearAllTargets())
-        .thenAnswer((_) async {});
     when(() => workoutSetLocalDataSource.clearAllSets())
         .thenAnswer((_) async {});
     when(() => muscleStimulusLocalDataSource.clearStimulusForUser(any()))
@@ -123,7 +116,6 @@ void main() {
       exerciseLocalDataSource: exerciseLocalDataSource,
       mealLocalDataSource: mealLocalDataSource,
       nutritionLogLocalDataSource: nutritionLogLocalDataSource,
-      targetLocalDataSource: targetLocalDataSource,
       workoutSetLocalDataSource: workoutSetLocalDataSource,
       muscleStimulusLocalDataSource: muscleStimulusLocalDataSource,
     );
@@ -293,7 +285,6 @@ void main() {
       // All user-scoped tables must be cleared.
       verify(() => mealLocalDataSource.clearAllMeals()).called(1);
       verify(() => nutritionLogLocalDataSource.clearAllLogs()).called(1);
-      verify(() => targetLocalDataSource.clearAllTargets()).called(1);
       verify(() => workoutSetLocalDataSource.clearAllSets()).called(1);
       // Only user-owned exercises — seeded rows are preserved.
       verify(
@@ -318,7 +309,6 @@ void main() {
       verifyNever(() => repository.clearSession());
       verifyNever(() => mealLocalDataSource.clearAllMeals());
       verifyNever(() => nutritionLogLocalDataSource.clearAllLogs());
-      verifyNever(() => targetLocalDataSource.clearAllTargets());
       verifyNever(() => workoutSetLocalDataSource.clearAllSets());
       verifyNever(
         () => exerciseLocalDataSource.clearUserOwnedExercises(any()),
@@ -348,7 +338,6 @@ void main() {
       // but a clean database matters for reinstall / edge-case scenarios.
       verify(() => mealLocalDataSource.clearAllMeals()).called(1);
       verify(() => nutritionLogLocalDataSource.clearAllLogs()).called(1);
-      verify(() => targetLocalDataSource.clearAllTargets()).called(1);
       verify(() => workoutSetLocalDataSource.clearAllSets()).called(1);
       verify(
         () => exerciseLocalDataSource.clearUserOwnedExercises('user-1'),
