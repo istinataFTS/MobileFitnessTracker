@@ -38,8 +38,22 @@ class ExercisesTab extends StatefulWidget {
     'library_exercises_loading_indicator',
   );
 
+  // Keys for the exercise dialog factor editor.
+  static const Key factorEditorKey = ValueKey<String>(
+    'library_exercise_dialog_factor_editor',
+  );
+  static const Key resetFactorsButtonKey = ValueKey<String>(
+    'library_exercise_dialog_reset_factors_button',
+  );
+
   static Key muscleChipKey(String muscle) =>
       ValueKey<String>('library_exercises_muscle_chip_$muscle');
+
+  static Key factorSliderKey(String muscle) =>
+      ValueKey<String>('library_exercise_dialog_factor_slider_$muscle');
+
+  static Key factorValueKey(String muscle) =>
+      ValueKey<String>('library_exercise_dialog_factor_value_$muscle');
 
   @override
   State<ExercisesTab> createState() => _ExercisesTabState();
@@ -50,6 +64,11 @@ class _ExercisesTabState extends State<ExercisesTab> {
 
   String _searchQuery = '';
   String? _selectedMuscleFilter;
+
+  /// Caches the last-loaded exercise list so the tab remains visible when the
+  /// bloc emits [ExerciseFactorsLoaded] (which is not an [ExercisesLoaded]
+  /// state and would otherwise clear the list).
+  List<Exercise> _cachedExercises = const <Exercise>[];
 
   @override
   void dispose() {
@@ -92,6 +111,11 @@ class _ExercisesTabState extends State<ExercisesTab> {
         }
       },
       builder: (BuildContext context, ExerciseState state) {
+        // Keep the cache fresh whenever exercises are loaded.
+        if (state is ExercisesLoaded) {
+          _cachedExercises = state.exercises;
+        }
+
         if (state is ExerciseLoading) {
           return const Center(
             child: CircularProgressIndicator(
@@ -105,18 +129,15 @@ class _ExercisesTabState extends State<ExercisesTab> {
           return _buildErrorState(context, state.message);
         }
 
-        final List<Exercise> allExercises =
-            state is ExercisesLoaded ? state.exercises : <Exercise>[];
-
         final List<Exercise> filteredExercises = LibraryExerciseFilters.apply(
-          exercises: allExercises,
+          exercises: _cachedExercises,
           query: _searchQuery,
           selectedMuscle: _selectedMuscleFilter,
         );
 
         final LibraryExercisePageViewData viewData =
             LibraryExerciseViewDataMapper.map(
-          allExercises: allExercises,
+          allExercises: _cachedExercises,
           filteredExercises: filteredExercises,
           searchQuery: _searchQuery,
           selectedMuscle: _selectedMuscleFilter,
@@ -591,6 +612,10 @@ class _ExercisesTabState extends State<ExercisesTab> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Exercise add/edit dialog
+// ---------------------------------------------------------------------------
+
 class _ExerciseDialog extends StatefulWidget {
   const _ExerciseDialog({this.exercise});
 
@@ -602,7 +627,12 @@ class _ExerciseDialog extends StatefulWidget {
 
 class _ExerciseDialogState extends State<_ExerciseDialog> {
   late final TextEditingController _nameController;
-  late final Set<String> _selectedMuscles;
+
+  /// Insertion-ordered map: simple-key muscle → activation factor ∈ [0, 1].
+  /// Replaces the old `Set<String> _selectedMuscles` — the keys serve the same
+  /// role as the set members while the values drive the factor sliders.
+  late final Map<String, double> _selectedMuscleFactors;
+
   final Uuid _uuid = const Uuid();
 
   bool get isEditing => widget.exercise != null;
@@ -611,8 +641,25 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.exercise?.name ?? '');
-    _selectedMuscles =
-        Set<String>.from(widget.exercise?.muscleGroups ?? const <String>[]);
+
+    // Seed the factor map from the exercise's existing muscle groups.
+    // Factors default to 1.0 and are overwritten once [ExerciseFactorsLoaded]
+    // arrives from the bloc (see the BlocListener in build()).
+    _selectedMuscleFactors = <String, double>{
+      for (final muscle in widget.exercise?.muscleGroups ?? const <String>[])
+        muscle: 1.0,
+    };
+
+    if (isEditing) {
+      // Dispatch after the first frame so the BlocProvider is in the tree.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context
+              .read<ExerciseBloc>()
+              .add(LoadExerciseFactorsEvent(widget.exercise!.id));
+        }
+      });
+    }
   }
 
   @override
@@ -621,44 +668,81 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
     super.dispose();
   }
 
+  /// Called when [ExerciseFactorsLoaded] arrives.
+  ///
+  /// Raw factors may use granular keys (seed data) or simple keys (user
+  /// exercises). Granular keys are mapped to their simple equivalents via
+  /// [MuscleGroups.granularToSimple] and multiple granular contributions to
+  /// the same simple key are averaged.
+  void _applyLoadedFactors(Map<String, double> rawFactors) {
+    final Map<String, List<double>> grouped = <String, List<double>>{};
+    for (final entry in rawFactors.entries) {
+      final String simpleKey =
+          MuscleGroups.granularToSimple[entry.key] ?? entry.key;
+      grouped.putIfAbsent(simpleKey, () => <double>[]).add(entry.value);
+    }
+
+    setState(() {
+      for (final entry in grouped.entries) {
+        if (_selectedMuscleFactors.containsKey(entry.key)) {
+          final double avg =
+              entry.value.reduce((double a, double b) => a + b) /
+              entry.value.length;
+          _selectedMuscleFactors[entry.key] = avg;
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isValid =
-        _nameController.text.trim().isNotEmpty && _selectedMuscles.isNotEmpty;
+        _nameController.text.trim().isNotEmpty &&
+        _selectedMuscleFactors.isNotEmpty;
 
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            _buildHeader(context),
-            const Divider(height: 1),
-            Flexible(child: _buildContent(context)),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(AppStrings.cancel),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: isValid ? _handleSave : null,
-                      child: Text(
-                        isEditing ? AppStrings.saveChanges : AppStrings.add,
+    return BlocListener<ExerciseBloc, ExerciseState>(
+      listenWhen: (_, ExerciseState current) =>
+          current is ExerciseFactorsLoaded &&
+          current.exerciseId == widget.exercise?.id,
+      listener: (BuildContext context, ExerciseState state) {
+        _applyLoadedFactors((state as ExerciseFactorsLoaded).factors);
+      },
+      child: Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _buildHeader(context),
+              const Divider(height: 1),
+              Flexible(child: _buildContent(context)),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(AppStrings.cancel),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isValid ? _handleSave : null,
+                        child: Text(
+                          isEditing
+                              ? AppStrings.saveChanges
+                              : AppStrings.add,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -720,18 +804,20 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
                 spacing: 8,
                 runSpacing: 8,
                 children: MuscleGroups.all.map((String muscle) {
-                  final bool isSelected = _selectedMuscles.contains(muscle);
+                  final bool isSelected =
+                      _selectedMuscleFactors.containsKey(muscle);
                   return FilterChip(
                     label: Text(MuscleGroups.getDisplayName(muscle)),
                     selected: isSelected,
                     onSelected: (bool selected) {
                       setInnerState(() {
                         if (selected) {
-                          _selectedMuscles.add(muscle);
+                          _selectedMuscleFactors[muscle] = 1.0;
                         } else {
-                          _selectedMuscles.remove(muscle);
+                          _selectedMuscleFactors.remove(muscle);
                         }
                       });
+                      // Re-evaluate isValid (name + at-least-one-muscle check).
                       setState(() {});
                     },
                     selectedColor: AppTheme.primaryOrange.withOpacity(0.2),
@@ -740,6 +826,67 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
                   );
                 }).toList(),
               ),
+
+              // Factor editor — only shown when at least one muscle is selected.
+              if (_selectedMuscleFactors.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 24),
+                Row(
+                  children: <Widget>[
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppTheme.textDim,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        AppStrings.muscleFactorHint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textDim,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  AppStrings.muscleFactorTitle,
+                  key: ExercisesTab.factorEditorKey,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                ..._selectedMuscleFactors.entries.map(
+                  (MapEntry<String, double> entry) {
+                    return _FactorRow(
+                      key: ExercisesTab.factorSliderKey(entry.key),
+                      muscle: entry.key,
+                      value: entry.value,
+                      onChanged: (double newValue) {
+                        setInnerState(() {
+                          _selectedMuscleFactors[entry.key] = newValue;
+                        });
+                      },
+                    );
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: ExercisesTab.resetFactorsButtonKey,
+                    onPressed: () {
+                      setInnerState(() {
+                        for (final String key
+                            in _selectedMuscleFactors.keys) {
+                          _selectedMuscleFactors[key] = 1.0;
+                        }
+                      });
+                    },
+                    child: const Text(AppStrings.resetFactors),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -749,23 +896,125 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
 
   void _handleSave() {
     final String name = _nameController.text.trim();
+    // Snapshot the factor map so the event carries an immutable copy.
+    final Map<String, double> muscleFactors =
+        Map<String, double>.of(_selectedMuscleFactors);
 
     if (isEditing) {
       final Exercise updatedExercise = widget.exercise!.copyWith(
         name: name,
-        muscleGroups: _selectedMuscles.toList(),
+        muscleGroups: muscleFactors.keys.toList(),
       );
-      context.read<ExerciseBloc>().add(UpdateExerciseEvent(updatedExercise));
+      context.read<ExerciseBloc>().add(
+            UpdateExerciseEvent(updatedExercise, muscleFactors: muscleFactors),
+          );
     } else {
       final Exercise newExercise = Exercise(
         id: _uuid.v4(),
         name: name,
-        muscleGroups: _selectedMuscles.toList(),
+        muscleGroups: muscleFactors.keys.toList(),
         createdAt: DateTime.now(),
       );
-      context.read<ExerciseBloc>().add(AddExerciseEvent(newExercise));
+      context.read<ExerciseBloc>().add(
+            AddExerciseEvent(newExercise, muscleFactors: muscleFactors),
+          );
     }
 
     Navigator.pop(context);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-muscle factor slider row
+// ---------------------------------------------------------------------------
+
+/// A self-contained slider row for one muscle group inside the exercise dialog.
+///
+/// Uses its own [State] so that dragging only rebuilds this row rather than
+/// the entire dialog.  The parent is notified via [onChanged] only when the
+/// drag ends, keeping [_selectedMuscleFactors] in sync without forcing a
+/// full-dialog rebuild on every frame.
+class _FactorRow extends StatefulWidget {
+  const _FactorRow({
+    super.key,
+    required this.muscle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String muscle;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  State<_FactorRow> createState() => _FactorRowState();
+}
+
+class _FactorRowState extends State<_FactorRow> {
+  late double _localValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _localValue = widget.value;
+  }
+
+  @override
+  void didUpdateWidget(_FactorRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync when the parent resets all factors (e.g. "Reset to defaults").
+    if (oldWidget.value != widget.value) {
+      _localValue = widget.value;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            width: 80,
+            child: Text(
+              MuscleGroups.getDisplayName(widget.muscle),
+              style: Theme.of(context).textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Slider(
+              value: _localValue,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              activeColor: AppTheme.primaryOrange,
+              onChanged: (double value) {
+                // Update local state only — fast per-frame feedback.
+                setState(() => _localValue = value);
+              },
+              onChangeEnd: (double value) {
+                // Notify parent once the gesture completes.
+                widget.onChanged(value);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 40,
+            child: Text(
+              key: ExercisesTab.factorValueKey(widget.muscle),
+              '${_localValue.toStringAsFixed(2)}x',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textMedium,
+                    fontWeight: FontWeight.w500,
+                  ),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

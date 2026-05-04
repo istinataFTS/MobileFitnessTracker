@@ -163,6 +163,12 @@ class AppStrings {
       'Create exercises to track your workouts';
   static const String emptyLibrary = 'Your library is empty';
 
+  // Muscle factor editor (exercise dialog)
+  static const String muscleFactorTitle = 'Muscle activation';
+  static const String muscleFactorHint =
+      'How much each muscle is taxed by one set';
+  static const String resetFactors = 'Reset to defaults';
+
   // ==================== Nutrition ====================
   static const String nutrition = 'Nutrition';
   static const String meal = 'Meal';
