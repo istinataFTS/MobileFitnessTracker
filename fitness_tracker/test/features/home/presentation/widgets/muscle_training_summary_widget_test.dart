@@ -4,7 +4,6 @@ import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
-import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
@@ -42,10 +41,8 @@ void main() {
   // never renders a "Chest" title that would collide with muscle summary rows.
   final HomeLoaded loadedHomeState = HomeLoaded(
     data: HomeDashboardData(
-      targets: const <Target>[],
       todaysLogs: const <NutritionLog>[],
       dailyMacros: const <String, double>{},
-
     ),
   );
 

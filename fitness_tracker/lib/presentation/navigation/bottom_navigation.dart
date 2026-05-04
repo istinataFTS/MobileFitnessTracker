@@ -9,11 +9,10 @@ import '../../features/home/home.dart';
 import '../../features/library/application/exercise_bloc.dart';
 import '../../features/library/application/meal_bloc.dart';
 import '../../features/library/library.dart';
+import '../../features/log/application/nutrition_log_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
 import '../../features/profile/profile.dart';
 import '../../features/settings/presentation/settings_scope.dart';
-import '../../features/targets/targets.dart';
-import '../../features/log/application/nutrition_log_bloc.dart';
 
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});
@@ -27,9 +26,8 @@ class _BottomNavigationState extends State<BottomNavigation> {
   static const int _logTabIndex = 1;
   static const int _historyTabIndex = 2;
   static const int _libraryTabIndex = 3;
-  static const int _targetsTabIndex = 4;
-  static const int _profileTabIndex = 5;
-  static const int _tabCount = 6;
+  static const int _profileTabIndex = 4;
+  static const int _tabCount = 5;
 
   int _selectedIndex = _homeTabIndex;
 
@@ -38,7 +36,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
   bool _didRequestExerciseData = false;
   bool _didRequestMealData = false;
   bool _didRequestNutritionLogData = false;
-  bool _didRequestTargetsData = false;
 
   void _onItemTapped(int index) {
     if (_selectedIndex == index) {
@@ -73,9 +70,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
         _ensureExerciseDataLoaded();
         _ensureMealDataLoaded();
         break;
-      case _targetsTabIndex:
-        _ensureTargetsDataLoaded();
-        break;
       case _homeTabIndex:
       case _profileTabIndex:
         break;
@@ -109,15 +103,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
     context.read<NutritionLogBloc>().add(LoadDailyLogsEvent(DateTime.now()));
   }
 
-  void _ensureTargetsDataLoaded() {
-    if (_didRequestTargetsData) {
-      return;
-    }
-
-    _didRequestTargetsData = true;
-    context.read<TargetsBloc>().add(LoadTargetsEvent());
-  }
-
   Widget _buildPageForIndex(int index) {
     if (!_visitedTabs.contains(index)) {
       return const SizedBox.shrink();
@@ -134,8 +119,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
         return HistoryPage(settings: settings);
       case _libraryTabIndex:
         return const LibraryPage();
-      case _targetsTabIndex:
-        return const TargetsPage();
       case _profileTabIndex:
         return const ProfilePage();
       default:
@@ -186,11 +169,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
               icon: Icon(Icons.library_books_outlined, size: 22),
               activeIcon: Icon(Icons.library_books, size: 22),
               label: AppStrings.navLibrary,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.flag_outlined, size: 22),
-              activeIcon: Icon(Icons.flag, size: 22),
-              label: AppStrings.navTargets,
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline, size: 22),

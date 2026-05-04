@@ -1,7 +1,6 @@
 class DatabaseTables {
   DatabaseTables._();
 
-  static const String targets = 'targets';
   static const String workoutSets = 'workout_sets';
   static const String exercises = 'exercises';
   static const String meals = 'meals';
@@ -12,22 +11,6 @@ class DatabaseTables {
   static const String appMetadata = 'app_metadata';
 
   static const String ownerUserId = 'owner_user_id';
-
-  static const String targetId = 'id';
-  static const String targetType = 'type';
-  static const String targetCategoryKey = 'category_key';
-  static const String targetValue = 'target_value';
-  static const String targetUnit = 'unit';
-  static const String targetPeriod = 'period';
-  static const String targetCreatedAt = 'created_at';
-  static const String targetUpdatedAt = 'updated_at';
-  static const String targetServerId = 'server_id';
-  static const String targetSyncStatus = 'sync_status';
-  static const String targetLastSyncedAt = 'last_synced_at';
-  static const String targetLastSyncError = 'last_sync_error';
-
-  static const String legacyTargetMuscleGroup = 'muscle_group';
-  static const String legacyTargetWeeklyGoal = 'weekly_goal';
 
   static const String setId = 'id';
   static const String setExerciseId = 'exercise_id';

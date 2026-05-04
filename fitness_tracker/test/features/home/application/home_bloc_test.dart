@@ -3,7 +3,6 @@ import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/entity_sync_metadata.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
-import 'package:fitness_tracker/domain/entities/target.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/usecases/load_home_dashboard_data.dart';
@@ -18,29 +17,6 @@ void main() {
   late HomeBloc bloc;
 
   final DateTime now = DateTime(2026, 3, 19, 10, 0);
-
-  final List<Target> targets = <Target>[
-    Target(
-      id: 'target-chest',
-      type: TargetType.muscleSets,
-      categoryKey: 'chest',
-      targetValue: 6,
-      unit: 'sets',
-      period: TargetPeriod.weekly,
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-    Target(
-      id: 'target-protein',
-      type: TargetType.macro,
-      categoryKey: 'protein',
-      targetValue: 180,
-      unit: 'g',
-      period: TargetPeriod.daily,
-      createdAt: now,
-      syncMetadata: const EntitySyncMetadata(),
-    ),
-  ];
 
   final NutritionLog olderLog = NutritionLog(
     id: 'log-older',
@@ -78,7 +54,6 @@ void main() {
     Map<String, double>? macros,
   }) {
     return HomeDashboardData(
-      targets: targets,
       todaysLogs: todaysLogs ?? <NutritionLog>[newerLog, olderLog],
       dailyMacros: macros ?? dailyMacros,
     );

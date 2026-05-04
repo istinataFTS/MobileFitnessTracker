@@ -7,7 +7,6 @@ import '../../../features/auth/presentation/sign_in_page.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
 import '../../../features/settings/presentation/settings_scope.dart';
-import '../../../features/targets/targets.dart';
 import '../application/profile_cubit.dart';
 import 'mappers/profile_view_data_mapper.dart';
 import 'models/profile_view_data.dart';
@@ -23,7 +22,6 @@ class ProfilePage extends StatelessWidget {
   static const Key subtitleKey = ProfilePageKeys.subtitleKey;
   static const Key sessionBannerKey = ProfilePageKeys.sessionBannerKey;
   static const Key settingsTileKey = ProfilePageKeys.settingsTileKey;
-  static const Key targetsTileKey = ProfilePageKeys.targetsTileKey;
   static const Key historyTileKey = ProfilePageKeys.historyTileKey;
   static const Key accountStatusTileKey = ProfilePageKeys.accountStatusTileKey;
   static const Key cloudMigrationTileKey =
@@ -131,14 +129,6 @@ class _ProfileViewState extends State<_ProfileView> {
                 context,
                 MaterialPageRoute<void>(
                   builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-            onOpenTargets: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const TargetsPage(),
                 ),
               );
             },

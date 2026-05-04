@@ -63,7 +63,6 @@ class AppStrings {
   static const String success = 'Success';
   static const String successSetLogged = 'Set logged successfully';
   static const String successMealLogged = 'Meal logged successfully';
-  static const String successTargetSet = 'Target set successfully';
   static const String successDataSaved = 'Data saved successfully';
   static const String successDataDeleted = 'Data deleted successfully';
   static const String savedSuccessfully = 'Saved successfully';
@@ -213,41 +212,6 @@ class AppStrings {
   static const String mealNameHint = 'e.g. Chicken Breast';
   static const String servingSizeHint = 'e.g. 100';
   static const String macrosPerServing = 'Macros per Serving';
-
-  // ==================== Targets ====================
-  static const String targets = 'Targets';
-  static const String targetsTitle = 'Targets';
-  static const String target = 'Target';
-  static const String weeklyGoal = 'Weekly Goal';
-  static const String setTarget = 'Set Target';
-  static const String addTarget = 'Add Target';
-  static const String addFirstTarget = 'Add Your First Target';
-  static const String editTarget = 'Edit Target';
-  static const String deleteTarget = 'Delete Target';
-  static const String removeTarget = 'Remove Target';
-  static const String removeTargetConfirm =
-      'Are you sure you want to remove this target?';
-  static const String muscleGroup = 'Muscle Group';
-  static const String targetMuscleGroup = 'Muscle Group';
-  static const String targetWeeklyGoal = 'Weekly Goal';
-  static const String weeklyRepGoal = 'Weekly Sets Goal';
-  static const String setsPerWeek = 'sets/week';
-  static const String targetProgress = 'Progress';
-  static const String targetCompleted = 'Completed';
-  static const String targetInProgress = 'In Progress';
-  static const String noTargets = 'No targets set';
-  static const String noTargetsYet = 'No targets yet';
-  static const String noTargetsDescription =
-      'Set weekly goals for muscle groups to track your progress';
-  static const String createTargetsDescription =
-      'Set weekly goals for each muscle group';
-  static const String aboutTargets = 'About Targets';
-  static const String aboutTargetsDescription =
-      'Set weekly goals for muscle groups and track your progress';
-  static const String targetDeleteConfirm = 'Delete this target?';
-  static const String targetReached = 'Target Reached!';
-  static const String setsThisWeek = 'sets this week';
-  static const String allMuscleGroupsAdded = 'All muscle groups have targets';
 
   // ==================== History ====================
   static const String history = 'History';

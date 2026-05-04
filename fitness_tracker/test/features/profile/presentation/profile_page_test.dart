@@ -107,7 +107,6 @@ void main() {
     expect(find.byKey(ProfilePage.sessionBannerKey), findsOneWidget);
     expect(find.byKey(ProfilePage.accountModeBannerKey), findsOneWidget);
     expect(find.byKey(ProfilePage.settingsTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.targetsTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.historyTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.accountStatusTileKey), findsOneWidget);
     expect(find.byKey(ProfilePage.cloudMigrationTileKey), findsOneWidget);

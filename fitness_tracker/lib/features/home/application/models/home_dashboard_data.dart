@@ -1,18 +1,15 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../domain/entities/nutrition_log.dart';
-import '../../../../domain/entities/target.dart';
 
 class HomeDashboardData extends Equatable {
   const HomeDashboardData({
-    required this.targets,
     required this.todaysLogs,
     required this.dailyMacros,
     this.muscleSetCounts = const <String, int>{},
     this.weeklySetCount = 0,
   });
 
-  final List<Target> targets;
   final List<NutritionLog> todaysLogs;
   final Map<String, double> dailyMacros;
 
@@ -38,7 +35,6 @@ class HomeDashboardData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        targets,
         todaysLogs,
         dailyMacros,
         muscleSetCounts,

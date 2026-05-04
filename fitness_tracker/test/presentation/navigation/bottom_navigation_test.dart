@@ -8,7 +8,6 @@ import 'package:fitness_tracker/features/library/application/meal_bloc.dart';
 import 'package:fitness_tracker/features/log/log.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:fitness_tracker/features/settings/presentation/settings_scope.dart';
-import 'package:fitness_tracker/features/targets/application/targets_bloc.dart';
 import 'package:fitness_tracker/presentation/navigation/bottom_navigation.dart';
 import 'package:fitness_tracker/features/log/application/nutrition_log_bloc.dart';
 import 'package:flutter/material.dart';
@@ -35,9 +34,6 @@ class MockWorkoutBloc extends MockBloc<WorkoutEvent, WorkoutState>
 
 class MockHistoryBloc extends MockBloc<HistoryEvent, HistoryState>
     implements HistoryBloc {}
-
-class MockTargetsBloc extends MockBloc<TargetsEvent, TargetsState>
-    implements TargetsBloc {}
 
 class MockNutritionLogBloc
     extends MockBloc<NutritionLogEvent, NutritionLogState>
@@ -67,10 +63,6 @@ class FakeHistoryEvent extends Fake implements HistoryEvent {}
 
 class FakeHistoryState extends Fake implements HistoryState {}
 
-class FakeTargetsEvent extends Fake implements TargetsEvent {}
-
-class FakeTargetsState extends Fake implements TargetsState {}
-
 class FakeNutritionLogEvent extends Fake implements NutritionLogEvent {}
 
 class FakeNutritionLogState extends Fake implements NutritionLogState {}
@@ -83,7 +75,6 @@ void main() {
   late MockMealBloc mealBloc;
   late MockWorkoutBloc workoutBloc;
   late MockHistoryBloc historyBloc;
-  late MockTargetsBloc targetsBloc;
   late MockNutritionLogBloc nutritionLogBloc;
 
   setUpAll(() {
@@ -99,8 +90,6 @@ void main() {
     registerFallbackValue(FakeWorkoutState());
     registerFallbackValue(FakeHistoryEvent());
     registerFallbackValue(FakeHistoryState());
-    registerFallbackValue(FakeTargetsEvent());
-    registerFallbackValue(FakeTargetsState());
     registerFallbackValue(FakeNutritionLogEvent());
     registerFallbackValue(FakeNutritionLogState());
   });
@@ -113,7 +102,6 @@ void main() {
     mealBloc = MockMealBloc();
     workoutBloc = MockWorkoutBloc();
     historyBloc = MockHistoryBloc();
-    targetsBloc = MockTargetsBloc();
     nutritionLogBloc = MockNutritionLogBloc();
 
     when(
@@ -170,13 +158,6 @@ void main() {
       () => historyBloc.effects,
     ).thenAnswer((_) => const Stream<HistoryUiEffect>.empty());
 
-    when(() => targetsBloc.state).thenReturn(TargetsInitial());
-    whenListen<TargetsState>(
-      targetsBloc,
-      const Stream<TargetsState>.empty(),
-      initialState: TargetsInitial(),
-    );
-
     when(() => nutritionLogBloc.state).thenReturn(NutritionLogInitial());
     whenListen<NutritionLogState>(
       nutritionLogBloc,
@@ -202,7 +183,6 @@ void main() {
         BlocProvider<MealBloc>.value(value: mealBloc),
         BlocProvider<WorkoutBloc>.value(value: workoutBloc),
         BlocProvider<HistoryBloc>.value(value: historyBloc),
-        BlocProvider<TargetsBloc>.value(value: targetsBloc),
         BlocProvider<NutritionLogBloc>.value(value: nutritionLogBloc),
       ],
       child: SettingsScope(child: const MaterialApp(home: BottomNavigation())),
