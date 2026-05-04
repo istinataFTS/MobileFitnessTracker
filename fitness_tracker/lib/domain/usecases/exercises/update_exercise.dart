@@ -21,7 +21,10 @@ class UpdateExercise {
     required this.rebuildMuscleStimulusFromWorkoutHistory,
   });
 
-  Future<Either<Failure, void>> call(Exercise exercise) async {
+  Future<Either<Failure, void>> call(
+    Exercise exercise, {
+    Map<String, double>? muscleFactors,
+  }) async {
     // Normalize muscle group names to lowercase at save time so the stored
     // data is always consistent, regardless of how the exercise was built
     // (UI chip selection, import, sync, etc.).
@@ -55,7 +58,10 @@ class UpdateExercise {
     final updateResult = await repository.updateExercise(preparedExercise);
 
     return updateResult.fold((failure) async => Left(failure), (_) async {
-      final syncResult = await syncExerciseMuscleFactors(preparedExercise);
+      final syncResult = await syncExerciseMuscleFactors(
+        preparedExercise,
+        muscleFactors: muscleFactors,
+      );
       return syncResult.fold(
         (failure) async => Left(failure),
         (_) async => rebuildMuscleStimulusFromWorkoutHistory(userId),
