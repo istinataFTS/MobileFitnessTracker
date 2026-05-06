@@ -1,0 +1,20 @@
+project_id = "fitness-tracker"   # local identifier; remote ref set via `supabase link`
+
+[api]
+enabled = true
+port    = 54321
+
+[db]
+port             = 54322
+shadow_port      = 54320
+major_version    = 15
+
+[functions]
+verify_jwt = true                 # global default; no public functions in C-1
+
+[functions.voice-stt]
+verify_jwt = true
+[functions.voice-chat]
+verify_jwt = true
+[functions.voice-tts]
+verify_jwt = true
