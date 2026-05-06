@@ -46,3 +46,25 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+  backend:
+    name: Backend (Deno)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fitness_tracker/supabase/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Check formatting
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Run tests
+        run: deno test --allow-all

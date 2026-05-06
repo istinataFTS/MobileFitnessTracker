@@ -1,0 +1,80 @@
+# Supabase — Fitness Tracker Voice Bot Backend
+
+## Prerequisites
+
+- Supabase CLI ≥ 1.180
+- Deno ≥ 1.40
+
+## First-time setup
+
+```sh
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase secrets set OPENAI_API_KEY=sk-...
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` are injected automatically by
+the Edge Function runtime — do **not** set them manually.
+
+## Local development
+
+Create `.env.local` (gitignored) with:
+
+```
+OPENAI_API_KEY=sk-...
+SUPABASE_URL=http://localhost:54321
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key-from-supabase-start>
+SUPABASE_ANON_KEY=<anon-key-from-supabase-start>
+```
+
+Then start the local stack and serve all Edge Functions:
+
+```sh
+supabase start
+supabase functions serve --env-file .env.local
+```
+
+## Running tests
+
+Run from the `fitness_tracker/` directory:
+
+```sh
+deno test --allow-all supabase/functions
+```
+
+## Deploying
+
+Apply migrations first, then deploy functions:
+
+```sh
+supabase db push
+supabase functions deploy voice-stt voice-chat voice-tts
+```
+
+The `.github/workflows/supabase-deploy.yml` GitHub Action (`workflow_dispatch`)
+does this in one step against the linked project.
+
+## Pricing & cost monitoring
+
+All OpenAI calls are recorded in `voice_usage_log`. Query today's spend per user:
+
+```sql
+select
+  user_id,
+  sum(cost_usd)  as total_usd,
+  count(*)       as calls
+from voice_usage_log
+where created_at >= date_trunc('day', now() at time zone 'UTC')
+group by user_id
+order by total_usd desc;
+```
+
+## Where the OpenAI key lives (and where it doesn't)
+
+The `OPENAI_API_KEY` lives **only** as a Supabase Function secret set via
+`supabase secrets set`. It is:
+
+- ✅ Read inside Edge Functions via `Deno.env.get('OPENAI_API_KEY')`
+- ❌ Never present in `lib/` (Flutter client code)
+- ❌ Never in git history
+- ❌ Never logged by any Edge Function

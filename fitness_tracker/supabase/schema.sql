@@ -302,3 +302,101 @@ create policy "follows: owner can delete"
   using (follower_id = auth.uid());
 
 -- updated_at trigger not needed on follows (immutable after insert).
+
+-- =============================================================================
+-- Voice assistant tables (Plan C-1)
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- voice_usage_log — per-call OpenAI cost + metadata, always written
+-- ---------------------------------------------------------------------------
+create table public.voice_usage_log (
+  id              uuid          primary key default gen_random_uuid(),
+  user_id         uuid          not null references auth.users(id) on delete cascade,
+  function_name   text          not null
+                                  check (function_name in ('voice-stt', 'voice-chat', 'voice-tts')),
+  model           text          not null,
+  input_tokens    integer       null check (input_tokens    is null or input_tokens    >= 0),
+  output_tokens   integer       null check (output_tokens   is null or output_tokens   >= 0),
+  audio_seconds   numeric(10,3) null check (audio_seconds   is null or audio_seconds   >= 0),
+  characters      integer       null check (characters      is null or characters      >= 0),
+  cost_usd        numeric(10,6) not null default 0 check (cost_usd >= 0),
+  pricing_version text          not null,
+  latency_ms      integer       not null check (latency_ms >= 0),
+  session_id      uuid          null,
+  status          text          not null default 'OK',
+  created_at      timestamptz   not null default now()
+);
+
+create index idx_voice_usage_log_user_created
+  on public.voice_usage_log (user_id, created_at desc);
+
+create index idx_voice_usage_log_user_day
+  on public.voice_usage_log (user_id, (date_trunc('day', created_at)));
+
+alter table public.voice_usage_log enable row level security;
+
+create policy "voice_usage_log: owner select"
+  on public.voice_usage_log for select
+  to authenticated
+  using (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- voice_sessions — opt-in full transcripts
+-- ---------------------------------------------------------------------------
+create table public.voice_sessions (
+  id              uuid          primary key,
+  user_id         uuid          not null references auth.users(id) on delete cascade,
+  started_at      timestamptz   not null default now(),
+  ended_at        timestamptz   null,
+  transcript      jsonb         not null default '[]'::jsonb,
+  turn_count      integer       not null default 0  check (turn_count     >= 0),
+  total_cost_usd  numeric(10,6) not null default 0  check (total_cost_usd >= 0),
+  outcome         text          null
+                                  check (outcome is null
+                                         or outcome in ('completed','cancelled','budget_exceeded','error')),
+  created_at      timestamptz   not null default now(),
+  updated_at      timestamptz   not null default now()
+);
+
+create index idx_voice_sessions_user_started
+  on public.voice_sessions (user_id, started_at desc);
+
+create trigger trg_voice_sessions_updated_at
+  before update on public.voice_sessions
+  for each row execute function public.set_updated_at();
+
+alter table public.voice_sessions enable row level security;
+
+create policy "voice_sessions: owner select"
+  on public.voice_sessions for select
+  to authenticated
+  using (user_id = auth.uid());
+
+create policy "voice_sessions: owner delete"
+  on public.voice_sessions for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- Helper: atomic append of one turn to a voice session.
+-- ---------------------------------------------------------------------------
+create or replace function public.voice_session_append_turn(
+  p_session_id    uuid,
+  p_user_id       uuid,
+  p_turn          jsonb,
+  p_cost_usd      numeric
+) returns void
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.voice_sessions (id, user_id, transcript, turn_count, total_cost_usd)
+  values (p_session_id, p_user_id, jsonb_build_array(p_turn), 1, p_cost_usd)
+  on conflict (id) do update set
+    transcript     = voice_sessions.transcript || jsonb_build_array(p_turn),
+    turn_count     = voice_sessions.turn_count + 1,
+    total_cost_usd = voice_sessions.total_cost_usd + p_cost_usd,
+    updated_at     = now();
+end;
+$$;

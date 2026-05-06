@@ -1,0 +1,37 @@
+name: Supabase Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'What to deploy'
+        type: choice
+        options: [functions, migrations, both]
+        default: both
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fitness_tracker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF:  ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Push migrations
+        if: ${{ inputs.target != 'functions' }}
+        run: supabase db push
+
+      - name: Deploy functions
+        if: ${{ inputs.target != 'migrations' }}
+        run: supabase functions deploy voice-stt voice-chat voice-tts
