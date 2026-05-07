@@ -93,7 +93,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
             onSessionLoggingChanged: (bool value) =>
-                context.read<VoiceSettingsCubit>().setSessionLogging(enabled: value),
+                context.read<VoiceSettingsCubit>().setSessionLogging(value),
             onVoiceVoiceTapped: () =>
                 _selectTtsVoice(context, viewData, voiceSettings),
           ),

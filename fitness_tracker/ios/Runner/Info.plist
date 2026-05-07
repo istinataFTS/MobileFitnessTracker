@@ -49,6 +49,9 @@
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Voice assistant microphone access -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The voice assistant uses the microphone to transcribe your speech.</string>
 	<!-- Privacy - Required for App Store -->
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This app does not track user data.</string>

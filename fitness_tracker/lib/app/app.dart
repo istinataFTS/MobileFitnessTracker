@@ -48,7 +48,9 @@ class FitnessTrackerApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AppSettingsCubit>(
-          create: (_) => AppSettingsCubit(repository: di.sl())..loadSettings(),
+          // Use the GetIt lazy singleton so VoiceSettingsCubit and any other
+          // consumer share the exact same instance and state.
+          create: (_) => di.sl<AppSettingsCubit>()..loadSettings(),
         ),
         BlocProvider<ProfileCubit>(
           create: (_) => di.sl<ProfileCubit>()..loadProfile(),
