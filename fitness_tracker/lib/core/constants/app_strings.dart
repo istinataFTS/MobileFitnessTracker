@@ -398,7 +398,6 @@ class AppStringsPhase7 {
   static const String periodAllTime = AppStrings.periodAllTime;
 
   static const String sets = AppStrings.sets;
-  static const String target = AppStrings.target;
   static const String muscles = AppStrings.muscles;
   static const String progress = AppStrings.progress;
 
