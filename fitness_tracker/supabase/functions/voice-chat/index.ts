@@ -1,7 +1,7 @@
 import { authenticate } from '../_shared/auth.ts';
 import { assertWithinBudget, getBudgetState } from '../_shared/budget.ts';
 import { costForChat } from '../_shared/cost.ts';
-import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
+import { preflight } from '../_shared/cors.ts';
 import { ErrorCodes, VoiceError, errorResponse } from '../_shared/errors.ts';
 import { completeChat } from '../_shared/openai.ts';
 import { appendSessionTurn } from '../_shared/session.ts';
@@ -180,9 +180,17 @@ async function handleChat(req: Request, t0: number): Promise<Response> {
   });
 
   if (chatResult.toolCall) {
+    // Stable placeholder content for transcript readability — the
+    // structured `toolCall` field carries the real intent. An empty
+    // string here would render as a blank assistant bubble in any
+    // future transcript viewer.
     await appendSessionTurn(supabase, {
       sessionId: parsed.sessionId, userId: user.id,
-      turn: { role: 'assistant', content: '', toolCall: chatResult.toolCall },
+      turn: {
+        role: 'assistant',
+        content: `[tool_call: ${chatResult.toolCall.name}]`,
+        toolCall: chatResult.toolCall,
+      },
       costUsd: cost, enabled: parsed.sessionLoggingEnabled,
     });
   } else if (chatResult.message !== undefined) {
@@ -220,6 +228,6 @@ Deno.serve(async (req) => {
   try {
     return await handleChat(req, t0);
   } catch (err) {
-    return errorResponse(err, new Headers(CORS_HEADERS));
+    return errorResponse(err);
   }
 });

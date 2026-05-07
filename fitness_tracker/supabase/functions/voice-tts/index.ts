@@ -132,6 +132,6 @@ Deno.serve(async (req) => {
   try {
     return await handleTts(req, t0);
   } catch (err) {
-    return errorResponse(err, new Headers(CORS_HEADERS));
+    return errorResponse(err);
   }
 });
