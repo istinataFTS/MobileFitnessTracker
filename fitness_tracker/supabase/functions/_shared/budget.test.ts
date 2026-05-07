@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { assertWithinBudget } from './budget.ts';
+import { assertWithinBudget, getBudgetState } from './budget.ts';
 import { ErrorCodes, VoiceError } from './errors.ts';
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -62,4 +62,43 @@ Deno.test('assertWithinBudget: custom daily cap is respected', async () => {
     VoiceError,
   );
   assertEquals(err.code, ErrorCodes.BUDGET_EXCEEDED);
+});
+
+// ---------------------------------------------------------------------------
+// getBudgetState — the non-throwing post-success reader
+// ---------------------------------------------------------------------------
+
+Deno.test('getBudgetState: under cap → exceeded=false, remaining > 0', async () => {
+  const state = await getBudgetState(makeSupabase([{ cost_usd: 0.4 }]), 'user-1');
+  assertEquals(state.usedUsd, 0.4);
+  assertEquals(state.remainingUsd, 0.6);
+  assertEquals(state.exceeded, false);
+});
+
+Deno.test('getBudgetState: at cap → exceeded=true but DOES NOT throw', async () => {
+  // Critical: getBudgetState is the post-success reader. If it threw on
+  // crossing the cap, every voice request that *just* crossed $1 would
+  // 402 the user even though their work succeeded and was billed.
+  const state = await getBudgetState(makeSupabase([{ cost_usd: 1.0 }]), 'user-1');
+  assertEquals(state.usedUsd, 1.0);
+  assertEquals(state.remainingUsd, 0);
+  assertEquals(state.exceeded, true);
+});
+
+Deno.test('getBudgetState: over cap → remainingUsd clamped to 0 (never negative)', async () => {
+  const state = await getBudgetState(
+    makeSupabase([{ cost_usd: 1.5 }]),
+    'user-1',
+  );
+  assertEquals(state.usedUsd, 1.5);
+  assertEquals(state.remainingUsd, 0);
+  assertEquals(state.exceeded, true);
+});
+
+Deno.test('getBudgetState: DB error → throws INTERNAL (DB error is not a budget signal)', async () => {
+  const err = await assertRejects(
+    () => getBudgetState(makeSupabase([], { message: 'db error' }), 'user-1'),
+    VoiceError,
+  );
+  assertEquals(err.code, ErrorCodes.INTERNAL);
 });

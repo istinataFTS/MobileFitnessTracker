@@ -24,7 +24,7 @@ const STATUS_MAP: Array<[string, number]> = [
 for (const [code, status] of STATUS_MAP) {
   Deno.test(`errorResponse maps VoiceError(${code}) → ${status}`, async () => {
     const err = new VoiceError(code as never, 'test', status);
-    const res = errorResponse(err, new Headers());
+    const res = errorResponse(err);
     assertEquals(res.status, status);
     const body = await res.json();
     assertEquals(body.code, code);
@@ -49,6 +49,6 @@ Deno.test('errorResponse maps unknown error → 500 and returns INTERNAL code', 
 
 Deno.test('errorResponse includes CORS headers', () => {
   const err = new VoiceError(ErrorCodes.INTERNAL, 'x', 500);
-  const res = errorResponse(err, new Headers());
+  const res = errorResponse(err);
   assertEquals(res.headers.get('Access-Control-Allow-Origin'), '*');
 });

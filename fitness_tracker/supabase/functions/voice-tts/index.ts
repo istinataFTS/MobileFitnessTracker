@@ -1,5 +1,5 @@
 import { authenticate } from '../_shared/auth.ts';
-import { assertWithinBudget } from '../_shared/budget.ts';
+import { assertWithinBudget, getBudgetState } from '../_shared/budget.ts';
 import { costForTts } from '../_shared/cost.ts';
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ErrorCodes, VoiceError, errorResponse } from '../_shared/errors.ts';
@@ -108,7 +108,9 @@ async function handleTts(req: Request, t0: number): Promise<Response> {
     enabled: parsed.sessionLoggingEnabled,
   });
 
-  const { remainingUsd } = await assertWithinBudget(supabase, user.id);
+  // Non-throwing read after a successful call: assertWithinBudget would
+  // penalise the user for crossing the cap on the very call that succeeded.
+  const { remainingUsd } = await getBudgetState(supabase, user.id);
 
   return new Response(ttsResult.audio, {
     status: 200,
@@ -130,6 +132,6 @@ Deno.serve(async (req) => {
   try {
     return await handleTts(req, t0);
   } catch (err) {
-    return errorResponse(err, new Headers(CORS_HEADERS));
+    return errorResponse(err);
   }
 });

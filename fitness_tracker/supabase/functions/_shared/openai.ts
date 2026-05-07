@@ -11,8 +11,23 @@ export function _setFetch(f: typeof fetch): void {
   _fetch = f;
 }
 
+/**
+ * Reads the OpenAI API key from the environment. Fails fast with a clear
+ * error if the secret is unset — otherwise an empty bearer token would be
+ * sent to OpenAI, OpenAI would return 401, and we'd surface a confusing
+ * error. Server misconfig must surface as such, not as a per-request issue.
+ */
 function getApiKey(): string {
-  return Deno.env.get('OPENAI_API_KEY') ?? '';
+  const key = Deno.env.get('OPENAI_API_KEY');
+  if (!key) {
+    console.error('[voice] OPENAI_API_KEY is not set — set via `supabase secrets set OPENAI_API_KEY=...`');
+    throw new VoiceError(
+      ErrorCodes.OPENAI_UNAVAILABLE,
+      'Voice service is misconfigured',
+      502,
+    );
+  }
+  return key;
 }
 
 function makeHeaders(extra?: Record<string, string>): Headers {
@@ -23,24 +38,43 @@ function makeHeaders(extra?: Record<string, string>): Headers {
   });
 }
 
-async function withTimeout(signal: AbortSignal, fn: () => Promise<Response>): Promise<Response> {
-  const timer = setTimeout(() => signal.dispatchEvent(new Event('abort')), TIMEOUT_MS);
+/**
+ * Runs `fn` with an abort signal that fires after TIMEOUT_MS. The previous
+ * implementation tried to fake an abort by dispatching a synthetic event on
+ * the signal, which is a no-op — only `controller.abort()` actually puts the
+ * signal in aborted state. Without this fix, real-world OpenAI hangs would
+ * never be canceled by the timer.
+ */
+async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fn();
-    clearTimeout(timer);
-    return res;
+    return await fn(controller.signal);
   } catch (err) {
-    clearTimeout(timer);
     if ((err as Error).name === 'AbortError') {
       throw new VoiceError(ErrorCodes.TIMEOUT, 'OpenAI request timed out', 504);
     }
     throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
+/**
+ * Maps OpenAI HTTP status codes to our VoiceError codes.
+ *
+ * Note: 401/403 from OpenAI means OUR API key is bad (server misconfig),
+ * NOT that the user's JWT is bad. Mapping to UNAUTHORIZED would mislead
+ * the client into prompting the user to sign in again. Surface as
+ * OPENAI_UNAVAILABLE (502) instead, with a server-side log so the
+ * misconfig is observable.
+ */
 function mapOpenAiStatus(status: number): never {
   if (status === 429) throw new VoiceError(ErrorCodes.RATE_LIMITED, 'OpenAI rate limit exceeded', 429);
-  if (status === 401 || status === 403) throw new VoiceError(ErrorCodes.UNAUTHORIZED, 'OpenAI auth failed', 500);
+  if (status === 401 || status === 403) {
+    console.error('[voice] OpenAI rejected our API key — check OPENAI_API_KEY secret');
+    throw new VoiceError(ErrorCodes.OPENAI_UNAVAILABLE, 'OpenAI authentication failed', 502);
+  }
   throw new VoiceError(ErrorCodes.OPENAI_UNAVAILABLE, `OpenAI returned HTTP ${status}`, 502);
 }
 
@@ -55,19 +89,18 @@ export interface WhisperResponse {
 }
 
 export async function transcribeAudio(audio: Blob, language = 'en'): Promise<WhisperResponse> {
-  const controller = new AbortController();
   const form = new FormData();
   form.append('file', audio, 'audio.m4a');
   form.append('model', 'whisper-1');
   form.append('language', language);
   form.append('response_format', 'verbose_json');
 
-  const res = await withTimeout(controller.signal, () =>
+  const res = await withTimeout((signal) =>
     _fetch(`${OPENAI_BASE}/audio/transcriptions`, {
       method: 'POST',
       headers: makeHeaders(),
       body: form,
-      signal: controller.signal,
+      signal,
     })
   );
 
@@ -106,9 +139,7 @@ export interface ChatResponse {
 }
 
 export async function completeChat(req: ChatRequest): Promise<ChatResponse> {
-  const controller = new AbortController();
-
-  const res = await withTimeout(controller.signal, () =>
+  const res = await withTimeout((signal) =>
     _fetch(`${OPENAI_BASE}/chat/completions`, {
       method: 'POST',
       headers: makeHeaders({ 'Content-Type': 'application/json' }),
@@ -118,7 +149,7 @@ export async function completeChat(req: ChatRequest): Promise<ChatResponse> {
         tools: req.tools.length > 0 ? req.tools : undefined,
         tool_choice: req.tools.length > 0 ? 'auto' : undefined,
       }),
-      signal: controller.signal,
+      signal,
     })
   );
 
@@ -161,14 +192,12 @@ export interface TtsResponse {
 }
 
 export async function synthesizeSpeech(text: string, voice: TtsVoice): Promise<TtsResponse> {
-  const controller = new AbortController();
-
-  const res = await withTimeout(controller.signal, () =>
+  const res = await withTimeout((signal) =>
     _fetch(`${OPENAI_BASE}/audio/speech`, {
       method: 'POST',
       headers: makeHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ model: 'tts-1', input: text, voice }),
-      signal: controller.signal,
+      signal,
     })
   );
 
