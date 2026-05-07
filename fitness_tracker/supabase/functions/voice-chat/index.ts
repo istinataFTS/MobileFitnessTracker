@@ -36,6 +36,53 @@ interface ParsedChat {
   sessionLoggingEnabled: boolean;
 }
 
+/**
+ * Roles that clients are allowed to include in history. The 'system' role is
+ * explicitly excluded — only the server-built `SYSTEM_PROMPT_TEMPLATE` may
+ * become a system message. Allowing client-supplied 'system' turns would let
+ * an attacker inject "ignore prior instructions" prompts and bypass the
+ * bot's scope-refusal.
+ */
+const ALLOWED_HISTORY_ROLES: ReadonlySet<string> = new Set(['user', 'assistant', 'tool']);
+
+/**
+ * Defensively converts an unknown raw-history payload into a typed `Turn[]`.
+ * Rejects malformed entries silently, but logs (warns) when a 'system' role
+ * is dropped so abuse is observable in server logs without breaking the
+ * caller.
+ *
+ * Exported for direct unit testing — the security guarantees of this
+ * function are too important to test only indirectly through the handler.
+ */
+export function sanitizeHistory(raw: unknown[]): Turn[] {
+  const out: Turn[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const t = entry as Record<string, unknown>;
+    const role = t.role;
+    const content = t.content;
+
+    if (typeof role !== 'string' || typeof content !== 'string') continue;
+
+    if (role === 'system') {
+      console.warn('[voice-chat] dropped client-supplied system turn — possible prompt-injection attempt');
+      continue;
+    }
+    if (!ALLOWED_HISTORY_ROLES.has(role)) continue;
+
+    if (role === 'tool') {
+      const toolCallId = t.toolCallId;
+      if (typeof toolCallId !== 'string') continue;
+      out.push({ role: 'tool', content, toolCallId });
+    } else if (role === 'assistant') {
+      out.push({ role: 'assistant', content });
+    } else {
+      out.push({ role: 'user', content });
+    }
+  }
+  return out;
+}
+
 async function parseChat(req: Request): Promise<ParsedChat> {
   let body: Record<string, unknown>;
   try {
@@ -55,8 +102,14 @@ async function parseChat(req: Request): Promise<ParsedChat> {
   }
 
   const rawHistory = Array.isArray(body.history) ? body.history : [];
-  // Enforce maximum 3 turns server-side.
-  const history = rawHistory.slice(-MAX_HISTORY_TURNS) as Turn[];
+  // Validate every turn before forwarding to OpenAI. Without this, a
+  // client could inject a 'system' role turn whose content overrides the
+  // server-built system prompt — bypassing the bot's scope-refusal and
+  // turning the endpoint into a free general-purpose ChatGPT proxy on
+  // our budget. Validation rejects 'system' from clients explicitly,
+  // logs the attempt for observability, and only forwards user/assistant/
+  // tool turns with string content. Then truncates to the 3-turn limit.
+  const history = sanitizeHistory(rawHistory).slice(-MAX_HISTORY_TURNS);
 
   const ctx = (body.context ?? {}) as Partial<VoiceContext>;
   const context: VoiceContext = {
