@@ -42,6 +42,17 @@ dependencies:
   uuid: ^4.5.1
   connectivity_plus: ^6.1.4
 
+  # Voice bot — audio I/O (used actively in C-4)
+  record: ^5.1.2
+  just_audio: ^0.9.40
+
+  # Voice bot — secure credential storage (used in C-2)
+  flutter_secure_storage: ^9.2.2
+  permission_handler: ^11.3.1
+
+  # Voice bot — wake-word engine (used in C-4)
+  porcupine_flutter: ^3.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
