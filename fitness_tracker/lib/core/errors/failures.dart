@@ -38,3 +38,8 @@ class AuthFailure extends Failure {
 class UnexpectedFailure extends Failure {
   const UnexpectedFailure(super.message);
 }
+
+/// Remote HTTP / Edge Function failure.
+class ServerFailure extends Failure {
+  const ServerFailure(super.message);
+}

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
+import '../../../domain/entities/voice_settings.dart';
+import '../../../features/voice/application/voice_settings_cubit.dart';
 import '../application/app_settings_cubit.dart';
 import '../domain/settings_display_formatter.dart';
 import 'mappers/settings_page_view_data_mapper.dart';
@@ -61,8 +63,10 @@ class _SettingsPageState extends State<SettingsPage> {
         context.read<AppSettingsCubit>().clearError();
       },
       builder: (BuildContext context, AppSettingsState state) {
+        final VoiceSettings voiceSettings =
+            context.watch<VoiceSettingsCubit>().state;
         final SettingsPageViewData viewData =
-            SettingsPageViewDataMapper.map(state);
+            SettingsPageViewDataMapper.map(state, voiceSettings: voiceSettings);
 
         return Scaffold(
           backgroundColor: AppTheme.backgroundDark,
@@ -88,6 +92,10 @@ class _SettingsPageState extends State<SettingsPage> {
             onWeightUnitTapped: state.isSaving
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
+            onSessionLoggingChanged: (bool value) =>
+                context.read<VoiceSettingsCubit>().setSessionLogging(enabled: value),
+            onVoiceVoiceTapped: () =>
+                _selectTtsVoice(context, viewData, voiceSettings),
           ),
         );
       },
@@ -168,6 +176,35 @@ class _SettingsPageState extends State<SettingsPage> {
         return context.read<AppSettingsCubit>().setWeightUnit(selected);
       },
     );
+  }
+
+  Future<void> _selectTtsVoice(
+    BuildContext context,
+    SettingsPageViewData viewData,
+    VoiceSettings voiceSettings,
+  ) async {
+    final TtsVoice? selected = await showModalBottomSheet<TtsVoice>(
+      context: context,
+      backgroundColor: AppTheme.surfaceDark,
+      builder: (BuildContext context) {
+        return SettingsOptionSheet<TtsVoice>(
+          options: viewData.voiceSettings.voiceOptions
+              .map(
+                (SettingsSelectionOptionViewData<TtsVoice> option) =>
+                    SettingsOption<TtsVoice>(
+                  value: option.value,
+                  title: option.title,
+                  selected: option.selected,
+                ),
+              )
+              .toList(growable: false),
+        );
+      },
+    );
+
+    if (selected == null || selected == voiceSettings.ttsVoice) return;
+    if (!context.mounted) return;
+    context.read<VoiceSettingsCubit>().setTtsVoice(selected);
   }
 
   Future<void> _saveWithFeedback(

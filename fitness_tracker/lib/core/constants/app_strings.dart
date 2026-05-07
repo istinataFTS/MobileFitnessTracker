@@ -384,6 +384,29 @@ class AppStrings {
   static const String intensityMaximum = 'Maximum';
   static const String musclesSuffix = 'muscles';
   static const String stimulusLabel = 'Stimulus';
+
+  // ==================== Voice Assistant ====================
+  static const String voiceSectionTitle = 'Voice Assistant';
+  static const String voiceSessionLoggingTitle = 'Session logging';
+  static const String voiceSessionLoggingSubtitle =
+      'Save conversation transcripts to your account';
+  static const String voiceTtsVoiceTitle = 'Assistant voice';
+  static const String voiceTtsVoiceSubtitle = 'Choose the text-to-speech voice';
+  static const String voiceBudgetTitle = 'Daily usage';
+  static const String voiceBudgetSubtitle = 'Voice assistant runs on a \$1.00/day budget';
+  static const String voiceDeleteHistoryTitle = 'Delete voice history';
+  static const String voiceDeleteHistorySubtitle =
+      'Permanently remove all saved voice transcripts';
+
+  // Voice error messages
+  static const String voiceErrorGuestForbidden =
+      'Sign in to use the voice assistant.';
+  static const String voiceErrorBudgetExceeded =
+      'Daily voice budget reached. Resets at midnight UTC.';
+  static const String voiceErrorUnavailable =
+      'Voice service is temporarily unavailable. Please try again.';
+  static const String voiceErrorTimeout = 'Request timed out. Please try again.';
+  static const String voiceErrorGeneric = 'Something went wrong. Please try again.';
 }
 
 class AppStringsPhase7 {

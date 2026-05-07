@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../domain/entities/app_settings.dart';
+import '../../../../domain/entities/voice_settings.dart';
 
 class SettingsPageViewData extends Equatable {
   const SettingsPageViewData({
@@ -27,6 +28,7 @@ class SettingsPageViewData extends Equatable {
     required this.isLoading,
     required this.isSaving,
     required this.errorMessage,
+    this.voiceSettings = const VoiceSettingsViewData(),
   });
 
   final String infoMessage;
@@ -52,6 +54,7 @@ class SettingsPageViewData extends Equatable {
   final bool isLoading;
   final bool isSaving;
   final String? errorMessage;
+  final VoiceSettingsViewData voiceSettings;
 
   @override
   List<Object?> get props => <Object?>[
@@ -78,6 +81,26 @@ class SettingsPageViewData extends Equatable {
         isLoading,
         isSaving,
         errorMessage,
+        voiceSettings,
+      ];
+}
+
+class VoiceSettingsViewData extends Equatable {
+  const VoiceSettingsViewData({
+    this.sessionLoggingEnabled = false,
+    this.selectedVoice = TtsVoice.nova,
+    this.voiceOptions = const <SettingsSelectionOptionViewData<TtsVoice>>[],
+  });
+
+  final bool sessionLoggingEnabled;
+  final TtsVoice selectedVoice;
+  final List<SettingsSelectionOptionViewData<TtsVoice>> voiceOptions;
+
+  @override
+  List<Object?> get props => <Object?>[
+        sessionLoggingEnabled,
+        selectedVoice,
+        voiceOptions,
       ];
 }
 

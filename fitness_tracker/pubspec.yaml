@@ -35,6 +35,9 @@ dependencies:
   cupertino_icons: ^1.0.6
   device_preview: ^1.1.0
 
+  # HTTP client (multipart STT uploads, binary TTS downloads)
+  http: ^1.2.0
+
   # Utils
   uuid: ^4.5.1
   connectivity_plus: ^6.1.4
