@@ -1,5 +1,5 @@
 import { authenticate } from '../_shared/auth.ts';
-import { assertWithinBudget } from '../_shared/budget.ts';
+import { assertWithinBudget, getBudgetState } from '../_shared/budget.ts';
 import { costForChat } from '../_shared/cost.ts';
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ErrorCodes, VoiceError, errorResponse } from '../_shared/errors.ts';
@@ -140,7 +140,9 @@ async function handleChat(req: Request, t0: number): Promise<Response> {
     });
   }
 
-  const { remainingUsd } = await assertWithinBudget(supabase, user.id);
+  // Non-throwing read: the work has been billed; a budget gate would penalise
+  // a successful call when the cost crosses the cap on this very turn.
+  const { remainingUsd } = await getBudgetState(supabase, user.id);
 
   const base = {
     model: chatResult.model,

@@ -1,5 +1,5 @@
 import { authenticate } from '../_shared/auth.ts';
-import { assertWithinBudget } from '../_shared/budget.ts';
+import { assertWithinBudget, getBudgetState } from '../_shared/budget.ts';
 import { costForWhisper } from '../_shared/cost.ts';
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ErrorCodes, VoiceError, errorResponse } from '../_shared/errors.ts';
@@ -97,7 +97,10 @@ async function handleStt(req: Request, t0: number): Promise<Response> {
     enabled: parsed.sessionLoggingEnabled,
   });
 
-  const { remainingUsd } = await assertWithinBudget(supabase, user.id);
+  // Use the non-throwing reader after a successful call: the work has been
+  // billed, so a budget read that 402'd here would penalise the user for a
+  // request that already succeeded.
+  const { remainingUsd } = await getBudgetState(supabase, user.id);
 
   return json(200, {
     transcript: whisper.text,
