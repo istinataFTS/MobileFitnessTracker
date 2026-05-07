@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../domain/entities/app_settings.dart';
+import '../../../domain/entities/voice_settings.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
 
 class AppSettingsState extends Equatable {
@@ -180,6 +181,39 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Voice settings setters
+  // ---------------------------------------------------------------------------
+
+  Future<void> setVoiceSettings(VoiceSettings voiceSettings) async {
+    await saveSettings(state.settings.copyWith(voiceSettings: voiceSettings));
+  }
+
+  Future<void> setVoiceWakeWordPreset(WakeWordPreset preset) =>
+      setVoiceSettings(
+          state.settings.voiceSettings.copyWith(wakeWordPreset: preset));
+
+  Future<void> setVoiceTtsVoice(TtsVoice voice) =>
+      setVoiceSettings(state.settings.voiceSettings.copyWith(ttsVoice: voice));
+
+  Future<void> setVoiceSessionLogging(bool enabled) => setVoiceSettings(
+      state.settings.voiceSettings
+          .copyWith(sessionLoggingEnabled: enabled));
+
+  Future<void> setVoiceWorkoutModeAutoEnable(bool enabled) => setVoiceSettings(
+      state.settings.voiceSettings
+          .copyWith(workoutModeAutoEnable: enabled));
+
+  Future<void> setVoiceTtsVolume(double volume) => setVoiceSettings(
+      state.settings.voiceSettings
+          .copyWith(ttsVolume: volume.clamp(0.0, 1.0)));
+
+  Future<void> setVoiceWakeWordArmedInForeground(bool armed) => setVoiceSettings(
+      state.settings.voiceSettings
+          .copyWith(wakeWordArmedInForeground: armed));
+
+  // ---------------------------------------------------------------------------
 
   Future<bool> setSectionExpanded(String sectionId, {required bool expanded}) {
     final Map<String, bool> updated =

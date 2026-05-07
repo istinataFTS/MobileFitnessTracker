@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+enum WakeWordPreset { samoLevski, trainer, thomas }
+
 enum TtsVoice { alloy, echo, fable, nova, onyx, shimmer }
 
 extension TtsVoiceLabel on TtsVoice {
@@ -20,32 +22,59 @@ extension TtsVoiceLabel on TtsVoice {
     }
   }
 
+  /// API string sent to the OpenAI TTS endpoint.
   String get apiValue => name;
 }
 
 class VoiceSettings extends Equatable {
   const VoiceSettings({
-    required this.sessionLoggingEnabled,
-    required this.ttsVoice,
+    this.wakeWordPreset = WakeWordPreset.samoLevski,
+    this.ttsVoice = TtsVoice.nova,
+    this.sessionLoggingEnabled = false,
+    this.workoutModeAutoEnable = false,
+    this.ttsVolume = 1.0,
+    this.wakeWordArmedInForeground = true,
   });
 
-  const VoiceSettings.defaults()
-      : sessionLoggingEnabled = false,
-        ttsVoice = TtsVoice.nova;
+  const VoiceSettings.defaults() : this();
 
-  final bool sessionLoggingEnabled;
+  final WakeWordPreset wakeWordPreset;
   final TtsVoice ttsVoice;
+  final bool sessionLoggingEnabled;
+  final bool workoutModeAutoEnable;
+
+  /// TTS playback volume in range 0.0–1.0.
+  final double ttsVolume;
+
+  final bool wakeWordArmedInForeground;
 
   VoiceSettings copyWith({
-    bool? sessionLoggingEnabled,
+    WakeWordPreset? wakeWordPreset,
     TtsVoice? ttsVoice,
-  }) {
-    return VoiceSettings(
-      sessionLoggingEnabled: sessionLoggingEnabled ?? this.sessionLoggingEnabled,
-      ttsVoice: ttsVoice ?? this.ttsVoice,
-    );
-  }
+    bool? sessionLoggingEnabled,
+    bool? workoutModeAutoEnable,
+    double? ttsVolume,
+    bool? wakeWordArmedInForeground,
+  }) =>
+      VoiceSettings(
+        wakeWordPreset: wakeWordPreset ?? this.wakeWordPreset,
+        ttsVoice: ttsVoice ?? this.ttsVoice,
+        sessionLoggingEnabled:
+            sessionLoggingEnabled ?? this.sessionLoggingEnabled,
+        workoutModeAutoEnable:
+            workoutModeAutoEnable ?? this.workoutModeAutoEnable,
+        ttsVolume: ttsVolume ?? this.ttsVolume,
+        wakeWordArmedInForeground:
+            wakeWordArmedInForeground ?? this.wakeWordArmedInForeground,
+      );
 
   @override
-  List<Object?> get props => <Object?>[sessionLoggingEnabled, ttsVoice];
+  List<Object?> get props => [
+        wakeWordPreset,
+        ttsVoice,
+        sessionLoggingEnabled,
+        workoutModeAutoEnable,
+        ttsVolume,
+        wakeWordArmedInForeground,
+      ];
 }
