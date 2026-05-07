@@ -46,7 +46,10 @@ class ProfileContent extends StatelessWidget {
             subtitle: viewData.accountModeSubtitle,
           ),
           const SizedBox(height: 32),
+
+          // ── App / preferences ──────────────────────────────────────────
           _ProfileSection(
+            icon: Icons.apps_outlined,
             title: 'Your Space',
             children: <Widget>[
               _NavigationTile(
@@ -65,8 +68,15 @@ class ProfileContent extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+
+          // Thin divider between app-preferences and auth/account sections.
+          const SizedBox(height: 16),
+          const Divider(color: AppTheme.borderDark, thickness: 1),
+          const SizedBox(height: 16),
+
+          // ── Auth / account ─────────────────────────────────────────────
           _ProfileSection(
+            icon: Icons.shield_outlined,
             title: 'Account Status',
             children: <Widget>[
               _StatusTile(
@@ -92,6 +102,7 @@ class ProfileContent extends StatelessWidget {
           const SizedBox(height: 24),
           _ProfileSection(
             key: ProfilePageKeys.deferredSectionKey,
+            icon: Icons.schedule_outlined,
             title: 'Deferred Until Auth / Supabase',
             children: viewData.deferredItems
                 .map(
@@ -105,6 +116,7 @@ class ProfileContent extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _ProfileSection(
+            icon: Icons.info_outline,
             title: 'About',
             children: viewData.infoTiles
                 .map(
@@ -137,10 +149,12 @@ class ProfileContent extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Profile header
+// ---------------------------------------------------------------------------
+
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.viewData,
-  });
+  const _ProfileHeader({required this.viewData});
 
   final ProfilePageViewData viewData;
 
@@ -189,10 +203,12 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Session and account banners
+// ---------------------------------------------------------------------------
+
 class _SessionBanner extends StatelessWidget {
-  const _SessionBanner({
-    required this.message,
-  });
+  const _SessionBanner({required this.message});
 
   final String message;
 
@@ -213,6 +229,7 @@ class _SessionBanner extends StatelessWidget {
           const Icon(
             Icons.info_outline,
             color: AppTheme.primaryOrange,
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -256,6 +273,7 @@ class _AccountModeBanner extends StatelessWidget {
           const Icon(
             Icons.account_circle_outlined,
             color: AppTheme.primaryOrange,
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -284,13 +302,19 @@ class _AccountModeBanner extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Section wrapper
+// ---------------------------------------------------------------------------
+
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({
     super.key,
+    required this.icon,
     required this.title,
     required this.children,
   });
 
+  final IconData icon;
   final String title;
   final List<Widget> children;
 
@@ -301,11 +325,17 @@ class _ProfileSection extends StatelessWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+          child: Row(
+            children: <Widget>[
+              Icon(icon, size: 18, color: AppTheme.primaryOrange),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
           ),
         ),
         ...children,
@@ -314,6 +344,11 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tile variants
+// ---------------------------------------------------------------------------
+
+/// Tappable navigation tile — leads to another page.
 class _NavigationTile extends StatelessWidget {
   const _NavigationTile({
     required this.tileKey,
@@ -342,16 +377,24 @@ class _NavigationTile extends StatelessWidget {
             color: AppTheme.primaryOrange.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: AppTheme.primaryOrange, size: 22),
+          child: Icon(icon, color: AppTheme.primaryOrange, size: 24),
         ),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        subtitle: Text(subtitle),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textMedium,
+              ),
+        ),
         trailing: const Icon(
           Icons.chevron_right,
           color: AppTheme.textDim,
+          size: 24,
         ),
         onTap: onTap,
       ),
@@ -359,6 +402,7 @@ class _NavigationTile extends StatelessWidget {
   }
 }
 
+/// Read-only status tile — shows informational data, not tappable.
 class _StatusTile extends StatelessWidget {
   const _StatusTile({
     this.tileKey,
@@ -378,14 +422,23 @@ class _StatusTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         key: tileKey,
-        leading: Icon(icon, color: AppTheme.textMedium),
-        title: Text(title),
-        subtitle: Text(subtitle),
+        leading: Icon(icon, color: AppTheme.primaryOrange, size: 24),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textMedium,
+              ),
+        ),
       ),
     );
   }
 }
 
+/// Static info tile — deferred items and similar non-interactive rows.
 class _StaticInfoTile extends StatelessWidget {
   const _StaticInfoTile({
     required this.icon,
@@ -402,9 +455,17 @@ class _StaticInfoTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(icon, color: AppTheme.textMedium),
-        title: Text(title),
-        subtitle: Text(subtitle),
+        leading: Icon(icon, color: AppTheme.primaryOrange, size: 24),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textMedium,
+              ),
+        ),
       ),
     );
   }
