@@ -3,6 +3,12 @@
 //
 // Run with: deno test --allow-all supabase/functions/voice-stt/index.test.ts
 
+// `getApiKey()` in openai.ts fails fast when OPENAI_API_KEY is missing — set a
+// dummy so mocked-fetch tests below can build request headers.
+if (!Deno.env.get('OPENAI_API_KEY')) {
+  Deno.env.set('OPENAI_API_KEY', 'sk-test-dummy-key');
+}
+
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { assertWithinBudget } from '../_shared/budget.ts';

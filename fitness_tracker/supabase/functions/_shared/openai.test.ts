@@ -7,6 +7,14 @@ import {
 } from './openai.ts';
 import { ErrorCodes, VoiceError } from './errors.ts';
 
+// Ensure the API-key env var is set for the bulk of tests below.
+// `getApiKey()` now fails fast when the env var is missing, so without this
+// shim every existing test would error before reaching the mocked fetch.
+// The dedicated "missing key" test deletes and restores this value.
+if (!Deno.env.get('OPENAI_API_KEY')) {
+  Deno.env.set('OPENAI_API_KEY', 'sk-test-dummy-key');
+}
+
 // Restore real fetch after each test group.
 const realFetch = globalThis.fetch;
 
@@ -196,12 +204,50 @@ Deno.test('synthesizeSpeech: request body contains correct model and voice', asy
   }
 });
 
-Deno.test('synthesizeSpeech: HTTP 401 → UNAUTHORIZED mapped to 500', async () => {
+Deno.test('synthesizeSpeech: HTTP 401 → OPENAI_UNAVAILABLE (server misconfig, not user auth)', async () => {
+  // OpenAI 401/403 means OUR key is bad — not the user's JWT. Surfacing as
+  // UNAUTHORIZED would mislead the client into prompting the user to sign in.
   mockFetch(new Response('', { status: 401 }));
   try {
     const err = await assertRejects(() => synthesizeSpeech('hi', 'nova'), VoiceError);
-    assertEquals(err.code, ErrorCodes.UNAUTHORIZED);
+    assertEquals(err.code, ErrorCodes.OPENAI_UNAVAILABLE);
+    assertEquals(err.httpStatus, 502);
   } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test('synthesizeSpeech: HTTP 403 → OPENAI_UNAVAILABLE', async () => {
+  mockFetch(new Response('', { status: 403 }));
+  try {
+    const err = await assertRejects(() => synthesizeSpeech('hi', 'nova'), VoiceError);
+    assertEquals(err.code, ErrorCodes.OPENAI_UNAVAILABLE);
+    assertEquals(err.httpStatus, 502);
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test('OPENAI_API_KEY missing → OPENAI_UNAVAILABLE before any HTTP call', async () => {
+  // The key absence is a server misconfig, not a per-request issue.
+  // We must fail fast with a clear error rather than send an empty bearer
+  // token to OpenAI (which would 401 and confuse the client).
+  const originalKey = Deno.env.get('OPENAI_API_KEY');
+  Deno.env.delete('OPENAI_API_KEY');
+
+  let fetchCalled = false;
+  _setFetch(() => {
+    fetchCalled = true;
+    return Promise.resolve(new Response('', { status: 200 }));
+  });
+
+  try {
+    const err = await assertRejects(() => synthesizeSpeech('hi', 'nova'), VoiceError);
+    assertEquals(err.code, ErrorCodes.OPENAI_UNAVAILABLE);
+    assertEquals(err.httpStatus, 502);
+    assertEquals(fetchCalled, false, 'should not reach the network when key is missing');
+  } finally {
+    if (originalKey !== undefined) Deno.env.set('OPENAI_API_KEY', originalKey);
     restoreFetch();
   }
 });
