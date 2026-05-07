@@ -1,5 +1,6 @@
 import '../../../../core/constants/app_info.dart';
 import '../../../../domain/entities/app_settings.dart';
+import '../../../../domain/entities/voice_settings.dart';
 import '../../../settings/application/app_settings_cubit.dart';
 import '../../domain/settings_display_formatter.dart';
 import '../models/settings_page_view_data.dart';
@@ -7,7 +8,10 @@ import '../models/settings_page_view_data.dart';
 class SettingsPageViewDataMapper {
   const SettingsPageViewDataMapper._();
 
-  static SettingsPageViewData map(AppSettingsState state) {
+  static SettingsPageViewData map(
+    AppSettingsState state, {
+    VoiceSettings voiceSettings = const VoiceSettings.defaults(),
+  }) {
     final AppSettings settings = state.settings;
 
     return SettingsPageViewData(
@@ -77,6 +81,19 @@ class SettingsPageViewDataMapper {
       isLoading: state.isLoading && !state.hasLoaded,
       isSaving: state.isSaving,
       errorMessage: state.errorMessage,
+      voiceSettings: VoiceSettingsViewData(
+        sessionLoggingEnabled: voiceSettings.sessionLoggingEnabled,
+        selectedVoice: voiceSettings.ttsVoice,
+        voiceOptions: TtsVoice.values
+            .map(
+              (v) => SettingsSelectionOptionViewData<TtsVoice>(
+                value: v,
+                title: v.displayName,
+                selected: v == voiceSettings.ttsVoice,
+              ),
+            )
+            .toList(growable: false),
+      ),
     );
   }
 }
