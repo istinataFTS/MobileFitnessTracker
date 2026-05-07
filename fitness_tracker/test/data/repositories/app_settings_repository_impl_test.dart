@@ -17,6 +17,14 @@ void main() {
   setUp(() {
     mockDataSource = MockAppMetadataLocalDataSource();
     repository = AppSettingsRepositoryImpl(localDataSource: mockDataSource);
+
+    // The repository also reads/writes the uiExpansionState JSON field.
+    // Provide safe defaults so tests that don't care about it don't fail
+    // with MissingStubError → RepositoryGuard converting it to Left.
+    when(() => mockDataSource.readJsonObject(any()))
+        .thenAnswer((_) async => null);
+    when(() => mockDataSource.writeJsonObject(any(), any()))
+        .thenAnswer((_) async {});
   });
 
   group('AppSettingsRepositoryImpl', () {
