@@ -1,3 +1,5 @@
+import '../../../core/constants/voice_constants.dart';
+import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
@@ -22,6 +24,7 @@ class NoopVoiceRemoteDataSource implements VoiceRemoteDataSource {
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
   }) async =>
       VoiceMessage(
         role: VoiceRole.assistant,
@@ -41,7 +44,7 @@ class NoopVoiceRemoteDataSource implements VoiceRemoteDataSource {
   @override
   Future<VoiceBudget> getBudget() async => const VoiceBudget(
         usedUsd: 0,
-        dailyCapUsd: 1.0,
+        dailyCapUsd: VoiceConstants.dailyBudgetCapUsd,
       );
 
   @override

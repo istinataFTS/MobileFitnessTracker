@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
+import '../../../config/env_config.dart';
 import 'supabase_client_provider.dart';
 import 'voice_remote_datasource.dart';
 
@@ -17,10 +20,10 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
 
   SupabaseClient get _supabase => clientProvider.client;
 
-  String get _functionsBaseUrl {
-    final url = _supabase.functionsUrl;
-    return url;
-  }
+  // EnvConfig.supabaseUrl is the compile-time constant used when initialising
+  // the Supabase client, so it is always consistent with the client's base URL.
+  static const String _functionsBaseUrl =
+      '${EnvConfig.supabaseUrl}/functions/v1';
 
   Future<String> _bearerToken() async {
     final session = _supabase.auth.currentSession;
@@ -75,6 +78,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
   }) async {
     final token = await _bearerToken();
     final uri = Uri.parse('$_functionsBaseUrl/voice-chat');
@@ -85,6 +89,11 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
               'content': m.content,
             })
         .toList();
+
+    // Map enum to the short form the Edge Function expects.
+    // This mapping lives only at the datasource boundary.
+    final weightUnitString =
+        weightUnit == WeightUnit.kilograms ? 'kg' : 'lb';
 
     final response = await http.post(
       uri,
@@ -97,7 +106,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
         'user_message': userMessage,
         'history': historyJson,
         'context': <String, dynamic>{
-          'weight_unit': 'kg',
+          'weight_unit': weightUnitString,
         },
         'session_logging_enabled': settings.sessionLoggingEnabled,
       }),
@@ -111,8 +120,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     final kind = json['kind'] as String?;
 
     if (kind == 'tool_call') {
-      // Surface tool-call results as a readable assistant message for now.
-      // C-5 (Brain) will handle proper tool dispatch.
+      // Surface tool-call results as-is for now. C-5 (Brain) handles dispatch.
       final toolCall = json['tool_call'] as Map<String, dynamic>? ?? {};
       final toolName = toolCall['name'] as String? ?? 'action';
       return VoiceMessage(
@@ -151,7 +159,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
       },
       body: jsonEncode(<String, dynamic>{
         'text': text,
-        'voice': voice.apiValue,
+        'voice': voice.name,
         'session_id': sessionId,
         'session_logging_enabled': sessionLoggingEnabled,
       }),
@@ -190,10 +198,15 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     final rows = result as List<dynamic>;
     final usedUsd = rows.fold<double>(
       0.0,
-      (sum, row) => sum + ((row as Map<String, dynamic>)['cost_usd'] as num).toDouble(),
+      (sum, row) =>
+          sum +
+          ((row as Map<String, dynamic>)['cost_usd'] as num).toDouble(),
     );
 
-    return VoiceBudget(usedUsd: usedUsd, dailyCapUsd: 1.0);
+    return VoiceBudget(
+      usedUsd: usedUsd,
+      dailyCapUsd: VoiceConstants.dailyBudgetCapUsd,
+    );
   }
 
   // ---------------------------------------------------------------------------

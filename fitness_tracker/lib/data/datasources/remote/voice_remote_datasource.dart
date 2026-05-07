@@ -1,3 +1,4 @@
+import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
@@ -15,6 +16,7 @@ abstract class VoiceRemoteDataSource {
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
   });
 
   Future<List<int>> synthesise({

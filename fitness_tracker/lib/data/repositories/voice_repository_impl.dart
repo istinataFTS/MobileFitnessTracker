@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 
 import '../../core/errors/failures.dart';
+import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/voice_budget.dart';
 import '../../domain/entities/voice_message.dart';
 import '../../domain/entities/voice_settings.dart';
@@ -32,12 +33,14 @@ class VoiceRepositoryImpl implements VoiceRepository {
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
   }) =>
       _guard(() => remoteDataSource.chat(
             userMessage: userMessage,
             sessionId: sessionId,
             history: history,
             settings: settings,
+            weightUnit: weightUnit,
           ));
 
   @override
@@ -64,8 +67,7 @@ class VoiceRepositoryImpl implements VoiceRepository {
 
   Future<Either<Failure, T>> _guard<T>(Future<T> Function() action) async {
     try {
-      final result = await action();
-      return Right(result);
+      return Right(await action());
     } on Failure catch (f) {
       return Left(f);
     } catch (e) {

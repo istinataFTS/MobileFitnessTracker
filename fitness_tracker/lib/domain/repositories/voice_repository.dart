@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 
+import '../entities/app_settings.dart';
 import '../entities/voice_budget.dart';
 import '../entities/voice_message.dart';
 import '../entities/voice_settings.dart';
@@ -15,11 +16,13 @@ abstract class VoiceRepository {
   });
 
   /// Send a user message and receive an assistant reply via voice-chat.
+  /// [weightUnit] is mapped to the API string at the datasource boundary.
   Future<Either<Failure, VoiceMessage>> chat({
     required String userMessage,
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
   });
 
   /// Synthesise text to audio bytes via the voice-tts Edge Function.
