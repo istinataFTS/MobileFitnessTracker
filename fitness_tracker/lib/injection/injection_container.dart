@@ -35,6 +35,7 @@ import 'modules/register_meals_nutrition_module.dart';
 import 'modules/register_muscle_load_module.dart';
 import 'modules/register_muscle_stimulus_module.dart';
 import 'modules/register_profile_module.dart';
+import 'modules/register_settings_module.dart';
 import 'modules/register_social_module.dart';
 import 'modules/register_voice_module.dart';
 import 'modules/register_workout_module.dart';
@@ -50,6 +51,7 @@ Future<void> init({
   await sl.reset(dispose: true);
 
   registerCoreModule(sl);
+  registerSettingsModule(sl);
   registerProfileModule(sl);
   registerSocialModule(sl);
   registerVoiceModule(sl);
