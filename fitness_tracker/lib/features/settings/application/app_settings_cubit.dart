@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/constants/voice_constants.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_settings.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
@@ -182,45 +183,70 @@ class AppSettingsCubit extends Cubit<AppSettingsState> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Voice settings setters
-  // ---------------------------------------------------------------------------
-
-  Future<void> setVoiceSettings(VoiceSettings voiceSettings) async {
-    await saveSettings(state.settings.copyWith(voiceSettings: voiceSettings));
-  }
-
-  Future<void> setVoiceWakeWordPreset(WakeWordPreset preset) =>
-      setVoiceSettings(
-          state.settings.voiceSettings.copyWith(wakeWordPreset: preset));
-
-  Future<void> setVoiceTtsVoice(TtsVoice voice) =>
-      setVoiceSettings(state.settings.voiceSettings.copyWith(ttsVoice: voice));
-
-  Future<void> setVoiceSessionLogging(bool enabled) => setVoiceSettings(
-      state.settings.voiceSettings
-          .copyWith(sessionLoggingEnabled: enabled));
-
-  Future<void> setVoiceWorkoutModeAutoEnable(bool enabled) => setVoiceSettings(
-      state.settings.voiceSettings
-          .copyWith(workoutModeAutoEnable: enabled));
-
-  Future<void> setVoiceTtsVolume(double volume) => setVoiceSettings(
-      state.settings.voiceSettings
-          .copyWith(ttsVolume: volume.clamp(0.0, 1.0)));
-
-  Future<void> setVoiceWakeWordArmedInForeground(bool armed) => setVoiceSettings(
-      state.settings.voiceSettings
-          .copyWith(wakeWordArmedInForeground: armed));
-
-  // ---------------------------------------------------------------------------
-
   Future<bool> setSectionExpanded(String sectionId, {required bool expanded}) {
     final Map<String, bool> updated =
         Map<String, bool>.from(state.settings.uiExpansionState)
           ..[sectionId] = expanded;
     return saveSettings(
       state.settings.copyWith(uiExpansionState: updated),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Voice settings setters
+  //
+  // Each setter writes the whole `AppSettings` via `saveSettings`, which is
+  // the single persistence path. This keeps voice-settings storage uniform
+  // with every other setting and avoids any per-field shortcut that could
+  // diverge from the source of truth.
+  // ---------------------------------------------------------------------------
+
+  Future<bool> setVoiceSettings(VoiceSettings voice) {
+    return saveSettings(state.settings.copyWith(voiceSettings: voice));
+  }
+
+  Future<bool> setVoiceWakeWordPreset(WakeWordPreset preset) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(wakeWordPreset: preset),
+    );
+  }
+
+  Future<bool> setVoiceSessionLoggingEnabled(bool enabled) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(sessionLoggingEnabled: enabled),
+    );
+  }
+
+  Future<bool> setVoiceWorkoutModeAutoEnable(bool enabled) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(workoutModeAutoEnable: enabled),
+    );
+  }
+
+  Future<bool> setVoiceTtsVolume(double volume) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(
+        ttsVolume: volume.clamp(0.0, 1.0).toDouble(),
+      ),
+    );
+  }
+
+  Future<bool> setVoiceTtsSpeechRate(double rate) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(
+        ttsSpeechRate: rate
+            .clamp(
+              VoiceConstants.minTtsSpeechRate,
+              VoiceConstants.maxTtsSpeechRate,
+            )
+            .toDouble(),
+      ),
+    );
+  }
+
+  Future<bool> setVoiceWakeWordArmedInForeground(bool armed) {
+    return setVoiceSettings(
+      state.settings.voiceSettings.copyWith(wakeWordArmedInForeground: armed),
     );
   }
 

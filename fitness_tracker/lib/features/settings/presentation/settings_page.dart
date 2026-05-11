@@ -92,10 +92,11 @@ class _SettingsPageState extends State<SettingsPage> {
             onWeightUnitTapped: state.isSaving
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
-            onSessionLoggingChanged: (bool value) =>
-                context.read<VoiceSettingsCubit>().setSessionLogging(value),
-            onVoiceVoiceTapped: () =>
-                _selectTtsVoice(context, viewData, voiceSettings),
+            onSessionLoggingChanged: (bool value) => context
+                .read<VoiceSettingsCubit>()
+                .setSessionLoggingEnabled(value),
+            onSpeechRateChanged: (double value) =>
+                context.read<VoiceSettingsCubit>().setTtsSpeechRate(value),
           ),
         );
       },
@@ -176,35 +177,6 @@ class _SettingsPageState extends State<SettingsPage> {
         return context.read<AppSettingsCubit>().setWeightUnit(selected);
       },
     );
-  }
-
-  Future<void> _selectTtsVoice(
-    BuildContext context,
-    SettingsPageViewData viewData,
-    VoiceSettings voiceSettings,
-  ) async {
-    final TtsVoice? selected = await showModalBottomSheet<TtsVoice>(
-      context: context,
-      backgroundColor: AppTheme.surfaceDark,
-      builder: (BuildContext context) {
-        return SettingsOptionSheet<TtsVoice>(
-          options: viewData.voiceSettings.voiceOptions
-              .map(
-                (SettingsSelectionOptionViewData<TtsVoice> option) =>
-                    SettingsOption<TtsVoice>(
-                  value: option.value,
-                  title: option.title,
-                  selected: option.selected,
-                ),
-              )
-              .toList(growable: false),
-        );
-      },
-    );
-
-    if (selected == null || selected == voiceSettings.ttsVoice) return;
-    if (!context.mounted) return;
-    context.read<VoiceSettingsCubit>().setTtsVoice(selected);
   }
 
   Future<void> _saveWithFeedback(

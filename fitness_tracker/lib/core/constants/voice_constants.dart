@@ -1,16 +1,42 @@
+﻿/// Voice-bot tunables. Single source of truth for any number or duration
+/// referenced by the voice feature. **Never inline these constants** ΓÇö
+/// always import from here so a future tweak lives in one place.
+///
+/// Values mirror the master spec (see `Agreements for our implementation
+/// plans.txt` ┬º3.4).
 abstract final class VoiceConstants {
-  /// Daily budget cap in USD enforced by Edge Functions (master spec §3.4).
-  static const double dailyBudgetCapUsd = 1.00;
+  VoiceConstants._();
 
-  /// Maximum conversation turns sent to voice-chat per call.
+  /// Daily voice-chat budget cap per user, in USD. Enforced server-side
+  /// by the `voice-chat` Edge Function. Mirrored here only for UI
+  /// presentation (budget meter, "remaining today" label).
+  ///
+  /// STT and TTS are device-native and cost nothing.
+  static const double dailyBudgetCapUsd = 0.50;
+
+  /// Maximum conversation turns sent to `voice-chat` per call. The
+  /// server also enforces this; we cap on the client to avoid wasting
+  /// bandwidth on history that will be discarded.
   static const int maxHistoryTurns = 3;
 
-  /// Maximum characters in a TTS request (Edge Function limit).
-  static const int maxTtsCharacters = 800;
+  /// Lower bound for the user-tunable TTS speech rate (1.0 = system default).
+  static const double minTtsSpeechRate = 0.5;
 
-  /// Maximum audio file size accepted by voice-stt.
-  static const int maxAudioBytes = 4 * 1024 * 1024; // 4 MB
+  /// Upper bound for the user-tunable TTS speech rate.
+  static const double maxTtsSpeechRate = 2.0;
 
-  /// Timeout for OpenAI API calls (matches Edge Function timeout).
-  static const Duration openAiTimeout = Duration(seconds: 30);
+  /// Default TTS speech rate (matches system default).
+  static const double defaultTtsSpeechRate = 1.0;
+
+  /// Default TTS volume (1.0 = full).
+  static const double defaultTtsVolume = 1.0;
+
+  /// STT recognition timeout ΓÇö drops the partial transcript if the user
+  /// has stopped speaking for this long. Tuned for short workout-log
+  /// utterances ("log bench, 80 by 10") rather than free-form prose.
+  static const Duration sttSilenceTimeout = Duration(seconds: 2);
+
+  /// Hard upper bound for STT listening ΓÇö even if the user keeps
+  /// talking, force a stop at this duration to bound costs and UX.
+  static const Duration sttListenTimeout = Duration(seconds: 30);
 }

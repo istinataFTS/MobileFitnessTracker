@@ -1,13 +1,14 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../domain/entities/app_session.dart';
-import '../../../domain/entities/app_settings.dart';
+import '../../../domain/entities/app_settings.dart' show WeightUnit;
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
@@ -15,10 +16,8 @@ import '../../../domain/repositories/app_settings_repository.dart';
 import '../../../domain/usecases/voice/delete_voice_history.dart';
 import '../../../domain/usecases/voice/get_voice_budget.dart';
 import '../../../domain/usecases/voice/send_voice_message.dart';
-import '../../../domain/usecases/voice/synthesise_speech.dart';
-import '../../../domain/usecases/voice/transcribe_audio.dart';
-import '../data/services/voice_credential_service.dart';
-import '../data/services/voice_permission_service.dart';
+import '../data/services/voice_stt_service.dart';
+import '../data/services/voice_tts_service.dart';
 
 // ---------------------------------------------------------------------------
 // Events
@@ -31,6 +30,9 @@ abstract class VoiceEvent extends Equatable {
   List<Object?> get props => <Object?>[];
 }
 
+/// Fired when a voice session begins (user opens the overlay or wakes
+/// the bot). Carries the current auth session so guests can be
+/// rejected before any network call.
 class VoiceSessionStarted extends VoiceEvent {
   const VoiceSessionStarted(this.session);
 
@@ -40,17 +42,44 @@ class VoiceSessionStarted extends VoiceEvent {
   List<Object?> get props => <Object?>[session];
 }
 
-class VoiceTranscribeRequested extends VoiceEvent {
-  const VoiceTranscribeRequested({
-    required this.audioBytes,
-    required this.mimeType,
+/// Starts an STT session. Pure event — the bloc subscribes to the
+/// stream emitted by the [VoiceSttService] and forwards the final
+/// transcript as a [VoiceSendMessage].
+class VoiceListenRequested extends VoiceEvent {
+  const VoiceListenRequested();
+}
+
+/// Stops an in-progress STT session gracefully (the final partial
+/// becomes the final transcript).
+class VoiceListenStopRequested extends VoiceEvent {
+  const VoiceListenStopRequested();
+}
+
+/// Internal: emitted by the bloc itself when STT yields a result.
+/// Public so widget tests can drive the bloc directly without
+/// plumbing a real STT engine.
+class VoiceTranscriptReceived extends VoiceEvent {
+  const VoiceTranscriptReceived({
+    required this.transcript,
+    required this.isFinal,
   });
 
-  final List<int> audioBytes;
-  final String mimeType;
+  final String transcript;
+  final bool isFinal;
 
   @override
-  List<Object?> get props => <Object?>[audioBytes, mimeType];
+  List<Object?> get props => <Object?>[transcript, isFinal];
+}
+
+/// Internal: emitted by the bloc when STT errors out.
+class VoiceTranscriptFailed extends VoiceEvent {
+  const VoiceTranscriptFailed(this.kind, [this.message]);
+
+  final VoiceSttErrorKind kind;
+  final String? message;
+
+  @override
+  List<Object?> get props => <Object?>[kind, message];
 }
 
 class VoiceSendMessage extends VoiceEvent {
@@ -62,27 +91,16 @@ class VoiceSendMessage extends VoiceEvent {
   List<Object?> get props => <Object?>[text];
 }
 
-class VoiceBudgetRefreshRequested extends VoiceEvent {}
-
-class VoiceHistoryDeleteRequested extends VoiceEvent {}
-
-class VoiceConversationCleared extends VoiceEvent {}
-
-class VoicePermissionOpenSettingsRequested extends VoiceEvent {
-  const VoicePermissionOpenSettingsRequested();
+class VoiceBudgetRefreshRequested extends VoiceEvent {
+  const VoiceBudgetRefreshRequested();
 }
 
-class VoicePicovoiceKeySet extends VoiceEvent {
-  const VoicePicovoiceKeySet(this.key);
-
-  final String key;
-
-  @override
-  List<Object?> get props => <Object?>[key];
+class VoiceHistoryDeleteRequested extends VoiceEvent {
+  const VoiceHistoryDeleteRequested();
 }
 
-class VoicePicovoiceKeyCleared extends VoiceEvent {
-  const VoicePicovoiceKeyCleared();
+class VoiceConversationCleared extends VoiceEvent {
+  const VoiceConversationCleared();
 }
 
 // ---------------------------------------------------------------------------
@@ -91,11 +109,11 @@ class VoicePicovoiceKeyCleared extends VoiceEvent {
 
 enum VoiceStatus {
   idle,
+  listening,
   transcribing,
   thinking,
   speaking,
   error,
-  permissionDenied,
 }
 
 class VoiceState extends Equatable {
@@ -106,26 +124,35 @@ class VoiceState extends Equatable {
     this.sessionId,
     this.isGuest = false,
     this.errorMessage,
-    this.lastAudioBytes,
-    this.permissionStatus,
-    this.hasPicovoiceKey = false,
+    this.liveTranscript = '',
   });
 
+  /// Top-level state machine. Maps directly to overlay states in C-3.
   final VoiceStatus status;
+
+  /// Conversation so far this session (user + assistant turns).
   final List<VoiceMessage> messages;
+
+  /// Latest known budget snapshot — drives the budget meter.
   final VoiceBudget? budget;
+
+  /// Server-side session UUID. Null until [VoiceSessionStarted] fires.
   final String? sessionId;
+
+  /// True for unauthenticated sessions — voice features are gated
+  /// behind sign-in in v1.
   final bool isGuest;
+
+  /// Set when [status] == [VoiceStatus.error]. Already mapped to a
+  /// user-facing string by the bloc; the UI never has to translate.
   final String? errorMessage;
-  final List<int>? lastAudioBytes;
 
-  /// Current mic permission status. Null means not yet checked.
-  final VoicePermissionStatus? permissionStatus;
-
-  /// Whether a non-empty Picovoice access key is stored in secure storage.
-  final bool hasPicovoiceKey;
+  /// Partial transcript displayed live in the overlay while STT is
+  /// running. Cleared on transition to [VoiceStatus.thinking].
+  final String liveTranscript;
 
   bool get isBusy =>
+      status == VoiceStatus.listening ||
       status == VoiceStatus.transcribing ||
       status == VoiceStatus.thinking ||
       status == VoiceStatus.speaking;
@@ -137,11 +164,9 @@ class VoiceState extends Equatable {
     String? sessionId,
     bool? isGuest,
     String? errorMessage,
-    List<int>? lastAudioBytes,
-    VoicePermissionStatus? permissionStatus,
-    bool? hasPicovoiceKey,
+    String? liveTranscript,
     bool clearError = false,
-    bool clearAudio = false,
+    bool clearTranscript = false,
   }) {
     return VoiceState(
       status: status ?? this.status,
@@ -150,9 +175,8 @@ class VoiceState extends Equatable {
       sessionId: sessionId ?? this.sessionId,
       isGuest: isGuest ?? this.isGuest,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      lastAudioBytes: clearAudio ? null : lastAudioBytes ?? this.lastAudioBytes,
-      permissionStatus: permissionStatus ?? this.permissionStatus,
-      hasPicovoiceKey: hasPicovoiceKey ?? this.hasPicovoiceKey,
+      liveTranscript:
+          clearTranscript ? '' : liveTranscript ?? this.liveTranscript,
     );
   }
 
@@ -164,9 +188,7 @@ class VoiceState extends Equatable {
         sessionId,
         isGuest,
         errorMessage,
-        lastAudioBytes,
-        permissionStatus,
-        hasPicovoiceKey,
+        liveTranscript,
       ];
 }
 
@@ -174,139 +196,182 @@ class VoiceState extends Equatable {
 // Bloc
 // ---------------------------------------------------------------------------
 
+/// Voice-bot state machine.
+///
+/// **Critical architectural rule:** this bloc does NOT depend on
+/// `VoiceRepository` directly. All data access goes through use
+/// cases ([SendVoiceMessage], [GetVoiceBudget], [DeleteVoiceHistory])
+/// and through device service ports ([VoiceSttService],
+/// [VoiceTtsService]). This keeps the bloc testable with simple
+/// fakes and ensures the data layer can swap implementations
+/// without touching application code.
 class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   VoiceBloc({
-    required TranscribeAudio transcribeAudio,
     required SendVoiceMessage sendVoiceMessage,
-    required SynthesizeSpeech synthesizeSpeech,
     required GetVoiceBudget getVoiceBudget,
     required DeleteVoiceHistory deleteVoiceHistory,
-    required VoicePermissionService permissionService,
-    required VoiceCredentialService credentialService,
+    required VoiceSttService sttService,
+    required VoiceTtsService ttsService,
     required AppSettingsRepository appSettingsRepository,
-  })  : _transcribeAudio = transcribeAudio,
-        _sendVoiceMessage = sendVoiceMessage,
-        _synthesizeSpeech = synthesizeSpeech,
+    required VoiceSettings Function() currentVoiceSettings,
+  })  : _sendVoiceMessage = sendVoiceMessage,
         _getVoiceBudget = getVoiceBudget,
         _deleteVoiceHistory = deleteVoiceHistory,
-        _permissionService = permissionService,
-        _credentialService = credentialService,
+        _stt = sttService,
+        _tts = ttsService,
         _appSettingsRepository = appSettingsRepository,
+        _currentVoiceSettings = currentVoiceSettings,
         super(const VoiceState()) {
     on<VoiceSessionStarted>(_onSessionStarted);
-    on<VoiceTranscribeRequested>(_onTranscribeRequested);
+    on<VoiceListenRequested>(_onListenRequested);
+    on<VoiceListenStopRequested>(_onListenStopRequested);
+    on<VoiceTranscriptReceived>(_onTranscriptReceived);
+    on<VoiceTranscriptFailed>(_onTranscriptFailed);
     on<VoiceSendMessage>(_onSendMessage);
     on<VoiceBudgetRefreshRequested>(_onBudgetRefresh);
     on<VoiceHistoryDeleteRequested>(_onHistoryDelete);
     on<VoiceConversationCleared>(_onConversationCleared);
-    on<VoicePermissionOpenSettingsRequested>(_onPermissionOpenSettings);
-    on<VoicePicovoiceKeySet>(_onPicovoiceKeySet);
-    on<VoicePicovoiceKeyCleared>(_onPicovoiceKeyCleared);
   }
 
   static const _uuid = Uuid();
 
-  final TranscribeAudio _transcribeAudio;
   final SendVoiceMessage _sendVoiceMessage;
-  final SynthesizeSpeech _synthesizeSpeech;
   final GetVoiceBudget _getVoiceBudget;
   final DeleteVoiceHistory _deleteVoiceHistory;
-  final VoicePermissionService _permissionService;
-  final VoiceCredentialService _credentialService;
+  final VoiceSttService _stt;
+  final VoiceTtsService _tts;
   final AppSettingsRepository _appSettingsRepository;
 
+  /// Injected as a callback so the bloc reads the *current* settings
+  /// at each request, never a stale snapshot captured at construction.
+  /// In production this is `() => voiceSettingsCubit.state`.
+  final VoiceSettings Function() _currentVoiceSettings;
+
+  StreamSubscription<VoiceSttResult>? _sttSubscription;
+
   // ---------------------------------------------------------------------------
-  // Session start — auth gate → permission gate → credential check
+  // Session lifecycle
   // ---------------------------------------------------------------------------
 
-  Future<void> _onSessionStarted(
-    VoiceSessionStarted event,
-    Emitter<VoiceState> emit,
-  ) async {
+  void _onSessionStarted(VoiceSessionStarted event, Emitter<VoiceState> emit) {
     final isGuest = !event.session.isAuthenticated;
-    if (isGuest) {
-      emit(state.copyWith(
-        isGuest: true,
-        sessionId: null,
-        messages: const <VoiceMessage>[],
-        clearError: true,
-      ));
-      return;
-    }
-
-    // 1. Check existing permission (no dialog).
-    var permStatus = await _permissionService.checkMicrophonePermission();
-
-    // 2. If not yet granted, request (shows system dialog on first call).
-    if (permStatus != VoicePermissionStatus.granted) {
-      permStatus = await _permissionService.requestMicrophonePermission();
-    }
-
-    // 3. If still not granted, surface the error and stop.
-    if (permStatus != VoicePermissionStatus.granted) {
-      final message = permStatus == VoicePermissionStatus.deniedPermanently
-          ? AppStrings.voicePermissionDeniedPermanently
-          : AppStrings.voicePermissionDenied;
-      emit(state.copyWith(
-        isGuest: false,
-        status: VoiceStatus.permissionDenied,
-        permissionStatus: permStatus,
-        errorMessage: message,
-        messages: const <VoiceMessage>[],
-      ));
-      return;
-    }
-
-    // 4. Permission granted — emit updated status and check Picovoice key.
-    final hasKey = await _credentialService.hasPicovoiceAccessKey();
-    final sessionId = _uuid.v4();
-
+    final sessionId = isGuest ? null : _uuid.v4();
     emit(state.copyWith(
-      isGuest: false,
-      status: VoiceStatus.idle,
+      isGuest: isGuest,
       sessionId: sessionId,
       messages: const <VoiceMessage>[],
-      permissionStatus: VoicePermissionStatus.granted,
-      hasPicovoiceKey: hasKey,
+      status: VoiceStatus.idle,
       clearError: true,
+      clearTranscript: true,
     ));
   }
 
   // ---------------------------------------------------------------------------
-  // Transcribe
+  // STT (device-native)
   // ---------------------------------------------------------------------------
 
-  Future<void> _onTranscribeRequested(
-    VoiceTranscribeRequested event,
+  Future<void> _onListenRequested(
+    VoiceListenRequested event,
     Emitter<VoiceState> emit,
   ) async {
-    if (_isGuestOrBusy(emit)) return;
-    final sid = _ensureSessionId(emit);
+    if (_rejectGuest(emit) || _rejectBusy()) return;
+    _ensureSessionId(emit);
 
-    final settings = await _currentVoiceSettings();
-
-    emit(state.copyWith(status: VoiceStatus.transcribing, clearError: true));
-
-    final result = await _transcribeAudio(
-      audioBytes: event.audioBytes,
-      sessionId: sid,
-      mimeType: event.mimeType,
-      sessionLoggingEnabled: settings.sessionLoggingEnabled,
-    );
-
-    result.fold(
-      (failure) => emit(state.copyWith(
+    try {
+      await _stt.initialize();
+    } catch (e, st) {
+      AppLogger.warning('VoiceBloc: STT initialize failed',
+          error: e, stackTrace: st);
+      emit(state.copyWith(
         status: VoiceStatus.error,
-        errorMessage: _messageFor(failure),
+        errorMessage: 'Voice recognition is not available on this device.',
+      ));
+      return;
+    }
+
+    if (!_stt.isAvailable) {
+      emit(state.copyWith(
+        status: VoiceStatus.error,
+        errorMessage: 'Voice recognition is not available on this device.',
+      ));
+      return;
+    }
+
+    emit(state.copyWith(
+      status: VoiceStatus.listening,
+      clearError: true,
+      clearTranscript: true,
+    ));
+
+    await _sttSubscription?.cancel();
+    _sttSubscription = _stt.listen().listen(
+      (result) => add(VoiceTranscriptReceived(
+        transcript: result.transcript,
+        isFinal: result.isFinal,
       )),
-      (transcript) {
-        if (transcript.isNotEmpty) {
-          add(VoiceSendMessage(transcript));
+      onError: (Object e) {
+        if (e is VoiceSttException) {
+          add(VoiceTranscriptFailed(e.kind, e.message));
         } else {
-          emit(state.copyWith(status: VoiceStatus.idle));
+          add(VoiceTranscriptFailed(VoiceSttErrorKind.unknown, e.toString()));
         }
       },
+      cancelOnError: true,
     );
+  }
+
+  Future<void> _onListenStopRequested(
+    VoiceListenStopRequested event,
+    Emitter<VoiceState> emit,
+  ) async {
+    await _stt.stop();
+  }
+
+  void _onTranscriptReceived(
+    VoiceTranscriptReceived event,
+    Emitter<VoiceState> emit,
+  ) {
+    // Partial result — show live in the overlay but don't transition state.
+    if (!event.isFinal) {
+      emit(state.copyWith(liveTranscript: event.transcript));
+      return;
+    }
+
+    // Final result. Cancel the subscription defensively in case the
+    // platform plugin keeps the stream open for a heartbeat after the
+    // final result.
+    _sttSubscription?.cancel();
+    _sttSubscription = null;
+
+    final text = event.transcript.trim();
+    if (text.isEmpty) {
+      // "Didn't catch that" — drop back to idle without an error.
+      // The C-4 layer can play "Repeat please" through TTS.
+      emit(state.copyWith(
+        status: VoiceStatus.idle,
+        clearTranscript: true,
+      ));
+      return;
+    }
+
+    emit(state.copyWith(
+      status: VoiceStatus.transcribing,
+      liveTranscript: text,
+    ));
+    add(VoiceSendMessage(text));
+  }
+
+  void _onTranscriptFailed(
+    VoiceTranscriptFailed event,
+    Emitter<VoiceState> emit,
+  ) {
+    _sttSubscription?.cancel();
+    _sttSubscription = null;
+    emit(state.copyWith(
+      status: VoiceStatus.error,
+      errorMessage: _sttErrorMessage(event.kind),
+      clearTranscript: true,
+    ));
   }
 
   // ---------------------------------------------------------------------------
@@ -317,7 +382,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     VoiceSendMessage event,
     Emitter<VoiceState> emit,
   ) async {
-    if (_isGuestOrBusy(emit)) return;
+    if (_rejectGuest(emit)) return;
     final sid = _ensureSessionId(emit);
 
     final userMsg = VoiceMessage(
@@ -331,26 +396,17 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       status: VoiceStatus.thinking,
       messages: updatedMessages,
       clearError: true,
+      clearTranscript: true,
     ));
 
-    final settingsResult = await _appSettingsRepository.getSettings();
-    final weightUnit = settingsResult.fold(
-      (_) => WeightUnit.kilograms,
-      (s) => s.weightUnit,
-    );
-    final voiceSettings = settingsResult.fold(
-      (_) => const VoiceSettings.defaults(),
-      (s) => s.voiceSettings,
-    );
+    final weightUnit = await _readWeightUnit();
 
-    // Cap history at the last N turns before sending to the API.
-    final historyForApi = _trimmedHistory(updatedMessages);
-
+    final history = _trimHistory(updatedMessages);
     final chatResult = await _sendVoiceMessage(
       userMessage: event.text,
       sessionId: sid,
-      history: historyForApi,
-      settings: voiceSettings,
+      history: history,
+      settings: _currentVoiceSettings(),
       weightUnit: weightUnit,
     );
 
@@ -366,21 +422,51 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
           messages: withReply,
         ));
 
-        await _synthesiseAndEmit(
-          assistantMsg.content,
-          sid,
-          voiceSettings.ttsVoice,
-          voiceSettings.sessionLoggingEnabled,
-          emit,
-          withReply,
-        );
+        await _speak(assistantMsg.content);
+
+        emit(state.copyWith(
+          status: VoiceStatus.idle,
+          messages: withReply,
+        ));
+        _refreshBudget();
       },
     );
   }
 
+  Future<void> _speak(String text) async {
+    if (text.isEmpty) return;
+    final settings = _currentVoiceSettings();
+    // Apply current volume/rate before each speak so settings changes
+    // mid-session are honored without restarting the TTS engine.
+    await _tts.setVolume(settings.ttsVolume);
+    await _tts.setSpeechRate(settings.ttsSpeechRate);
+    await _tts.speak(text);
+  }
+
+  /// Trims `messages` to the last [VoiceConstants.maxHistoryTurns]
+  /// entries. Bounded server-side too, but trimming on the client
+  /// avoids sending oversize payloads.
+  List<VoiceMessage> _trimHistory(List<VoiceMessage> messages) {
+    if (messages.length <= VoiceConstants.maxHistoryTurns) return messages;
+    return messages.sublist(messages.length - VoiceConstants.maxHistoryTurns);
+  }
+
+  Future<WeightUnit> _readWeightUnit() async {
+    final result = await _appSettingsRepository.getSettings();
+    return result.fold(
+      // If settings can't be read, fall back to the safest default
+      // (kg) rather than failing the chat call — the bot will still
+      // function, just confirm in metric.
+      (_) => WeightUnit.kilograms,
+      (settings) => settings.weightUnit,
+    );
+  }
+
   // ---------------------------------------------------------------------------
-  // Budget
+  // Budget / history
   // ---------------------------------------------------------------------------
+
+  void _refreshBudget() => add(const VoiceBudgetRefreshRequested());
 
   Future<void> _onBudgetRefresh(
     VoiceBudgetRefreshRequested event,
@@ -394,10 +480,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // History delete
-  // ---------------------------------------------------------------------------
-
   Future<void> _onHistoryDelete(
     VoiceHistoryDeleteRequested event,
     Emitter<VoiceState> emit,
@@ -405,7 +487,9 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     if (state.isGuest) return;
     final result = await _deleteVoiceHistory();
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: _messageFor(failure))),
+      (failure) => emit(state.copyWith(
+        errorMessage: _messageFor(failure),
+      )),
       (_) => emit(state.copyWith(
         messages: const <VoiceMessage>[],
         sessionId: _uuid.v4(),
@@ -414,10 +498,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Conversation clear
-  // ---------------------------------------------------------------------------
-
   void _onConversationCleared(
     VoiceConversationCleared event,
     Emitter<VoiceState> emit,
@@ -425,117 +505,29 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     emit(state.copyWith(
       messages: const <VoiceMessage>[],
       sessionId: _uuid.v4(),
+      status: VoiceStatus.idle,
       clearError: true,
-      clearAudio: true,
+      clearTranscript: true,
     ));
   }
 
   // ---------------------------------------------------------------------------
-  // Permission: open settings
+  // Helpers
   // ---------------------------------------------------------------------------
 
-  Future<void> _onPermissionOpenSettings(
-    VoicePermissionOpenSettingsRequested event,
-    Emitter<VoiceState> emit,
-  ) async {
-    await _permissionService.openAppSettings();
+  bool _rejectGuest(Emitter<VoiceState> emit) {
+    if (!state.isGuest) return false;
+    emit(state.copyWith(
+      status: VoiceStatus.error,
+      errorMessage: 'Sign in to use the voice assistant.',
+    ));
+    return true;
   }
 
-  // ---------------------------------------------------------------------------
-  // Picovoice key management
-  // ---------------------------------------------------------------------------
-
-  Future<void> _onPicovoiceKeySet(
-    VoicePicovoiceKeySet event,
-    Emitter<VoiceState> emit,
-  ) async {
-    try {
-      await _credentialService.setPicovoiceAccessKey(event.key);
-      emit(state.copyWith(hasPicovoiceKey: true));
-    } catch (e) {
-      AppLogger.warning(
-        'VoiceBloc: failed to store Picovoice key',
-        category: 'voice',
-        error: e,
-      );
-      emit(state.copyWith(
-        status: VoiceStatus.error,
-        errorMessage: AppStrings.voicePicovoiceKeyMissing,
-      ));
-    }
-  }
-
-  Future<void> _onPicovoiceKeyCleared(
-    VoicePicovoiceKeyCleared event,
-    Emitter<VoiceState> emit,
-  ) async {
-    await _credentialService.clearPicovoiceAccessKey();
-    emit(state.copyWith(hasPicovoiceKey: false));
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  Future<void> _synthesiseAndEmit(
-    String text,
-    String sessionId,
-    TtsVoice voice,
-    bool sessionLoggingEnabled,
-    Emitter<VoiceState> emit,
-    List<VoiceMessage> messages,
-  ) async {
-    final ttsResult = await _synthesizeSpeech(
-      text: text,
-      sessionId: sessionId,
-      voice: voice,
-      sessionLoggingEnabled: sessionLoggingEnabled,
-    );
-
-    ttsResult.fold(
-      (failure) => emit(state.copyWith(
-        status: VoiceStatus.error,
-        errorMessage: _messageFor(failure),
-        messages: messages,
-      )),
-      (audioBytes) {
-        emit(state.copyWith(
-          status: VoiceStatus.idle,
-          messages: messages,
-          lastAudioBytes: audioBytes,
-        ));
-        _refreshBudget();
-      },
-    );
-  }
-
-  void _refreshBudget() => add(VoiceBudgetRefreshRequested());
-
-  Future<VoiceSettings> _currentVoiceSettings() async {
-    final result = await _appSettingsRepository.getSettings();
-    return result.fold(
-      (_) => const VoiceSettings.defaults(),
-      (s) => s.voiceSettings,
-    );
-  }
-
-  List<VoiceMessage> _trimmedHistory(List<VoiceMessage> messages) {
-    return messages.length > VoiceConstants.maxHistoryTurns
-        ? messages.sublist(messages.length - VoiceConstants.maxHistoryTurns)
-        : messages;
-  }
-
-  bool _isGuestOrBusy(Emitter<VoiceState> emit) {
-    if (state.isGuest) {
-      emit(state.copyWith(
-        status: VoiceStatus.error,
-        errorMessage: AppStrings.voiceErrorGuestForbidden,
-      ));
-      return true;
-    }
-    if (state.isBusy) return true;
-    return false;
-  }
+  /// Returns true if the bloc is already mid-operation. Caller should
+  /// silently drop the event — re-entering a state would corrupt the
+  /// state machine.
+  bool _rejectBusy() => state.isBusy;
 
   String _ensureSessionId(Emitter<VoiceState> emit) {
     final sid = state.sessionId ?? _uuid.v4();
@@ -546,9 +538,36 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   }
 
   String _messageFor(Failure failure) {
-    if (failure is ServerFailure) return failure.message;
-    return failure.message.isNotEmpty
-        ? failure.message
-        : AppStrings.voiceErrorGeneric;
+    if (failure.message.isNotEmpty) return failure.message;
+    return 'Something went wrong.';
+  }
+
+  /// Maps STT error kinds to user-visible strings. The bloc owns this
+  /// mapping (rather than each widget) so the message is consistent
+  /// wherever the error state is shown — overlay, settings, debug
+  /// panel.
+  String _sttErrorMessage(VoiceSttErrorKind kind) {
+    switch (kind) {
+      case VoiceSttErrorKind.permissionDenied:
+        return 'Microphone access is required. Please allow it and try again.';
+      case VoiceSttErrorKind.permissionPermanentlyDenied:
+        return 'Microphone access is permanently denied. Enable it in system settings.';
+      case VoiceSttErrorKind.unavailable:
+        return 'Voice recognition is not available on this device.';
+      case VoiceSttErrorKind.noSpeech:
+        return 'I did not catch that. Please try again.';
+      case VoiceSttErrorKind.network:
+        return 'Voice recognition needs an internet connection right now.';
+      case VoiceSttErrorKind.unknown:
+        return 'Voice recognition failed. Please try again.';
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _sttSubscription?.cancel();
+    _sttSubscription = null;
+    await _tts.stop();
+    await super.close();
   }
 }

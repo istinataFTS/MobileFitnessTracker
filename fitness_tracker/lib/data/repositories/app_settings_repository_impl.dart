@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 
+import '../../core/constants/voice_constants.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
 import '../../domain/entities/app_settings.dart';
@@ -14,13 +15,18 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
   static const String _weightUnitKey = 'settings.weight_unit';
   static const String _uiExpansionStateKey = 'settings.ui_expansion_state';
 
-  // Voice settings keys
-  static const String _kVoiceWakeWordPreset = 'settings.voice_wake_word_preset';
-  static const String _kVoiceTtsVoice = 'settings.voice_tts_voice';
-  static const String _kVoiceSessionLogging = 'settings.voice_session_logging';
-  static const String _kVoiceWorkoutModeAuto = 'settings.voice_workout_mode_auto';
-  static const String _kVoiceTtsVolume = 'settings.voice_tts_volume';
-  static const String _kVoiceWakeWordArmed = 'settings.voice_wake_word_armed';
+  // Voice settings — one metadata key per field. Missing keys fall back
+  // to the corresponding VoiceSettings default.
+  static const String _voiceWakeWordPresetKey =
+      'settings.voice.wake_word_preset';
+  static const String _voiceSessionLoggingKey =
+      'settings.voice.session_logging';
+  static const String _voiceWorkoutModeAutoKey =
+      'settings.voice.workout_mode_auto';
+  static const String _voiceTtsVolumeKey = 'settings.voice.tts_volume';
+  static const String _voiceTtsSpeechRateKey = 'settings.voice.tts_speech_rate';
+  static const String _voiceWakeWordArmedKey =
+      'settings.voice.wake_word_armed';
 
   final AppMetadataLocalDataSource localDataSource;
 
@@ -35,32 +41,12 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
           await localDataSource.readBool(_notificationsEnabledKey);
       final weekStartDayRaw =
           await localDataSource.readString(_weekStartDayKey);
-      final weightUnitRaw = await localDataSource.readString(_weightUnitKey);
+      final weightUnitRaw =
+          await localDataSource.readString(_weightUnitKey);
       final uiExpansionRaw =
           await localDataSource.readJsonObject(_uiExpansionStateKey);
 
-      // Voice settings
-      final wakeWordStr =
-          await localDataSource.readString(_kVoiceWakeWordPreset);
-      final ttsVoiceStr = await localDataSource.readString(_kVoiceTtsVoice);
-      final sessionLog = await localDataSource.readBool(_kVoiceSessionLogging);
-      final workoutAuto =
-          await localDataSource.readBool(_kVoiceWorkoutModeAuto);
-      final ttsVolStr = await localDataSource.readString(_kVoiceTtsVolume);
-      final wakeArmed = await localDataSource.readBool(_kVoiceWakeWordArmed);
-
-      final voiceSettings = VoiceSettings(
-        wakeWordPreset: _parseEnum(
-          WakeWordPreset.values,
-          wakeWordStr,
-          WakeWordPreset.samoLevski,
-        ),
-        ttsVoice: _parseEnum(TtsVoice.values, ttsVoiceStr, TtsVoice.nova),
-        sessionLoggingEnabled: sessionLog ?? false,
-        workoutModeAutoEnable: workoutAuto ?? false,
-        ttsVolume: double.tryParse(ttsVolStr ?? '') ?? 1.0,
-        wakeWordArmedInForeground: wakeArmed ?? true,
-      );
+      final voiceSettings = await _readVoiceSettings();
 
       return AppSettings(
         notificationsEnabled: notificationsEnabled ?? true,
@@ -91,46 +77,114 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
         _uiExpansionStateKey,
         settings.uiExpansionState.cast<String, dynamic>(),
       );
-
-      // Voice settings
-      await localDataSource.writeString(
-        _kVoiceWakeWordPreset,
-        settings.voiceSettings.wakeWordPreset.name,
-      );
-      await localDataSource.writeString(
-        _kVoiceTtsVoice,
-        settings.voiceSettings.ttsVoice.name,
-      );
-      await localDataSource.writeBool(
-        _kVoiceSessionLogging,
-        settings.voiceSettings.sessionLoggingEnabled,
-      );
-      await localDataSource.writeBool(
-        _kVoiceWorkoutModeAuto,
-        settings.voiceSettings.workoutModeAutoEnable,
-      );
-      await localDataSource.writeString(
-        _kVoiceTtsVolume,
-        settings.voiceSettings.ttsVolume.toString(),
-      );
-      await localDataSource.writeBool(
-        _kVoiceWakeWordArmed,
-        settings.voiceSettings.wakeWordArmedInForeground,
-      );
+      await _writeVoiceSettings(settings.voiceSettings);
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Parsers
+  // VoiceSettings persistence
   // ---------------------------------------------------------------------------
 
+  Future<VoiceSettings> _readVoiceSettings() async {
+    const defaults = VoiceSettings.defaults();
+
+    final wakePresetRaw =
+        await localDataSource.readString(_voiceWakeWordPresetKey);
+    final sessionLogging =
+        await localDataSource.readBool(_voiceSessionLoggingKey);
+    final workoutAuto =
+        await localDataSource.readBool(_voiceWorkoutModeAutoKey);
+    final ttsVolumeRaw =
+        await localDataSource.readString(_voiceTtsVolumeKey);
+    final ttsSpeechRateRaw =
+        await localDataSource.readString(_voiceTtsSpeechRateKey);
+    final wakeArmed =
+        await localDataSource.readBool(_voiceWakeWordArmedKey);
+
+    return VoiceSettings(
+      wakeWordPreset: _parseEnum(
+        WakeWordPreset.values,
+        wakePresetRaw,
+        defaults.wakeWordPreset,
+      ),
+      sessionLoggingEnabled: sessionLogging ?? defaults.sessionLoggingEnabled,
+      workoutModeAutoEnable: workoutAuto ?? defaults.workoutModeAutoEnable,
+      ttsVolume: _clampedDouble(
+        ttsVolumeRaw,
+        min: 0.0,
+        max: 1.0,
+        fallback: defaults.ttsVolume,
+      ),
+      ttsSpeechRate: _clampedDouble(
+        ttsSpeechRateRaw,
+        min: VoiceConstants.minTtsSpeechRate,
+        max: VoiceConstants.maxTtsSpeechRate,
+        fallback: defaults.ttsSpeechRate,
+      ),
+      wakeWordArmedInForeground:
+          wakeArmed ?? defaults.wakeWordArmedInForeground,
+    );
+  }
+
+  Future<void> _writeVoiceSettings(VoiceSettings voice) async {
+    await localDataSource.writeString(
+      _voiceWakeWordPresetKey,
+      voice.wakeWordPreset.name,
+    );
+    await localDataSource.writeBool(
+      _voiceSessionLoggingKey,
+      voice.sessionLoggingEnabled,
+    );
+    await localDataSource.writeBool(
+      _voiceWorkoutModeAutoKey,
+      voice.workoutModeAutoEnable,
+    );
+    await localDataSource.writeString(
+      _voiceTtsVolumeKey,
+      voice.ttsVolume.toString(),
+    );
+    await localDataSource.writeString(
+      _voiceTtsSpeechRateKey,
+      voice.ttsSpeechRate.toString(),
+    );
+    await localDataSource.writeBool(
+      _voiceWakeWordArmedKey,
+      voice.wakeWordArmedInForeground,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /// Parses an enum value by `.name`. Falls back to `fallback` on null,
+  /// empty, or unknown values — so an out-of-range row from an older
+  /// build never crashes the app.
   static T _parseEnum<T extends Enum>(
     List<T> values,
-    String? name,
+    String? rawName,
     T fallback,
   ) {
-    if (name == null) return fallback;
-    return values.firstWhere((e) => e.name == name, orElse: () => fallback);
+    if (rawName == null || rawName.isEmpty) return fallback;
+    for (final value in values) {
+      if (value.name == rawName) return value;
+    }
+    return fallback;
+  }
+
+  /// Parses a stored double; falls back when missing or unparseable.
+  /// Clamps to the valid range so a corrupt row can't push the UI
+  /// outside the user-tunable bounds.
+  static double _clampedDouble(
+    String? raw, {
+    required double min,
+    required double max,
+    required double fallback,
+  }) {
+    if (raw == null || raw.isEmpty) return fallback;
+    final parsed = double.tryParse(raw);
+    if (parsed == null) return fallback;
+    return parsed.clamp(min, max).toDouble();
   }
 
   Map<String, bool> _parseUiExpansionState(Map<String, dynamic>? raw) {
