@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
 import '../models/profile_view_data.dart';
 import '../profile_page_keys.dart';
@@ -11,12 +12,14 @@ class ProfileContent extends StatelessWidget {
     required this.onRefresh,
     required this.onOpenSettings,
     required this.onOpenHistory,
+    required this.onOpenVoiceAssistant,
   });
 
   final ProfilePageViewData viewData;
   final Future<void> Function() onRefresh;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenHistory;
+  final VoidCallback onOpenVoiceAssistant;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +68,13 @@ class ProfileContent extends StatelessWidget {
                 title: 'History',
                 subtitle: 'Review logged workouts and progress',
                 onTap: onOpenHistory,
+              ),
+              _NavigationTile(
+                tileKey: ProfilePageKeys.voiceAssistantTileKey,
+                icon: Icons.mic_rounded,
+                title: AppStrings.voiceProfileTileTitle,
+                subtitle: AppStrings.voiceProfileTileSubtitle,
+                onTap: onOpenVoiceAssistant,
               ),
             ],
           ),

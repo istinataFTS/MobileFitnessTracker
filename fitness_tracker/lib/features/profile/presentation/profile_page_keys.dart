@@ -24,6 +24,9 @@ class ProfilePageKeys {
   static const Key historyTileKey = ValueKey<String>(
     'profile_history_tile',
   );
+  static const Key voiceAssistantTileKey = ValueKey<String>(
+    'profile_voice_assistant_tile',
+  );
   static const Key accountStatusTileKey = ValueKey<String>(
     'profile_account_status_tile',
   );

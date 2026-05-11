@@ -5,6 +5,7 @@ import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_settings.dart';
 import '../../../features/voice/application/voice_settings_cubit.dart';
+import '../../../features/voice/presentation/voice_settings_page.dart';
 import '../application/app_settings_cubit.dart';
 import '../domain/settings_display_formatter.dart';
 import 'mappers/settings_page_view_data_mapper.dart';
@@ -92,14 +93,21 @@ class _SettingsPageState extends State<SettingsPage> {
             onWeightUnitTapped: state.isSaving
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
-            onSessionLoggingChanged: (bool value) => context
-                .read<VoiceSettingsCubit>()
-                .setSessionLoggingEnabled(value),
-            onSpeechRateChanged: (double value) =>
-                context.read<VoiceSettingsCubit>().setTtsSpeechRate(value),
+            onOpenVoiceSettings: () => _openVoiceSettings(context),
           ),
         );
       },
+    );
+  }
+
+  void _openVoiceSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider<VoiceSettingsCubit>.value(
+          value: context.read<VoiceSettingsCubit>(),
+          child: const VoiceSettingsPage(),
+        ),
+      ),
     );
   }
 

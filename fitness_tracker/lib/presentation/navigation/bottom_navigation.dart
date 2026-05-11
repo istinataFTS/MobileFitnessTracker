@@ -11,8 +11,10 @@ import '../../features/library/application/meal_bloc.dart';
 import '../../features/library/library.dart';
 import '../../features/log/application/nutrition_log_bloc.dart';
 import '../../features/log/presentation/pages/log_page.dart';
+import '../../features/profile/application/profile_cubit.dart';
 import '../../features/profile/profile.dart';
 import '../../features/settings/presentation/settings_scope.dart';
+import '../../features/voice/presentation/widgets/voice_fab.dart';
 
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key});
@@ -128,7 +130,10 @@ class _BottomNavigationState extends State<BottomNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<ProfileCubit>().state.session;
     return Scaffold(
+      floatingActionButton: VoiceFab(session: session),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: IndexedStack(
         index: _selectedIndex,
         children: List<Widget>.generate(_tabCount, _buildPageForIndex),
