@@ -24,4 +24,7 @@ class SettingsPageKeys {
   static const Key errorBannerKey = ValueKey<String>(
     'settings_error_banner',
   );
+  static const Key voiceAssistantTileKey = ValueKey<String>(
+    'settings_voice_assistant_tile',
+  );
 }

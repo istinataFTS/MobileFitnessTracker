@@ -11,5 +11,18 @@ export 'application/voice_settings_cubit.dart';
 export 'data/services/voice_stt_service.dart';
 export 'data/services/voice_tts_service.dart';
 
-// Presentation
+// Presentation — pages
+export 'presentation/voice_overlay_page.dart';
+export 'presentation/voice_settings_page.dart';
+
+// Presentation — widgets
 export 'presentation/widgets/voice_budget_indicator.dart';
+export 'presentation/widgets/voice_confirmation_card.dart';
+export 'presentation/widgets/voice_fab.dart';
+export 'presentation/widgets/voice_overlay_status_view.dart';
+export 'presentation/widgets/voice_transcript_list.dart';
+export 'presentation/widgets/voice_workout_mode_banner.dart';
+
+// Keys
+export 'presentation/voice_overlay_keys.dart';
+export 'presentation/voice_settings_page_keys.dart';

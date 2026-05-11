@@ -12,6 +12,7 @@ import '../../../domain/entities/app_settings.dart' show WeightUnit;
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
+import '../../../domain/entities/voice_tool_call.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
 import '../../../domain/usecases/voice/delete_voice_history.dart';
 import '../../../domain/usecases/voice/get_voice_budget.dart';
@@ -104,6 +105,43 @@ class VoiceConversationCleared extends VoiceEvent {
 }
 
 // ---------------------------------------------------------------------------
+// C-3 events — confirmation card & workout mode
+// ---------------------------------------------------------------------------
+
+/// C-5 fires this after parsing a tool call from the LLM response.
+/// Passing [null] clears an in-progress confirmation card.
+class VoicePendingConfirmationSet extends VoiceEvent {
+  const VoicePendingConfirmationSet(this.toolCall);
+
+  final VoiceToolCall? toolCall;
+
+  @override
+  List<Object?> get props => <Object?>[toolCall];
+}
+
+/// User tapped "Yes, do it" on the confirmation card.
+/// C-5 replaces the stub handler with real bloc dispatch.
+class VoiceConfirmationAccepted extends VoiceEvent {
+  const VoiceConfirmationAccepted();
+}
+
+/// User tapped "Cancel" on the confirmation card.
+class VoiceConfirmationCancelled extends VoiceEvent {
+  const VoiceConfirmationCancelled();
+}
+
+/// User toggled Workout Mode inside the overlay.
+/// The wakelock itself is applied in C-4; this event updates UI state.
+class VoiceWorkoutModeToggled extends VoiceEvent {
+  const VoiceWorkoutModeToggled({required this.active});
+
+  final bool active;
+
+  @override
+  List<Object?> get props => <Object?>[active];
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -125,6 +163,8 @@ class VoiceState extends Equatable {
     this.isGuest = false,
     this.errorMessage,
     this.liveTranscript = '',
+    this.pendingConfirmation,
+    this.isWorkoutModeActive = false,
   });
 
   /// Top-level state machine. Maps directly to overlay states in C-3.
@@ -151,6 +191,17 @@ class VoiceState extends Equatable {
   /// running. Cleared on transition to [VoiceStatus.thinking].
   final String liveTranscript;
 
+  /// Non-null when the LLM returned a tool call awaiting confirmation.
+  /// C-3 renders [VoiceConfirmationCard] while this is set.
+  /// C-5 populates it via [VoicePendingConfirmationSet]; until then
+  /// it remains null and the card is hidden.
+  final VoiceToolCall? pendingConfirmation;
+
+  /// True when the user has activated Workout Mode in the overlay.
+  /// The actual wakelock is applied in C-4; this flag drives the banner
+  /// and the toggle switch in [VoiceOverlayStatusView].
+  final bool isWorkoutModeActive;
+
   bool get isBusy =>
       status == VoiceStatus.listening ||
       status == VoiceStatus.transcribing ||
@@ -165,8 +216,11 @@ class VoiceState extends Equatable {
     bool? isGuest,
     String? errorMessage,
     String? liveTranscript,
+    VoiceToolCall? pendingConfirmation,
+    bool? isWorkoutModeActive,
     bool clearError = false,
     bool clearTranscript = false,
+    bool clearPendingConfirmation = false,
   }) {
     return VoiceState(
       status: status ?? this.status,
@@ -177,6 +231,10 @@ class VoiceState extends Equatable {
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       liveTranscript:
           clearTranscript ? '' : liveTranscript ?? this.liveTranscript,
+      pendingConfirmation: clearPendingConfirmation
+          ? null
+          : pendingConfirmation ?? this.pendingConfirmation,
+      isWorkoutModeActive: isWorkoutModeActive ?? this.isWorkoutModeActive,
     );
   }
 
@@ -189,6 +247,8 @@ class VoiceState extends Equatable {
         isGuest,
         errorMessage,
         liveTranscript,
+        pendingConfirmation,
+        isWorkoutModeActive,
       ];
 }
 
@@ -231,6 +291,11 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     on<VoiceBudgetRefreshRequested>(_onBudgetRefresh);
     on<VoiceHistoryDeleteRequested>(_onHistoryDelete);
     on<VoiceConversationCleared>(_onConversationCleared);
+    // C-3 events
+    on<VoicePendingConfirmationSet>(_onPendingConfirmationSet);
+    on<VoiceConfirmationAccepted>(_onConfirmationAccepted);
+    on<VoiceConfirmationCancelled>(_onConfirmationCancelled);
+    on<VoiceWorkoutModeToggled>(_onWorkoutModeToggled);
   }
 
   static const _uuid = Uuid();
@@ -561,6 +626,45 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       case VoiceSttErrorKind.unknown:
         return 'Voice recognition failed. Please try again.';
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-3 handlers — confirmation & workout mode
+  // ---------------------------------------------------------------------------
+
+  void _onPendingConfirmationSet(
+    VoicePendingConfirmationSet event,
+    Emitter<VoiceState> emit,
+  ) {
+    emit(state.copyWith(
+      pendingConfirmation: event.toolCall,
+      clearPendingConfirmation: event.toolCall == null,
+    ));
+  }
+
+  void _onConfirmationAccepted(
+    VoiceConfirmationAccepted event,
+    Emitter<VoiceState> emit,
+  ) {
+    // C-5 replaces this stub with real tool dispatch to the appropriate
+    // bloc (WorkoutLogBloc, NutritionLogBloc, etc.). Until then, simply
+    // clear the card so the overlay returns to idle.
+    emit(state.copyWith(clearPendingConfirmation: true));
+  }
+
+  void _onConfirmationCancelled(
+    VoiceConfirmationCancelled event,
+    Emitter<VoiceState> emit,
+  ) {
+    emit(state.copyWith(clearPendingConfirmation: true));
+  }
+
+  void _onWorkoutModeToggled(
+    VoiceWorkoutModeToggled event,
+    Emitter<VoiceState> emit,
+  ) {
+    // C-4 wires the wakelock call here. For now update the UI flag only.
+    emit(state.copyWith(isWorkoutModeActive: event.active));
   }
 
   @override
