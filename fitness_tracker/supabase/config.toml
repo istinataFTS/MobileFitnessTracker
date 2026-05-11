@@ -10,11 +10,7 @@ shadow_port      = 54320
 major_version    = 15
 
 [functions]
-verify_jwt = true                 # global default; no public functions in C-1
+verify_jwt = true                 # global default; no public functions
 
-[functions.voice-stt]
-verify_jwt = true
 [functions.voice-chat]
-verify_jwt = true
-[functions.voice-tts]
 verify_jwt = true

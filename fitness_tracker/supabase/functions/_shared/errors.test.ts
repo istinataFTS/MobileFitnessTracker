@@ -13,8 +13,6 @@ const STATUS_MAP: Array<[string, number]> = [
   [ErrorCodes.GUEST_FORBIDDEN, 403],
   [ErrorCodes.BUDGET_EXCEEDED, 402],
   [ErrorCodes.INVALID_REQUEST, 400],
-  [ErrorCodes.AUDIO_TOO_LARGE, 413],
-  [ErrorCodes.AUDIO_DECODE_FAIL, 422],
   [ErrorCodes.OPENAI_UNAVAILABLE, 502],
   [ErrorCodes.RATE_LIMITED, 429],
   [ErrorCodes.TIMEOUT, 504],
@@ -37,7 +35,7 @@ Deno.test('errorResponse maps unknown error → 500 and returns INTERNAL code', 
   console.error = (...args: unknown[]) => consoleSpy.push(args);
 
   try {
-    const res = errorResponse(new Error('boom'), new Headers());
+    const res = errorResponse(new Error('boom'));
     assertEquals(res.status, 500);
     const body = await res.json();
     assertEquals(body.code, ErrorCodes.INTERNAL);
