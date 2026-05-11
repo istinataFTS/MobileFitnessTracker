@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../domain/entities/app_settings.dart';
-import '../../../../domain/entities/voice_settings.dart';
 
 class SettingsPageViewData extends Equatable {
   const SettingsPageViewData({
@@ -85,22 +84,28 @@ class SettingsPageViewData extends Equatable {
       ];
 }
 
+/// Subset of voice settings the main Settings page shows.
+///
+/// Note: this is a *trimmed* projection — the full wake-word picker,
+/// volume slider, and credential UI live on the dedicated Voice
+/// Settings page (added in C-3). The main page only exposes the
+/// two most-frequently-toggled fields.
 class VoiceSettingsViewData extends Equatable {
   const VoiceSettingsViewData({
     this.sessionLoggingEnabled = false,
-    this.selectedVoice = TtsVoice.nova,
-    this.voiceOptions = const <SettingsSelectionOptionViewData<TtsVoice>>[],
+    this.ttsSpeechRate = 1.0,
+    this.ttsSpeechRatePreview = '1.0×',
   });
 
   final bool sessionLoggingEnabled;
-  final TtsVoice selectedVoice;
-  final List<SettingsSelectionOptionViewData<TtsVoice>> voiceOptions;
+  final double ttsSpeechRate;
+  final String ttsSpeechRatePreview;
 
   @override
   List<Object?> get props => <Object?>[
         sessionLoggingEnabled,
-        selectedVoice,
-        voiceOptions,
+        ttsSpeechRate,
+        ttsSpeechRatePreview,
       ];
 }
 

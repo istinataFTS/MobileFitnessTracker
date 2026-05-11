@@ -21,6 +21,8 @@ class AppSettings extends Equatable {
   /// Missing keys fall back to each section's `initiallyExpanded` default.
   final Map<String, bool> uiExpansionState;
 
+  /// Voice-bot preferences. Always present; defaults to the master-spec
+  /// values when no rows exist in `app_metadata`.
   final VoiceSettings voiceSettings;
 
   const AppSettings({
@@ -46,7 +48,8 @@ class AppSettings extends Equatable {
     VoiceSettings? voiceSettings,
   }) {
     return AppSettings(
-      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      notificationsEnabled:
+          notificationsEnabled ?? this.notificationsEnabled,
       weekStartDay: weekStartDay ?? this.weekStartDay,
       weightUnit: weightUnit ?? this.weightUnit,
       uiExpansionState: uiExpansionState ?? this.uiExpansionState,

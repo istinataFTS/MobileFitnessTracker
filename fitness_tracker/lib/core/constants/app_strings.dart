@@ -390,10 +390,15 @@ class AppStrings {
   static const String voiceSessionLoggingTitle = 'Session logging';
   static const String voiceSessionLoggingSubtitle =
       'Save conversation transcripts to your account';
-  static const String voiceTtsVoiceTitle = 'Assistant voice';
-  static const String voiceTtsVoiceSubtitle = 'Choose the text-to-speech voice';
+  // Replaces the legacy "voiceTtsVoice*" strings — device-native TTS
+  // uses the OS-configured voice, so the only TTS knob exposed to the
+  // user in the main Settings page is the speech rate.
+  static const String voiceTtsSpeechRateTitle = 'Speech rate';
+  static const String voiceTtsSpeechRateSubtitle =
+      'How fast the assistant talks (system voice is used)';
   static const String voiceBudgetTitle = 'Daily usage';
-  static const String voiceBudgetSubtitle = 'Voice assistant runs on a \$1.00/day budget';
+  static const String voiceBudgetSubtitle =
+      'Voice assistant runs on a \$0.50/day budget';
   static const String voiceDeleteHistoryTitle = 'Delete voice history';
   static const String voiceDeleteHistorySubtitle =
       'Permanently remove all saved voice transcripts';
@@ -407,39 +412,6 @@ class AppStrings {
       'Voice service is temporarily unavailable. Please try again.';
   static const String voiceErrorTimeout = 'Request timed out. Please try again.';
   static const String voiceErrorGeneric = 'Something went wrong. Please try again.';
-
-  // Voice permissions
-  static const String voicePermissionDenied =
-      'Microphone access is required for the voice assistant. '
-      'Please allow access when prompted.';
-  static const String voicePermissionDeniedPermanently =
-      'Microphone access was denied. '
-      'Please enable it in System Settings → Privacy → Microphone.';
-  static const String voicePermissionOpenSettings = 'Open Settings';
-
-  // Voice credentials
-  static const String voicePicovoiceKeyTitle = 'Wake-word engine key';
-  static const String voicePicovoiceKeySubtitle =
-      'Enter your Picovoice access key to enable wake-word activation.';
-  static const String voicePicovoiceKeyMissing =
-      'Wake-word key not configured. Tap to add.';
-  static const String voicePicovoiceKeyConfigured = 'Wake-word key configured.';
-  static const String voicePicovoiceKeyClearTitle = 'Clear wake-word key';
-  static const String voicePicovoiceKeyClearSubtitle =
-      'This will disable wake-word detection until a new key is entered.';
-
-  // Wake word preset labels
-  static const String wakeWordSamoLevski = 'Samo Levski';
-  static const String wakeWordTrainer = 'Trainer';
-  static const String wakeWordThomas = 'Thomas';
-
-  // TTS voice labels (match OpenAI names exactly for mapping)
-  static const String ttsVoiceAlloy = 'Alloy';
-  static const String ttsVoiceEcho = 'Echo';
-  static const String ttsVoiceFable = 'Fable';
-  static const String ttsVoiceNova = 'Nova';
-  static const String ttsVoiceOnyx = 'Onyx';
-  static const String ttsVoiceShimmer = 'Shimmer';
 }
 
 class AppStringsPhase7 {

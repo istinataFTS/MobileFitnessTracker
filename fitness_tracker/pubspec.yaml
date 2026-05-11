@@ -42,16 +42,17 @@ dependencies:
   uuid: ^4.5.1
   connectivity_plus: ^6.1.4
 
-  # Voice bot — audio I/O (used actively in C-4)
-  record: ^5.1.2
-  just_audio: ^0.9.40
+  # Voice bot — device-native STT (Android SpeechRecognizer / iOS SFSpeechRecognizer)
+  speech_to_text: ^7.0.0
 
-  # Voice bot — secure credential storage (used in C-2)
-  flutter_secure_storage: ^9.2.2
+  # Voice bot — device-native TTS (Android TextToSpeech / iOS AVSpeechSynthesizer)
+  flutter_tts: ^4.2.2
+
+  # Voice bot — runtime permissions (microphone, speech recognition)
   permission_handler: ^11.3.1
 
-  # Voice bot — wake-word engine (used in C-4)
-  porcupine_flutter: ^3.0.3
+  # Voice bot — secure storage for Picovoice access key
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:

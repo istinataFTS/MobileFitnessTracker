@@ -19,6 +19,7 @@ import '../../data/repositories/app_settings_repository_impl.dart';
 import '../../domain/repositories/app_session_repository.dart';
 import '../../domain/repositories/app_settings_repository.dart';
 import '../../domain/services/authenticated_data_source_preference_resolver.dart';
+import '../../features/settings/application/app_settings_cubit.dart';
 
 void registerCoreModule(GetIt sl) {
   sl.registerLazySingleton<Clock>(() => const SystemClock());
@@ -76,6 +77,14 @@ void registerCoreModule(GetIt sl) {
     () => AppSettingsRepositoryImpl(
       localDataSource: sl(),
     ),
+  );
+
+  // AppSettingsCubit is a lazy singleton because `VoiceSettingsCubit`
+  // (and any other future consumer) needs to read from and write
+  // through the *same* instance backing the Settings page. A factory
+  // would create independent instances and let their states drift.
+  sl.registerLazySingleton<AppSettingsCubit>(
+    () => AppSettingsCubit(repository: sl()),
   );
 
   sl.registerLazySingleton(

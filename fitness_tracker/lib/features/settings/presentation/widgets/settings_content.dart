@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/voice_constants.dart';
 import '../../../../core/themes/app_theme.dart';
-import '../../../../domain/entities/voice_settings.dart';
 import '../models/settings_page_view_data.dart';
 import '../settings_page_keys.dart';
 
@@ -15,7 +15,7 @@ class SettingsContent extends StatelessWidget {
     required this.onWeekStartTapped,
     required this.onWeightUnitTapped,
     this.onSessionLoggingChanged,
-    this.onVoiceVoiceTapped,
+    this.onSpeechRateChanged,
   });
 
   final SettingsPageViewData viewData;
@@ -24,7 +24,7 @@ class SettingsContent extends StatelessWidget {
   final VoidCallback onWeekStartTapped;
   final VoidCallback onWeightUnitTapped;
   final ValueChanged<bool>? onSessionLoggingChanged;
-  final VoidCallback? onVoiceVoiceTapped;
+  final ValueChanged<double>? onSpeechRateChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -122,14 +122,10 @@ class SettingsContent extends StatelessWidget {
                   onChanged: onSessionLoggingChanged,
                 ),
               ),
-              _SelectionTile(
-                tileKey: const Key('voice_tts_voice_tile'),
-                icon: Icons.spatial_audio_outlined,
-                title: AppStrings.voiceTtsVoiceTitle,
-                subtitle: AppStrings.voiceTtsVoiceSubtitle,
-                helperText: viewData.voiceSettings.selectedVoice.displayName,
-                enabled: onVoiceVoiceTapped != null,
-                onTap: onVoiceVoiceTapped ?? () {},
+              _SpeechRateTile(
+                speechRate: viewData.voiceSettings.ttsSpeechRate,
+                preview: viewData.voiceSettings.ttsSpeechRatePreview,
+                onChanged: onSpeechRateChanged,
               ),
             ],
           ),
@@ -351,6 +347,82 @@ class _SelectionTile extends StatelessWidget {
           color: AppTheme.textDim,
         ),
         onTap: enabled ? onTap : null,
+      ),
+    );
+  }
+}
+
+class _SpeechRateTile extends StatelessWidget {
+  const _SpeechRateTile({
+    required this.speechRate,
+    required this.preview,
+    required this.onChanged,
+  });
+
+  final double speechRate;
+  final String preview;
+  final ValueChanged<double>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onChanged != null;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.speed_outlined,
+                  color: enabled ? AppTheme.primaryOrange : AppTheme.textDim,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text(AppStrings.voiceTtsSpeechRateTitle),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppStrings.voiceTtsSpeechRateSubtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textMedium,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  preview,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.primaryOrange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+            Slider(
+              key: const Key('voice_tts_speech_rate_slider'),
+              value: speechRate.clamp(
+                VoiceConstants.minTtsSpeechRate,
+                VoiceConstants.maxTtsSpeechRate,
+              ),
+              min: VoiceConstants.minTtsSpeechRate,
+              max: VoiceConstants.maxTtsSpeechRate,
+              // 15 discrete steps across the 0.5–2.0 range — granular
+              // enough for taste, coarse enough that consecutive
+              // values are audibly different.
+              divisions: 15,
+              activeColor: AppTheme.primaryOrange,
+              label: preview,
+              onChanged: enabled ? onChanged : null,
+            ),
+          ],
+        ),
       ),
     );
   }

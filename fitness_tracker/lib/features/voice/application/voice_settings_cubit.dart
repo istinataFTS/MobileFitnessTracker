@@ -5,54 +5,80 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/voice_settings.dart';
 import '../../settings/application/app_settings_cubit.dart';
 
-/// A thin cubit that mirrors the [VoiceSettings] slice of [AppSettingsCubit].
+/// Thin facade exposing the voice-specific slice of [AppSettingsCubit].
 ///
-/// All reads come from [AppSettingsCubit] state; all writes delegate to
-/// [AppSettingsCubit] setters which persist through [AppSettingsRepository].
-/// This cubit is never an independent source of truth.
+/// Why a separate cubit:
+/// - The Voice Settings page (C-3) needs a focused stream of just
+///   the voice fields, not the whole `AppSettingsState`.
+/// - Widget tests for voice settings should be able to inject a
+///   simpler cubit than the full settings one.
+///
+/// Why it delegates instead of holding its own state:
+/// - Persistence lives in one place (`AppSettings` repository) — a
+///   separate writer would let the two states drift.
+/// - `AppSettingsCubit` is registered as a lazy singleton in DI so
+///   every consumer sees the same instance — toggling a voice
+///   setting from the Voice Settings page is immediately reflected
+///   in the main Settings page and vice versa.
 class VoiceSettingsCubit extends Cubit<VoiceSettings> {
-  VoiceSettingsCubit(this._appSettingsCubit)
-      : super(_appSettingsCubit.state.settings.voiceSettings) {
-    // Ensure AppSettings are loaded from SQLite, then emit the correct state.
-    _init();
-    // Mirror subsequent AppSettingsCubit changes (voice slice only).
-    _sub = _appSettingsCubit.stream
+  VoiceSettingsCubit({required AppSettingsCubit appSettingsCubit})
+      : _appSettingsCubit = appSettingsCubit,
+        super(appSettingsCubit.state.settings.voiceSettings) {
+    // Ensure settings are loaded from disk before the UI starts
+    // reading from this cubit. If a load is already in flight or
+    // completed, `ensureLoaded` is a no-op.
+    unawaited(_init());
+
+    // Mirror downstream changes from AppSettingsCubit so the Voice
+    // Settings page reacts to writes made elsewhere (e.g. main
+    // Settings page changes weight unit while this cubit is alive).
+    _subscription = _appSettingsCubit.stream
         .map((s) => s.settings.voiceSettings)
         .distinct()
-        .listen(emit);
+        .listen(_emitIfOpen);
   }
 
   final AppSettingsCubit _appSettingsCubit;
-  late final StreamSubscription<VoiceSettings> _sub;
+  late final StreamSubscription<VoiceSettings> _subscription;
 
   Future<void> _init() async {
     await _appSettingsCubit.ensureLoaded();
-    if (!isClosed) {
-      emit(_appSettingsCubit.state.settings.voiceSettings);
-    }
+    _emitIfOpen(_appSettingsCubit.state.settings.voiceSettings);
   }
 
-  Future<void> setWakeWordPreset(WakeWordPreset preset) =>
+  void _emitIfOpen(VoiceSettings next) {
+    if (isClosed) return;
+    if (next == state) return;
+    emit(next);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Setters — all delegate to AppSettingsCubit, which owns persistence.
+  // Each returns Future<bool> mirroring the underlying save result so the
+  // UI can show a "couldn't save" toast if disk write fails.
+  // ---------------------------------------------------------------------------
+
+  Future<bool> setWakeWordPreset(WakeWordPreset preset) =>
       _appSettingsCubit.setVoiceWakeWordPreset(preset);
 
-  Future<void> setTtsVoice(TtsVoice voice) =>
-      _appSettingsCubit.setVoiceTtsVoice(voice);
+  Future<bool> setSessionLoggingEnabled(bool enabled) =>
+      _appSettingsCubit.setVoiceSessionLoggingEnabled(enabled);
 
-  Future<void> setSessionLogging(bool enabled) =>
-      _appSettingsCubit.setVoiceSessionLogging(enabled);
-
-  Future<void> setWorkoutModeAutoEnable(bool enabled) =>
+  Future<bool> setWorkoutModeAutoEnable(bool enabled) =>
       _appSettingsCubit.setVoiceWorkoutModeAutoEnable(enabled);
 
-  Future<void> setTtsVolume(double volume) =>
+  Future<bool> setTtsVolume(double volume) =>
       _appSettingsCubit.setVoiceTtsVolume(volume);
 
-  Future<void> setWakeWordArmedInForeground(bool armed) =>
+  Future<bool> setTtsSpeechRate(double rate) =>
+      _appSettingsCubit.setVoiceTtsSpeechRate(rate);
+
+  Future<bool> setWakeWordArmedInForeground(bool armed) =>
       _appSettingsCubit.setVoiceWakeWordArmedInForeground(armed);
 
   @override
-  Future<void> close() {
-    _sub.cancel();
-    return super.close();
+  Future<void> close() async {
+    await _subscription.cancel();
+    await super.close();
   }
 }
