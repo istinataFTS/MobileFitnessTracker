@@ -20,7 +20,7 @@ export interface BudgetState {
 export async function getBudgetState(
   supabase: SupabaseClient,
   userId: string,
-  dailyCapUsd = 1.00,
+  dailyCapUsd = 0.50,
 ): Promise<BudgetState> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -55,7 +55,7 @@ export async function getBudgetState(
 export async function assertWithinBudget(
   supabase: SupabaseClient,
   userId: string,
-  dailyCapUsd = 1.00,
+  dailyCapUsd = 0.50,
 ): Promise<{ usedUsd: number; remainingUsd: number }> {
   const state = await getBudgetState(supabase, userId, dailyCapUsd);
 

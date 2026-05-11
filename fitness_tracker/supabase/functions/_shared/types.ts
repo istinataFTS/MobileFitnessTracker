@@ -1,4 +1,4 @@
-export type FunctionName = 'voice-stt' | 'voice-chat' | 'voice-tts';
+export type FunctionName = 'voice-chat';
 
 export interface AuthedUser {
   readonly id: string;  // auth.users.id (uuid)
@@ -8,8 +8,6 @@ export interface AuthedUser {
 export interface UsageMetrics {
   readonly inputTokens?: number;
   readonly outputTokens?: number;
-  readonly audioSeconds?: number;
-  readonly characters?: number;
 }
 
 export interface UsageLogInput extends UsageMetrics {
