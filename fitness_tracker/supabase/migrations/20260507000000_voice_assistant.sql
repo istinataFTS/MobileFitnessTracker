@@ -1,32 +1,30 @@
 -- Migration: voice assistant tables
 --
--- Introduces voice_usage_log (always written per OpenAI call) and
--- voice_sessions (opt-in full transcripts). All writes are performed
--- by Edge Functions using the service-role key. Authenticated users
--- have SELECT only on both tables; owner DELETE on voice_sessions for
--- privacy-erasure support.
+-- Introduces voice_usage_log (written per voice-chat LLM call) and
+-- voice_sessions (opt-in full transcripts). STT and TTS are device-native
+-- and incur no server cost. All writes are performed by Edge Functions
+-- using the service-role key. Authenticated users have SELECT only on
+-- both tables; owner DELETE on voice_sessions for privacy-erasure support.
 --
 -- Safe to re-run: all statements use IF EXISTS / IF NOT EXISTS.
 
 -- ---------------------------------------------------------------------------
--- voice_usage_log — per-call OpenAI cost + metadata, always written
+-- voice_usage_log — per voice-chat call cost + metadata, always written
 -- ---------------------------------------------------------------------------
 create table if not exists public.voice_usage_log (
   id              uuid          primary key default gen_random_uuid(),
   user_id         uuid          not null references auth.users(id) on delete cascade,
 
-  -- Which Edge Function recorded this row.
+  -- Only 'voice-chat' records rows. STT and TTS are device-native (free).
   function_name   text          not null
-                                  check (function_name in ('voice-stt', 'voice-chat', 'voice-tts')),
+                                  check (function_name in ('voice-chat')),
 
-  -- OpenAI model identifier verbatim (e.g. 'whisper-1', 'gpt-4o-mini-2024-07-18', 'tts-1').
+  -- OpenAI model identifier verbatim (e.g. 'gpt-4o-mini-2024-07-18').
   model           text          not null,
 
-  -- Pricing-unit fields; null means not applicable for this function.
-  input_tokens    integer       null check (input_tokens    is null or input_tokens    >= 0),
-  output_tokens   integer       null check (output_tokens   is null or output_tokens   >= 0),
-  audio_seconds   numeric(10,3) null check (audio_seconds   is null or audio_seconds   >= 0),
-  characters      integer       null check (characters      is null or characters      >= 0),
+  -- Token counts for the LLM call.
+  input_tokens    integer       null check (input_tokens  is null or input_tokens  >= 0),
+  output_tokens   integer       null check (output_tokens is null or output_tokens >= 0),
 
   -- Computed cost in USD (6-decimal precision matches OpenAI's billing unit).
   -- NEVER NULL: failed calls record 0.
@@ -39,7 +37,7 @@ create table if not exists public.voice_usage_log (
   -- End-to-end latency observed inside the Edge Function (Deno performance.now).
   latency_ms      integer       not null check (latency_ms >= 0),
 
-  -- Optional grouping: same session_id across stt→chat→tts triplet.
+  -- Optional grouping: same session_id across an stt→chat→tts turn.
   session_id      uuid          null,
 
   -- 'OK' for successful calls; structured error code otherwise.

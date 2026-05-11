@@ -1,5 +1,13 @@
 # Supabase — Fitness Tracker Voice Bot Backend
 
+## Architecture
+
+One Edge Function: **`voice-chat`** (GPT-4o-mini with tool calling).
+
+STT and TTS run **on-device** (Android `SpeechRecognizer` / iOS `SFSpeechRecognizer`
+for STT; Android `TextToSpeech` / iOS `AVSpeechSynthesizer` for TTS) — no audio
+ever reaches the server. Only the transcribed text is sent to `voice-chat`.
+
 ## Prerequisites
 
 - Supabase CLI ≥ 1.180
@@ -27,7 +35,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key-from-supabase-start>
 SUPABASE_ANON_KEY=<anon-key-from-supabase-start>
 ```
 
-Then start the local stack and serve all Edge Functions:
+Then start the local stack and serve the Edge Function:
 
 ```sh
 supabase start
@@ -44,11 +52,11 @@ deno test --allow-all supabase/functions
 
 ## Deploying
 
-Apply migrations first, then deploy functions:
+Apply migrations first, then deploy the function:
 
 ```sh
 supabase db push
-supabase functions deploy voice-stt voice-chat voice-tts
+supabase functions deploy voice-chat
 ```
 
 The `.github/workflows/supabase-deploy.yml` GitHub Action (`workflow_dispatch`)
@@ -56,7 +64,8 @@ does this in one step against the linked project.
 
 ## Pricing & cost monitoring
 
-All OpenAI calls are recorded in `voice_usage_log`. Query today's spend per user:
+All `voice-chat` LLM calls are recorded in `voice_usage_log`. Query today's
+spend per user:
 
 ```sql
 select
@@ -69,12 +78,15 @@ group by user_id
 order by total_usd desc;
 ```
 
+Estimated cost: ~$0.0001 per voice interaction (GPT-4o-mini tokens only).
+Daily cap: $0.50 per user.
+
 ## Where the OpenAI key lives (and where it doesn't)
 
 The `OPENAI_API_KEY` lives **only** as a Supabase Function secret set via
 `supabase secrets set`. It is:
 
-- ✅ Read inside Edge Functions via `Deno.env.get('OPENAI_API_KEY')`
+- ✅ Read inside the `voice-chat` Edge Function via `Deno.env.get('OPENAI_API_KEY')`
 - ❌ Never present in `lib/` (Flutter client code)
 - ❌ Never in git history
 - ❌ Never logged by any Edge Function

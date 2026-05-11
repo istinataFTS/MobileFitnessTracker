@@ -308,18 +308,17 @@ create policy "follows: owner can delete"
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- voice_usage_log — per-call OpenAI cost + metadata, always written
+-- voice_usage_log — per voice-chat call cost + metadata, always written
+-- Only voice-chat (GPT-4o-mini) incurs cost. STT and TTS are device-native.
 -- ---------------------------------------------------------------------------
 create table public.voice_usage_log (
   id              uuid          primary key default gen_random_uuid(),
   user_id         uuid          not null references auth.users(id) on delete cascade,
   function_name   text          not null
-                                  check (function_name in ('voice-stt', 'voice-chat', 'voice-tts')),
+                                  check (function_name in ('voice-chat')),
   model           text          not null,
-  input_tokens    integer       null check (input_tokens    is null or input_tokens    >= 0),
-  output_tokens   integer       null check (output_tokens   is null or output_tokens   >= 0),
-  audio_seconds   numeric(10,3) null check (audio_seconds   is null or audio_seconds   >= 0),
-  characters      integer       null check (characters      is null or characters      >= 0),
+  input_tokens    integer       null check (input_tokens  is null or input_tokens  >= 0),
+  output_tokens   integer       null check (output_tokens is null or output_tokens >= 0),
   cost_usd        numeric(10,6) not null default 0 check (cost_usd >= 0),
   pricing_version text          not null,
   latency_ms      integer       not null check (latency_ms >= 0),
