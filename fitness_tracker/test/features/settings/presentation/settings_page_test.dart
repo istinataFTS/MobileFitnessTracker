@@ -19,7 +19,6 @@ void main() {
   setUpAll(() {
     registerFallbackValue(WeekStartDay.monday);
     registerFallbackValue(WeightUnit.kilograms);
-    registerFallbackValue(TtsVoice.nova);
   });
 
   late MockAppSettingsCubit cubit;
@@ -64,8 +63,8 @@ void main() {
       const Stream<VoiceSettings>.empty(),
       initialState: initialVoiceSettings,
     );
-    when(() => voiceCubit.setSessionLogging(any())).thenAnswer((_) async {});
-    when(() => voiceCubit.setTtsVoice(any())).thenAnswer((_) async {});
+    when(() => voiceCubit.setSessionLoggingEnabled(any())).thenAnswer((_) async => true);
+    when(() => voiceCubit.setTtsVolume(any())).thenAnswer((_) async => true);
 
     final AppSettingsState initialState = buildState(
       settings: const AppSettings(
