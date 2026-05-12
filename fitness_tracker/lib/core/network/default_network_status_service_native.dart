@@ -35,10 +35,26 @@ class DefaultNetworkStatusService implements NetworkStatusService {
             (ConnectivityResult r) => r != ConnectivityResult.none,
           );
           if (!hasInterface) return false;
-          // Verify we actually have internet, not just a local network.
           return isNetworkAvailable();
         })
         .where((bool reachable) => reachable)
+        .distinct();
+  }
+
+  /// Emits the current online/offline status on every connectivity change.
+  /// Emits `false` immediately when the interface is lost; emits `true`
+  /// once actual internet reachability is confirmed after a reconnect.
+  @override
+  Stream<bool> get onConnectivityChanged {
+    return Connectivity()
+        .onConnectivityChanged
+        .asyncMap((List<ConnectivityResult> results) async {
+          final bool hasInterface = results.any(
+            (ConnectivityResult r) => r != ConnectivityResult.none,
+          );
+          if (!hasInterface) return false;
+          return isNetworkAvailable();
+        })
         .distinct();
   }
 }

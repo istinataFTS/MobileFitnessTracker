@@ -1,5 +1,8 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../core/network/network_status_service.dart';
+import '../../core/platform/wakelock_service.dart';
 import '../../core/sync/remote_sync_runtime_policy.dart';
 import '../../data/datasources/remote/noop_voice_remote_datasource.dart';
 import '../../data/datasources/remote/supabase_voice_remote_datasource.dart';
@@ -13,25 +16,54 @@ import '../../features/settings/application/app_settings_cubit.dart';
 import '../../features/voice/application/voice_bloc.dart';
 import '../../features/voice/application/voice_settings_cubit.dart';
 import '../../features/voice/data/services/flutter_tts_voice_tts_service.dart';
+import '../../features/voice/data/services/porcupine_voice_wake_word_service.dart';
+import '../../features/voice/data/services/secure_storage_voice_credential_service.dart';
 import '../../features/voice/data/services/speech_to_text_voice_stt_service.dart';
+import '../../features/voice/data/services/voice_credential_service.dart';
 import '../../features/voice/data/services/voice_stt_service.dart';
 import '../../features/voice/data/services/voice_tts_service.dart';
+import '../../features/voice/data/services/voice_wake_word_service.dart';
 
 /// Wires up the voice feature.
 ///
 /// Ordering note: `registerCoreModule` must run before this module
-/// (it owns the lazy-singleton `AppSettingsCubit` and the
-/// `AppSettingsRepository`). The injection bootstrap (`injection.dart`)
-/// already enforces this order.
+/// (it owns `AppSettingsCubit`, `AppSettingsRepository`, and
+/// `NetworkStatusService`). The injection bootstrap enforces this order.
 void registerVoiceModule(GetIt sl) {
-  // ── Device services (STT + TTS) ────────────────────────────────
+  // ── Secure storage (shared with VoiceCredentialService) ────────────────
+  // Only register if not already present (e.g. if another module added it).
+  if (!sl.isRegistered<FlutterSecureStorage>()) {
+    sl.registerLazySingleton<FlutterSecureStorage>(
+      () => const FlutterSecureStorage(),
+    );
+  }
+
+  // ── Voice credential service ───────────────────────────────────────────
+  sl.registerLazySingleton<VoiceCredentialService>(
+    () => SecureStorageVoiceCredentialService(sl<FlutterSecureStorage>()),
+  );
+
+  // ── Device services (STT + TTS) ────────────────────────────────────────
   // Lazy singletons: the underlying plugins hold native resources
   // (microphone session, TTS engine) and must not be torn down /
-  // re-created per page.
+  // re-created per overlay instance.
   sl.registerLazySingleton<VoiceSttService>(SpeechToTextVoiceSttService.new);
   sl.registerLazySingleton<VoiceTtsService>(FlutterTtsVoiceTtsService.new);
 
-  // ── Repository + datasource ────────────────────────────────────
+  // ── Wake-word engine ───────────────────────────────────────────────────
+  // Lazy singleton: Porcupine holds the microphone and must not be
+  // torn down/re-created per overlay instance. VoiceFab manages lifecycle
+  // (start on resume, stop on background).
+  sl.registerLazySingleton<VoiceWakeWordService>(
+    () => PorcupineVoiceWakeWordService(credentialService: sl()),
+  );
+
+  // ── Wakelock service ───────────────────────────────────────────────────
+  sl.registerLazySingleton<WakelockService>(
+    () => const DefaultWakelockService(),
+  );
+
+  // ── Repository + datasource ────────────────────────────────────────────
   sl.registerLazySingleton<VoiceRepository>(
     () => VoiceRepositoryImpl(remoteDataSource: sl()),
   );
@@ -42,24 +74,22 @@ void registerVoiceModule(GetIt sl) {
         : const NoopVoiceRemoteDataSource(),
   );
 
-  // ── Use cases ──────────────────────────────────────────────────
+  // ── Use cases ──────────────────────────────────────────────────────────
   sl.registerLazySingleton(() => GetVoiceBudget(sl()));
   sl.registerLazySingleton(() => DeleteVoiceHistory(sl()));
   sl.registerLazySingleton(() => SendVoiceMessage(sl()));
 
-  // ── Cubits / blocs ─────────────────────────────────────────────
-  // VoiceSettingsCubit is a factory so each page gets its own
-  // subscription to AppSettingsCubit's stream — but the *state* it
-  // mirrors comes from the shared singleton, so all instances see
-  // the same values.
+  // ── Cubits / blocs ─────────────────────────────────────────────────────
+  // VoiceSettingsCubit: factory — each page gets its own subscription to
+  // AppSettingsCubit's stream, but the *state* it mirrors comes from the
+  // shared singleton, so all instances see the same values.
   sl.registerFactory(
     () => VoiceSettingsCubit(appSettingsCubit: sl<AppSettingsCubit>()),
   );
 
-  // VoiceBloc is also a factory (per voice overlay). The injected
-  // `currentVoiceSettings` callback reads the latest values from
-  // the singleton AppSettingsCubit at every chat turn — no stale
-  // snapshot.
+  // VoiceBloc: factory — per voice overlay instance.
+  // `currentVoiceSettings` is a callback so the bloc reads the latest values
+  // from the singleton AppSettingsCubit at every chat turn (no stale snapshot).
   sl.registerFactory(
     () => VoiceBloc(
       sendVoiceMessage: sl(),
@@ -70,6 +100,9 @@ void registerVoiceModule(GetIt sl) {
       appSettingsRepository: sl(),
       currentVoiceSettings: () =>
           sl<AppSettingsCubit>().state.settings.voiceSettings,
+      networkStatusService: sl<NetworkStatusService>(),
+      wakeWordService: sl<VoiceWakeWordService>(),
+      wakelockService: sl<WakelockService>(),
     ),
   );
 }

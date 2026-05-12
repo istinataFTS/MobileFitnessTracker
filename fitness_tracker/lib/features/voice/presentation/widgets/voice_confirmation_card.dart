@@ -39,17 +39,17 @@ class VoiceConfirmationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
+          const Row(
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.check_circle_outline_rounded,
                 color: AppTheme.primaryOrange,
                 size: 18,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 AppStrings.voiceConfirmActionLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppTheme.textDim,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

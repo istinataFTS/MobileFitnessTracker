@@ -140,7 +140,6 @@ class _TranscriptBubble extends StatelessWidget {
               border: isUser
                   ? Border.all(
                       color: AppTheme.primaryOrange.withAlpha(76),
-                      width: 1,
                     )
                   : null,
             ),

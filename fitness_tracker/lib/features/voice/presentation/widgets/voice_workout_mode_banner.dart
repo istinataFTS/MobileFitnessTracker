@@ -31,16 +31,16 @@ class VoiceWorkoutModeBanner extends StatelessWidget {
           decoration: const BoxDecoration(
             color: AppTheme.primaryOrange,
           ),
-          child: Row(
+          child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.fitness_center_rounded,
                 size: 14,
                 color: AppTheme.textLight,
               ),
-              const SizedBox(width: 6),
-              const Text(
+              SizedBox(width: 6),
+              Text(
                 AppStrings.voiceWorkoutModeBanner,
                 style: TextStyle(
                   color: AppTheme.textLight,
@@ -49,8 +49,8 @@ class VoiceWorkoutModeBanner extends StatelessWidget {
                   letterSpacing: 0.3,
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(
+              SizedBox(width: 8),
+              Icon(
                 Icons.close_rounded,
                 size: 14,
                 color: AppTheme.textLight,

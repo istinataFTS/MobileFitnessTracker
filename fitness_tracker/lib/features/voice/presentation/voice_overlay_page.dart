@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
+import '../../../core/network/network_status_service.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_session.dart';
+import '../../../domain/entities/voice_settings.dart' show WakeWordPreset;
 import '../../../injection/injection_container.dart';
 import '../application/voice_bloc.dart';
 import '../application/voice_settings_cubit.dart';
+import '../data/services/voice_wake_word_service.dart';
 import 'voice_overlay_keys.dart';
 import 'voice_settings_page.dart';
 import 'widgets/voice_budget_indicator.dart';
@@ -18,8 +23,8 @@ import 'widgets/voice_workout_mode_banner.dart';
 /// Full-screen voice overlay.
 ///
 /// Scopes a fresh [VoiceBloc] instance (factory) and fires
-/// [VoiceSessionStarted] on first build. The bloc orchestrates
-/// STT → chat → TTS; this page is purely presentation.
+/// [VoiceSessionStarted] on first build. Manages connectivity and
+/// wake-word subscriptions for the duration the overlay is visible.
 class VoiceOverlayPage extends StatelessWidget {
   const VoiceOverlayPage({required this.session, super.key});
 
@@ -28,17 +33,77 @@ class VoiceOverlayPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<VoiceBloc>(
-      create: (_) => sl<VoiceBloc>()
-        ..add(VoiceSessionStarted(session)),
+      create: (_) => sl<VoiceBloc>()..add(VoiceSessionStarted(session)),
       child: _VoiceOverlayView(session: session),
     );
   }
 }
 
-class _VoiceOverlayView extends StatelessWidget {
+class _VoiceOverlayView extends StatefulWidget {
   const _VoiceOverlayView({required this.session});
 
   final AppSession session;
+
+  @override
+  State<_VoiceOverlayView> createState() => _VoiceOverlayViewState();
+}
+
+class _VoiceOverlayViewState extends State<_VoiceOverlayView> {
+  StreamSubscription<bool>? _connectivitySub;
+  StreamSubscription<WakeWordPreset>? _wakeWordSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialConnectivity();
+    _subscribeToConnectivity();
+    _subscribeToWakeWord();
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    _wakeWordSub?.cancel();
+    super.dispose();
+  }
+
+  // ── Connectivity ────────────────────────────────────────────────────────────
+
+  Future<void> _checkInitialConnectivity() async {
+    final isOnline =
+        await sl<NetworkStatusService>().isNetworkAvailable();
+    if (mounted) {
+      context
+          .read<VoiceBloc>()
+          .add(VoiceConnectivityChanged(isOnline: isOnline));
+    }
+  }
+
+  void _subscribeToConnectivity() {
+    _connectivitySub =
+        sl<NetworkStatusService>().onConnectivityChanged.listen((isOnline) {
+      if (mounted) {
+        context
+            .read<VoiceBloc>()
+            .add(VoiceConnectivityChanged(isOnline: isOnline));
+      }
+    });
+  }
+
+  // ── Wake-word re-trigger while overlay is open ──────────────────────────────
+
+  void _subscribeToWakeWord() {
+    _wakeWordSub =
+        sl<VoiceWakeWordService>().onWakeWordDetected.listen((_) {
+      if (!mounted) return;
+      final bloc = context.read<VoiceBloc>();
+      if (bloc.state.status == VoiceStatus.idle) {
+        bloc.add(const VoiceListenRequested());
+      }
+    });
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -89,8 +154,8 @@ class _VoiceOverlayView extends StatelessWidget {
                           onConfirm: () =>
                               bloc.add(const VoiceConfirmationAccepted()),
                           onEdit: () {
-                            // C-5: populate a text field with the summary for editing.
-                            // For now, cancel and let the user re-dictate.
+                            // C-5: populate a text field with the summary for
+                            // editing. For now cancel and let the user re-dictate.
                             bloc.add(const VoiceConfirmationCancelled());
                           },
                           onCancel: () =>
@@ -137,6 +202,10 @@ class _VoiceOverlayView extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
 
 class _OverlayHeader extends StatelessWidget {
   const _OverlayHeader({

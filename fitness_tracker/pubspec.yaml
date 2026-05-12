@@ -54,6 +54,22 @@ dependencies:
   # Voice bot — secure storage for Picovoice access key
   flutter_secure_storage: ^9.2.4
 
+  # Voice bot — wake-word engine (Picovoice Porcupine, foreground-only)
+  porcupine_flutter: ^3.0.3
+
+  # Required for PorcupineVoiceWakeWordService to extract .ppn assets to a
+  # filesystem path (Porcupine requires file paths, not asset bundle paths).
+  path_provider: ^2.1.0
+
+  # Voice bot — audio capture used by Porcupine's microphone pipeline
+  record: ^6.0.0
+
+  # Voice bot — wake-word audio preview in Voice Settings (future use)
+  just_audio: ^0.9.40
+
+  # Voice bot — screen-on during Workout Mode
+  wakelock_plus: ^1.2.10
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -78,3 +94,8 @@ flutter:
     - assets/images/icons/
     - assets/images/illustrations/
     - assets/data/
+    # Wake-word models (Picovoice Porcupine). Zero-byte placeholders until
+    # real .ppn files are obtained from console.picovoice.ai.
+    - assets/wake_words/android/
+    - assets/wake_words/ios/
+    - assets/wake_words/porcupine_params.pv

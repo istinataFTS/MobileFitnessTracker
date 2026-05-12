@@ -5,6 +5,8 @@
          call, but not by the on-device STT/TTS themselves. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- wakelock_plus: keep screen on during Workout Mode -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="fitness_tracker"
         android:name="${applicationName}"

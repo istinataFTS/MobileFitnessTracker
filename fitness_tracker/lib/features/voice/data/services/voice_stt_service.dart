@@ -45,13 +45,28 @@ abstract class VoiceSttService {
   /// Whether the STT engine is available after [initialize].
   bool get isAvailable;
 
-  /// Begin listening and return a stream of partial + final results.
-  ///
-  /// The stream emits [VoiceSttResult] objects with [isFinal] == false
-  /// for live transcripts, then a final one with [isFinal] == true.
-  /// On error, the stream adds a [VoiceSttException] via `onError`.
-  Stream<VoiceSttResult> listen();
+  /// Whether the STT engine is currently listening.
+  bool get isListening;
 
-  /// Stop listening. Any pending partial result is discarded.
+  /// Begin listening and return a broadcast stream of [VoiceSttResult].
+  ///
+  /// Emits [VoiceSttResult] objects with [isFinal] == false for live
+  /// partial transcripts, then a final result with [isFinal] == true.
+  /// On error the stream adds a [VoiceSttException] via `onError`.
+  ///
+  /// [localeId] overrides the device default locale (e.g. `'en-US'`).
+  /// Pass null to use the device default.
+  Stream<VoiceSttResult> listen({String? localeId});
+
+  /// Stop listening gracefully. Any pending partial result is discarded.
   Future<void> stop();
+
+  /// Cancel in-progress STT without committing a result. Unlike [stop],
+  /// this does NOT emit a final [VoiceSttResult] — any partial transcript
+  /// is discarded. Used when the user taps "Cancel" during listening.
+  Future<void> cancel();
+
+  /// Release native resources. Called at app shutdown by the DI framework;
+  /// never called directly by [VoiceBloc].
+  Future<void> dispose();
 }
