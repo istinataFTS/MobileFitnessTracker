@@ -1,22 +1,36 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
-import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/features/history/history.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
 import 'package:fitness_tracker/features/library/application/exercise_bloc.dart';
 import 'package:fitness_tracker/features/library/application/meal_bloc.dart';
 import 'package:fitness_tracker/features/log/log.dart';
+import 'package:fitness_tracker/features/profile/application/profile_cubit.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:fitness_tracker/features/settings/presentation/settings_scope.dart';
+import 'package:fitness_tracker/features/voice/application/voice_settings_cubit.dart';
+import 'package:fitness_tracker/features/voice/data/services/voice_wake_word_service.dart';
 import 'package:fitness_tracker/presentation/navigation/bottom_navigation.dart';
-import 'package:fitness_tracker/features/log/application/nutrition_log_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
 class MockAppSettingsCubit extends MockCubit<AppSettingsState>
     implements AppSettingsCubit {}
+
+class MockProfileCubit extends MockCubit<ProfileState>
+    implements ProfileCubit {}
+
+class MockVoiceSettingsCubit extends MockCubit<VoiceSettings>
+    implements VoiceSettingsCubit {}
 
 class MockHomeBloc extends MockBloc<HomeEvent, HomeState> implements HomeBloc {}
 
@@ -38,6 +52,10 @@ class MockHistoryBloc extends MockBloc<HistoryEvent, HistoryState>
 class MockNutritionLogBloc
     extends MockBloc<NutritionLogEvent, NutritionLogState>
     implements NutritionLogBloc {}
+
+// ---------------------------------------------------------------------------
+// Fakes (for registerFallbackValue)
+// ---------------------------------------------------------------------------
 
 class FakeHomeEvent extends Fake implements HomeEvent {}
 
@@ -67,8 +85,47 @@ class FakeNutritionLogEvent extends Fake implements NutritionLogEvent {}
 
 class FakeNutritionLogState extends Fake implements NutritionLogState {}
 
+// ---------------------------------------------------------------------------
+// Fake VoiceWakeWordService — no-op, stream-safe, no native binaries.
+// ---------------------------------------------------------------------------
+
+class _FakeVoiceWakeWordService implements VoiceWakeWordService {
+  final StreamController<WakeWordPreset> _detectedCtrl =
+      StreamController<WakeWordPreset>.broadcast();
+  final StreamController<VoiceWakeWordException> _errorCtrl =
+      StreamController<VoiceWakeWordException>.broadcast();
+
+  @override
+  Stream<WakeWordPreset> get onWakeWordDetected => _detectedCtrl.stream;
+
+  @override
+  Stream<VoiceWakeWordException> get onError => _errorCtrl.stream;
+
+  @override
+  bool get isRunning => false;
+
+  @override
+  Future<void> start(WakeWordPreset preset) async {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _detectedCtrl.close();
+    await _errorCtrl.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 void main() {
   late MockAppSettingsCubit appSettingsCubit;
+  late MockProfileCubit profileCubit;
+  late MockVoiceSettingsCubit voiceSettingsCubit;
+  late _FakeVoiceWakeWordService voiceWakeWordService;
   late MockHomeBloc homeBloc;
   late MockMuscleVisualBloc muscleVisualBloc;
   late MockExerciseBloc exerciseBloc;
@@ -96,6 +153,9 @@ void main() {
 
   setUp(() {
     appSettingsCubit = MockAppSettingsCubit();
+    profileCubit = MockProfileCubit();
+    voiceSettingsCubit = MockVoiceSettingsCubit();
+    voiceWakeWordService = _FakeVoiceWakeWordService();
     homeBloc = MockHomeBloc();
     muscleVisualBloc = MockMuscleVisualBloc();
     exerciseBloc = MockExerciseBloc();
@@ -113,18 +173,32 @@ void main() {
       initialState: AppSettingsState.initial().copyWith(hasLoaded: true),
     );
 
-    when(() => homeBloc.state).thenReturn(HomeInitial());
+    when(() => profileCubit.state).thenReturn(ProfileState.initial());
+    whenListen<ProfileState>(
+      profileCubit,
+      const Stream<ProfileState>.empty(),
+      initialState: ProfileState.initial(),
+    );
+
+    when(() => voiceSettingsCubit.state).thenReturn(const VoiceSettings());
+    whenListen<VoiceSettings>(
+      voiceSettingsCubit,
+      const Stream<VoiceSettings>.empty(),
+      initialState: const VoiceSettings(),
+    );
+
+    when(() => homeBloc.state).thenReturn(const HomeInitial());
     whenListen<HomeState>(
       homeBloc,
       const Stream<HomeState>.empty(),
-      initialState: HomeInitial(),
+      initialState: const HomeInitial(),
     );
 
-    when(() => muscleVisualBloc.state).thenReturn(MuscleVisualInitial());
+    when(() => muscleVisualBloc.state).thenReturn(const MuscleVisualInitial());
     whenListen<MuscleVisualState>(
       muscleVisualBloc,
       const Stream<MuscleVisualState>.empty(),
-      initialState: MuscleVisualInitial(),
+      initialState: const MuscleVisualInitial(),
     );
 
     when(() => exerciseBloc.state).thenReturn(ExerciseInitial());
@@ -173,10 +247,15 @@ void main() {
     when(() => historyBloc.add(any())).thenReturn(null);
   });
 
+  tearDown(() async {
+    await voiceWakeWordService.dispose();
+  });
+
   Widget buildSubject() {
     return MultiBlocProvider(
       providers: <BlocProvider<dynamic>>[
         BlocProvider<AppSettingsCubit>.value(value: appSettingsCubit),
+        BlocProvider<ProfileCubit>.value(value: profileCubit),
         BlocProvider<HomeBloc>.value(value: homeBloc),
         BlocProvider<MuscleVisualBloc>.value(value: muscleVisualBloc),
         BlocProvider<ExerciseBloc>.value(value: exerciseBloc),
@@ -185,7 +264,14 @@ void main() {
         BlocProvider<HistoryBloc>.value(value: historyBloc),
         BlocProvider<NutritionLogBloc>.value(value: nutritionLogBloc),
       ],
-      child: SettingsScope(child: const MaterialApp(home: BottomNavigation())),
+      child: SettingsScope(
+        child: MaterialApp(
+          home: BottomNavigation(
+            voiceSettingsCubit: voiceSettingsCubit,
+            voiceWakeWordService: voiceWakeWordService,
+          ),
+        ),
+      ),
     );
   }
 

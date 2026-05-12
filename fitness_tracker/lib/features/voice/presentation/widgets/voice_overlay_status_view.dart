@@ -38,7 +38,7 @@ class VoiceOverlayStatusView extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppTheme.surfaceDark,
         border: Border(
-          top: BorderSide(color: AppTheme.borderDark, width: 1),
+          top: BorderSide(color: AppTheme.borderDark),
         ),
       ),
       child: Column(
@@ -288,7 +288,7 @@ class _WorkoutModeRow extends StatelessWidget {
           key: VoiceOverlayKeys.workoutModeToggleKey,
           value: isActive,
           onChanged: (_) => onToggle(),
-          activeColor: AppTheme.primaryOrange,
+          activeThumbColor: AppTheme.primaryOrange,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ],

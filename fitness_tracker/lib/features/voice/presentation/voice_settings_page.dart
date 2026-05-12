@@ -37,10 +37,10 @@ class VoiceSettingsPage extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 32),
             children: <Widget>[
               // ── Wake Word ─────────────────────────────────────────────
-              _SectionHeader(AppStrings.voiceWakeWordSectionTitle),
+              const _SectionHeader(AppStrings.voiceWakeWordSectionTitle),
               _WakeWordPicker(
                 selected: settings.wakeWordPreset,
-                onSelect: (p) => cubit.setWakeWordPreset(p),
+                onSelect: cubit.setWakeWordPreset,
               ),
               const SizedBox(height: 4),
               SwitchListTile(
@@ -55,11 +55,11 @@ class VoiceSettingsPage extends StatelessWidget {
                 ),
                 value: settings.wakeWordArmedInForeground,
                 onChanged: cubit.setWakeWordArmedInForeground,
-                activeColor: AppTheme.primaryOrange,
+                activeThumbColor: AppTheme.primaryOrange,
               ),
 
               // ── Behavior ──────────────────────────────────────────────
-              _SectionHeader(AppStrings.voiceBehaviorSectionTitle),
+              const _SectionHeader(AppStrings.voiceBehaviorSectionTitle),
               SwitchListTile(
                 key: VoiceSettingsPageKeys.sessionLoggingToggleKey,
                 title: const Text(
@@ -72,7 +72,7 @@ class VoiceSettingsPage extends StatelessWidget {
                 ),
                 value: settings.sessionLoggingEnabled,
                 onChanged: cubit.setSessionLoggingEnabled,
-                activeColor: AppTheme.primaryOrange,
+                activeThumbColor: AppTheme.primaryOrange,
               ),
               SwitchListTile(
                 key: VoiceSettingsPageKeys.workoutModeAutoToggleKey,
@@ -86,11 +86,11 @@ class VoiceSettingsPage extends StatelessWidget {
                 ),
                 value: settings.workoutModeAutoEnable,
                 onChanged: cubit.setWorkoutModeAutoEnable,
-                activeColor: AppTheme.primaryOrange,
+                activeThumbColor: AppTheme.primaryOrange,
               ),
 
               // ── Voice Output ──────────────────────────────────────────
-              _SectionHeader(AppStrings.voiceOutputSectionTitle),
+              const _SectionHeader(AppStrings.voiceOutputSectionTitle),
               _SliderTile(
                 key: VoiceSettingsPageKeys.ttsVolumeSliderKey,
                 title: AppStrings.voiceTtsVolumeTitle,
@@ -115,16 +115,15 @@ class VoiceSettingsPage extends StatelessWidget {
               ),
 
               // ── Daily Budget ──────────────────────────────────────────
-              _SectionHeader(AppStrings.voiceBudgetSectionTitle),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              const _SectionHeader(AppStrings.voiceBudgetSectionTitle),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
                       AppStrings.voiceBudgetResetNote,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.textDim,
                         fontSize: 13,
                       ),
@@ -134,7 +133,7 @@ class VoiceSettingsPage extends StatelessWidget {
               ),
 
               // ── Privacy ───────────────────────────────────────────────
-              _SectionHeader(AppStrings.voicePrivacySectionTitle),
+              const _SectionHeader(AppStrings.voicePrivacySectionTitle),
               ListTile(
                 key: VoiceSettingsPageKeys.deleteHistoryButtonKey,
                 leading: const Icon(
@@ -264,41 +263,45 @@ class _WakeWordPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: WakeWordPreset.values.map((preset) {
-        final bool isSelected = preset == selected;
-        return ListTile(
-          key: _tileKey(preset),
-          leading: Radio<WakeWordPreset>(
-            value: preset,
-            groupValue: selected,
-            onChanged: (v) => onSelect(v!),
-            activeColor: AppTheme.primaryOrange,
-          ),
-          title: Text(
-            preset.displayName,
-            style: TextStyle(
-              color: isSelected ? AppTheme.textLight : AppTheme.textMedium,
-              fontWeight:
-                  isSelected ? FontWeight.w600 : FontWeight.normal,
+    return RadioGroup<WakeWordPreset>(
+      groupValue: selected,
+      onChanged: (WakeWordPreset? v) {
+        if (v != null) onSelect(v);
+      },
+      child: Column(
+        children: WakeWordPreset.values.map((WakeWordPreset preset) {
+          final bool isSelected = preset == selected;
+          return ListTile(
+            key: _tileKey(preset),
+            leading: Radio<WakeWordPreset>(
+              value: preset,
+              activeColor: AppTheme.primaryOrange,
             ),
-          ),
-          subtitle: Text(
-            _pronunciation(preset),
-            style: const TextStyle(
+            title: Text(
+              preset.displayName,
+              style: TextStyle(
+                color: isSelected ? AppTheme.textLight : AppTheme.textMedium,
+                fontWeight:
+                    isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            subtitle: Text(
+              _pronunciation(preset),
+              style: const TextStyle(
+                color: AppTheme.textDim,
+                fontSize: 12,
+              ),
+            ),
+            trailing: IconButton(
+              tooltip: AppStrings.voiceWakeWordPreviewTooltip,
+              icon: const Icon(Icons.volume_up_rounded, size: 18),
               color: AppTheme.textDim,
-              fontSize: 12,
+              onPressed: () => _preview(preset),
             ),
-          ),
-          trailing: IconButton(
-            tooltip: AppStrings.voiceWakeWordPreviewTooltip,
-            icon: const Icon(Icons.volume_up_rounded, size: 18),
-            color: AppTheme.textDim,
-            onPressed: () => _preview(preset),
-          ),
-          onTap: () => onSelect(preset),
-        );
-      }).toList(),
+            onTap: () => onSelect(preset),
+          );
+        }).toList(),
+      ),
     );
   }
 

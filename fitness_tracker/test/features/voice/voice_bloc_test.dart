@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
+import 'package:fitness_tracker/core/constants/app_strings.dart';
 import 'package:fitness_tracker/core/enums/auth_mode.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
+import 'package:fitness_tracker/core/network/network_status_service.dart';
+import 'package:fitness_tracker/core/platform/wakelock_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
@@ -17,6 +20,7 @@ import 'package:fitness_tracker/domain/usecases/voice/send_voice_message.dart';
 import 'package:fitness_tracker/features/voice/application/voice_bloc.dart';
 import 'package:fitness_tracker/features/voice/data/services/voice_stt_service.dart';
 import 'package:fitness_tracker/features/voice/data/services/voice_tts_service.dart';
+import 'package:fitness_tracker/features/voice/data/services/voice_wake_word_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -121,6 +125,64 @@ class FakeVoiceSttService implements VoiceSttService {
   }
 }
 
+/// No-op [NetworkStatusService] — the bloc stores it but dispatches
+/// connectivity events via [VoiceConnectivityChanged] (fired by the overlay
+/// page), so the service itself is never called inside the bloc.
+class FakeNetworkStatusService implements NetworkStatusService {
+  @override
+  Future<bool> isNetworkAvailable() async => true;
+
+  @override
+  Stream<bool> get onConnectivityRestored => const Stream.empty();
+
+  @override
+  Stream<bool> get onConnectivityChanged => const Stream.empty();
+}
+
+/// Instrumented [WakelockService] — records how many times enable/disable
+/// were called so tests can assert correct wakelock behaviour.
+class FakeWakelockService implements WakelockService {
+  int enableCount = 0;
+  int disableCount = 0;
+
+  @override
+  Future<void> enable() async => enableCount++;
+
+  @override
+  Future<void> disable() async => disableCount++;
+}
+
+/// Simple [VoiceWakeWordService] fake — the bloc stores it but its lifecycle
+/// (start/stop) is managed by [VoiceFab], not the bloc.
+class FakeVoiceWakeWordService implements VoiceWakeWordService {
+  final StreamController<WakeWordPreset> _detectedController =
+      StreamController<WakeWordPreset>.broadcast();
+  final StreamController<VoiceWakeWordException> _errorController =
+      StreamController<VoiceWakeWordException>.broadcast();
+  bool _running = false;
+
+  @override
+  Stream<WakeWordPreset> get onWakeWordDetected => _detectedController.stream;
+
+  @override
+  Stream<VoiceWakeWordException> get onError => _errorController.stream;
+
+  @override
+  bool get isRunning => _running;
+
+  @override
+  Future<void> start(WakeWordPreset preset) async => _running = true;
+
+  @override
+  Future<void> stop() async => _running = false;
+
+  @override
+  Future<void> dispose() async {
+    await _detectedController.close();
+    await _errorController.close();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -132,6 +194,9 @@ VoiceBloc _makeBloc({
   required AppSettingsRepository appSettingsRepository,
   VoiceTtsService? tts,
   VoiceSttService? stt,
+  NetworkStatusService? networkStatus,
+  VoiceWakeWordService? wakeWord,
+  WakelockService? wakelock,
   VoiceSettings settings = const VoiceSettings.defaults(),
 }) {
   return VoiceBloc(
@@ -142,6 +207,9 @@ VoiceBloc _makeBloc({
     ttsService: tts ?? FakeVoiceTtsService(),
     appSettingsRepository: appSettingsRepository,
     currentVoiceSettings: () => settings,
+    networkStatusService: networkStatus ?? FakeNetworkStatusService(),
+    wakeWordService: wakeWord ?? FakeVoiceWakeWordService(),
+    wakelockService: wakelock ?? FakeWakelockService(),
   );
 }
 
@@ -191,7 +259,7 @@ void main() {
         appSettingsRepository: settingsRepo,
       ),
       act: (bloc) => bloc.add(const VoiceSessionStarted(AppSession.guest())),
-      expect: () => <VoiceState>[
+      expect: () => <Matcher>[
         isA<VoiceState>().having((s) => s.isGuest, 'isGuest', isTrue),
       ],
     );
@@ -233,7 +301,7 @@ void main() {
       ),
       seed: () => const VoiceState(isGuest: true, sessionId: 'sid'),
       act: (bloc) => bloc.add(const VoiceSendMessage('hello')),
-      expect: () => <VoiceState>[
+      expect: () => <Matcher>[
         isA<VoiceState>().having((s) => s.status, 'status', VoiceStatus.error),
       ],
       verify: (_) => verifyNever(
@@ -497,5 +565,265 @@ void main() {
     // if someone re-introduces a `repository: VoiceRepository` param the
     // file won't compile and they'll see the rule next to the error.
     expect(VoiceBloc, isNotNull);
+  });
+
+  // ---------------------------------------------------------------------------
+  // VoiceConnectivityChanged (C-4)
+  // ---------------------------------------------------------------------------
+
+  group('VoiceConnectivityChanged', () {
+    blocTest<VoiceBloc, VoiceState>(
+      'going offline sets isOnline to false',
+      build: () => _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+      ),
+      seed: () => const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: true,
+      ),
+      act: (bloc) => bloc.add(const VoiceConnectivityChanged(isOnline: false)),
+      expect: () => <Matcher>[
+        isA<VoiceState>().having((s) => s.isOnline, 'isOnline', isFalse),
+        // Second emit: hasAnnouncedOfflineThisSession flipped to true
+        isA<VoiceState>()
+            .having((s) => s.isOnline, 'isOnline', isFalse)
+            .having(
+              (s) => s.hasAnnouncedOfflineThisSession,
+              'announced',
+              isTrue,
+            ),
+      ],
+    );
+
+    blocTest<VoiceBloc, VoiceState>(
+      'going online sets isOnline to true without additional state changes',
+      build: () => _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+      ),
+      seed: () => const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: false,
+      ),
+      act: (bloc) => bloc.add(const VoiceConnectivityChanged(isOnline: true)),
+      expect: () => <Matcher>[
+        isA<VoiceState>().having((s) => s.isOnline, 'isOnline', isTrue),
+      ],
+    );
+
+    blocTest<VoiceBloc, VoiceState>(
+      'first offline event triggers TTS announcement',
+      build: () {
+        final tts = FakeVoiceTtsService();
+        return _makeBloc(
+          sendVoiceMessage: sendVoiceMessage,
+          getVoiceBudget: getBudget,
+          deleteVoiceHistory: deleteHistory,
+          appSettingsRepository: settingsRepo,
+          tts: tts,
+        );
+      },
+      seed: () => const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: true,
+        hasAnnouncedOfflineThisSession: false,
+      ),
+      act: (bloc) async {
+        bloc.add(const VoiceConnectivityChanged(isOnline: false));
+        // Let the async speak() call complete.
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      },
+      verify: (bloc) {
+        expect(bloc.state.hasAnnouncedOfflineThisSession, isTrue);
+      },
+    );
+
+    blocTest<VoiceBloc, VoiceState>(
+      'second offline event within same session does NOT repeat announcement',
+      build: () => _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        tts: FakeVoiceTtsService(),
+      ),
+      // Simulate: user was offline, came back online, goes offline again.
+      seed: () => const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: true,
+        hasAnnouncedOfflineThisSession: true, // already announced once
+      ),
+      act: (bloc) async {
+        bloc.add(const VoiceConnectivityChanged(isOnline: false));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      },
+      // Only one emit: isOnline → false. No second emit for announcement.
+      expect: () => <Matcher>[
+        isA<VoiceState>()
+            .having((s) => s.isOnline, 'isOnline', isFalse)
+            .having(
+              (s) => s.hasAnnouncedOfflineThisSession,
+              'announced',
+              isTrue,
+            ),
+      ],
+    );
+
+    blocTest<VoiceBloc, VoiceState>(
+      'duplicate connectivity event is a no-op',
+      build: () => _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+      ),
+      seed: () => const VoiceState(isGuest: false, sessionId: 'sid'),
+      act: (bloc) =>
+          bloc.add(const VoiceConnectivityChanged(isOnline: true)), // already true
+      expect: () => <Matcher>[], // no state changes
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // VoiceWorkoutModeToggled + wakelock (C-4)
+  // ---------------------------------------------------------------------------
+
+  group('VoiceWorkoutModeToggled', () {
+    test('activating workout mode calls wakelock.enable()', () async {
+      final wakelock = FakeWakelockService();
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        wakelock: wakelock,
+      );
+      bloc.add(const VoiceWorkoutModeToggled(active: true));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(wakelock.enableCount, 1);
+      expect(bloc.state.isWorkoutModeActive, isTrue);
+      await bloc.close();
+    });
+
+    test('deactivating workout mode calls wakelock.disable()', () async {
+      final wakelock = FakeWakelockService();
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        wakelock: wakelock,
+      );
+      // Start with workout mode active.
+      bloc.emit(bloc.state.copyWith(isWorkoutModeActive: true));
+      bloc.add(const VoiceWorkoutModeToggled(active: false));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      // close() also calls disable(), so disableCount should be at least 1
+      // from the toggle event (close() adds another after bloc.close()).
+      expect(wakelock.disableCount, greaterThanOrEqualTo(1));
+      expect(bloc.state.isWorkoutModeActive, isFalse);
+      await bloc.close();
+    });
+
+    blocTest<VoiceBloc, VoiceState>(
+      'isWorkoutModeActive is reflected in state',
+      build: () => _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+      ),
+      act: (bloc) {
+        bloc.add(const VoiceWorkoutModeToggled(active: true));
+        bloc.add(const VoiceWorkoutModeToggled(active: false));
+      },
+      expect: () => <Matcher>[
+        isA<VoiceState>()
+            .having((s) => s.isWorkoutModeActive, 'isWorkoutModeActive', isTrue),
+        isA<VoiceState>()
+            .having((s) => s.isWorkoutModeActive, 'isWorkoutModeActive', isFalse),
+      ],
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // close() releases wakelock (C-4)
+  // ---------------------------------------------------------------------------
+
+  test('close() always releases the wakelock', () async {
+    final wakelock = FakeWakelockService();
+    final bloc = _makeBloc(
+      sendVoiceMessage: sendVoiceMessage,
+      getVoiceBudget: getBudget,
+      deleteVoiceHistory: deleteHistory,
+      appSettingsRepository: settingsRepo,
+      wakelock: wakelock,
+    );
+    await bloc.close();
+    expect(wakelock.disableCount, 1);
+  });
+
+  test('close() releases wakelock even when workout mode is active', () async {
+    final wakelock = FakeWakelockService();
+    final bloc = _makeBloc(
+      sendVoiceMessage: sendVoiceMessage,
+      getVoiceBudget: getBudget,
+      deleteVoiceHistory: deleteHistory,
+      appSettingsRepository: settingsRepo,
+      wakelock: wakelock,
+    );
+    // Activate workout mode (calls enable).
+    bloc.add(const VoiceWorkoutModeToggled(active: true));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(wakelock.enableCount, 1);
+    // Closing without explicitly toggling off must still release the lock.
+    await bloc.close();
+    expect(wakelock.disableCount, 1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // TTS spoken error messages (C-4)
+  // ---------------------------------------------------------------------------
+
+  group('Spoken errors', () {
+    FakeVoiceTtsService? sharedTts;
+
+    blocTest<VoiceBloc, VoiceState>(
+      'offline announcement text matches AppStrings constant',
+      build: () {
+        sharedTts = FakeVoiceTtsService();
+        return _makeBloc(
+          sendVoiceMessage: sendVoiceMessage,
+          getVoiceBudget: getBudget,
+          deleteVoiceHistory: deleteHistory,
+          appSettingsRepository: settingsRepo,
+          tts: sharedTts,
+        );
+      },
+      seed: () => const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: true,
+      ),
+      act: (bloc) async {
+        bloc.add(const VoiceConnectivityChanged(isOnline: false));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      },
+      verify: (_) {
+        expect(
+          sharedTts!.lastSpoken,
+          AppStrings.voiceSpokenOfflineAnnouncement,
+        );
+      },
+    );
   });
 }

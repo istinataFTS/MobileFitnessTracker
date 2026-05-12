@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../config/env_config.dart';
 import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../domain/entities/app_settings.dart' show WeightUnit;
@@ -19,7 +20,9 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
 
   SupabaseClient get _supabase => clientProvider.client;
 
-  String get _functionsBaseUrl => _supabase.functionsUrl;
+  /// Edge Functions base URL — constructed from the compile-time Supabase URL
+  /// using the standard Supabase pattern: `$supabaseUrl/functions/v1`.
+  String get _functionsBaseUrl => '${EnvConfig.supabaseUrl}/functions/v1';
 
   Future<String> _bearerToken() async {
     final session = _supabase.auth.currentSession;

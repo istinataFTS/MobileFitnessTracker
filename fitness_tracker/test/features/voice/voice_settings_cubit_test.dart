@@ -1,4 +1,3 @@
-import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/voice_settings.dart';
@@ -40,7 +39,10 @@ void main() {
     test(
         'initial state is derived from AppSettingsCubit.state.settings.voiceSettings',
         () async {
-      const customVoice = VoiceSettings(ttsVoice: TtsVoice.echo);
+      const customVoice = VoiceSettings(
+        wakeWordPreset: WakeWordPreset.trainer,
+        ttsVolume: 0.7,
+      );
       const settings = AppSettings(
         notificationsEnabled: true,
         weekStartDay: WeekStartDay.monday,
@@ -52,11 +54,13 @@ void main() {
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
 
-      final voiceCubit = VoiceSettingsCubit(appCubit);
-      // After _init() fires and AppSettingsCubit is loaded:
+      final voiceCubit =
+          VoiceSettingsCubit(appSettingsCubit: appCubit);
+      // Allow _init() to complete.
       await Future<void>.delayed(Duration.zero);
 
-      expect(voiceCubit.state.ttsVoice, TtsVoice.echo);
+      expect(voiceCubit.state.wakeWordPreset, WakeWordPreset.trainer);
+      expect(voiceCubit.state.ttsVolume, 0.7);
 
       await voiceCubit.close();
       await appCubit.close();
@@ -66,41 +70,9 @@ void main() {
         () async {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
-      final voiceCubit = VoiceSettingsCubit(appCubit);
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
 
-      // Should not throw
-      await voiceCubit.close();
-      await appCubit.close();
-    });
-
-    test('setTtsVoice delegates to AppSettingsCubit', () async {
-      final repo = _stubRepo();
-      final appCubit = _makeAppSettingsCubit(repo);
-      await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appCubit);
-
-      await voiceCubit.setTtsVoice(TtsVoice.shimmer);
-
-      final captured = verify(() => repo.saveSettings(captureAny())).captured;
-      final saved = captured.last as AppSettings;
-      expect(saved.voiceSettings.ttsVoice, TtsVoice.shimmer);
-
-      await voiceCubit.close();
-      await appCubit.close();
-    });
-
-    test('setSessionLogging delegates to AppSettingsCubit', () async {
-      final repo = _stubRepo();
-      final appCubit = _makeAppSettingsCubit(repo);
-      await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appCubit);
-
-      await voiceCubit.setSessionLogging(true);
-
-      final captured = verify(() => repo.saveSettings(captureAny())).captured;
-      final saved = captured.last as AppSettings;
-      expect(saved.voiceSettings.sessionLoggingEnabled, isTrue);
-
+      // Should not throw.
       await voiceCubit.close();
       await appCubit.close();
     });
@@ -109,7 +81,7 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appCubit);
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
 
       await voiceCubit.setWakeWordPreset(WakeWordPreset.trainer);
 
@@ -121,20 +93,68 @@ void main() {
       await appCubit.close();
     });
 
+    test('setSessionLoggingEnabled delegates to AppSettingsCubit', () async {
+      final repo = _stubRepo();
+      final appCubit = _makeAppSettingsCubit(repo);
+      await appCubit.ensureLoaded();
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+
+      await voiceCubit.setSessionLoggingEnabled(true);
+
+      final captured = verify(() => repo.saveSettings(captureAny())).captured;
+      final saved = captured.last as AppSettings;
+      expect(saved.voiceSettings.sessionLoggingEnabled, isTrue);
+
+      await voiceCubit.close();
+      await appCubit.close();
+    });
+
+    test('setTtsVolume delegates to AppSettingsCubit', () async {
+      final repo = _stubRepo();
+      final appCubit = _makeAppSettingsCubit(repo);
+      await appCubit.ensureLoaded();
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+
+      await voiceCubit.setTtsVolume(0.6);
+
+      final captured = verify(() => repo.saveSettings(captureAny())).captured;
+      final saved = captured.last as AppSettings;
+      expect(saved.voiceSettings.ttsVolume, 0.6);
+
+      await voiceCubit.close();
+      await appCubit.close();
+    });
+
+    test('setTtsSpeechRate delegates to AppSettingsCubit', () async {
+      final repo = _stubRepo();
+      final appCubit = _makeAppSettingsCubit(repo);
+      await appCubit.ensureLoaded();
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+
+      await voiceCubit.setTtsSpeechRate(0.9);
+
+      final captured = verify(() => repo.saveSettings(captureAny())).captured;
+      final saved = captured.last as AppSettings;
+      expect(saved.voiceSettings.ttsSpeechRate, 0.9);
+
+      await voiceCubit.close();
+      await appCubit.close();
+    });
+
     test('state does not change when non-voice AppSettings field changes',
         () async {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appCubit);
+      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
 
       final statesBefore = voiceCubit.state;
 
-      // Change a non-voice setting (weightUnit)
+      // Change a non-voice setting.
       await appCubit.setWeightUnit(WeightUnit.pounds);
       await Future<void>.delayed(Duration.zero);
 
-      // VoiceSettingsCubit state should not have emitted a new value
+      // VoiceSettingsCubit state must not have emitted a new value.
       expect(voiceCubit.state, equals(statesBefore));
 
       await voiceCubit.close();

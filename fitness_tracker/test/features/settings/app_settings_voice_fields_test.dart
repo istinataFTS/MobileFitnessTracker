@@ -1,5 +1,4 @@
 import 'package:dartz/dartz.dart';
-import 'package:fitness_tracker/data/repositories/app_settings_repository_impl.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/domain/repositories/app_settings_repository.dart';
@@ -36,8 +35,8 @@ void main() {
       expect(defaults.wakeWordPreset, WakeWordPreset.samoLevski);
     });
 
-    test('ttsVoice defaults to nova', () {
-      expect(defaults.ttsVoice, TtsVoice.nova);
+    test('ttsSpeechRate defaults to 1.0', () {
+      expect(defaults.ttsSpeechRate, 1.0);
     });
 
     test('sessionLoggingEnabled defaults to false', () {
@@ -60,16 +59,16 @@ void main() {
   group('VoiceSettings.copyWith preserves unmodified fields', () {
     const base = VoiceSettings(
       wakeWordPreset: WakeWordPreset.trainer,
-      ttsVoice: TtsVoice.echo,
+      ttsSpeechRate: 1.5,
       sessionLoggingEnabled: true,
       workoutModeAutoEnable: true,
       ttsVolume: 0.5,
       wakeWordArmedInForeground: false,
     );
 
-    test('copying only ttsVoice leaves other fields unchanged', () {
-      final updated = base.copyWith(ttsVoice: TtsVoice.shimmer);
-      expect(updated.ttsVoice, TtsVoice.shimmer);
+    test('copying only ttsSpeechRate leaves other fields unchanged', () {
+      final updated = base.copyWith(ttsSpeechRate: 0.8);
+      expect(updated.ttsSpeechRate, 0.8);
       expect(updated.wakeWordPreset, WakeWordPreset.trainer);
       expect(updated.sessionLoggingEnabled, isTrue);
       expect(updated.workoutModeAutoEnable, isTrue);
@@ -90,9 +89,9 @@ void main() {
 
     test('copyWith updates voiceSettings only', () {
       const settings = AppSettings.defaults();
-      const newVoice = VoiceSettings(ttsVoice: TtsVoice.alloy);
+      const newVoice = VoiceSettings(ttsSpeechRate: 1.5);
       final updated = settings.copyWith(voiceSettings: newVoice);
-      expect(updated.voiceSettings.ttsVoice, TtsVoice.alloy);
+      expect(updated.voiceSettings.ttsSpeechRate, 1.5);
       // Other fields unchanged
       expect(updated.notificationsEnabled, settings.notificationsEnabled);
       expect(updated.weightUnit, settings.weightUnit);
@@ -101,8 +100,7 @@ void main() {
     test('props includes voiceSettings', () {
       const a = AppSettings.defaults();
       final b = a.copyWith(
-        voiceSettings:
-            const VoiceSettings(ttsVoice: TtsVoice.onyx),
+        voiceSettings: const VoiceSettings(ttsSpeechRate: 0.7),
       );
       expect(a, isNot(equals(b)));
     });
@@ -127,18 +125,18 @@ void main() {
 
     tearDown(() => cubit.close());
 
-    test('setVoiceTtsVoice saves updated voiceSettings', () async {
+    test('setVoiceTtsSpeechRate saves updated voiceSettings', () async {
       await cubit.ensureLoaded();
-      await cubit.setVoiceTtsVoice(TtsVoice.echo);
+      await cubit.setVoiceTtsSpeechRate(1.5);
 
       final captured = verify(() => repo.saveSettings(captureAny())).captured;
       final saved = captured.last as AppSettings;
-      expect(saved.voiceSettings.ttsVoice, TtsVoice.echo);
+      expect(saved.voiceSettings.ttsSpeechRate, 1.5);
     });
 
-    test('setVoiceSessionLogging saves updated voiceSettings', () async {
+    test('setVoiceSessionLoggingEnabled saves updated voiceSettings', () async {
       await cubit.ensureLoaded();
-      await cubit.setVoiceSessionLogging(true);
+      await cubit.setVoiceSessionLoggingEnabled(true);
 
       final captured = verify(() => repo.saveSettings(captureAny())).captured;
       final saved = captured.last as AppSettings;
@@ -188,15 +186,8 @@ void main() {
   // -------------------------------------------------------------------------
 
   group('AppSettingsRepositoryImpl.getSettings voice field parsing', () {
-    test('_parseEnum returns fallback for null name', () {
-      // Access via public API: a repo with no stored voice keys returns defaults
-      // (tested indirectly via integration — see manual functional test §8)
-      //
-      // Directly verify the enum parser logic via the public getSettings API
-      // once the datasource is wired. Unit coverage lives in the datasource
-      // mock tests; this group covers the static helper behavior.
+    test('WakeWordPreset enum has the expected 3 values', () {
       expect(WakeWordPreset.values.length, 3);
-      expect(TtsVoice.values.length, 6);
     });
 
     test('ttsVolume parse: valid string "0.75" → 0.75', () {

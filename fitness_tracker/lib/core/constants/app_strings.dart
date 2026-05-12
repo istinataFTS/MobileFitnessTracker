@@ -473,6 +473,24 @@ class AppStrings {
   static const String voiceProfileTileSubtitle =
       'Settings, wake word & daily budget';
 
+  // ── Voice spoken (TTS) error strings ──────────────────────────────────────
+  // Read aloud by device TTS. Keep them natural, brief, and pronounceable.
+  // No markdown, parentheses, or special symbols.
+  static const String voiceSpokenOfflineAnnouncement =
+      "I'm offline right now. I can still listen and speak, "
+      "but I won't understand complex requests.";
+  static const String voiceSpokenNetworkDown =
+      "My network is off. Please check your connection.";
+  static const String voiceSpokenNoSpeech =
+      "Repeat, please — I did not hear anything.";
+  static const String voiceSpokenBudgetExceeded =
+      "I have hit today's voice budget. "
+      "Please try again tomorrow, or use the app directly.";
+  static const String voiceSpokenGenericError =
+      "Something went wrong. Please try again.";
+  static const String voiceSpokenTimeout =
+      "That took too long. Please try again.";
+
   // ── Wake word preset labels ────────────────────────────────────────────────
   static const String wakeWordSamoLevski = 'Samo Levski';
   static const String wakeWordTrainer = 'Trainer';
