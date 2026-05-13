@@ -316,11 +316,17 @@ class _WorkoutHistorySection extends StatelessWidget {
     return Column(
       children: <Widget>[
         for (int i = 0; i < filteredSets.length; i++) ...<Widget>[
-          _WorkoutSetCard(
-            set: filteredSets[i],
-            exercise: exerciseMap[filteredSets[i].exerciseId]!,
-            weightUnit: weightUnit,
-          ),
+          if (exerciseMap.containsKey(filteredSets[i].exerciseId))
+            _WorkoutSetCard(
+              set: filteredSets[i],
+              exercise: exerciseMap[filteredSets[i].exerciseId]!,
+              weightUnit: weightUnit,
+            )
+          else
+            _OrphanedWorkoutSetCard(
+              set: filteredSets[i],
+              weightUnit: weightUnit,
+            ),
           if (i < filteredSets.length - 1) const SizedBox(height: 12),
         ],
       ],
@@ -585,6 +591,97 @@ class _WorkoutSetCard extends StatelessWidget {
         content: Text(
           'Remove ${exercise.name} - ${set.reps} reps @ $displayWeight?',
         ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<HistoryBloc>().add(DeleteSetEvent(set.id));
+              Navigator.pop(dialogContext);
+            },
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Orphaned workout set card (exercise was deleted from library)
+// ---------------------------------------------------------------------------
+
+class _OrphanedWorkoutSetCard extends StatelessWidget {
+  final WorkoutSet set;
+  final WeightUnit weightUnit;
+
+  const _OrphanedWorkoutSetCard({
+    required this.set,
+    required this.weightUnit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayWeight = WeightUnitUtils.formatForDisplay(
+      set.weight,
+      weightUnit,
+    );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.link_off, size: 16, color: AppTheme.textMedium),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Unknown exercise',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textMedium,
+                          fontStyle: FontStyle.italic,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: () => _confirmDelete(context, displayWeight),
+                  tooltip: 'Delete set',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _MetricChip(icon: Icons.repeat, label: '${set.reps} reps'),
+                _MetricChip(icon: Icons.fitness_center, label: displayWeight),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String displayWeight) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title: const Text('Delete Set?'),
+        content: Text('Remove ${set.reps} reps @ $displayWeight?'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
