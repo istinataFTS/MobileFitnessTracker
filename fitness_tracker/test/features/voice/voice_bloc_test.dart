@@ -11,12 +11,20 @@ import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/voice_budget.dart';
+import 'package:fitness_tracker/domain/entities/voice_chat_result.dart';
 import 'package:fitness_tracker/domain/entities/voice_message.dart';
 import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/domain/repositories/app_settings_repository.dart';
+import 'package:fitness_tracker/domain/usecases/exercises/get_all_exercises.dart';
+import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_daily_macros.dart';
+import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import 'package:fitness_tracker/domain/usecases/voice/delete_voice_history.dart';
 import 'package:fitness_tracker/domain/usecases/voice/get_voice_budget.dart';
 import 'package:fitness_tracker/domain/usecases/voice/send_voice_message.dart';
+import 'package:fitness_tracker/domain/usecases/workout_sets/get_sets_by_date_range.dart';
+import 'package:fitness_tracker/domain/usecases/workout_sets/get_weekly_sets.dart';
+import 'package:fitness_tracker/features/history/history.dart';
+import 'package:fitness_tracker/features/log/log.dart';
 import 'package:fitness_tracker/features/voice/application/voice_bloc.dart';
 import 'package:fitness_tracker/features/voice/data/services/voice_stt_service.dart';
 import 'package:fitness_tracker/features/voice/data/services/voice_tts_service.dart';
@@ -34,8 +42,28 @@ class MockGetVoiceBudget extends Mock implements GetVoiceBudget {}
 
 class MockDeleteVoiceHistory extends Mock implements DeleteVoiceHistory {}
 
-class MockAppSettingsRepository extends Mock
-    implements AppSettingsRepository {}
+class MockAppSettingsRepository extends Mock implements AppSettingsRepository {}
+
+// C-5 mocks — target blocs and query use cases
+class MockWorkoutBloc extends MockBloc<WorkoutEvent, WorkoutState>
+    implements WorkoutBloc {}
+
+class MockNutritionLogBloc
+    extends MockBloc<NutritionLogEvent, NutritionLogState>
+    implements NutritionLogBloc {}
+
+class MockHistoryBloc extends MockBloc<HistoryEvent, HistoryState>
+    implements HistoryBloc {}
+
+class MockGetSetsByDateRange extends Mock implements GetSetsByDateRange {}
+
+class MockGetDailyMacros extends Mock implements GetDailyMacros {}
+
+class MockGetWeeklySets extends Mock implements GetWeeklySets {}
+
+class MockGetAllExercises extends Mock implements GetAllExercises {}
+
+class MockGetLogsForDate extends Mock implements GetLogsForDate {}
 
 class FakeVoiceTtsService implements VoiceTtsService {
   int speakCount = 0;
@@ -184,6 +212,43 @@ class FakeVoiceWakeWordService implements VoiceWakeWordService {
 }
 
 // ---------------------------------------------------------------------------
+// C-5 default stub factories — return empty results so existing tests are unaffected
+// ---------------------------------------------------------------------------
+
+GetAllExercises _defaultGetAllExercises() {
+  final m = MockGetAllExercises();
+  when(() => m()).thenAnswer((_) async => const Right([]));
+  return m;
+}
+
+GetSetsByDateRange _defaultGetSetsByDateRange() {
+  final m = MockGetSetsByDateRange();
+  when(() => m(
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        muscleGroup: any(named: 'muscleGroup'),
+      )).thenAnswer((_) async => const Right([]));
+  return m;
+}
+
+GetDailyMacros _defaultGetDailyMacros() {
+  final m = MockGetDailyMacros();
+  when(() => m(any())).thenAnswer((_) async => const Right({}));
+  return m;
+}
+
+GetWeeklySets _defaultGetWeeklySets() {
+  final m = MockGetWeeklySets();
+  return m;
+}
+
+GetLogsForDate _defaultGetLogsForDate() {
+  final m = MockGetLogsForDate();
+  when(() => m(any())).thenAnswer((_) async => const Right([]));
+  return m;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -198,6 +263,15 @@ VoiceBloc _makeBloc({
   VoiceWakeWordService? wakeWord,
   WakelockService? wakelock,
   VoiceSettings settings = const VoiceSettings.defaults(),
+  // C-5 params — optional so existing tests remain unchanged
+  WorkoutBloc? workoutBloc,
+  NutritionLogBloc? nutritionLogBloc,
+  HistoryBloc? historyBloc,
+  GetSetsByDateRange? getSetsByDateRange,
+  GetDailyMacros? getDailyMacros,
+  GetWeeklySets? getWeeklySets,
+  GetAllExercises? getAllExercises,
+  GetLogsForDate? getLogsForDate,
 }) {
   return VoiceBloc(
     sendVoiceMessage: sendVoiceMessage,
@@ -210,6 +284,14 @@ VoiceBloc _makeBloc({
     networkStatusService: networkStatus ?? FakeNetworkStatusService(),
     wakeWordService: wakeWord ?? FakeVoiceWakeWordService(),
     wakelockService: wakelock ?? FakeWakelockService(),
+    workoutBloc: workoutBloc ?? MockWorkoutBloc(),
+    nutritionLogBloc: nutritionLogBloc ?? MockNutritionLogBloc(),
+    historyBloc: historyBloc ?? MockHistoryBloc(),
+    getSetsByDateRange: getSetsByDateRange ?? _defaultGetSetsByDateRange(),
+    getDailyMacros: getDailyMacros ?? _defaultGetDailyMacros(),
+    getWeeklySets: getWeeklySets ?? _defaultGetWeeklySets(),
+    getAllExercises: getAllExercises ?? _defaultGetAllExercises(),
+    getLogsForDate: getLogsForDate ?? _defaultGetLogsForDate(),
   );
 }
 
@@ -219,11 +301,16 @@ VoiceMessage _assistantMsg(String content) => VoiceMessage(
       createdAt: DateTime(2026),
     );
 
+VoiceChatResult _assistantResult(String content) =>
+    VoiceChatTextResponse(message: _assistantMsg(content));
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const VoiceSettings.defaults());
     registerFallbackValue(WeightUnit.kilograms);
     registerFallbackValue(<VoiceMessage>[]);
+    // C-5: fallback values for use-case named params
+    registerFallbackValue(DateTime(2026));
   });
 
   late MockSendVoiceMessage sendVoiceMessage;
@@ -324,7 +411,9 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: any(named: 'weightUnit'),
-            )).thenAnswer((_) async => Right(_assistantMsg('Got it!')));
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
+            )).thenAnswer((_) async => Right(_assistantResult('Got it!')));
         return _makeBloc(
           sendVoiceMessage: sendVoiceMessage,
           getVoiceBudget: getBudget,
@@ -353,6 +442,8 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: any(named: 'weightUnit'),
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
             )).thenAnswer(
           (_) async => const Left(ServerFailure('Rate limited')),
         );
@@ -391,7 +482,9 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: any(named: 'weightUnit'),
-            )).thenAnswer((_) async => Right(_assistantMsg('ok')));
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
+            )).thenAnswer((_) async => Right(_assistantResult('ok')));
         return _makeBloc(
           sendVoiceMessage: sendVoiceMessage,
           getVoiceBudget: getBudget,
@@ -408,6 +501,8 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: captureAny(named: 'weightUnit'),
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
             )).captured;
         expect(captured.single, WeightUnit.pounds);
       },
@@ -443,7 +538,9 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: any(named: 'weightUnit'),
-            )).thenAnswer((_) async => Right(_assistantMsg('confirmed')));
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
+            )).thenAnswer((_) async => Right(_assistantResult('confirmed')));
         return _makeBloc(
           sendVoiceMessage: sendVoiceMessage,
           getVoiceBudget: getBudget,
@@ -468,6 +565,8 @@ void main() {
               history: any(named: 'history'),
               settings: any(named: 'settings'),
               weightUnit: any(named: 'weightUnit'),
+              recentSets: any(named: 'recentSets'),
+              recentNutritionLogs: any(named: 'recentNutritionLogs'),
             )).called(1);
       },
     );
