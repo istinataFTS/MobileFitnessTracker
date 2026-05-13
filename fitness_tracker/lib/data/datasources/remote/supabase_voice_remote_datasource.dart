@@ -8,8 +8,11 @@ import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../domain/entities/app_settings.dart' show WeightUnit;
 import '../../../domain/entities/voice_budget.dart';
+import '../../../domain/entities/voice_chat_context.dart';
+import '../../../domain/entities/voice_chat_result.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
+import '../../../domain/entities/voice_tool_call.dart';
 import 'supabase_client_provider.dart';
 import 'voice_remote_datasource.dart';
 
@@ -35,22 +38,29 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<VoiceMessage> chat({
+  Future<VoiceChatResult> chat({
     required String userMessage,
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
     required WeightUnit weightUnit,
+    List<RecentSetContext>? recentSets,
+    List<RecentNutritionLogContext>? recentNutritionLogs,
   }) async {
     final token = await _bearerToken();
     final uri = Uri.parse('$_functionsBaseUrl/voice-chat');
 
-    final historyJson = history
-        .map((m) => <String, String>{
-              'role': m.role == VoiceRole.user ? 'user' : 'assistant',
-              'content': m.content,
-            })
-        .toList();
+    final body = <String, dynamic>{
+      'session_id': sessionId,
+      'user_message': userMessage,
+      'history': _serializeHistory(history),
+      'context': _buildContext(
+        weightUnit: weightUnit,
+        recentSets: recentSets,
+        recentNutritionLogs: recentNutritionLogs,
+      ),
+      'session_logging_enabled': settings.sessionLoggingEnabled,
+    };
 
     final response = await http.post(
       uri,
@@ -58,18 +68,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(<String, dynamic>{
-        'session_id': sessionId,
-        'user_message': userMessage,
-        'history': historyJson,
-        'context': <String, dynamic>{
-          // Explicit mapping at the boundary — never `weightUnit.name`,
-          // which would emit 'kilograms' / 'pounds'. The Edge Function
-          // expects the short codes 'kg' / 'lb'.
-          'weight_unit': _weightUnitCode(weightUnit),
-        },
-        'session_logging_enabled': settings.sessionLoggingEnabled,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode != 200) {
@@ -77,25 +76,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final kind = json['kind'] as String?;
-
-    if (kind == 'tool_call') {
-      // Surface tool-call results as a readable assistant message for now.
-      // C-5 (Brain) will handle proper tool dispatch.
-      final toolCall = json['tool_call'] as Map<String, dynamic>? ?? <String, dynamic>{};
-      final toolName = toolCall['name'] as String? ?? 'action';
-      return VoiceMessage(
-        role: VoiceRole.assistant,
-        content: '[tool: $toolName]',
-        createdAt: DateTime.now(),
-      );
-    }
-
-    return VoiceMessage(
-      role: VoiceRole.assistant,
-      content: json['message'] as String? ?? '',
-      createdAt: DateTime.now(),
-    );
+    return _parseResult(json);
   }
 
   // ---------------------------------------------------------------------------
@@ -142,8 +123,170 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
   }
 
   // ---------------------------------------------------------------------------
+  // Context builder
+  // ---------------------------------------------------------------------------
+
+  Map<String, dynamic> _buildContext({
+    required WeightUnit weightUnit,
+    List<RecentSetContext>? recentSets,
+    List<RecentNutritionLogContext>? recentNutritionLogs,
+  }) {
+    final now = DateTime.now();
+    final currentDate = _formatDate(now);
+
+    return <String, dynamic>{
+      'current_date': currentDate,
+      'weight_unit': _weightUnitCode(weightUnit),
+      'recent_sets': recentSets
+              ?.map((s) => <String, dynamic>{
+                    'set_id': s.setId,
+                    'exercise_name': s.exerciseName,
+                    'weight': s.weight,
+                    'reps': s.reps,
+                    'intensity': s.intensity,
+                    'date': _formatDate(s.date),
+                  })
+              .toList() ??
+          <dynamic>[],
+      'recent_nutrition_logs': recentNutritionLogs
+              ?.map((l) => <String, dynamic>{
+                    'log_id': l.logId,
+                    'meal_name': l.mealName,
+                    'calories': l.calories,
+                    'date': _formatDate(l.date),
+                  })
+              .toList() ??
+          <dynamic>[],
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Result parser
+  // ---------------------------------------------------------------------------
+
+  VoiceChatResult _parseResult(Map<String, dynamic> json) {
+    final kind = json['kind'] as String?;
+
+    if (kind == 'tool_call') {
+      final tc = json['tool_call'] as Map<String, dynamic>? ?? <String, dynamic>{};
+      final toolName = tc['name'] as String? ?? '';
+      final toolCallId = tc['id'] as String? ?? '';
+      final args = (tc['arguments'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+
+      // clarify → plain text spoken question
+      if (toolName == 'clarify') {
+        final question = args['question'] as String? ?? '';
+        return VoiceChatTextResponse(
+          message: VoiceMessage(
+            role: VoiceRole.assistant,
+            content: question,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+
+      // Query tools → client executes locally, no confirmation card
+      const queryTools = <String>{'getWeeklyVolume', 'getDailyMacros', 'getRecentSets'};
+      if (queryTools.contains(toolName)) {
+        return VoiceChatQueryCall(
+          toolCallId: toolCallId,
+          toolName: toolName,
+          args: args,
+        );
+      }
+
+      // Mutation tools → show confirmation card
+      final displaySummary = _buildDisplaySummary(toolName, args);
+      return VoiceChatMutationCall(
+        toolCall: VoiceToolCall(
+          id: toolCallId,
+          toolName: toolName,
+          displaySummary: displaySummary,
+          args: args,
+        ),
+      );
+    }
+
+    // Plain text message
+    return VoiceChatTextResponse(
+      message: VoiceMessage(
+        role: VoiceRole.assistant,
+        content: json['content'] as String? ?? json['message'] as String? ?? '',
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Display summary builder
+  // ---------------------------------------------------------------------------
+
+  /// Builds the human-readable summary shown on [VoiceConfirmationCard].
+  /// Built from LLM-provided args only — never issues a DB read.
+  /// Falls back to the tool name if args are incomplete (defensive).
+  String _buildDisplaySummary(String toolName, Map<String, dynamic> args) {
+    switch (toolName) {
+      case 'logWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'Exercise';
+        final weight = args['weight'] as num? ?? 0;
+        final reps = args['reps'] as num? ?? 0;
+        return 'Log: $exercise — $weight × $reps reps';
+
+      case 'editWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'set';
+        final parts = <String>[];
+        if (args['reps'] != null) parts.add('reps: ${args['reps']}');
+        if (args['weight'] != null) parts.add('weight: ${args['weight']}');
+        if (args['intensity'] != null) parts.add('intensity: ${args['intensity']}');
+        final changes = parts.isEmpty ? 'no changes' : parts.join(', ');
+        return 'Edit: $exercise ($changes)';
+
+      case 'deleteWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'set';
+        return 'Delete: $exercise set';
+
+      case 'logNutrition':
+        final meal = args['mealName'] as String? ?? 'Meal';
+        final cals = args['calories'] as num?;
+        final grams = args['gramsConsumed'] as num?;
+        if (grams != null) return 'Log: $meal — ${grams}g';
+        if (cals != null) return 'Log: $meal — $cals kcal';
+        return 'Log: $meal';
+
+      case 'editNutritionLog':
+        final meal = args['mealName'] as String? ?? 'nutrition log';
+        return 'Edit: $meal';
+
+      case 'deleteNutritionLog':
+        final meal = args['mealName'] as String? ?? 'nutrition log';
+        return 'Delete: $meal';
+
+      default:
+        return toolName;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // History serializer
+  // ---------------------------------------------------------------------------
+
+  List<Map<String, String>> _serializeHistory(List<VoiceMessage> history) {
+    return history
+        .map((m) => <String, String>{
+              'role': m.role == VoiceRole.user ? 'user' : 'assistant',
+              'content': m.content,
+            })
+        .toList();
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  String _formatDate(DateTime dt) =>
+      '${dt.year.toString().padLeft(4, '0')}-'
+      '${dt.month.toString().padLeft(2, '0')}-'
+      '${dt.day.toString().padLeft(2, '0')}';
 
   /// Maps the in-app [WeightUnit] enum to the short code the Edge
   /// Function's system prompt expects. This is the **only** place in
