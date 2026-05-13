@@ -59,8 +59,8 @@ class AuthSessionShell extends StatelessWidget {
           key: ValueKey<String>(sessionKey),
           child: MultiBlocProvider(
             providers: <BlocProvider<dynamic>>[
-              BlocProvider<WorkoutBloc>(
-                create: (_) => di.sl<WorkoutBloc>(),
+              BlocProvider<WorkoutBloc>.value(
+                value: di.sl<WorkoutBloc>(),
               ),
               BlocProvider<HomeBloc>(
                 create: (_) => di.sl<HomeBloc>(),
@@ -71,14 +71,14 @@ class AuthSessionShell extends StatelessWidget {
               BlocProvider<ExerciseBloc>(
                 create: (_) => di.sl<ExerciseBloc>(),
               ),
-              BlocProvider<HistoryBloc>(
-                create: (_) => di.sl<HistoryBloc>(),
+              BlocProvider<HistoryBloc>.value(
+                value: di.sl<HistoryBloc>(),
               ),
               BlocProvider<MealBloc>(
                 create: (_) => di.sl<MealBloc>(),
               ),
-              BlocProvider<NutritionLogBloc>(
-                create: (_) => di.sl<NutritionLogBloc>(),
+              BlocProvider<NutritionLogBloc>.value(
+                value: di.sl<NutritionLogBloc>(),
               ),
               BlocProvider<VoiceBloc>(
                 create: (_) => di.sl<VoiceBloc>(),

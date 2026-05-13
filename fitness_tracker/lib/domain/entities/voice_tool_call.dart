@@ -11,10 +11,15 @@ import 'package:equatable/equatable.dart';
 /// dispatches to the appropriate existing bloc (C-5's responsibility).
 class VoiceToolCall extends Equatable {
   const VoiceToolCall({
+    required this.id,
     required this.toolName,
     required this.displaySummary,
     required this.args,
   });
+
+  /// OpenAI tool_call identifier (e.g. `'call_abc123'`).
+  /// Used for future multi-turn correlation and testing.
+  final String id;
 
   /// Internal tool identifier returned by the LLM, e.g. `'logWorkoutSet'`.
   /// C-5 reads this to pick the right dispatch target.
@@ -29,5 +34,5 @@ class VoiceToolCall extends Equatable {
   final Map<String, dynamic> args;
 
   @override
-  List<Object?> get props => <Object?>[toolName, displaySummary, args];
+  List<Object?> get props => <Object?>[id, toolName, displaySummary, args];
 }

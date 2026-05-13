@@ -215,16 +215,24 @@ Deno.test('voice-chat: happy path → message response with kind=message', async
   }
 });
 
-Deno.test('voice-chat: echo tool call path produces kind=tool_call', async () => {
-  mockChatToolCall('echo', { text: 'hello' });
+Deno.test('voice-chat: logWorkoutSet tool call path produces correct toolCall fields', async () => {
+  const logArgs = {
+    exerciseName: 'Bench Press',
+    exerciseId: 'ex-1',
+    reps: 8,
+    weight: 80,
+    intensity: 3,
+    date: '2026-05-13',
+  };
+  mockChatToolCall('logWorkoutSet', logArgs);
   try {
     const { completeChat } = await import('../_shared/openai.ts');
     const result = await completeChat({
-      history: [{ role: 'user', content: 'test echo' }],
-      tools: [{ type: 'function', function: { name: 'echo', description: 'echoes', parameters: {} } }],
+      history: [{ role: 'user', content: 'log bench press 80 kg 8 reps' }],
+      tools: [{ type: 'function', function: { name: 'logWorkoutSet', description: 'log a set', parameters: {} } }],
     });
-    assertEquals(result.toolCall?.name, 'echo');
-    assertEquals(result.toolCall?.arguments, { text: 'hello' });
+    assertEquals(result.toolCall?.name, 'logWorkoutSet');
+    assertEquals(result.toolCall?.arguments, logArgs);
     assertEquals(result.message, undefined);
   } finally {
     _setFetch(REAL_FETCH);
@@ -303,4 +311,71 @@ Deno.test('sanitizeHistory: silently drops null / non-object entries', () => {
   const result = sanitizeHistory([null, 'a string', 42, { role: 'user', content: 'ok' }]);
   assertEquals(result.length, 1);
   assertEquals(result[0].content, 'ok');
+});
+
+// ---------------------------------------------------------------------------
+// buildSystemPrompt — all 4 placeholders are replaced
+// ---------------------------------------------------------------------------
+
+const { buildSystemPrompt } = await import('./index.ts');
+
+Deno.test('buildSystemPrompt: fills {{current_date}} placeholder', () => {
+  const prompt = buildSystemPrompt({
+    currentDate: '2026-05-13',
+    weightUnit: 'kg',
+    recentSets: [],
+    recentNutritionLogs: [],
+  });
+  assertEquals(prompt.includes('2026-05-13'), true);
+  assertEquals(prompt.includes('{{current_date}}'), false);
+});
+
+Deno.test('buildSystemPrompt: fills {{weight_unit}} placeholder', () => {
+  const prompt = buildSystemPrompt({
+    currentDate: '2026-05-13',
+    weightUnit: 'lb',
+    recentSets: [],
+    recentNutritionLogs: [],
+  });
+  assertEquals(prompt.includes('lb'), true);
+  assertEquals(prompt.includes('{{weight_unit}}'), false);
+});
+
+Deno.test('buildSystemPrompt: fills {{recent_sets}} with formatted set data', () => {
+  const prompt = buildSystemPrompt({
+    currentDate: '2026-05-13',
+    weightUnit: 'kg',
+    recentSets: [
+      { setId: 'set-1', exerciseName: 'Squat', weight: 100, reps: 5, intensity: 4, date: '2026-05-13' },
+    ],
+    recentNutritionLogs: [],
+  });
+  assertEquals(prompt.includes('Squat'), true);
+  assertEquals(prompt.includes('set-1'), true);
+  assertEquals(prompt.includes('{{recent_sets}}'), false);
+});
+
+Deno.test('buildSystemPrompt: fills {{recent_nutrition_logs}} with formatted log data', () => {
+  const prompt = buildSystemPrompt({
+    currentDate: '2026-05-13',
+    weightUnit: 'kg',
+    recentSets: [],
+    recentNutritionLogs: [
+      { logId: 'log-1', mealName: 'Chicken', calories: 350, date: '2026-05-13' },
+    ],
+  });
+  assertEquals(prompt.includes('Chicken'), true);
+  assertEquals(prompt.includes('log-1'), true);
+  assertEquals(prompt.includes('{{recent_nutrition_logs}}'), false);
+});
+
+Deno.test('buildSystemPrompt: empty recent data shows fallback text, no raw placeholders', () => {
+  const prompt = buildSystemPrompt({
+    currentDate: '2026-05-13',
+    weightUnit: 'kg',
+    recentSets: [],
+    recentNutritionLogs: [],
+  });
+  assertEquals(prompt.includes('None logged yet.'), true);
+  assertEquals(prompt.includes('{{'), false);
 });

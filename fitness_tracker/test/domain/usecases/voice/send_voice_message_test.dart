@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/core/errors/failures.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/voice_chat_result.dart';
 import 'package:fitness_tracker/domain/entities/voice_message.dart';
 import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/domain/repositories/voice_repository.dart';
@@ -31,6 +32,7 @@ void main() {
       content: 'Got it!',
       createdAt: DateTime(2026),
     );
+    final assistantResult = VoiceChatTextResponse(message: assistantMsg);
 
     test('delegates to repository.chat with correct parameters', () async {
       when(() => repo.chat(
@@ -39,7 +41,7 @@ void main() {
             history: const <VoiceMessage>[],
             settings: const VoiceSettings.defaults(),
             weightUnit: WeightUnit.kilograms,
-          )).thenAnswer((_) async => Right(assistantMsg));
+          )).thenAnswer((_) async => Right(assistantResult));
 
       final result = await useCase(
         userMessage: 'bench press',
@@ -49,7 +51,7 @@ void main() {
         weightUnit: WeightUnit.kilograms,
       );
 
-      expect(result, Right<Failure, VoiceMessage>(assistantMsg));
+      expect(result, Right<Failure, VoiceChatResult>(assistantResult));
     });
 
     test('passes weightUnit through to repository', () async {
@@ -59,7 +61,7 @@ void main() {
             history: any(named: 'history'),
             settings: any(named: 'settings'),
             weightUnit: WeightUnit.pounds,
-          )).thenAnswer((_) async => Right(assistantMsg));
+          )).thenAnswer((_) async => Right(assistantResult));
 
       await useCase(
         userMessage: 'log 200lb squat',

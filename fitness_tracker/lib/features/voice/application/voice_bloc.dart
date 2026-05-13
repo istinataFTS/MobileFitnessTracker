@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_strings.dart';
+import '../../../core/constants/muscle_stimulus_constants.dart';
 import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
@@ -12,14 +13,27 @@ import '../../../core/network/network_status_service.dart';
 import '../../../core/platform/wakelock_service.dart';
 import '../../../domain/entities/app_session.dart';
 import '../../../domain/entities/app_settings.dart' show WeightUnit;
+import '../../../domain/entities/exercise.dart';
+import '../../../domain/entities/nutrition_log.dart';
 import '../../../domain/entities/voice_budget.dart';
+import '../../../domain/entities/voice_chat_context.dart';
+import '../../../domain/entities/voice_chat_result.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
 import '../../../domain/entities/voice_tool_call.dart';
+import '../../../domain/entities/workout_set.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
+import '../../../domain/usecases/exercises/get_all_exercises.dart';
+import '../../../domain/usecases/nutrition_logs/get_daily_macros.dart';
+import '../../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../../domain/usecases/voice/delete_voice_history.dart';
 import '../../../domain/usecases/voice/get_voice_budget.dart';
 import '../../../domain/usecases/voice/send_voice_message.dart';
+import '../../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
+import '../../../domain/usecases/workout_sets/get_weekly_sets.dart';
+import '../../../features/history/history.dart';
+import '../../../features/log/application/nutrition_log_bloc.dart';
+import '../../../features/log/application/workout_bloc.dart';
 import '../data/services/voice_stt_service.dart';
 import '../data/services/voice_tts_service.dart';
 import '../data/services/voice_wake_word_service.dart';
@@ -124,7 +138,6 @@ class VoicePendingConfirmationSet extends VoiceEvent {
 }
 
 /// User tapped "Yes, do it" on the confirmation card.
-/// C-5 replaces the stub handler with real bloc dispatch.
 class VoiceConfirmationAccepted extends VoiceEvent {
   const VoiceConfirmationAccepted();
 }
@@ -214,8 +227,6 @@ class VoiceState extends Equatable {
 
   /// Non-null when the LLM returned a tool call awaiting confirmation.
   /// C-3 renders [VoiceConfirmationCard] while this is set.
-  /// C-5 populates it via [VoicePendingConfirmationSet]; until then
-  /// it remains null and the card is hidden.
   final VoiceToolCall? pendingConfirmation;
 
   /// True when the user has activated Workout Mode in the overlay.
@@ -301,6 +312,11 @@ class VoiceState extends Equatable {
 /// Plugin packages (`speech_to_text`, `flutter_tts`, `porcupine_flutter`,
 /// `wakelock_plus`) are never imported here — they live only in their
 /// respective service implementations.
+///
+/// **Mutation dispatch rule (C-5):** tool confirmation dispatches events to
+/// [WorkoutBloc], [NutritionLogBloc], or [HistoryBloc]. Never to a repository
+/// or use case directly — bypassing the bloc layer would skip refresh side
+/// effects and sync-coordinator triggers.
 class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   VoiceBloc({
     required SendVoiceMessage sendVoiceMessage,
@@ -313,6 +329,16 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     required NetworkStatusService networkStatusService,
     required VoiceWakeWordService wakeWordService,
     required WakelockService wakelockService,
+    // C-5: mutation dispatch targets
+    required WorkoutBloc workoutBloc,
+    required NutritionLogBloc nutritionLogBloc,
+    required HistoryBloc historyBloc,
+    // C-5: query execution use cases
+    required GetSetsByDateRange getSetsByDateRange,
+    required GetDailyMacros getDailyMacros,
+    required GetWeeklySets getWeeklySets,
+    required GetAllExercises getAllExercises,
+    required GetLogsForDate getLogsForDate,
   })  : _sendVoiceMessage = sendVoiceMessage,
         _getVoiceBudget = getVoiceBudget,
         _deleteVoiceHistory = deleteVoiceHistory,
@@ -323,6 +349,15 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         _networkStatusService = networkStatusService,
         _wakeWordService = wakeWordService,
         _wakelock = wakelockService,
+        _workoutBloc = workoutBloc,
+        _nutritionLogBloc = nutritionLogBloc,
+        _historyBloc = historyBloc,
+        _getSetsByDateRange = getSetsByDateRange,
+        _getDailyMacros = getDailyMacros,
+        // ignore: unused_field
+        _getWeeklySets = getWeeklySets,
+        _getAllExercises = getAllExercises,
+        _getLogsForDate = getLogsForDate,
         super(const VoiceState()) {
     on<VoiceSessionStarted>(_onSessionStarted);
     on<VoiceListenRequested>(_onListenRequested);
@@ -368,6 +403,26 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
   final WakelockService _wakelock;
 
+  // C-5: mutation dispatch targets (singleton blocs shared with the app shell)
+  final WorkoutBloc _workoutBloc;
+  final NutritionLogBloc _nutritionLogBloc;
+  final HistoryBloc _historyBloc;
+
+  // C-5: query execution use cases
+  final GetSetsByDateRange _getSetsByDateRange;
+  final GetDailyMacros _getDailyMacros;
+  // ignore: unused_field
+  final GetWeeklySets _getWeeklySets;
+  final GetAllExercises _getAllExercises;
+  final GetLogsForDate _getLogsForDate;
+
+  // C-5: exercise cache for name-to-ID resolution; refreshed lazily once per session
+  List<Exercise> _cachedExercises = <Exercise>[];
+
+  // C-5: recent-entity caches populated by _buildRecentContext; used for edit/delete lookups
+  List<WorkoutSet> _cachedWorkoutSets = <WorkoutSet>[];
+  List<NutritionLog> _cachedNutritionLogs = <NutritionLog>[];
+
   StreamSubscription<VoiceSttResult>? _sttSubscription;
 
   // ---------------------------------------------------------------------------
@@ -377,6 +432,10 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   void _onSessionStarted(VoiceSessionStarted event, Emitter<VoiceState> emit) {
     final isGuest = !event.session.isAuthenticated;
     final sessionId = isGuest ? null : _uuid.v4();
+    // Reset per-session caches on new session
+    _cachedExercises = <Exercise>[];
+    _cachedWorkoutSets = <WorkoutSet>[];
+    _cachedNutritionLogs = <NutritionLog>[];
     emit(state.copyWith(
       isGuest: isGuest,
       sessionId: sessionId,
@@ -528,6 +587,9 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
     final weightUnit = await _readWeightUnit();
 
+    // Build extended context (recent sets + nutrition logs for edit/delete IDs)
+    final (recentSets, recentLogs) = await _buildRecentContext();
+
     final history = _trimHistory(updatedMessages);
     final chatResult = await _sendVoiceMessage(
       userMessage: event.text,
@@ -535,6 +597,8 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       history: history,
       settings: _currentVoiceSettings(),
       weightUnit: weightUnit,
+      recentSets: recentSets,
+      recentNutritionLogs: recentLogs,
     );
 
     await chatResult.fold(
@@ -548,20 +612,36 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
           unawaited(_speak(spokenMessage));
         }
       },
-      (assistantMsg) async {
-        final withReply = <VoiceMessage>[...updatedMessages, assistantMsg];
-        emit(state.copyWith(
-          status: VoiceStatus.speaking,
-          messages: withReply,
-        ));
+      (result) async {
+        switch (result) {
+          case VoiceChatTextResponse(:final message):
+            final withReply = <VoiceMessage>[...updatedMessages, message];
+            emit(state.copyWith(status: VoiceStatus.speaking, messages: withReply));
+            await _speak(message.content);
+            emit(state.copyWith(status: VoiceStatus.idle));
+            _refreshBudget();
 
-        await _speak(assistantMsg.content);
+          case VoiceChatMutationCall(:final toolCall):
+            // Don't add to messages yet; the confirmation card drives the next step.
+            emit(state.copyWith(
+              status: VoiceStatus.idle,
+              messages: updatedMessages,
+            ));
+            add(VoicePendingConfirmationSet(toolCall));
 
-        emit(state.copyWith(
-          status: VoiceStatus.idle,
-          messages: withReply,
-        ));
-        _refreshBudget();
+          case VoiceChatQueryCall(:final toolName, :final args):
+            final spoken = await _executeQueryTool(toolName, args);
+            final assistantMsg = VoiceMessage(
+              role: VoiceRole.assistant,
+              content: spoken,
+              createdAt: DateTime.now(),
+            );
+            final withReply = <VoiceMessage>[...updatedMessages, assistantMsg];
+            emit(state.copyWith(status: VoiceStatus.speaking, messages: withReply));
+            await _speak(spoken);
+            emit(state.copyWith(status: VoiceStatus.idle));
+            _refreshBudget();
+        }
       },
     );
   }
@@ -596,6 +676,443 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       // (kg) rather than failing the chat call.
       (_) => WeightUnit.kilograms,
       (settings) => settings.weightUnit,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Recent context builder
+  // ---------------------------------------------------------------------------
+
+  /// Fetches the last 5 workout sets (past 7 days) and last 5 nutrition logs
+  /// (today) for use as edit/delete context. Caches raw entities for lookup.
+  /// Errors are swallowed — empty context is acceptable; the LLM simply
+  /// won't propose edit/delete for unknown rows.
+  Future<(List<RecentSetContext>, List<RecentNutritionLogContext>)>
+      _buildRecentContext() async {
+    try {
+      // Exercise cache — refresh lazily once per session
+      if (_cachedExercises.isEmpty) {
+        final exResult = await _getAllExercises();
+        _cachedExercises =
+            exResult.fold((_) => <Exercise>[], (list) => list);
+      }
+
+      final exerciseMap = <String, String>{
+        for (final e in _cachedExercises) e.id: e.name,
+      };
+
+      // Last 5 workout sets from the past 7 days
+      final setsResult = await _getSetsByDateRange(
+        startDate: DateTime.now().subtract(const Duration(days: 7)),
+        endDate: DateTime.now(),
+      );
+      final rawSets = setsResult.fold((_) => <WorkoutSet>[], (s) => s);
+      _cachedWorkoutSets = rawSets.take(5).toList();
+
+      final recentSets = _cachedWorkoutSets
+          .map((s) => RecentSetContext(
+                setId: s.id,
+                exerciseName: exerciseMap[s.exerciseId] ?? s.exerciseId,
+                weight: s.weight,
+                reps: s.reps,
+                intensity: s.intensity,
+                date: s.date,
+              ))
+          .toList();
+
+      // Last 5 nutrition logs for today
+      final logsResult = await _getLogsForDate(DateTime.now());
+      final rawLogs = logsResult.fold((_) => <NutritionLog>[], (l) => l);
+      _cachedNutritionLogs = rawLogs.take(5).toList();
+
+      final recentLogs = _cachedNutritionLogs
+          .map((l) => RecentNutritionLogContext(
+                logId: l.id,
+                mealName: l.mealName,
+                calories: l.calories,
+                date: l.loggedAt,
+              ))
+          .toList();
+
+      return (recentSets, recentLogs);
+    } catch (e, st) {
+      AppLogger.warning('VoiceBloc: _buildRecentContext failed',
+          error: e, stackTrace: st);
+      return (<RecentSetContext>[], <RecentNutritionLogContext>[]);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Confirmation accepted — real implementation
+  // ---------------------------------------------------------------------------
+
+  Future<void> _onConfirmationAccepted(
+    VoiceConfirmationAccepted event,
+    Emitter<VoiceState> emit,
+  ) async {
+    final toolCall = state.pendingConfirmation;
+    if (toolCall == null) return;
+
+    emit(state.copyWith(clearPendingConfirmation: true));
+
+    final now = DateTime.now();
+    final spokenSuccess = await _dispatchMutationTool(toolCall, now);
+
+    if (spokenSuccess != null) {
+      final confirmMsg = VoiceMessage(
+        role: VoiceRole.assistant,
+        content: spokenSuccess,
+        createdAt: now,
+      );
+      emit(state.copyWith(
+        status: VoiceStatus.speaking,
+        messages: <VoiceMessage>[...state.messages, confirmMsg],
+      ));
+      await _speak(spokenSuccess);
+      emit(state.copyWith(status: VoiceStatus.idle));
+    } else {
+      emit(state.copyWith(status: VoiceStatus.idle));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Mutation tool dispatcher
+  // ---------------------------------------------------------------------------
+
+  /// Dispatches the confirmed tool call to the appropriate target bloc.
+  /// Returns the spoken success string, or null if dispatch failed.
+  Future<String?> _dispatchMutationTool(
+    VoiceToolCall tc,
+    DateTime now,
+  ) async {
+    try {
+      switch (tc.toolName) {
+        case 'logWorkoutSet':
+          final set = _buildWorkoutSet(tc.args, now);
+          if (set == null) return AppStrings.voiceSpokenExerciseNotFound;
+          _workoutBloc.add(AddWorkoutSetEvent(set));
+          return AppStrings.voiceSpokenSetLogged;
+
+        case 'editWorkoutSet':
+          final setId = tc.args['setId'] as String? ?? '';
+          final existing = _fetchSetById(setId);
+          if (existing == null) return AppStrings.voiceSpokenToolFailed;
+          final updated = _applyWorkoutSetEdits(existing, tc.args);
+          _historyBloc.add(UpdateSetEvent(updated));
+          return AppStrings.voiceSpokenSetUpdated;
+
+        case 'deleteWorkoutSet':
+          final setId = tc.args['setId'] as String? ?? '';
+          if (setId.isEmpty) return AppStrings.voiceSpokenToolFailed;
+          _historyBloc.add(DeleteSetEvent(setId));
+          return AppStrings.voiceSpokenSetDeleted;
+
+        case 'logNutrition':
+          final log = _buildNutritionLog(tc.args, now);
+          if (log == null) return AppStrings.voiceSpokenToolFailed;
+          _nutritionLogBloc.add(AddNutritionLogEvent(log));
+          return AppStrings.voiceSpokenNutritionLogged;
+
+        case 'editNutritionLog':
+          final logId = tc.args['logId'] as String? ?? '';
+          final existing = _fetchNutritionLogById(logId);
+          if (existing == null) return AppStrings.voiceSpokenToolFailed;
+          final updated = _applyNutritionLogEdits(existing, tc.args);
+          _historyBloc.add(UpdateNutritionHistoryLogEvent(updated));
+          return AppStrings.voiceSpokenNutritionUpdated;
+
+        case 'deleteNutritionLog':
+          final logId = tc.args['logId'] as String? ?? '';
+          if (logId.isEmpty) return AppStrings.voiceSpokenToolFailed;
+          _historyBloc.add(DeleteNutritionHistoryLogEvent(logId));
+          return AppStrings.voiceSpokenNutritionDeleted;
+
+        default:
+          AppLogger.warning('VoiceBloc: unknown mutation tool: ${tc.toolName}');
+          return AppStrings.voiceSpokenToolFailed;
+      }
+    } catch (e, st) {
+      AppLogger.warning('VoiceBloc: tool dispatch failed',
+          error: e, stackTrace: st);
+      return AppStrings.voiceSpokenToolFailed;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Entity builders
+  // ---------------------------------------------------------------------------
+
+  WorkoutSet? _buildWorkoutSet(Map<String, dynamic> args, DateTime now) {
+    final exerciseName = args['exerciseName'] as String?;
+    final exerciseId = args['exerciseId'] as String?;
+    final reps = (args['reps'] as num?)?.toInt();
+    final weight = (args['weight'] as num?)?.toDouble();
+
+    if (exerciseName == null || reps == null || weight == null) {
+      AppLogger.warning('VoiceBloc: logWorkoutSet missing required args');
+      return null;
+    }
+
+    final resolvedExerciseId =
+        exerciseId ?? _resolveExerciseIdFromCache(exerciseName);
+    if (resolvedExerciseId == null) {
+      AppLogger.warning(
+          'VoiceBloc: cannot resolve exerciseId for "$exerciseName"');
+      return null;
+    }
+
+    final intensityRaw =
+        (args['intensity'] as num?)?.toInt() ?? MuscleStimulus.defaultIntensity;
+    final intensity = intensityRaw.clamp(
+        MuscleStimulus.minIntensity, MuscleStimulus.maxIntensity);
+
+    final dateStr = args['date'] as String?;
+    final date = dateStr != null ? _parseIsoDate(dateStr) ?? now : now;
+
+    return WorkoutSet(
+      id: const Uuid().v4(),
+      exerciseId: resolvedExerciseId,
+      reps: reps,
+      weight: weight,
+      intensity: intensity,
+      date: date,
+      createdAt: now,
+    );
+  }
+
+  NutritionLog? _buildNutritionLog(Map<String, dynamic> args, DateTime now) {
+    final mealName = args['mealName'] as String?;
+    if (mealName == null) return null;
+
+    final mealId = args['mealId'] as String?;
+    final gramsConsumed = (args['gramsConsumed'] as num?)?.toDouble();
+    final proteinGrams =
+        (args['proteinGrams'] as num?)?.toDouble() ?? 0.0;
+    final carbsGrams = (args['carbsGrams'] as num?)?.toDouble() ?? 0.0;
+    final fatGrams = (args['fatGrams'] as num?)?.toDouble() ?? 0.0;
+    final calories = (args['calories'] as num?)?.toDouble() ?? 0.0;
+
+    final dateStr = args['loggedAt'] as String?;
+    final loggedAt = dateStr != null ? _parseIsoDate(dateStr) ?? now : now;
+
+    return NutritionLog(
+      id: const Uuid().v4(),
+      mealId: mealId,
+      mealName: mealName,
+      gramsConsumed: gramsConsumed,
+      proteinGrams: proteinGrams,
+      carbsGrams: carbsGrams,
+      fatGrams: fatGrams,
+      calories: calories,
+      loggedAt: loggedAt,
+      createdAt: now,
+    );
+  }
+
+  WorkoutSet _applyWorkoutSetEdits(
+      WorkoutSet existing, Map<String, dynamic> args) {
+    final newIntensity = (args['intensity'] as num?)?.toInt();
+    return existing.copyWith(
+      reps: (args['reps'] as num?)?.toInt() ?? existing.reps,
+      weight: (args['weight'] as num?)?.toDouble() ?? existing.weight,
+      intensity: newIntensity != null
+          ? newIntensity.clamp(
+              MuscleStimulus.minIntensity, MuscleStimulus.maxIntensity)
+          : existing.intensity,
+    );
+  }
+
+  NutritionLog _applyNutritionLogEdits(
+      NutritionLog existing, Map<String, dynamic> args) {
+    return existing.copyWith(
+      gramsConsumed:
+          (args['gramsConsumed'] as num?)?.toDouble() ?? existing.gramsConsumed,
+      proteinGrams:
+          (args['proteinGrams'] as num?)?.toDouble() ?? existing.proteinGrams,
+      carbsGrams:
+          (args['carbsGrams'] as num?)?.toDouble() ?? existing.carbsGrams,
+      fatGrams: (args['fatGrams'] as num?)?.toDouble() ?? existing.fatGrams,
+      calories: (args['calories'] as num?)?.toDouble() ?? existing.calories,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Cache lookups
+  // ---------------------------------------------------------------------------
+
+  WorkoutSet? _fetchSetById(String setId) {
+    if (setId.isEmpty) return null;
+    for (final s in _cachedWorkoutSets) {
+      if (s.id == setId) return s;
+    }
+    AppLogger.warning('VoiceBloc: setId "$setId" not found in recent cache');
+    return null;
+  }
+
+  NutritionLog? _fetchNutritionLogById(String logId) {
+    if (logId.isEmpty) return null;
+    for (final l in _cachedNutritionLogs) {
+      if (l.id == logId) return l;
+    }
+    AppLogger.warning('VoiceBloc: logId "$logId" not found in recent cache');
+    return null;
+  }
+
+  /// Attempts to match an exercise name against the cached exercise list.
+  /// Returns the exercise ID, or null if no match found.
+  String? _resolveExerciseIdFromCache(String exerciseName) {
+    final lower = exerciseName.toLowerCase();
+    // Exact name match
+    for (final ex in _cachedExercises) {
+      if (ex.name.toLowerCase() == lower) return ex.id;
+    }
+    // Starts-with fuzzy fallback for colloquial names ("bench" → "Bench Press")
+    for (final ex in _cachedExercises) {
+      if (ex.name.toLowerCase().startsWith(lower)) return ex.id;
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // C-5: Query tool runner
+  // ---------------------------------------------------------------------------
+
+  Future<String> _executeQueryTool(
+    String toolName,
+    Map<String, dynamic> args,
+  ) async {
+    try {
+      switch (toolName) {
+        case 'getWeeklyVolume':
+          return await _queryWeeklyVolume(args);
+        case 'getDailyMacros':
+          return await _queryDailyMacros(args);
+        case 'getRecentSets':
+          return await _queryRecentSets(args);
+        default:
+          AppLogger.warning('VoiceBloc: unknown query tool: $toolName');
+          return AppStrings.voiceSpokenGenericError;
+      }
+    } catch (e, st) {
+      AppLogger.warning('VoiceBloc: query tool failed', error: e, stackTrace: st);
+      return AppStrings.voiceSpokenGenericError;
+    }
+  }
+
+  Future<String> _queryWeeklyVolume(Map<String, dynamic> args) async {
+    final muscleGroup = args['muscleGroup'] as String?;
+    final exerciseName = args['exerciseName'] as String?;
+    final startDateStr = args['startDate'] as String?;
+    final endDateStr = args['endDate'] as String?;
+
+    final start = startDateStr != null
+        ? _parseIsoDate(startDateStr) ?? _startOfCurrentWeek()
+        : _startOfCurrentWeek();
+    final end = endDateStr != null
+        ? _parseIsoDate(endDateStr) ?? DateTime.now()
+        : DateTime.now();
+
+    final result = await _getSetsByDateRange(
+      startDate: start,
+      endDate: end,
+      muscleGroup: muscleGroup,
+    );
+
+    return result.fold(
+      (_) => 'I could not retrieve your workout data right now.',
+      (sets) {
+        var filtered = sets;
+        if (exerciseName != null) {
+          final lower = exerciseName.toLowerCase();
+          filtered = sets.where((s) {
+            final name = _exerciseNameForId(s.exerciseId).toLowerCase();
+            return name.contains(lower);
+          }).toList();
+        }
+
+        if (filtered.isEmpty) {
+          final period =
+              muscleGroup != null ? '$muscleGroup sets' : 'sets';
+          return 'No $period logged in that period.';
+        }
+
+        // Group by exercise name
+        final counts = <String, int>{};
+        for (final s in filtered) {
+          final name = _exerciseNameForId(s.exerciseId);
+          counts[name] = (counts[name] ?? 0) + 1;
+        }
+
+        final total = filtered.length;
+        final breakdown =
+            counts.entries.map((e) => '${e.value} ${e.key}').join(', ');
+        final groupLabel =
+            muscleGroup != null ? '$muscleGroup sets' : 'sets';
+        return 'You logged $total $groupLabel: $breakdown.';
+      },
+    );
+  }
+
+  Future<String> _queryDailyMacros(Map<String, dynamic> args) async {
+    final dateStr = args['date'] as String?;
+    final date =
+        dateStr != null ? _parseIsoDate(dateStr) ?? DateTime.now() : DateTime.now();
+
+    final result = await _getDailyMacros(date);
+
+    return result.fold(
+      (_) => 'I could not retrieve your nutrition data right now.',
+      (macros) {
+        final protein = (macros['protein'] ?? 0.0).round();
+        final carbs = (macros['carbs'] ?? 0.0).round();
+        final fats = (macros['fats'] ?? 0.0).round();
+        final calories = (macros['calories'] ?? 0.0).round();
+
+        if (calories == 0) return 'Nothing has been logged for that day yet.';
+        return 'For that day: $calories calories, ${protein}g protein, '
+            '${carbs}g carbs, ${fats}g fat.';
+      },
+    );
+  }
+
+  Future<String> _queryRecentSets(Map<String, dynamic> args) async {
+    final exerciseName = args['exerciseName'] as String?;
+    final limit = (args['limit'] as num?)?.toInt() ?? 5;
+
+    final start = DateTime.now().subtract(const Duration(days: 30));
+    final result = await _getSetsByDateRange(
+      startDate: start,
+      endDate: DateTime.now(),
+    );
+
+    return result.fold(
+      (_) => 'I could not retrieve your recent sets right now.',
+      (sets) {
+        var filtered = sets;
+        if (exerciseName != null) {
+          final lower = exerciseName.toLowerCase();
+          filtered = sets.where((s) {
+            final name = _exerciseNameForId(s.exerciseId).toLowerCase();
+            return name.contains(lower);
+          }).toList();
+        }
+
+        final limited = filtered.take(limit).toList();
+        if (limited.isEmpty) {
+          return exerciseName != null
+              ? 'No recent sets found for $exerciseName.'
+              : 'No recent sets found.';
+        }
+
+        final lines = limited
+            .map((s) {
+              final name = _exerciseNameForId(s.exerciseId);
+              return '$name: ${s.weight} × ${s.reps} reps';
+            })
+            .join('. ');
+
+        return 'Most recent sets: $lines.';
+      },
     );
   }
 
@@ -660,16 +1177,6 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       pendingConfirmation: event.toolCall,
       clearPendingConfirmation: event.toolCall == null,
     ));
-  }
-
-  void _onConfirmationAccepted(
-    VoiceConfirmationAccepted event,
-    Emitter<VoiceState> emit,
-  ) {
-    // C-5 replaces this stub with real tool dispatch to the appropriate
-    // bloc (WorkoutLogBloc, NutritionLogBloc, etc.). Until then, simply
-    // clear the card so the overlay returns to idle.
-    emit(state.copyWith(clearPendingConfirmation: true));
   }
 
   void _onConfirmationCancelled(
@@ -737,6 +1244,38 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   String _messageFor(Failure failure) {
     if (failure.message.isNotEmpty) return failure.message;
     return 'Something went wrong.';
+  }
+
+  /// Returns the human-readable exercise name for a given ID from the cache,
+  /// or the raw ID string if the exercise is not cached.
+  String _exerciseNameForId(String exerciseId) {
+    for (final ex in _cachedExercises) {
+      if (ex.id == exerciseId) return ex.name;
+    }
+    return exerciseId;
+  }
+
+  /// Parses an ISO `yyyy-MM-dd` date string into a [DateTime].
+  /// Returns null if the string is malformed.
+  DateTime? _parseIsoDate(String s) {
+    try {
+      final parts = s.split('-');
+      if (parts.length != 3) return null;
+      return DateTime(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns midnight on Monday of the current week.
+  DateTime _startOfCurrentWeek() {
+    final now = DateTime.now();
+    final daysFromMonday = (now.weekday - 1) % 7;
+    return DateTime(now.year, now.month, now.day - daysFromMonday);
   }
 
   /// Maps STT error kinds to user-visible strings.

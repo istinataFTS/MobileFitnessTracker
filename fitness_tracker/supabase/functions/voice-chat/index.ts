@@ -6,7 +6,7 @@ import { ErrorCodes, VoiceError, errorResponse } from '../_shared/errors.ts';
 import { completeChat } from '../_shared/openai.ts';
 import { appendSessionTurn } from '../_shared/session.ts';
 import { TOOL_REGISTRY } from '../_shared/tools.ts';
-import type { FunctionName, Turn, VoiceContext } from '../_shared/types.ts';
+import type { FunctionName, RecentNutritionLogContext, RecentSetContext, Turn, VoiceContext } from '../_shared/types.ts';
 import { logUsage } from '../_shared/usage.ts';
 import { json, msSince, serviceClient } from '../_shared/utils.ts';
 
@@ -14,8 +14,9 @@ const FUNCTION_NAME: FunctionName = 'voice-chat';
 const MODEL = 'gpt-4o-mini-2024-07-18';
 const MAX_HISTORY_TURNS = 3;
 
-// System prompt template. Placeholders: {{current_date}}, {{weight_unit}}.
-const SYSTEM_PROMPT_TEMPLATE = `You are the voice assistant for a personal fitness-tracking app. Your ONLY responsibilities are:
+// System prompt template. Placeholders: {{current_date}}, {{weight_unit}},
+// {{recent_sets}}, {{recent_nutrition_logs}}.
+const SYSTEM_PROMPT_TEMPLATE = `You are Julio Velazquez, the voice assistant for a personal fitness-tracking app. Your ONLY responsibilities are:
 1. Logging, editing, and deleting workout sets and nutrition entries.
 2. Answering factual questions about the user's own logged data.
 
@@ -26,7 +27,21 @@ When the user is ambiguous, ask ONE clarifying question. After the user clarifie
 
 Never invent data. If the user asks about something you cannot retrieve via a tool, say so plainly.
 
-Today is {{current_date}}. Weight unit is {{weight_unit}}. Conversation language is English.`;
+Today is {{current_date}}. Weight unit is {{weight_unit}}. Conversation language is English.
+
+Recent workout sets (with IDs for editing/deleting):
+{{recent_sets}}
+
+Recent nutrition logs (with IDs for editing/deleting):
+{{recent_nutrition_logs}}
+
+Tool usage rules:
+- Use logWorkoutSet / logNutrition to record new entries. Confirm before calling.
+- For edits and deletes, find the row ID from the recent sets/logs above.
+- For queries (getWeeklyVolume, getDailyMacros, getRecentSets), call the tool — the app will execute it locally and speak the result; you do not need to generate a verbal summary.
+- Use clarify only when the user's intent cannot be resolved without one specific question.
+- If the user confirms ("yes", "do it", "confirm"), and you have enough data, call the mutation tool immediately without re-asking.
+- Never repeat a clarifying question you already asked.`;
 
 interface ParsedChat {
   sessionId: string;
@@ -116,6 +131,10 @@ async function parseChat(req: Request): Promise<ParsedChat> {
     currentDate: typeof ctx.currentDate === 'string' ? ctx.currentDate : new Date().toISOString().slice(0, 10),
     weightUnit: ctx.weightUnit === 'lb' ? 'lb' : 'kg',
     recentExerciseIds: Array.isArray(ctx.recentExerciseIds) ? ctx.recentExerciseIds : [],
+    recentSets: Array.isArray(ctx.recentSets) ? (ctx.recentSets as RecentSetContext[]) : [],
+    recentNutritionLogs: Array.isArray(ctx.recentNutritionLogs)
+      ? (ctx.recentNutritionLogs as RecentNutritionLogContext[])
+      : [],
   };
 
   const sessionLoggingEnabled = body.session_logging_enabled === true;
@@ -123,10 +142,35 @@ async function parseChat(req: Request): Promise<ParsedChat> {
   return { sessionId, userMessage, history, context, sessionLoggingEnabled };
 }
 
-function buildSystemPrompt(context: VoiceContext): string {
+function formatRecentSets(
+  sets: readonly RecentSetContext[] | undefined,
+  weightUnit: string,
+): string {
+  if (!sets || sets.length === 0) return 'None logged yet.';
+  return sets
+    .map(
+      (s) =>
+        `${s.date}: ${s.exerciseName} — ${s.weight} ${weightUnit} × ${s.reps} reps ` +
+        `(intensity ${s.intensity}) [id: ${s.setId}]`,
+    )
+    .join('\n');
+}
+
+function formatRecentNutritionLogs(
+  logs: readonly RecentNutritionLogContext[] | undefined,
+): string {
+  if (!logs || logs.length === 0) return 'None logged yet.';
+  return logs
+    .map((l) => `${l.date}: ${l.mealName} — ${l.calories} kcal [id: ${l.logId}]`)
+    .join('\n');
+}
+
+export function buildSystemPrompt(context: VoiceContext): string {
   return SYSTEM_PROMPT_TEMPLATE
     .replace('{{current_date}}', context.currentDate)
-    .replace('{{weight_unit}}', context.weightUnit);
+    .replace('{{weight_unit}}', context.weightUnit)
+    .replace('{{recent_sets}}', formatRecentSets(context.recentSets, context.weightUnit))
+    .replace('{{recent_nutrition_logs}}', formatRecentNutritionLogs(context.recentNutritionLogs));
 }
 
 async function handleChat(req: Request, t0: number): Promise<Response> {

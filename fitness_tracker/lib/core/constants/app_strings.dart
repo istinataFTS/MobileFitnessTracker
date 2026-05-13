@@ -473,6 +473,20 @@ class AppStrings {
   static const String voiceProfileTileSubtitle =
       'Settings, wake word & daily budget';
 
+  // ── Voice spoken (TTS) mutation success / error strings ───────────────────
+  // Read aloud by device TTS after a confirmed tool action.
+  // Keep them natural, brief, and pronounceable — no markdown or symbols.
+  static const String voiceSpokenSetLogged = 'Set logged.';
+  static const String voiceSpokenSetUpdated = 'Set updated.';
+  static const String voiceSpokenSetDeleted = 'Set deleted.';
+  static const String voiceSpokenNutritionLogged = 'Nutrition logged.';
+  static const String voiceSpokenNutritionUpdated = 'Nutrition entry updated.';
+  static const String voiceSpokenNutritionDeleted = 'Nutrition entry deleted.';
+  static const String voiceSpokenToolFailed =
+      'Something went wrong. Please try again.';
+  static const String voiceSpokenExerciseNotFound =
+      'I could not find that exercise in your library.';
+
   // ── Voice spoken (TTS) error strings ──────────────────────────────────────
   // Read aloud by device TTS. Keep them natural, brief, and pronounceable.
   // No markdown, parentheses, or special symbols.
