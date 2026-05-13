@@ -32,8 +32,26 @@ export interface ToolCall {
   readonly arguments: Record<string, unknown>;
 }
 
+export interface RecentSetContext {
+  readonly setId: string;
+  readonly exerciseName: string;
+  readonly weight: number;
+  readonly reps: number;
+  readonly intensity: number;
+  readonly date: string; // ISO yyyy-MM-dd
+}
+
+export interface RecentNutritionLogContext {
+  readonly logId: string;
+  readonly mealName: string;
+  readonly calories: number;
+  readonly date: string; // ISO yyyy-MM-dd
+}
+
 export interface VoiceContext {
-  readonly currentDate: string;                       // ISO yyyy-mm-dd
+  readonly currentDate: string;                                          // ISO yyyy-MM-dd
   readonly weightUnit: 'kg' | 'lb';
   readonly recentExerciseIds?: readonly string[];
+  readonly recentSets?: readonly RecentSetContext[];
+  readonly recentNutritionLogs?: readonly RecentNutritionLogContext[];
 }
