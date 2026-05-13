@@ -1,7 +1,9 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:fitness_tracker/features/settings/presentation/settings_page.dart';
+import 'package:fitness_tracker/features/voice/application/voice_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,9 @@ import 'package:mocktail/mocktail.dart';
 class MockAppSettingsCubit extends MockCubit<AppSettingsState>
     implements AppSettingsCubit {}
 
+class MockVoiceSettingsCubit extends MockCubit<VoiceSettings>
+    implements VoiceSettingsCubit {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(WeekStartDay.monday);
@@ -17,6 +22,7 @@ void main() {
   });
 
   late MockAppSettingsCubit cubit;
+  late MockVoiceSettingsCubit voiceCubit;
 
   AppSettingsState buildState({
     AppSettings settings = const AppSettings.defaults(),
@@ -35,8 +41,11 @@ void main() {
   }
 
   Widget buildSubject() {
-    return BlocProvider<AppSettingsCubit>.value(
-      value: cubit,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AppSettingsCubit>.value(value: cubit),
+        BlocProvider<VoiceSettingsCubit>.value(value: voiceCubit),
+      ],
       child: const MaterialApp(
         home: SettingsPage(),
       ),
@@ -45,6 +54,17 @@ void main() {
 
   setUp(() {
     cubit = MockAppSettingsCubit();
+    voiceCubit = MockVoiceSettingsCubit();
+
+    const VoiceSettings initialVoiceSettings = VoiceSettings.defaults();
+    when(() => voiceCubit.state).thenReturn(initialVoiceSettings);
+    whenListen<VoiceSettings>(
+      voiceCubit,
+      const Stream<VoiceSettings>.empty(),
+      initialState: initialVoiceSettings,
+    );
+    when(() => voiceCubit.setSessionLoggingEnabled(any())).thenAnswer((_) async => true);
+    when(() => voiceCubit.setTtsVolume(any())).thenAnswer((_) async => true);
 
     final AppSettingsState initialState = buildState(
       settings: const AppSettings(
@@ -204,7 +224,10 @@ void main() {
   testWidgets('saving state disables selection tiles and shows saving indicator', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 1200);
+    // Use a tall viewport so that the saving indicator (rendered at the bottom
+    // of the list, after the voice section added in C-2) is within Flutter's
+    // build cache extent and findable in the widget tree.
+    tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);

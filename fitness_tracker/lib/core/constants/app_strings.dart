@@ -390,10 +390,15 @@ class AppStrings {
   static const String voiceSessionLoggingTitle = 'Session logging';
   static const String voiceSessionLoggingSubtitle =
       'Save conversation transcripts to your account';
-  static const String voiceTtsVoiceTitle = 'Assistant voice';
-  static const String voiceTtsVoiceSubtitle = 'Choose the text-to-speech voice';
+  // Replaces the legacy "voiceTtsVoice*" strings — device-native TTS
+  // uses the OS-configured voice, so the only TTS knob exposed to the
+  // user in the main Settings page is the speech rate.
+  static const String voiceTtsSpeechRateTitle = 'Speech rate';
+  static const String voiceTtsSpeechRateSubtitle =
+      'How fast the assistant talks (system voice is used)';
   static const String voiceBudgetTitle = 'Daily usage';
-  static const String voiceBudgetSubtitle = 'Voice assistant runs on a \$1.00/day budget';
+  static const String voiceBudgetSubtitle =
+      'Voice assistant runs on a \$0.50/day budget';
   static const String voiceDeleteHistoryTitle = 'Delete voice history';
   static const String voiceDeleteHistorySubtitle =
       'Permanently remove all saved voice transcripts';
@@ -407,6 +412,106 @@ class AppStrings {
       'Voice service is temporarily unavailable. Please try again.';
   static const String voiceErrorTimeout = 'Request timed out. Please try again.';
   static const String voiceErrorGeneric = 'Something went wrong. Please try again.';
+
+  // ── Voice overlay ──────────────────────────────────────────────────────────
+  static const String voiceOverlayTitle = 'Julio Velazquez';
+  static const String voiceOverlayHintIdle =
+      'Tap the mic or say the wake word';
+  static const String voiceOverlayHintListening = 'Listening…';
+  static const String voiceOverlayHintTranscribing = 'Processing…';
+  static const String voiceOverlayHintThinking = 'Thinking…';
+  static const String voiceOverlayHintSpeaking = 'Speaking…';
+  static const String voiceOverlayStopListening = 'Stop';
+  static const String voiceOverlayInterrupt = 'Interrupt';
+  static const String voiceOverlayRetry = 'Try again';
+  static const String voiceOverlayWorkoutModeLabel = 'Workout Mode';
+  static const String voiceOverlayWorkoutModeTooltip =
+      'Keep screen on and wake word armed during your session';
+
+  // ── Voice confirmation card ────────────────────────────────────────────────
+  static const String voiceConfirmActionLabel = 'Confirm action';
+  static const String voiceConfirmYes = 'Yes, do it';
+  static const String voiceConfirmEdit = 'Edit';
+  static const String voiceConfirmCancel = 'Cancel';
+
+  // ── Voice workout-mode banner ──────────────────────────────────────────────
+  static const String voiceWorkoutModeBanner =
+      'Workout Mode — screen stays on';
+
+  // ── Voice Settings page ────────────────────────────────────────────────────
+  static const String voiceSettingsPageTitle = 'Voice Assistant';
+  static const String voiceWakeWordSectionTitle = 'Wake Word';
+  static const String voiceWakeWordPreviewTooltip = 'Preview pronunciation';
+  static const String voiceBehaviorSectionTitle = 'Behavior';
+  static const String voiceWakeWordArmedTitle = 'Armed while app is open';
+  static const String voiceWakeWordArmedSubtitle =
+      'Listen for wake word whenever the app is visible';
+  static const String voiceWorkoutModeAutoTitle = 'Auto-enable Workout Mode';
+  static const String voiceWorkoutModeAutoSubtitle =
+      'Arm wake word automatically when you start a workout';
+  static const String voiceOutputSectionTitle = 'Voice Output';
+  static const String voiceTtsVolumeTitle = 'Volume';
+  static const String voiceTtsVolumeSubtitle =
+      'Playback volume for the assistant\'s voice';
+  static const String voicePrivacySectionTitle = 'Privacy';
+  static const String voiceDeleteHistoryConfirmTitle = 'Delete voice history?';
+  static const String voiceDeleteHistoryConfirmBody =
+      'This removes all saved transcripts for your account. '
+      'Usage logs are kept for billing purposes.';
+  static const String voiceDeleteHistoryConfirmButton = 'Delete';
+  static const String voiceBudgetSectionTitle = 'Daily Budget';
+  static const String voiceBudgetResetNote =
+      'Resets at midnight UTC · Cap: \$0.50/day';
+
+  // ── Voice FAB ──────────────────────────────────────────────────────────────
+  static const String voiceFabTooltipOpen = 'Open Voice Assistant';
+  static const String voiceFabTooltipGuest =
+      'Sign in to use Voice Assistant';
+
+  // ── Profile tile ───────────────────────────────────────────────────────────
+  static const String voiceProfileTileTitle = 'Voice Assistant';
+  static const String voiceProfileTileSubtitle =
+      'Settings, wake word & daily budget';
+
+  // ── Voice spoken (TTS) mutation success / error strings ───────────────────
+  // Read aloud by device TTS after a confirmed tool action.
+  // Keep them natural, brief, and pronounceable — no markdown or symbols.
+  static const String voiceSpokenSetLogged = 'Set logged.';
+  static const String voiceSpokenSetUpdated = 'Set updated.';
+  static const String voiceSpokenSetDeleted = 'Set deleted.';
+  static const String voiceSpokenNutritionLogged = 'Nutrition logged.';
+  static const String voiceSpokenNutritionUpdated = 'Nutrition entry updated.';
+  static const String voiceSpokenNutritionDeleted = 'Nutrition entry deleted.';
+  static const String voiceSpokenToolFailed =
+      'Something went wrong. Please try again.';
+  static const String voiceSpokenExerciseNotFound =
+      'I could not find that exercise in your library.';
+
+  // ── Voice spoken (TTS) error strings ──────────────────────────────────────
+  // Read aloud by device TTS. Keep them natural, brief, and pronounceable.
+  // No markdown, parentheses, or special symbols.
+  static const String voiceSpokenOfflineAnnouncement =
+      "I'm offline right now. I can still listen and speak, "
+      "but I won't understand complex requests.";
+  static const String voiceSpokenNetworkDown =
+      "My network is off. Please check your connection.";
+  static const String voiceSpokenNoSpeech =
+      "Repeat, please — I did not hear anything.";
+  static const String voiceSpokenBudgetExceeded =
+      "I have hit today's voice budget. "
+      "Please try again tomorrow, or use the app directly.";
+  static const String voiceSpokenGenericError =
+      "Something went wrong. Please try again.";
+  static const String voiceSpokenTimeout =
+      "That took too long. Please try again.";
+
+  // ── Wake word preset labels ────────────────────────────────────────────────
+  static const String wakeWordSamoLevski = 'Samo Levski';
+  static const String wakeWordTrainer = 'Trainer';
+  static const String wakeWordThomas = 'Thomas';
+  static const String wakeWordPronunciationSamoLevski = 'SAH-mo LEV-ski';
+  static const String wakeWordPronunciationTrainer = 'TRAY-ner';
+  static const String wakeWordPronunciationThomas = 'TOH-mas';
 }
 
 class AppStringsPhase7 {

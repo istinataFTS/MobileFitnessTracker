@@ -79,42 +79,6 @@ function mapOpenAiStatus(status: number): never {
 }
 
 // ---------------------------------------------------------------------------
-// Whisper STT
-// ---------------------------------------------------------------------------
-
-export interface WhisperResponse {
-  text: string;
-  durationSeconds: number;
-  language: string;
-}
-
-export async function transcribeAudio(audio: Blob, language = 'en'): Promise<WhisperResponse> {
-  const form = new FormData();
-  form.append('file', audio, 'audio.m4a');
-  form.append('model', 'whisper-1');
-  form.append('language', language);
-  form.append('response_format', 'verbose_json');
-
-  const res = await withTimeout((signal) =>
-    _fetch(`${OPENAI_BASE}/audio/transcriptions`, {
-      method: 'POST',
-      headers: makeHeaders(),
-      body: form,
-      signal,
-    })
-  );
-
-  if (!res.ok) mapOpenAiStatus(res.status);
-
-  const json = await res.json();
-  return {
-    text: json.text ?? '',
-    durationSeconds: Number(json.duration ?? 0),
-    language: json.language ?? language,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Chat completion
 // ---------------------------------------------------------------------------
 
@@ -179,33 +143,3 @@ export async function completeChat(req: ChatRequest): Promise<ChatResponse> {
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// TTS
-// ---------------------------------------------------------------------------
-
-export type TtsVoice = 'alloy' | 'echo' | 'fable' | 'nova' | 'onyx' | 'shimmer';
-
-export interface TtsResponse {
-  audio: ArrayBuffer;
-  characters: number;
-  format: 'mp3';
-}
-
-export async function synthesizeSpeech(text: string, voice: TtsVoice): Promise<TtsResponse> {
-  const res = await withTimeout((signal) =>
-    _fetch(`${OPENAI_BASE}/audio/speech`, {
-      method: 'POST',
-      headers: makeHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ model: 'tts-1', input: text, voice }),
-      signal,
-    })
-  );
-
-  if (!res.ok) mapOpenAiStatus(res.status);
-
-  return {
-    audio: await res.arrayBuffer(),
-    characters: text.length,
-    format: 'mp3',
-  };
-}

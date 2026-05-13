@@ -5,6 +5,7 @@ import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_settings.dart';
 import '../../../features/voice/application/voice_settings_cubit.dart';
+import '../../../features/voice/presentation/voice_settings_page.dart';
 import '../application/app_settings_cubit.dart';
 import '../domain/settings_display_formatter.dart';
 import 'mappers/settings_page_view_data_mapper.dart';
@@ -92,13 +93,21 @@ class _SettingsPageState extends State<SettingsPage> {
             onWeightUnitTapped: state.isSaving
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
-            onSessionLoggingChanged: (bool value) =>
-                context.read<VoiceSettingsCubit>().setSessionLogging(enabled: value),
-            onVoiceVoiceTapped: () =>
-                _selectTtsVoice(context, viewData, voiceSettings),
+            onOpenVoiceSettings: () => _openVoiceSettings(context),
           ),
         );
       },
+    );
+  }
+
+  void _openVoiceSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider<VoiceSettingsCubit>.value(
+          value: context.read<VoiceSettingsCubit>(),
+          child: const VoiceSettingsPage(),
+        ),
+      ),
     );
   }
 
@@ -176,35 +185,6 @@ class _SettingsPageState extends State<SettingsPage> {
         return context.read<AppSettingsCubit>().setWeightUnit(selected);
       },
     );
-  }
-
-  Future<void> _selectTtsVoice(
-    BuildContext context,
-    SettingsPageViewData viewData,
-    VoiceSettings voiceSettings,
-  ) async {
-    final TtsVoice? selected = await showModalBottomSheet<TtsVoice>(
-      context: context,
-      backgroundColor: AppTheme.surfaceDark,
-      builder: (BuildContext context) {
-        return SettingsOptionSheet<TtsVoice>(
-          options: viewData.voiceSettings.voiceOptions
-              .map(
-                (SettingsSelectionOptionViewData<TtsVoice> option) =>
-                    SettingsOption<TtsVoice>(
-                  value: option.value,
-                  title: option.title,
-                  selected: option.selected,
-                ),
-              )
-              .toList(growable: false),
-        );
-      },
-    );
-
-    if (selected == null || selected == voiceSettings.ttsVoice) return;
-    if (!context.mounted) return;
-    context.read<VoiceSettingsCubit>().setTtsVoice(selected);
   }
 
   Future<void> _saveWithFeedback(

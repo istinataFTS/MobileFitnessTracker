@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/themes/app_theme.dart';
-import '../../../../domain/entities/voice_settings.dart';
 import '../models/settings_page_view_data.dart';
 import '../settings_page_keys.dart';
 
@@ -14,8 +13,7 @@ class SettingsContent extends StatelessWidget {
     required this.onNotificationsChanged,
     required this.onWeekStartTapped,
     required this.onWeightUnitTapped,
-    this.onSessionLoggingChanged,
-    this.onVoiceVoiceTapped,
+    required this.onOpenVoiceSettings,
   });
 
   final SettingsPageViewData viewData;
@@ -23,8 +21,7 @@ class SettingsContent extends StatelessWidget {
   final ValueChanged<bool> onNotificationsChanged;
   final VoidCallback onWeekStartTapped;
   final VoidCallback onWeightUnitTapped;
-  final ValueChanged<bool>? onSessionLoggingChanged;
-  final VoidCallback? onVoiceVoiceTapped;
+  final VoidCallback onOpenVoiceSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -108,28 +105,14 @@ class SettingsContent extends StatelessWidget {
           _Section(
             title: AppStrings.voiceSectionTitle,
             children: <Widget>[
-              Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: SwitchListTile(
-                  value: viewData.voiceSettings.sessionLoggingEnabled,
-                  activeColor: AppTheme.primaryOrange,
-                  secondary: const Icon(
-                    Icons.record_voice_over_outlined,
-                    color: AppTheme.primaryOrange,
-                  ),
-                  title: const Text(AppStrings.voiceSessionLoggingTitle),
-                  subtitle: const Text(AppStrings.voiceSessionLoggingSubtitle),
-                  onChanged: onSessionLoggingChanged,
-                ),
-              ),
               _SelectionTile(
-                tileKey: const Key('voice_tts_voice_tile'),
-                icon: Icons.spatial_audio_outlined,
-                title: AppStrings.voiceTtsVoiceTitle,
-                subtitle: AppStrings.voiceTtsVoiceSubtitle,
-                helperText: viewData.voiceSettings.selectedVoice.displayName,
-                enabled: onVoiceVoiceTapped != null,
-                onTap: onVoiceVoiceTapped ?? () {},
+                tileKey: SettingsPageKeys.voiceAssistantTileKey,
+                icon: Icons.mic_rounded,
+                title: AppStrings.voiceProfileTileTitle,
+                subtitle: AppStrings.voiceProfileTileSubtitle,
+                helperText: '',
+                enabled: true,
+                onTap: onOpenVoiceSettings,
               ),
             ],
           ),
@@ -344,8 +327,8 @@ class _SelectionTile extends StatelessWidget {
           color: enabled ? AppTheme.primaryOrange : AppTheme.textDim,
         ),
         title: Text(title),
-        subtitle: Text('$subtitle\n$helperText'),
-        isThreeLine: true,
+        subtitle: Text(helperText.isEmpty ? subtitle : '$subtitle\n$helperText'),
+        isThreeLine: helperText.isNotEmpty,
         trailing: const Icon(
           Icons.chevron_right,
           color: AppTheme.textDim,

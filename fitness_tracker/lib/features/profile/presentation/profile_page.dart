@@ -7,6 +7,9 @@ import '../../../features/auth/presentation/sign_in_page.dart';
 import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
 import '../../../features/settings/presentation/settings_scope.dart';
+import '../../../features/voice/application/voice_settings_cubit.dart';
+import '../../../features/voice/presentation/voice_settings_page.dart';
+import '../../../injection/injection_container.dart';
 import '../application/profile_cubit.dart';
 import 'mappers/profile_view_data_mapper.dart';
 import 'models/profile_view_data.dart';
@@ -138,6 +141,17 @@ class _ProfileViewState extends State<_ProfileView> {
                 MaterialPageRoute<void>(
                   builder: (_) => HistoryPage(
                     settings: SettingsScope.of(context),
+                  ),
+                ),
+              );
+            },
+            onOpenVoiceAssistant: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => BlocProvider<VoiceSettingsCubit>(
+                    create: (_) => sl<VoiceSettingsCubit>(),
+                    child: const VoiceSettingsPage(),
                   ),
                 ),
               );

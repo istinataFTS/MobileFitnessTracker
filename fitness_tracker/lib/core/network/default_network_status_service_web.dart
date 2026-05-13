@@ -16,4 +16,7 @@ class DefaultNetworkStatusService implements NetworkStatusService {
   /// The stream never emits because sync lifecycle hooks are skipped on web.
   @override
   Stream<bool> get onConnectivityRestored => const Stream.empty();
+
+  @override
+  Stream<bool> get onConnectivityChanged => const Stream.empty();
 }

@@ -34,4 +34,4 @@ jobs:
 
       - name: Deploy functions
         if: ${{ inputs.target != 'migrations' }}
-        run: supabase functions deploy voice-stt voice-chat voice-tts
+        run: supabase functions deploy voice-chat

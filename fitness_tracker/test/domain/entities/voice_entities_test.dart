@@ -66,25 +66,39 @@ void main() {
   });
 
   group('VoiceSettings', () {
-    test('defaults are off / nova', () {
+    test('defaults match master spec §3.6', () {
       const s = VoiceSettings.defaults();
+      expect(s.wakeWordPreset, WakeWordPreset.samoLevski);
       expect(s.sessionLoggingEnabled, isFalse);
-      expect(s.ttsVoice, TtsVoice.nova);
+      expect(s.workoutModeAutoEnable, isFalse);
+      expect(s.ttsVolume, 1.0);
+      expect(s.ttsSpeechRate, 1.0);
+      expect(s.wakeWordArmedInForeground, isTrue);
     });
 
     test('copyWith overrides only specified fields', () {
       const original = VoiceSettings.defaults();
-      final updated = original.copyWith(ttsVoice: TtsVoice.echo);
-      expect(updated.ttsVoice, TtsVoice.echo);
+      final updated = original.copyWith(ttsSpeechRate: 1.5);
+      expect(updated.ttsSpeechRate, 1.5);
+      // Every other field stays at the default.
+      expect(updated.wakeWordPreset, WakeWordPreset.samoLevski);
       expect(updated.sessionLoggingEnabled, isFalse);
+      expect(updated.ttsVolume, 1.0);
+      expect(updated.wakeWordArmedInForeground, isTrue);
     });
 
-    test('TtsVoice.nova has correct apiValue', () {
-      expect(TtsVoice.nova.apiValue, 'nova');
+    test('equality is by value across all six fields', () {
+      const a = VoiceSettings();
+      const b = VoiceSettings();
+      expect(a, b);
+      final c = a.copyWith(workoutModeAutoEnable: true);
+      expect(c, isNot(a));
     });
 
-    test('TtsVoice.alloy has correct displayName', () {
-      expect(TtsVoice.alloy.displayName, 'Alloy');
+    test('WakeWordPreset display names match master spec', () {
+      expect(WakeWordPreset.samoLevski.displayName, 'Samo Levski');
+      expect(WakeWordPreset.trainer.displayName, 'Trainer');
+      expect(WakeWordPreset.thomas.displayName, 'Thomas');
     });
   });
 }

@@ -22,28 +22,27 @@ Deno.test('logUsage: inserts row with correct shape', async () => {
     client,
     {
       userId: 'user-1',
-      functionName: 'voice-stt',
-      model: 'whisper-1',
-      audioSeconds: 4.5,
+      functionName: 'voice-chat',
+      model: 'gpt-4o-mini-2024-07-18',
+      inputTokens: 412,
+      outputTokens: 23,
       latencyMs: 320,
       sessionId: 'session-uuid',
       status: 'OK',
     },
-    0.00045,
+    0.000076,
   );
 
   assertEquals(captured?.user_id, 'user-1');
-  assertEquals(captured?.function_name, 'voice-stt');
-  assertEquals(captured?.model, 'whisper-1');
-  assertEquals(captured?.audio_seconds, 4.5);
-  assertEquals(captured?.cost_usd, 0.00045);
+  assertEquals(captured?.function_name, 'voice-chat');
+  assertEquals(captured?.model, 'gpt-4o-mini-2024-07-18');
+  assertEquals(captured?.input_tokens, 412);
+  assertEquals(captured?.output_tokens, 23);
+  assertEquals(captured?.cost_usd, 0.000076);
   assertEquals(captured?.pricing_version, PRICING_VERSION);
   assertEquals(captured?.latency_ms, 320);
   assertEquals(captured?.session_id, 'session-uuid');
   assertEquals(captured?.status, 'OK');
-  assertEquals(captured?.input_tokens, null);
-  assertEquals(captured?.output_tokens, null);
-  assertEquals(captured?.characters, null);
 });
 
 Deno.test('logUsage: DB error is swallowed (no throw)', async () => {
@@ -53,7 +52,7 @@ Deno.test('logUsage: DB error is swallowed (no throw)', async () => {
 
   try {
     const client = makeInsertClient(() => ({ error: { message: 'insert failed' } }));
-    // Should not throw
+    // Should not throw — a failed audit row must never block the user's request.
     await logUsage(client, {
       userId: 'u', functionName: 'voice-chat', model: 'gpt-4o-mini-2024-07-18',
       inputTokens: 100, outputTokens: 50, latencyMs: 200, status: 'INTERNAL',
@@ -64,16 +63,16 @@ Deno.test('logUsage: DB error is swallowed (no throw)', async () => {
   }
 });
 
-Deno.test('logUsage: optional metrics are null when not provided', async () => {
+Deno.test('logUsage: optional token metrics are null when not provided', async () => {
   let captured: Record<string, unknown> | null = null;
   const client = makeInsertClient((p) => { captured = p; return { error: null }; });
 
   await logUsage(client, {
-    userId: 'u', functionName: 'voice-tts', model: 'tts-1', latencyMs: 100, status: 'OK',
-  }, 0.001);
+    userId: 'u', functionName: 'voice-chat', model: 'gpt-4o-mini-2024-07-18',
+    latencyMs: 100, status: 'OK',
+  }, 0);
 
   assertEquals(captured?.input_tokens, null);
   assertEquals(captured?.output_tokens, null);
-  assertEquals(captured?.audio_seconds, null);
   assertEquals(captured?.session_id, null);
 });

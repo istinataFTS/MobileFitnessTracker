@@ -13,8 +13,6 @@ export async function logUsage(
     model: input.model,
     input_tokens: input.inputTokens ?? null,
     output_tokens: input.outputTokens ?? null,
-    audio_seconds: input.audioSeconds ?? null,
-    characters: input.characters ?? null,
     cost_usd: costUsd,
     pricing_version: PRICING_VERSION,
     latency_ms: input.latencyMs,

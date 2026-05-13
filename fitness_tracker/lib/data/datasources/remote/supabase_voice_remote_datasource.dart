@@ -3,10 +3,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../config/env_config.dart';
+import '../../../core/constants/voice_constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../../domain/entities/app_settings.dart' show WeightUnit;
 import '../../../domain/entities/voice_budget.dart';
+import '../../../domain/entities/voice_chat_context.dart';
+import '../../../domain/entities/voice_chat_result.dart';
 import '../../../domain/entities/voice_message.dart';
 import '../../../domain/entities/voice_settings.dart';
+import '../../../domain/entities/voice_tool_call.dart';
 import 'supabase_client_provider.dart';
 import 'voice_remote_datasource.dart';
 
@@ -17,10 +23,9 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
 
   SupabaseClient get _supabase => clientProvider.client;
 
-  String get _functionsBaseUrl {
-    final url = _supabase.functionsUrl;
-    return url;
-  }
+  /// Edge Functions base URL — constructed from the compile-time Supabase URL
+  /// using the standard Supabase pattern: `$supabaseUrl/functions/v1`.
+  String get _functionsBaseUrl => '${EnvConfig.supabaseUrl}/functions/v1';
 
   Future<String> _bearerToken() async {
     final session = _supabase.auth.currentSession;
@@ -29,62 +34,33 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
   }
 
   // ---------------------------------------------------------------------------
-  // Transcribe (voice-stt)
-  // ---------------------------------------------------------------------------
-
-  @override
-  Future<String> transcribe({
-    required List<int> audioBytes,
-    required String sessionId,
-    required String mimeType,
-    bool sessionLoggingEnabled = false,
-  }) async {
-    final token = await _bearerToken();
-    final uri = Uri.parse('$_functionsBaseUrl/voice-stt');
-
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..fields['session_id'] = sessionId
-      ..fields['session_logging_enabled'] = sessionLoggingEnabled.toString()
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'audio',
-          audioBytes,
-          filename: 'recording.${_extensionFor(mimeType)}',
-        ),
-      );
-
-    final streamed = await request.send();
-    final body = await streamed.stream.bytesToString();
-
-    if (streamed.statusCode != 200) {
-      _throwFromErrorBody(body, streamed.statusCode);
-    }
-
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    return json['transcript'] as String? ?? '';
-  }
-
-  // ---------------------------------------------------------------------------
   // Chat (voice-chat)
   // ---------------------------------------------------------------------------
 
   @override
-  Future<VoiceMessage> chat({
+  Future<VoiceChatResult> chat({
     required String userMessage,
     required String sessionId,
     required List<VoiceMessage> history,
     required VoiceSettings settings,
+    required WeightUnit weightUnit,
+    List<RecentSetContext>? recentSets,
+    List<RecentNutritionLogContext>? recentNutritionLogs,
   }) async {
     final token = await _bearerToken();
     final uri = Uri.parse('$_functionsBaseUrl/voice-chat');
 
-    final historyJson = history
-        .map((m) => <String, String>{
-              'role': m.role == VoiceRole.user ? 'user' : 'assistant',
-              'content': m.content,
-            })
-        .toList();
+    final body = <String, dynamic>{
+      'session_id': sessionId,
+      'user_message': userMessage,
+      'history': _serializeHistory(history),
+      'context': _buildContext(
+        weightUnit: weightUnit,
+        recentSets: recentSets,
+        recentNutritionLogs: recentNutritionLogs,
+      ),
+      'session_logging_enabled': settings.sessionLoggingEnabled,
+    };
 
     final response = await http.post(
       uri,
@@ -92,15 +68,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(<String, dynamic>{
-        'session_id': sessionId,
-        'user_message': userMessage,
-        'history': historyJson,
-        'context': <String, dynamic>{
-          'weight_unit': 'kg',
-        },
-        'session_logging_enabled': settings.sessionLoggingEnabled,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode != 200) {
@@ -108,65 +76,7 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final kind = json['kind'] as String?;
-
-    if (kind == 'tool_call') {
-      // Surface tool-call results as a readable assistant message for now.
-      // C-5 (Brain) will handle proper tool dispatch.
-      final toolCall = json['tool_call'] as Map<String, dynamic>? ?? {};
-      final toolName = toolCall['name'] as String? ?? 'action';
-      return VoiceMessage(
-        role: VoiceRole.assistant,
-        content: '[tool: $toolName]',
-        createdAt: DateTime.now(),
-      );
-    }
-
-    return VoiceMessage(
-      role: VoiceRole.assistant,
-      content: json['message'] as String? ?? '',
-      createdAt: DateTime.now(),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Synthesise (voice-tts)
-  // ---------------------------------------------------------------------------
-
-  @override
-  Future<List<int>> synthesise({
-    required String text,
-    required String sessionId,
-    required TtsVoice voice,
-    bool sessionLoggingEnabled = false,
-  }) async {
-    final token = await _bearerToken();
-    final uri = Uri.parse('$_functionsBaseUrl/voice-tts');
-
-    final response = await http.post(
-      uri,
-      headers: <String, String>{
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(<String, dynamic>{
-        'text': text,
-        'voice': voice.apiValue,
-        'session_id': sessionId,
-        'session_logging_enabled': sessionLoggingEnabled,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      _throwFromErrorBody(
-        response.headers['content-type']?.contains('json') == true
-            ? response.body
-            : '{"error":"TTS failed"}',
-        response.statusCode,
-      );
-    }
-
-    return response.bodyBytes.toList();
+    return _parseResult(json);
   }
 
   // ---------------------------------------------------------------------------
@@ -190,10 +100,14 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     final rows = result as List<dynamic>;
     final usedUsd = rows.fold<double>(
       0.0,
-      (sum, row) => sum + ((row as Map<String, dynamic>)['cost_usd'] as num).toDouble(),
+      (sum, row) =>
+          sum + ((row as Map<String, dynamic>)['cost_usd'] as num).toDouble(),
     );
 
-    return VoiceBudget(usedUsd: usedUsd, dailyCapUsd: 1.0);
+    return VoiceBudget(
+      usedUsd: usedUsd,
+      dailyCapUsd: VoiceConstants.dailyBudgetCapUsd,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -209,20 +123,181 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
   }
 
   // ---------------------------------------------------------------------------
+  // Context builder
+  // ---------------------------------------------------------------------------
+
+  Map<String, dynamic> _buildContext({
+    required WeightUnit weightUnit,
+    List<RecentSetContext>? recentSets,
+    List<RecentNutritionLogContext>? recentNutritionLogs,
+  }) {
+    final now = DateTime.now();
+    final currentDate = _formatDate(now);
+
+    return <String, dynamic>{
+      'current_date': currentDate,
+      'weight_unit': _weightUnitCode(weightUnit),
+      'recent_sets': recentSets
+              ?.map((s) => <String, dynamic>{
+                    'set_id': s.setId,
+                    'exercise_name': s.exerciseName,
+                    'weight': s.weight,
+                    'reps': s.reps,
+                    'intensity': s.intensity,
+                    'date': _formatDate(s.date),
+                  })
+              .toList() ??
+          <dynamic>[],
+      'recent_nutrition_logs': recentNutritionLogs
+              ?.map((l) => <String, dynamic>{
+                    'log_id': l.logId,
+                    'meal_name': l.mealName,
+                    'calories': l.calories,
+                    'date': _formatDate(l.date),
+                  })
+              .toList() ??
+          <dynamic>[],
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Result parser
+  // ---------------------------------------------------------------------------
+
+  VoiceChatResult _parseResult(Map<String, dynamic> json) {
+    final kind = json['kind'] as String?;
+
+    if (kind == 'tool_call') {
+      final tc = json['tool_call'] as Map<String, dynamic>? ?? <String, dynamic>{};
+      final toolName = tc['name'] as String? ?? '';
+      final toolCallId = tc['id'] as String? ?? '';
+      final args = (tc['arguments'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+
+      // clarify → plain text spoken question
+      if (toolName == 'clarify') {
+        final question = args['question'] as String? ?? '';
+        return VoiceChatTextResponse(
+          message: VoiceMessage(
+            role: VoiceRole.assistant,
+            content: question,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+
+      // Query tools → client executes locally, no confirmation card
+      const queryTools = <String>{'getWeeklyVolume', 'getDailyMacros', 'getRecentSets'};
+      if (queryTools.contains(toolName)) {
+        return VoiceChatQueryCall(
+          toolCallId: toolCallId,
+          toolName: toolName,
+          args: args,
+        );
+      }
+
+      // Mutation tools → show confirmation card
+      final displaySummary = _buildDisplaySummary(toolName, args);
+      return VoiceChatMutationCall(
+        toolCall: VoiceToolCall(
+          id: toolCallId,
+          toolName: toolName,
+          displaySummary: displaySummary,
+          args: args,
+        ),
+      );
+    }
+
+    // Plain text message
+    return VoiceChatTextResponse(
+      message: VoiceMessage(
+        role: VoiceRole.assistant,
+        content: json['content'] as String? ?? json['message'] as String? ?? '',
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Display summary builder
+  // ---------------------------------------------------------------------------
+
+  /// Builds the human-readable summary shown on [VoiceConfirmationCard].
+  /// Built from LLM-provided args only — never issues a DB read.
+  /// Falls back to the tool name if args are incomplete (defensive).
+  String _buildDisplaySummary(String toolName, Map<String, dynamic> args) {
+    switch (toolName) {
+      case 'logWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'Exercise';
+        final weight = args['weight'] as num? ?? 0;
+        final reps = args['reps'] as num? ?? 0;
+        return 'Log: $exercise — $weight × $reps reps';
+
+      case 'editWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'set';
+        final parts = <String>[];
+        if (args['reps'] != null) parts.add('reps: ${args['reps']}');
+        if (args['weight'] != null) parts.add('weight: ${args['weight']}');
+        if (args['intensity'] != null) parts.add('intensity: ${args['intensity']}');
+        final changes = parts.isEmpty ? 'no changes' : parts.join(', ');
+        return 'Edit: $exercise ($changes)';
+
+      case 'deleteWorkoutSet':
+        final exercise = args['exerciseName'] as String? ?? 'set';
+        return 'Delete: $exercise set';
+
+      case 'logNutrition':
+        final meal = args['mealName'] as String? ?? 'Meal';
+        final cals = args['calories'] as num?;
+        final grams = args['gramsConsumed'] as num?;
+        if (grams != null) return 'Log: $meal — ${grams}g';
+        if (cals != null) return 'Log: $meal — $cals kcal';
+        return 'Log: $meal';
+
+      case 'editNutritionLog':
+        final meal = args['mealName'] as String? ?? 'nutrition log';
+        return 'Edit: $meal';
+
+      case 'deleteNutritionLog':
+        final meal = args['mealName'] as String? ?? 'nutrition log';
+        return 'Delete: $meal';
+
+      default:
+        return toolName;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // History serializer
+  // ---------------------------------------------------------------------------
+
+  List<Map<String, String>> _serializeHistory(List<VoiceMessage> history) {
+    return history
+        .map((m) => <String, String>{
+              'role': m.role == VoiceRole.user ? 'user' : 'assistant',
+              'content': m.content,
+            })
+        .toList();
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
-  String _extensionFor(String mimeType) {
-    switch (mimeType) {
-      case 'audio/wav':
-        return 'wav';
-      case 'audio/mp4':
-      case 'audio/m4a':
-        return 'm4a';
-      case 'audio/ogg':
-        return 'ogg';
-      default:
-        return 'webm';
+  String _formatDate(DateTime dt) =>
+      '${dt.year.toString().padLeft(4, '0')}-'
+      '${dt.month.toString().padLeft(2, '0')}-'
+      '${dt.day.toString().padLeft(2, '0')}';
+
+  /// Maps the in-app [WeightUnit] enum to the short code the Edge
+  /// Function's system prompt expects. This is the **only** place in
+  /// `lib/` where 'kg' / 'lb' literals are allowed — every other layer
+  /// uses the typed enum.
+  String _weightUnitCode(WeightUnit unit) {
+    switch (unit) {
+      case WeightUnit.kilograms:
+        return 'kg';
+      case WeightUnit.pounds:
+        return 'lb';
     }
   }
 
@@ -231,7 +306,9 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
     try {
       final json = jsonDecode(body) as Map<String, dynamic>;
       message = json['error'] as String? ?? message;
-    } catch (_) {}
+    } catch (_) {
+      // Body is not JSON — keep the default message.
+    }
     throw ServerFailure(message);
   }
 }
