@@ -3,7 +3,7 @@ import 'package:get_it/get_it.dart';
 import '../../features/history/history.dart';
 
 void registerHistoryModule(GetIt sl) {
-  sl.registerFactory(
+  sl.registerLazySingleton(
     () => HistoryBloc(
       getAllWorkoutSets: sl(),
       getSetsByDateRange: sl(),

@@ -9,9 +9,16 @@ import '../../data/datasources/remote/supabase_voice_remote_datasource.dart';
 import '../../data/datasources/remote/voice_remote_datasource.dart';
 import '../../data/repositories/voice_repository_impl.dart';
 import '../../domain/repositories/voice_repository.dart';
+import '../../domain/usecases/exercises/get_all_exercises.dart';
+import '../../domain/usecases/nutrition_logs/get_daily_macros.dart';
+import '../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../domain/usecases/voice/delete_voice_history.dart';
 import '../../domain/usecases/voice/get_voice_budget.dart';
 import '../../domain/usecases/voice/send_voice_message.dart';
+import '../../domain/usecases/workout_sets/get_sets_by_date_range.dart';
+import '../../domain/usecases/workout_sets/get_weekly_sets.dart';
+import '../../features/history/history.dart';
+import '../../features/log/log.dart';
 import '../../features/settings/application/app_settings_cubit.dart';
 import '../../features/voice/application/voice_bloc.dart';
 import '../../features/voice/application/voice_settings_cubit.dart';
@@ -90,6 +97,9 @@ void registerVoiceModule(GetIt sl) {
   // VoiceBloc: factory — per voice overlay instance.
   // `currentVoiceSettings` is a callback so the bloc reads the latest values
   // from the singleton AppSettingsCubit at every chat turn (no stale snapshot).
+  // C-5 mutation targets (WorkoutBloc, NutritionLogBloc, HistoryBloc) are
+  // singletons — accessed via sl<> so the factory closes over the singleton
+  // references at construction time without triggering re-creation.
   sl.registerFactory(
     () => VoiceBloc(
       sendVoiceMessage: sl(),
@@ -103,6 +113,14 @@ void registerVoiceModule(GetIt sl) {
       networkStatusService: sl<NetworkStatusService>(),
       wakeWordService: sl<VoiceWakeWordService>(),
       wakelockService: sl<WakelockService>(),
+      workoutBloc: sl<WorkoutBloc>(),
+      nutritionLogBloc: sl<NutritionLogBloc>(),
+      historyBloc: sl<HistoryBloc>(),
+      getSetsByDateRange: sl<GetSetsByDateRange>(),
+      getDailyMacros: sl<GetDailyMacros>(),
+      getWeeklySets: sl<GetWeeklySets>(),
+      getAllExercises: sl<GetAllExercises>(),
+      getLogsForDate: sl<GetLogsForDate>(),
     ),
   );
 }

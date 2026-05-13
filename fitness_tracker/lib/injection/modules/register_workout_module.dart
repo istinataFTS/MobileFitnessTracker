@@ -21,7 +21,7 @@ import '../../domain/usecases/workout_sets/update_workout_set.dart';
 import '../../features/log/log.dart';
 
 void registerWorkoutModule(GetIt sl) {
-  sl.registerFactory(
+  sl.registerLazySingleton(
     () => WorkoutBloc(
       addWorkoutSet: sl(),
       getWeeklySets: sl(),
