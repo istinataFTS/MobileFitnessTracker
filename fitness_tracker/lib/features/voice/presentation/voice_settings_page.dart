@@ -100,7 +100,8 @@ class VoiceSettingsPage extends StatelessWidget {
                 max: 1.0,
                 divisions: 10,
                 label: '${(settings.ttsVolume * 100).round()}%',
-                onChanged: cubit.setTtsVolume,
+                onChanged: cubit.previewTtsVolume,
+                onChangeEnd: cubit.setTtsVolume,
               ),
               _SliderTile(
                 key: VoiceSettingsPageKeys.ttsSpeechRateSliderKey,
@@ -111,7 +112,8 @@ class VoiceSettingsPage extends StatelessWidget {
                 max: VoiceConstants.maxTtsSpeechRate,
                 divisions: 6,
                 label: '${settings.ttsSpeechRate.toStringAsFixed(1)}×',
-                onChanged: cubit.setTtsSpeechRate,
+                onChanged: cubit.previewTtsSpeechRate,
+                onChangeEnd: cubit.setTtsSpeechRate,
               ),
 
               // ── Daily Budget ──────────────────────────────────────────
@@ -179,15 +181,21 @@ class VoiceSettingsPage extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(dialogContext).pop();
-              // VoiceBloc is not in scope here (settings opened from Profile
-              // without an active overlay). Use the DI-registered facade.
-              // The actual delete is fire-and-forget; the snackbar is omitted
-              // here — C-5 can wire a result listener if needed.
-              context
-                  .read<VoiceSettingsCubit>();
-              // Trigger via VoiceBloc if available; else no-op — handled in C-5.
+              final success =
+                  await context.read<VoiceSettingsCubit>().clearHistory();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? AppStrings.voiceDeleteHistorySuccess
+                          : AppStrings.voiceDeleteHistoryFailed,
+                    ),
+                  ),
+                );
+              }
             },
             child: const Text(
               AppStrings.voiceDeleteHistoryConfirmButton,
@@ -327,6 +335,7 @@ class _SliderTile extends StatelessWidget {
     required this.divisions,
     required this.label,
     required this.onChanged,
+    this.onChangeEnd,
     super.key,
   });
 
@@ -338,6 +347,7 @@ class _SliderTile extends StatelessWidget {
   final int divisions;
   final String label;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -382,6 +392,7 @@ class _SliderTile extends StatelessWidget {
             activeColor: AppTheme.primaryOrange,
             inactiveColor: AppTheme.borderMedium,
             onChanged: onChanged,
+            onChangeEnd: onChangeEnd,
           ),
         ],
       ),

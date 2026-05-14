@@ -76,6 +76,7 @@ void main() {
   setUp(() {
     cubit = MockVoiceSettingsCubit();
     when(() => cubit.state).thenReturn(const VoiceSettings.defaults());
+    when(() => cubit.clearHistory()).thenAnswer((_) async => true);
     whenListen(
       cubit,
       Stream<VoiceSettings>.empty(),
@@ -229,6 +230,46 @@ void main() {
         );
 
         verify(() => cubit.setWakeWordArmedInForeground(false)).called(1);
+      });
+    });
+
+    group('delete history', () {
+      testWidgets('calls clearHistory on confirm', (tester) async {
+        await tester.pumpWidget(_wrap(cubit));
+        await tester.scrollUntilVisible(
+          find.byKey(VoiceSettingsPageKeys.deleteHistoryButtonKey),
+          100,
+        );
+        await tester.tap(
+          find.byKey(VoiceSettingsPageKeys.deleteHistoryButtonKey),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap the "Delete" confirmation button in the dialog.
+        await tester.tap(find.text(AppStrings.voiceDeleteHistoryConfirmButton));
+        await tester.pumpAndSettle();
+
+        verify(() => cubit.clearHistory()).called(1);
+      });
+
+      testWidgets('shows success snackbar after deletion', (tester) async {
+        await tester.pumpWidget(_wrap(cubit));
+        await tester.scrollUntilVisible(
+          find.byKey(VoiceSettingsPageKeys.deleteHistoryButtonKey),
+          100,
+        );
+        await tester.tap(
+          find.byKey(VoiceSettingsPageKeys.deleteHistoryButtonKey),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text(AppStrings.voiceDeleteHistoryConfirmButton));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(AppStrings.voiceDeleteHistorySuccess),
+          findsOneWidget,
+        );
       });
     });
   });
