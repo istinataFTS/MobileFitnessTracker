@@ -20,4 +20,10 @@ abstract final class VoiceOverlayKeys {
   static const Key closeButtonKey = ValueKey<String>('voice_overlay_close_button');
   static const Key settingsButtonKey = ValueKey<String>('voice_overlay_settings_button');
   static const Key budgetIndicatorKey = ValueKey<String>('voice_overlay_budget_indicator');
+
+  // Edit bar (appears after tapping Edit on the confirmation card)
+  static const Key editBarKey = ValueKey<String>('voice_edit_bar');
+  static const Key editBarFieldKey = ValueKey<String>('voice_edit_bar_field');
+  static const Key editBarSendKey = ValueKey<String>('voice_edit_bar_send');
+  static const Key editBarDiscardKey = ValueKey<String>('voice_edit_bar_discard');
 }

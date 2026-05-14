@@ -434,6 +434,11 @@ class AppStrings {
   static const String voiceConfirmEdit = 'Edit';
   static const String voiceConfirmCancel = 'Cancel';
 
+  // ── Voice edit bar (shown after tapping Edit on the confirmation card) ─────
+  static const String voiceEditBarHint = 'Correct the action…';
+  static const String voiceEditBarSend = 'Send correction';
+  static const String voiceEditBarDiscard = 'Discard';
+
   // ── Voice workout-mode banner ──────────────────────────────────────────────
   static const String voiceWorkoutModeBanner =
       'Workout Mode — screen stays on';
