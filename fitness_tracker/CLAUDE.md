@@ -90,12 +90,17 @@ SQLite via `sqflite`. Current schema version: **19**. Migration history is docum
 
 ### Voice bot
 
-The voice feature (C-1 backend complete) is split across:
+The voice feature is split across Flutter (on-device I/O) and a single Supabase Edge Function (LLM):
 
-- **Flutter side** (`features/voice/`, `data/datasources/remote/supabase_voice_remote_datasource.dart`): `VoiceBloc` orchestrates STT → chat → TTS in sequence. History is capped at the last 3 turns before sending to the API. Guest users cannot use voice.
-- **Backend** (`supabase/functions/`): three Deno Edge Functions (`voice-stt`, `voice-chat`, `voice-tts`) backed by OpenAI (Whisper, GPT-4o-mini, TTS-1). Shared modules live in `_shared/`. All calls are logged to `voice_usage_log` for cost monitoring, including failures (`status=<error_code>`, `cost_usd=0`).
+- **STT** — on-device via `speech_to_text` (`SpeechToTextVoiceSttService`). No server call, no cost. Hard-capped at 10 s per utterance (`VoiceConstants.sttListenTimeout`).
+- **LLM** — one Deno Edge Function (`supabase/functions/voice-chat/`) backed by GPT-4o-mini. Receives the transcript + up to 3 turns of history, returns plain text or a structured tool call. Daily cap: $0.50/UTC-day enforced server-side.
+- **TTS** — on-device via `flutter_tts` (`FlutterTtsVoiceTtsService`). No server call, no cost.
+- **Wake word** — on-device Picovoice Porcupine (`PorcupineVoiceWakeWordService`), 3 presets: samoLevski, trainer, thomas.
+- **`VoiceBloc`** (`features/voice/application/`) orchestrates the full STT → chat → TTS sequence and owns the tool dispatcher. Tool calls are dispatched to existing blocs (`WorkoutBloc`, `NutritionLogBloc`, `HistoryBloc`) — never to repositories directly.
+- **Shared backend modules** live in `supabase/functions/_shared/` (budget enforcement, OpenAI chat wrapper, cost accounting). All LLM calls are logged to `voice_usage_log`, including failures (`status=<error_code>`, `cost_usd=0`).
 - `OPENAI_API_KEY` lives exclusively as a Supabase function secret — it is never present in Flutter client code.
 - If Supabase is not configured, the voice module falls back to `NoopVoiceRemoteDataSource` (all calls return `ServerFailure`).
+- Guest users cannot use voice (FAB is visible-but-disabled with a sign-in CTA).
 
 ### Feature list
 
