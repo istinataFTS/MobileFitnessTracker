@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -62,14 +63,21 @@ class SupabaseVoiceRemoteDataSource implements VoiceRemoteDataSource {
       'session_logging_enabled': settings.sessionLoggingEnabled,
     };
 
-    final response = await http.post(
-      uri,
-      headers: <String, String>{
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+    final http.Response response;
+    try {
+      response = await http.post(
+        uri,
+        headers: <String, String>{
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      ).timeout(VoiceConstants.voiceChatHttpTimeout);
+    } on TimeoutException {
+      throw const ServerFailure(
+        'TIMEOUT: Voice service did not respond in time',
+      );
+    }
 
     if (response.statusCode != 200) {
       _throwFromErrorBody(response.body, response.statusCode);

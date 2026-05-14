@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../domain/entities/voice_settings.dart';
+import '../../../domain/usecases/voice/delete_voice_history.dart';
 import '../../settings/application/app_settings_cubit.dart';
 
 /// Thin facade exposing the voice-specific slice of [AppSettingsCubit].
@@ -21,8 +22,11 @@ import '../../settings/application/app_settings_cubit.dart';
 ///   setting from the Voice Settings page is immediately reflected
 ///   in the main Settings page and vice versa.
 class VoiceSettingsCubit extends Cubit<VoiceSettings> {
-  VoiceSettingsCubit({required AppSettingsCubit appSettingsCubit})
-      : _appSettingsCubit = appSettingsCubit,
+  VoiceSettingsCubit({
+    required AppSettingsCubit appSettingsCubit,
+    required DeleteVoiceHistory deleteVoiceHistory,
+  })  : _appSettingsCubit = appSettingsCubit,
+        _deleteVoiceHistory = deleteVoiceHistory,
         super(appSettingsCubit.state.settings.voiceSettings) {
     // Ensure settings are loaded from disk before the UI starts
     // reading from this cubit. If a load is already in flight or
@@ -39,6 +43,7 @@ class VoiceSettingsCubit extends Cubit<VoiceSettings> {
   }
 
   final AppSettingsCubit _appSettingsCubit;
+  final DeleteVoiceHistory _deleteVoiceHistory;
   late final StreamSubscription<VoiceSettings> _subscription;
 
   Future<void> _init() async {
@@ -75,6 +80,33 @@ class VoiceSettingsCubit extends Cubit<VoiceSettings> {
 
   Future<bool> setWakeWordArmedInForeground(bool armed) =>
       _appSettingsCubit.setVoiceWakeWordArmedInForeground(armed);
+
+  // ---------------------------------------------------------------------------
+  // Slider previews — emit local state without writing to disk.
+  // Use on [Slider.onChanged] for instant visual feedback; pair with the
+  // persisting setter on [Slider.onChangeEnd].
+  // ---------------------------------------------------------------------------
+
+  /// Live volume preview — does NOT persist. Pair with [setTtsVolume].
+  void previewTtsVolume(double volume) {
+    _emitIfOpen(state.copyWith(ttsVolume: volume));
+  }
+
+  /// Live speech-rate preview — does NOT persist. Pair with [setTtsSpeechRate].
+  void previewTtsSpeechRate(double rate) {
+    _emitIfOpen(state.copyWith(ttsSpeechRate: rate));
+  }
+
+  // ---------------------------------------------------------------------------
+  // History
+  // ---------------------------------------------------------------------------
+
+  /// Deletes all stored voice conversation history.
+  /// Returns `true` on success, `false` on failure.
+  Future<bool> clearHistory() async {
+    final result = await _deleteVoiceHistory();
+    return result.isRight();
+  }
 
   @override
   Future<void> close() async {

@@ -48,6 +48,12 @@ export async function getBudgetState(
  * Pre-call budget gate. Throws `BUDGET_EXCEEDED` (402) when the user has
  * met or crossed the daily cap. Use this BEFORE issuing any OpenAI call.
  *
+ * **Known limitation:** there is a TOCTOU window between this check and the
+ * later `logUsage` call — two concurrent requests from the same user can
+ * both pass the gate before either logs cost. Practical exposure is at most
+ * one extra ~$0.01 call against a $0.50 cap. An atomic Postgres function
+ * (advisory lock + insert) would eliminate this; tracked for a future PR.
+ *
  * Returns `{ usedUsd, remainingUsd }` for callers that want to log /
  * surface the pre-call values; callers needing a non-throwing read after
  * a successful call should use `getBudgetState` instead.

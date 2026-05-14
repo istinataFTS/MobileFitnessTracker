@@ -36,7 +36,13 @@ abstract final class VoiceConstants {
   /// utterances ("log bench, 80 by 10") rather than free-form prose.
   static const Duration sttSilenceTimeout = Duration(seconds: 2);
 
+  /// HTTP timeout for the `voice-chat` Edge Function call. Generous
+  /// enough for GPT-4o-mini (typically 1–3 s) plus network latency,
+  /// but short enough to avoid hanging indefinitely on poor connections.
+  static const Duration voiceChatHttpTimeout = Duration(seconds: 30);
+
   /// Hard upper bound for STT listening ΓÇö even if the user keeps
   /// talking, force a stop at this duration to bound costs and UX.
-  static const Duration sttListenTimeout = Duration(seconds: 30);
+  /// Spec §3.4 mandates a 10-second window.
+  static const Duration sttListenTimeout = Duration(seconds: 10);
 }

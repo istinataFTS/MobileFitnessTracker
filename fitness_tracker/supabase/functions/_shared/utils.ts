@@ -2,10 +2,14 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 import { CORS_HEADERS } from './cors.ts';
 
 export function serviceClient(): SupabaseClient {
-  return createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  );
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) {
+    throw new Error(
+      'Service client misconfigured: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set',
+    );
+  }
+  return createClient(url, key);
 }
 
 export function msSince(t0: number): number {

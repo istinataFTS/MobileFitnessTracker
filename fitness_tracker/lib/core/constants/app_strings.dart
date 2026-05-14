@@ -434,6 +434,11 @@ class AppStrings {
   static const String voiceConfirmEdit = 'Edit';
   static const String voiceConfirmCancel = 'Cancel';
 
+  // ── Voice edit bar (shown after tapping Edit on the confirmation card) ─────
+  static const String voiceEditBarHint = 'Correct the action…';
+  static const String voiceEditBarSend = 'Send correction';
+  static const String voiceEditBarDiscard = 'Discard';
+
   // ── Voice workout-mode banner ──────────────────────────────────────────────
   static const String voiceWorkoutModeBanner =
       'Workout Mode — screen stays on';
@@ -459,6 +464,9 @@ class AppStrings {
       'This removes all saved transcripts for your account. '
       'Usage logs are kept for billing purposes.';
   static const String voiceDeleteHistoryConfirmButton = 'Delete';
+  static const String voiceDeleteHistorySuccess = 'Voice history deleted.';
+  static const String voiceDeleteHistoryFailed =
+      'Could not delete voice history. Please try again.';
   static const String voiceBudgetSectionTitle = 'Daily Budget';
   static const String voiceBudgetResetNote =
       'Resets at midnight UTC · Cap: \$0.50/day';
@@ -504,6 +512,45 @@ class AppStrings {
       "Something went wrong. Please try again.";
   static const String voiceSpokenTimeout =
       "That took too long. Please try again.";
+
+  // ── Voice STT display messages (shown in transcript) ─────────────────────
+  static const String voiceSttErrorPermission =
+      'Microphone access is required. Please allow it and try again.';
+  static const String voiceSttErrorPermissionPermanent =
+      'Microphone access is permanently denied. Enable it in system settings.';
+  static const String voiceSttErrorUnavailable =
+      'Voice recognition is not available on this device.';
+  static const String voiceSttErrorNoSpeech =
+      'I did not catch that. Please try again.';
+  static const String voiceSttErrorNetwork =
+      'Voice recognition needs an internet connection right now.';
+  static const String voiceSttErrorUnknown =
+      'Voice recognition failed. Please try again.';
+
+  // ── Voice query response templates ───────────────────────────────────────
+  static const String voiceQueryWorkoutUnavailable =
+      'I could not retrieve your workout data right now.';
+  static const String voiceQueryNutritionUnavailable =
+      'I could not retrieve your nutrition data right now.';
+  static const String voiceQueryNothingLogged =
+      'Nothing has been logged for that day yet.';
+  static const String voiceQueryRecentSetsUnavailable =
+      'I could not retrieve your recent sets right now.';
+  static const String voiceQueryNoRecentSets = 'No recent sets found.';
+
+  static String voiceQueryNoSetsInPeriod(String period) =>
+      'No $period logged in that period.';
+  static String voiceQueryVolumeResult(
+          int total, String groupLabel, String breakdown) =>
+      'You logged $total $groupLabel: $breakdown.';
+  static String voiceQueryMacroResult(
+          int calories, int protein, int carbs, int fats) =>
+      'For that day: $calories calories, ${protein}g protein, '
+      '${carbs}g carbs, ${fats}g fat.';
+  static String voiceQueryNoRecentSetsFor(String exerciseName) =>
+      'No recent sets found for $exerciseName.';
+  static String voiceQueryRecentSetsResult(String lines) =>
+      'Most recent sets: $lines.';
 
   // ── Wake word preset labels ────────────────────────────────────────────────
   static const String wakeWordSamoLevski = 'Samo Levski';

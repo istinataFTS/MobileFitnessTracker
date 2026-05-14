@@ -91,7 +91,10 @@ void registerVoiceModule(GetIt sl) {
   // AppSettingsCubit's stream, but the *state* it mirrors comes from the
   // shared singleton, so all instances see the same values.
   sl.registerFactory(
-    () => VoiceSettingsCubit(appSettingsCubit: sl<AppSettingsCubit>()),
+    () => VoiceSettingsCubit(
+      appSettingsCubit: sl<AppSettingsCubit>(),
+      deleteVoiceHistory: sl<DeleteVoiceHistory>(),
+    ),
   );
 
   // VoiceBloc: factory — per voice overlay instance.

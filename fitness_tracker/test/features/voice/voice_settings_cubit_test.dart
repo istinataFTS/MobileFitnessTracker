@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/domain/repositories/app_settings_repository.dart';
+import 'package:fitness_tracker/domain/usecases/voice/delete_voice_history.dart';
 import 'package:fitness_tracker/features/settings/application/app_settings_cubit.dart';
 import 'package:fitness_tracker/features/voice/application/voice_settings_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,8 @@ import 'package:mocktail/mocktail.dart';
 // ---------------------------------------------------------------------------
 
 class MockAppSettingsRepository extends Mock implements AppSettingsRepository {}
+
+class MockDeleteVoiceHistory extends Mock implements DeleteVoiceHistory {}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,6 +39,13 @@ void main() {
   });
 
   group('VoiceSettingsCubit', () {
+    late MockDeleteVoiceHistory deleteVoiceHistory;
+
+    setUp(() {
+      deleteVoiceHistory = MockDeleteVoiceHistory();
+      when(() => deleteVoiceHistory()).thenAnswer((_) async => const Right(null));
+    });
+
     test(
         'initial state is derived from AppSettingsCubit.state.settings.voiceSettings',
         () async {
@@ -55,7 +65,10 @@ void main() {
       await appCubit.ensureLoaded();
 
       final voiceCubit =
-          VoiceSettingsCubit(appSettingsCubit: appCubit);
+          VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
       // Allow _init() to complete.
       await Future<void>.delayed(Duration.zero);
 
@@ -70,7 +83,10 @@ void main() {
         () async {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       // Should not throw.
       await voiceCubit.close();
@@ -81,7 +97,10 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       await voiceCubit.setWakeWordPreset(WakeWordPreset.trainer);
 
@@ -97,7 +116,10 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       await voiceCubit.setSessionLoggingEnabled(true);
 
@@ -113,7 +135,10 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       await voiceCubit.setTtsVolume(0.6);
 
@@ -129,7 +154,10 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       await voiceCubit.setTtsSpeechRate(0.9);
 
@@ -146,7 +174,10 @@ void main() {
       final repo = _stubRepo();
       final appCubit = _makeAppSettingsCubit(repo);
       await appCubit.ensureLoaded();
-      final voiceCubit = VoiceSettingsCubit(appSettingsCubit: appCubit);
+      final voiceCubit = VoiceSettingsCubit(
+            appSettingsCubit: appCubit,
+            deleteVoiceHistory: deleteVoiceHistory,
+          );
 
       final statesBefore = voiceCubit.state;
 

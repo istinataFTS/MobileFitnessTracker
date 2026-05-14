@@ -52,9 +52,16 @@ class _VoiceOverlayViewState extends State<_VoiceOverlayView> {
   StreamSubscription<bool>? _connectivitySub;
   StreamSubscription<WakeWordPreset>? _wakeWordSub;
 
+  /// Non-null while the user is correcting a pending confirmation via the
+  /// edit bar. Set to the [VoiceToolCall.displaySummary] when Edit is tapped;
+  /// cleared on Send or Discard.
+  String? _editPrefill;
+  late final TextEditingController _editController;
+
   @override
   void initState() {
     super.initState();
+    _editController = TextEditingController();
     _checkInitialConnectivity();
     _subscribeToConnectivity();
     _subscribeToWakeWord();
@@ -64,6 +71,7 @@ class _VoiceOverlayViewState extends State<_VoiceOverlayView> {
   void dispose() {
     _connectivitySub?.cancel();
     _wakeWordSub?.cancel();
+    _editController.dispose();
     super.dispose();
   }
 
@@ -154,12 +162,35 @@ class _VoiceOverlayViewState extends State<_VoiceOverlayView> {
                           onConfirm: () =>
                               bloc.add(const VoiceConfirmationAccepted()),
                           onEdit: () {
-                            // C-5: populate a text field with the summary for
-                            // editing. For now cancel and let the user re-dictate.
+                            final summary =
+                                state.pendingConfirmation!.displaySummary;
+                            setState(() {
+                              _editPrefill = summary;
+                              _editController
+                                ..text = summary
+                                ..selection = TextSelection(
+                                  baseOffset: 0,
+                                  extentOffset: summary.length,
+                                );
+                            });
                             bloc.add(const VoiceConfirmationCancelled());
                           },
                           onCancel: () =>
                               bloc.add(const VoiceConfirmationCancelled()),
+                        )
+                      else if (_editPrefill != null)
+                        _VoiceEditBar(
+                          controller: _editController,
+                          onSend: (text) {
+                            final trimmed = text.trim();
+                            if (trimmed.isEmpty) return;
+                            setState(() => _editPrefill = null);
+                            bloc.add(VoiceSendMessage(trimmed));
+                          },
+                          onDiscard: () => setState(() {
+                            _editPrefill = null;
+                            _editController.clear();
+                          }),
                         ),
                     ],
                   ),
@@ -204,6 +235,80 @@ class _VoiceOverlayViewState extends State<_VoiceOverlayView> {
 }
 
 // ---------------------------------------------------------------------------
+// Edit bar
+// ---------------------------------------------------------------------------
+
+/// Inline text field shown after the user taps "Edit" on a confirmation card.
+///
+/// Pre-populated with the parsed [VoiceToolCall.displaySummary] so the user
+/// can correct numbers or details before re-submitting to the voice bot.
+/// [onSend] fires with the trimmed text; [onDiscard] closes the bar.
+class _VoiceEditBar extends StatelessWidget {
+  const _VoiceEditBar({
+    required this.controller,
+    required this.onSend,
+    required this.onDiscard,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onSend;
+  final VoidCallback onDiscard;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: VoiceOverlayKeys.editBarKey,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceMedium,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderMedium),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: TextField(
+              key: VoiceOverlayKeys.editBarFieldKey,
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(
+                color: AppTheme.textLight,
+                fontSize: 15,
+              ),
+              decoration: const InputDecoration(
+                hintText: AppStrings.voiceEditBarHint,
+                hintStyle: TextStyle(color: AppTheme.textDim),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+              maxLines: null,
+              textInputAction: TextInputAction.send,
+              onSubmitted: onSend,
+            ),
+          ),
+          IconButton(
+            key: VoiceOverlayKeys.editBarDiscardKey,
+            icon: const Icon(Icons.close_rounded),
+            color: AppTheme.textDim,
+            tooltip: AppStrings.voiceEditBarDiscard,
+            onPressed: onDiscard,
+          ),
+          IconButton(
+            key: VoiceOverlayKeys.editBarSendKey,
+            icon: const Icon(Icons.send_rounded),
+            color: AppTheme.primaryOrange,
+            tooltip: AppStrings.voiceEditBarSend,
+            onPressed: () => onSend(controller.text),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
 
@@ -227,7 +332,7 @@ class _OverlayHeader extends StatelessWidget {
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
             color: AppTheme.textMedium,
             onPressed: onClose,
-            tooltip: 'Close',
+            tooltip: AppStrings.close,
           ),
           const Expanded(
             child: Text(
@@ -245,7 +350,7 @@ class _OverlayHeader extends StatelessWidget {
             icon: const Icon(Icons.tune_rounded),
             color: AppTheme.textMedium,
             onPressed: onSettings,
-            tooltip: 'Voice settings',
+            tooltip: AppStrings.voiceSettingsPageTitle,
           ),
         ],
       ),
