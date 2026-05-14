@@ -131,10 +131,18 @@ export async function completeChat(req: ChatRequest): Promise<ChatResponse> {
 
   if (msg?.tool_calls?.[0]) {
     const tc = msg.tool_calls[0];
+    let parsedArgs: Record<string, unknown> = {};
+    try {
+      parsedArgs = JSON.parse(tc.function.arguments ?? '{}');
+    } catch {
+      console.warn(
+        `[voice] malformed tool-call arguments from model: ${tc.function.arguments}`,
+      );
+    }
     result.toolCall = {
       id: tc.id,
       name: tc.function.name,
-      arguments: JSON.parse(tc.function.arguments ?? '{}'),
+      arguments: parsedArgs,
     };
   } else {
     result.message = msg?.content ?? '';

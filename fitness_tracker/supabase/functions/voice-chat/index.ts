@@ -98,6 +98,31 @@ export function sanitizeHistory(raw: unknown[]): Turn[] {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Context array type guards — silently drop malformed entries rather than
+// crashing on a bad cast.
+// ---------------------------------------------------------------------------
+
+function isRecentSet(v: unknown): v is RecentSetContext {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.setId === 'string'
+    && typeof o.exerciseName === 'string'
+    && typeof o.weight === 'number'
+    && typeof o.reps === 'number'
+    && typeof o.intensity === 'number'
+    && typeof o.date === 'string';
+}
+
+function isRecentNutritionLog(v: unknown): v is RecentNutritionLogContext {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.logId === 'string'
+    && typeof o.mealName === 'string'
+    && typeof o.calories === 'number'
+    && typeof o.date === 'string';
+}
+
 async function parseChat(req: Request): Promise<ParsedChat> {
   let body: Record<string, unknown>;
   try {
@@ -131,9 +156,11 @@ async function parseChat(req: Request): Promise<ParsedChat> {
     currentDate: typeof ctx.currentDate === 'string' ? ctx.currentDate : new Date().toISOString().slice(0, 10),
     weightUnit: ctx.weightUnit === 'lb' ? 'lb' : 'kg',
     recentExerciseIds: Array.isArray(ctx.recentExerciseIds) ? ctx.recentExerciseIds : [],
-    recentSets: Array.isArray(ctx.recentSets) ? (ctx.recentSets as RecentSetContext[]) : [],
+    recentSets: Array.isArray(ctx.recentSets)
+      ? ctx.recentSets.filter(isRecentSet)
+      : [],
     recentNutritionLogs: Array.isArray(ctx.recentNutritionLogs)
-      ? (ctx.recentNutritionLogs as RecentNutritionLogContext[])
+      ? ctx.recentNutritionLogs.filter(isRecentNutritionLog)
       : [],
   };
 
@@ -268,6 +295,10 @@ Deno.serve(async (req) => {
   const t0 = performance.now();
   const corsResp = preflight(req);
   if (corsResp) return corsResp;
+
+  if (req.method !== 'POST') {
+    return json(405, { code: 'METHOD_NOT_ALLOWED', message: 'Only POST is accepted' });
+  }
 
   try {
     return await handleChat(req, t0);
