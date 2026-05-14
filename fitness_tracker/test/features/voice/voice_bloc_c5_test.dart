@@ -648,6 +648,478 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // Mutation dispatch — editWorkoutSet via HistoryBloc
+  // -------------------------------------------------------------------------
+
+  group('editWorkoutSet', () {
+    final editableSet = WorkoutSet(
+      id: 'set-edit-1',
+      exerciseId: 'ex-bench',
+      reps: 8,
+      weight: 80.0,
+      intensity: 3,
+      date: _now,
+      createdAt: _now,
+    );
+
+    test('dispatches UpdateSetEvent when setId is found in recent cache',
+        () async {
+      when(() => getAllExercises())
+          .thenAnswer((_) async => Right([_benchExercise]));
+      // Populate _cachedWorkoutSets with the editable set.
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => Right([editableSet]));
+      when(() => getLogsForDate(any()))
+          .thenAnswer((_) async => const Right([]));
+      when(() => getDailyMacros(any()))
+          .thenAnswer((_) async => const Right({}));
+
+      final historyBloc = MockHistoryBloc();
+      final tts = _FakeTts();
+
+      final args = <String, dynamic>{
+        'setId': 'set-edit-1',
+        'reps': 10,
+        'weight': 90.0,
+      };
+      final toolCall = _mutationToolCall('editWorkoutSet', args);
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => Right(VoiceChatMutationCall(toolCall: toolCall)),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('change that bench press to 90 kg, 10 reps'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verify(() => historyBloc.add(any(that: isA<UpdateSetEvent>()))).called(1);
+      expect(tts.spoken.last, AppStrings.voiceSpokenSetUpdated);
+
+      await bloc.close();
+    });
+
+    test('speaks voiceSpokenToolFailed when setId is not in recent cache',
+        () async {
+      // Empty sets → _cachedWorkoutSets is empty → _fetchSetById returns null.
+      when(() => getAllExercises())
+          .thenAnswer((_) async => Right([_benchExercise]));
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => const Right([]));
+      when(() => getLogsForDate(any()))
+          .thenAnswer((_) async => const Right([]));
+      when(() => getDailyMacros(any()))
+          .thenAnswer((_) async => const Right({}));
+
+      final historyBloc = MockHistoryBloc();
+      final tts = _FakeTts();
+
+      final args = <String, dynamic>{'setId': 'phantom-set', 'reps': 12};
+      final toolCall = _mutationToolCall('editWorkoutSet', args);
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => Right(VoiceChatMutationCall(toolCall: toolCall)),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('edit that last set'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verifyNever(() => historyBloc.add(any()));
+      expect(tts.spoken.last, AppStrings.voiceSpokenToolFailed);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Mutation dispatch — editNutritionLog via HistoryBloc
+  // -------------------------------------------------------------------------
+
+  group('editNutritionLog', () {
+    test('dispatches UpdateNutritionHistoryLogEvent when logId is in recent cache',
+        () async {
+      final editableLog = NutritionLog(
+        id: 'log-edit-1',
+        mealName: 'Chicken',
+        calories: 300,
+        proteinGrams: 30,
+        carbsGrams: 10,
+        fatGrams: 5,
+        loggedAt: _now,
+        createdAt: _now,
+      );
+
+      when(() => getAllExercises())
+          .thenAnswer((_) async => Right([_benchExercise]));
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => const Right([]));
+      // Populate _cachedNutritionLogs with the editable log.
+      when(() => getLogsForDate(any()))
+          .thenAnswer((_) async => Right([editableLog]));
+      when(() => getDailyMacros(any()))
+          .thenAnswer((_) async => const Right({}));
+
+      final historyBloc = MockHistoryBloc();
+      final tts = _FakeTts();
+
+      final args = <String, dynamic>{
+        'logId': 'log-edit-1',
+        'calories': 400.0,
+        'proteinGrams': 35.0,
+      };
+      final toolCall = _mutationToolCall('editNutritionLog', args);
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => Right(VoiceChatMutationCall(toolCall: toolCall)),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('change that chicken to 400 calories'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verify(() =>
+              historyBloc.add(any(that: isA<UpdateNutritionHistoryLogEvent>())))
+          .called(1);
+      expect(tts.spoken.last, AppStrings.voiceSpokenNutritionUpdated);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Mutation dispatch — deleteNutritionLog via HistoryBloc
+  // -------------------------------------------------------------------------
+
+  group('deleteNutritionLog', () {
+    test('dispatches DeleteNutritionHistoryLogEvent to historyBloc', () async {
+      _stubContextUseCases(
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+      );
+
+      final historyBloc = MockHistoryBloc();
+      final tts = _FakeTts();
+
+      final args = <String, dynamic>{'logId': 'log-del-1'};
+      final toolCall = _mutationToolCall('deleteNutritionLog', args);
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => Right(VoiceChatMutationCall(toolCall: toolCall)),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('delete that nutrition log'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verify(() =>
+              historyBloc.add(any(that: isA<DeleteNutritionHistoryLogEvent>())))
+          .called(1);
+      expect(tts.spoken.last, AppStrings.voiceSpokenNutritionDeleted);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Query tool — getWeeklyVolume
+  // -------------------------------------------------------------------------
+
+  group('getWeeklyVolume query', () {
+    test('speaks set count and exercise name breakdown', () async {
+      when(() => getAllExercises())
+          .thenAnswer((_) async => Right([_benchExercise]));
+      final benchSet = WorkoutSet(
+        id: 'set-wv-1',
+        exerciseId: 'ex-bench',
+        reps: 8,
+        weight: 80.0,
+        intensity: 3,
+        date: _now,
+        createdAt: _now,
+      );
+      // Used by both context build (7-day) and the query itself.
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => Right([benchSet]));
+      when(() => getLogsForDate(any()))
+          .thenAnswer((_) async => const Right([]));
+      when(() => getDailyMacros(any()))
+          .thenAnswer((_) async => const Right({}));
+
+      final tts = _FakeTts();
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => const Right(VoiceChatQueryCall(
+          toolCallId: 'call-wv',
+          toolName: 'getWeeklyVolume',
+          args: {},
+        )),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('how many sets did I do this week?'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      // Response should name the exercise and mention the set count.
+      expect(tts.spoken.any((s) => s.contains('Bench Press')), isTrue);
+      expect(tts.spoken.any((s) => s.contains('1')), isTrue);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Query tool — getRecentSets
+  // -------------------------------------------------------------------------
+
+  group('getRecentSets query', () {
+    test('speaks formatted recent sets with exercise name and weight', () async {
+      when(() => getAllExercises())
+          .thenAnswer((_) async => Right([_benchExercise]));
+      final benchSet = WorkoutSet(
+        id: 'set-rs-1',
+        exerciseId: 'ex-bench',
+        reps: 10,
+        weight: 85.0,
+        intensity: 3,
+        date: _now,
+        createdAt: _now,
+      );
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => Right([benchSet]));
+      when(() => getLogsForDate(any()))
+          .thenAnswer((_) async => const Right([]));
+      when(() => getDailyMacros(any()))
+          .thenAnswer((_) async => const Right({}));
+
+      final tts = _FakeTts();
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => const Right(VoiceChatQueryCall(
+          toolCallId: 'call-rs',
+          toolName: 'getRecentSets',
+          args: {},
+        )),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('what were my recent sets?'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      // Response should include exercise name and weight.
+      expect(tts.spoken.any((s) => s.contains('Bench Press')), isTrue);
+      expect(tts.spoken.any((s) => s.contains('85')), isTrue);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Clarify — ambiguous input returns a clarifying question (text response)
+  // -------------------------------------------------------------------------
+
+  group('clarify', () {
+    test('speaks clarifying question and shows no confirmation card', () async {
+      _stubContextUseCases(
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+      );
+
+      final tts = _FakeTts();
+
+      const question =
+          'Which exercise did you mean — bench press or overhead press?';
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer(
+        (_) async => Right(VoiceChatTextResponse(
+          message: VoiceMessage(
+            role: VoiceRole.assistant,
+            content: question,
+            createdAt: _now,
+          ),
+        )),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getBudget: getBudget,
+        getAllExercises: getAllExercises,
+        getSetsByDateRange: getSetsByDateRange,
+        getLogsForDate: getLogsForDate,
+        getDailyMacros: getDailyMacros,
+        tts: tts,
+      );
+
+      bloc.add(VoiceSessionStarted(authSession()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      bloc.add(const VoiceSendMessage('log that exercise I did last time'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      // Clarifying question must be spoken.
+      expect(tts.spoken.any((s) => s.contains(question)), isTrue);
+      // No confirmation card — the user needs to answer first.
+      expect(bloc.state.pendingConfirmation, isNull);
+
+      await bloc.close();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Confirmation cancelled — clears pending confirmation, no dispatch
   // -------------------------------------------------------------------------
 
