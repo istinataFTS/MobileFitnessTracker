@@ -74,7 +74,7 @@ class _VoiceFabState extends State<VoiceFab>
     WidgetsBinding.instance.removeObserver(this);
     _wakeWordSub?.cancel();
     _wakeWordErrorSub?.cancel();
-    widget.wakeWordService.stop();
+    unawaited(widget.wakeWordService.stop());
     _pulseController.dispose();
     super.dispose();
   }
@@ -90,7 +90,7 @@ class _VoiceFabState extends State<VoiceFab>
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
-        widget.wakeWordService.stop();
+        unawaited(widget.wakeWordService.stop());
         _stopPulse();
     }
   }

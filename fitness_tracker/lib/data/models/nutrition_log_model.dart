@@ -96,6 +96,11 @@ class NutritionLogModel extends NutritionLog {
     };
   }
 
+  /// JSON serialization for future API / debugging use.
+  ///
+  /// **Not currently called** — local persistence uses [toMap] (DB column
+  /// names) and remote sync uses `SupabaseNutritionLogDto`. Kept for
+  /// completeness; keys use camelCase per JSON convention.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
