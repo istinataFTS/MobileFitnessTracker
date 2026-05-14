@@ -1019,7 +1019,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     );
 
     return result.fold(
-      (_) => 'I could not retrieve your workout data right now.',
+      (_) => AppStrings.voiceQueryWorkoutUnavailable,
       (sets) {
         var filtered = sets;
         if (exerciseName != null) {
@@ -1033,7 +1033,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         if (filtered.isEmpty) {
           final period =
               muscleGroup != null ? '$muscleGroup sets' : 'sets';
-          return 'No $period logged in that period.';
+          return AppStrings.voiceQueryNoSetsInPeriod(period);
         }
 
         // Group by exercise name
@@ -1048,7 +1048,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
             counts.entries.map((e) => '${e.value} ${e.key}').join(', ');
         final groupLabel =
             muscleGroup != null ? '$muscleGroup sets' : 'sets';
-        return 'You logged $total $groupLabel: $breakdown.';
+        return AppStrings.voiceQueryVolumeResult(total, groupLabel, breakdown);
       },
     );
   }
@@ -1061,16 +1061,16 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final result = await _getDailyMacros(date);
 
     return result.fold(
-      (_) => 'I could not retrieve your nutrition data right now.',
+      (_) => AppStrings.voiceQueryNutritionUnavailable,
       (macros) {
         final protein = (macros['protein'] ?? 0.0).round();
         final carbs = (macros['carbs'] ?? 0.0).round();
         final fats = (macros['fats'] ?? 0.0).round();
         final calories = (macros['calories'] ?? 0.0).round();
 
-        if (calories == 0) return 'Nothing has been logged for that day yet.';
-        return 'For that day: $calories calories, ${protein}g protein, '
-            '${carbs}g carbs, ${fats}g fat.';
+        if (calories == 0) return AppStrings.voiceQueryNothingLogged;
+        return AppStrings.voiceQueryMacroResult(
+            calories, protein, carbs, fats);
       },
     );
   }
@@ -1086,7 +1086,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     );
 
     return result.fold(
-      (_) => 'I could not retrieve your recent sets right now.',
+      (_) => AppStrings.voiceQueryRecentSetsUnavailable,
       (sets) {
         var filtered = sets;
         if (exerciseName != null) {
@@ -1100,8 +1100,8 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         final limited = filtered.take(limit).toList();
         if (limited.isEmpty) {
           return exerciseName != null
-              ? 'No recent sets found for $exerciseName.'
-              : 'No recent sets found.';
+              ? AppStrings.voiceQueryNoRecentSetsFor(exerciseName)
+              : AppStrings.voiceQueryNoRecentSets;
         }
 
         final lines = limited
@@ -1111,7 +1111,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
             })
             .join('. ');
 
-        return 'Most recent sets: $lines.';
+        return AppStrings.voiceQueryRecentSetsResult(lines);
       },
     );
   }
@@ -1282,17 +1282,17 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   String _sttErrorMessage(VoiceSttErrorKind kind) {
     switch (kind) {
       case VoiceSttErrorKind.permissionDenied:
-        return 'Microphone access is required. Please allow it and try again.';
+        return AppStrings.voiceSttErrorPermission;
       case VoiceSttErrorKind.permissionPermanentlyDenied:
-        return 'Microphone access is permanently denied. Enable it in system settings.';
+        return AppStrings.voiceSttErrorPermissionPermanent;
       case VoiceSttErrorKind.unavailable:
-        return 'Voice recognition is not available on this device.';
+        return AppStrings.voiceSttErrorUnavailable;
       case VoiceSttErrorKind.noSpeech:
-        return 'I did not catch that. Please try again.';
+        return AppStrings.voiceSttErrorNoSpeech;
       case VoiceSttErrorKind.network:
-        return 'Voice recognition needs an internet connection right now.';
+        return AppStrings.voiceSttErrorNetwork;
       case VoiceSttErrorKind.unknown:
-        return 'Voice recognition failed. Please try again.';
+        return AppStrings.voiceSttErrorUnknown;
     }
   }
 

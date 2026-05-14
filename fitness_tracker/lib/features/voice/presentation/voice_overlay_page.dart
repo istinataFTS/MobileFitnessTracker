@@ -332,7 +332,7 @@ class _OverlayHeader extends StatelessWidget {
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
             color: AppTheme.textMedium,
             onPressed: onClose,
-            tooltip: 'Close',
+            tooltip: AppStrings.close,
           ),
           const Expanded(
             child: Text(
@@ -350,7 +350,7 @@ class _OverlayHeader extends StatelessWidget {
             icon: const Icon(Icons.tune_rounded),
             color: AppTheme.textMedium,
             onPressed: onSettings,
-            tooltip: 'Voice settings',
+            tooltip: AppStrings.voiceSettingsPageTitle,
           ),
         ],
       ),
