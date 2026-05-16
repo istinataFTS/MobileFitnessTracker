@@ -40,7 +40,10 @@ class AppBootstrapper {
       await _initializeRemoteBackend();
       await _initializeDependencies();
       _registerSyncLifecycleHooks();
-      await _runInitialSync();
+      // Initial sync must not block startup: the data layer is offline-first,
+      // so a slow or unreachable backend would otherwise freeze the app until
+      // each feature sync hits its network timeout. Run it in the background.
+      unawaited(_runInitialSync());
       _configureSystemUi();
 
       // Seeding and diagnostics are non-critical — defer them until after the

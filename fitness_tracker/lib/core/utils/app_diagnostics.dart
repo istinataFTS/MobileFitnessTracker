@@ -85,11 +85,6 @@ class AppDiagnostics {
       );
       debugPrint('  Exercises: $exerciseCount records');
 
-      final targetCount = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT COUNT(*) FROM targets'),
-      );
-      debugPrint('  Targets: $targetCount records');
-
       final setsCount = Sqflite.firstIntValue(
         await db.rawQuery('SELECT COUNT(*) FROM workout_sets'),
       );

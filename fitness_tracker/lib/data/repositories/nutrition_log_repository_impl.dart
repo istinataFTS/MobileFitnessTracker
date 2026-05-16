@@ -3,6 +3,8 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/errors/sync_exceptions.dart';
+import '../../core/logging/app_logger.dart';
 import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/nutrition_log.dart';
 import '../../domain/repositories/nutrition_log_repository.dart';
@@ -50,8 +52,11 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
             return localLogs;
           }
 
-          final remoteLogs = await remoteDataSource.getAllLogs();
-          if (remoteLogs.isNotEmpty) {
+          final remoteLogs = await _tryRemoteFetch(
+            remoteDataSource.getAllLogs,
+            context: 'getAllLogs(localThenRemote)',
+          );
+          if (remoteLogs != null && remoteLogs.isNotEmpty) {
             await localDataSource.mergeRemoteLogs(
               remoteLogs.map(NutritionLogModel.fromEntity).toList(),
             );
@@ -64,9 +69,12 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
           }
 
           final localLogs = await localDataSource.getAllLogs();
-          final remoteLogs = await remoteDataSource.getAllLogs();
+          final remoteLogs = await _tryRemoteFetch(
+            remoteDataSource.getAllLogs,
+            context: 'getAllLogs(remoteThenLocal)',
+          );
 
-          if (remoteLogs.isEmpty) {
+          if (remoteLogs == null || remoteLogs.isEmpty) {
             return localLogs;
           }
 
@@ -392,6 +400,36 @@ class NutritionLogRepositoryImpl implements NutritionLogRepository {
     return RepositoryGuard.run(() async {
       await syncCoordinator.syncPendingChanges();
     });
+  }
+
+  /// Runs [fetch] and returns `null` on any transient remote failure
+  /// (auth, network, or backend error), logging a warning with [context].
+  /// Local DB exceptions propagate unchanged so they surface as real errors.
+  static Future<List<NutritionLog>?> _tryRemoteFetch(
+    Future<List<NutritionLog>> Function() fetch, {
+    required String context,
+  }) async {
+    try {
+      return await fetch();
+    } on AuthSyncException catch (e) {
+      AppLogger.warning(
+        '$context: auth failure, will use local cache — $e',
+        category: 'nutrition_log_repository',
+      );
+      return null;
+    } on NetworkSyncException catch (e) {
+      AppLogger.warning(
+        '$context: network failure, will use local cache — $e',
+        category: 'nutrition_log_repository',
+      );
+      return null;
+    } on RemoteSyncException catch (e) {
+      AppLogger.warning(
+        '$context: remote failure, will use local cache — $e',
+        category: 'nutrition_log_repository',
+      );
+      return null;
+    }
   }
 
   Map<String, double> _aggregateDailyMacros(List<NutritionLog> logs) {

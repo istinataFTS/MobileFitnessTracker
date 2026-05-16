@@ -91,9 +91,6 @@ flutter:
   assets:
     - assets/images/
     - assets/images/body/
-    - assets/images/icons/
-    - assets/images/illustrations/
-    - assets/data/
     # Wake-word models (Picovoice Porcupine). Zero-byte placeholders until
     # real .ppn files are obtained from console.picovoice.ai.
     - assets/wake_words/android/
