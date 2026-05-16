@@ -21,7 +21,6 @@ class _FakeWakeWordService implements VoiceWakeWordService {
       StreamController<VoiceWakeWordException>.broadcast();
 
   bool _running = false;
-  WakeWordPreset? _activePreset;
 
   // ── Helpers for driving the fake ─────────────────────────────────────────
 
@@ -44,13 +43,11 @@ class _FakeWakeWordService implements VoiceWakeWordService {
   @override
   Future<void> start(WakeWordPreset preset) async {
     _running = true;
-    _activePreset = preset;
   }
 
   @override
   Future<void> stop() async {
     _running = false;
-    _activePreset = null;
   }
 
   @override

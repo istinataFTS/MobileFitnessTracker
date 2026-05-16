@@ -276,4 +276,93 @@ void main() {
       expect(_match<ParsedLogNutrition>(matchLogNutrition, 'log oats 80 by 10'), isNull);
     });
   });
+
+  // =========================================================================
+  // matchEditNutrition
+  // =========================================================================
+
+  group('matchEditNutrition', () {
+    test('01 — change the calories to 300', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'change the calories to 300');
+      expect(r, isNotNull);
+      expect(r!.calories, 300);
+    });
+
+    test('02 — update protein to 40 grams', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'update protein to 40 grams');
+      expect(r, isNotNull);
+      expect(r!.proteinGrams, 40);
+      expect(r.calories, isNull);
+    });
+
+    test('03 — fix my last meal to 250 calories', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'fix my last meal to 250 calories');
+      expect(r, isNotNull);
+      expect(r!.calories, 250);
+    });
+
+    test('04 — actually it was 300 calories', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'actually it was 300 calories');
+      expect(r, isNotNull);
+      expect(r!.calories, 300);
+    });
+
+    test('05 — the carbs should be 50', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'the carbs should be 50');
+      expect(r, isNotNull);
+      expect(r!.carbsGrams, 50);
+    });
+
+    test('06 — i meant 40 grams of protein', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'i meant 40 grams of protein');
+      expect(r, isNotNull);
+      expect(r!.proteinGrams, 40);
+    });
+
+    test('07 — correct the fat to 12', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'correct the fat to 12');
+      expect(r, isNotNull);
+      expect(r!.fatGrams, 12);
+    });
+
+    test('08 — change my meal calories to 500', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'change my meal calories to 500');
+      expect(r, isNotNull);
+      expect(r!.calories, 500);
+    });
+
+    test('09 — the protein was wrong it should be 30', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'the protein was wrong it should be 30');
+      expect(r, isNotNull);
+      expect(r!.proteinGrams, 30);
+    });
+
+    test('10 — update the meal to 200 calories 20 protein', () {
+      final r = _match<ParsedEditNutrition>(matchEditNutrition, 'update the meal to 200 calories 20 protein');
+      expect(r, isNotNull);
+      expect(r!.calories, 200);
+      expect(r.proteinGrams, 20);
+    });
+
+    // Negative cases — must not steal log / delete / workout / query.
+    test('no match — log nutrition', () {
+      expect(_match<ParsedEditNutrition>(matchEditNutrition, 'log oats 300 calories'), isNull);
+    });
+
+    test('no match — delete nutrition', () {
+      expect(_match<ParsedEditNutrition>(matchEditNutrition, 'delete my last meal'), isNull);
+    });
+
+    test('no match — workout edit (no nutrition ref)', () {
+      expect(_match<ParsedEditNutrition>(matchEditNutrition, 'change the weight to 90 kg'), isNull);
+    });
+
+    test('no match — macro query', () {
+      expect(_match<ParsedEditNutrition>(matchEditNutrition, 'what are my macros'), isNull);
+    });
+
+    test('no match — edit verb but no value', () {
+      expect(_match<ParsedEditNutrition>(matchEditNutrition, 'change my last meal'), isNull);
+    });
+  });
 }

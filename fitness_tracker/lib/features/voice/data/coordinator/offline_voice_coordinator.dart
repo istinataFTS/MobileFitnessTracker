@@ -50,6 +50,7 @@ class OfflineVoiceCoordinator {
       ParsedEditWorkoutSet() => await _editSet(intent, weightUnit),
       ParsedDeleteWorkoutSet() => await _deleteSet(),
       ParsedLogNutrition() => await _logNutrition(intent),
+      ParsedEditNutrition() => await _editNutrition(intent),
       ParsedDeleteNutrition() => await _deleteNutrition(),
       ParsedQueryWeeklyVolume() => _queryCall('getWeeklyVolume', {}),
       ParsedQueryDailyMacros() => _queryCall('getDailyMacros', {}),
@@ -152,6 +153,43 @@ class OfflineVoiceCoordinator {
         args: {
           'mealName': meal?.name ?? intent.mealName,
           if (meal != null) 'mealId': meal.id,
+          if (intent.calories != null) 'calories': intent.calories,
+          if (intent.proteinGrams != null) 'proteinGrams': intent.proteinGrams,
+          if (intent.carbsGrams != null) 'carbsGrams': intent.carbsGrams,
+          if (intent.fatGrams != null) 'fatGrams': intent.fatGrams,
+        },
+      ),
+    );
+  }
+
+  Future<VoiceChatResult> _editNutrition(ParsedEditNutrition intent) async {
+    final recent = await _recentEntityLookup.mostRecentLog();
+    if (recent == null) {
+      return _errorResponse(AppStrings.voiceOfflineNoRecentLog);
+    }
+
+    final parts = <String>[];
+    if (intent.calories != null) {
+      parts.add('calories → ${intent.calories!.round()}');
+    }
+    if (intent.proteinGrams != null) {
+      parts.add('protein → ${intent.proteinGrams!.round()} g');
+    }
+    if (intent.carbsGrams != null) {
+      parts.add('carbs → ${intent.carbsGrams!.round()} g');
+    }
+    if (intent.fatGrams != null) {
+      parts.add('fat → ${intent.fatGrams!.round()} g');
+    }
+    final summary = 'Edit nutrition: ${parts.join(', ')}';
+
+    return VoiceChatMutationCall(
+      toolCall: VoiceToolCall(
+        id: _uuid.v4(),
+        toolName: 'editNutritionLog',
+        displaySummary: summary,
+        args: {
+          'logId': recent.id,
           if (intent.calories != null) 'calories': intent.calories,
           if (intent.proteinGrams != null) 'proteinGrams': intent.proteinGrams,
           if (intent.carbsGrams != null) 'carbsGrams': intent.carbsGrams,

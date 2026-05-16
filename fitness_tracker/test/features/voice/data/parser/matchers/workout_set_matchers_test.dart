@@ -207,13 +207,15 @@ void main() {
       expect(r!.reps, 12);
     });
 
-    test('16 — no it was 90 kg', () {
-      final r = _match<ParsedEditWorkoutSet>(matchEditWorkoutSet, 'no it was 90 kg');
-      // "no" contains "not " substring — implicit edit trigger via "not " not "no"
-      // Also "actually" not present. Let's check "wrong" — nope.
-      // Actually "no" is not in implicit triggers. Let's verify graceful null.
-      // This is an edge case we do NOT require to match.
-      // Just ensure no crash.
+    test('16 — no it was 90 kg (edge case: must not throw)', () {
+      // "no" is not an implicit-edit trigger; matching this is not required.
+      // We only assert the matcher returns gracefully rather than throwing.
+      expect(
+        () => matchEditWorkoutSet(
+          IntentParser.normalise('no it was 90 kg'),
+        ),
+        returnsNormally,
+      );
     });
 
     test('17 — i made a mistake it was 90 kg', () {

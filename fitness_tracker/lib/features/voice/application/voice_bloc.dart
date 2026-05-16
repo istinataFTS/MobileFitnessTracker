@@ -607,6 +607,12 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
     // C-6: Offline fallback — bypass the network entirely.
     if (!state.isOnline) {
+      // Warm the recent-entity caches so a confirmed offline edit/delete can
+      // resolve the set/log id back to a full entity. The online path does
+      // this via _buildRecentContext(); offline must do it explicitly since
+      // it skips that call. The underlying use cases read local sqflite, so
+      // this works without a network connection.
+      await _warmRecentCaches();
       final offlineResult = await _offlineCoordinator.process(
         event.text,
         weightUnit: weightUnit,
@@ -728,17 +734,19 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   // C-5: Recent context builder
   // ---------------------------------------------------------------------------
 
-  /// Fetches the last 5 workout sets (past 7 days) and last 5 nutrition logs
-  /// (today) for use as edit/delete context. Caches raw entities for lookup.
-  /// Errors are swallowed — empty context is acceptable; the LLM simply
-  /// won't propose edit/delete for unknown rows.
-  Future<(List<RecentSetContext>, List<RecentNutritionLogContext>)>
-  _buildRecentContext() async {
+  /// Populates [_cachedWorkoutSets] / [_cachedNutritionLogs] (last 5 sets from
+  /// the past 7 days, last 5 logs from today) and warms the exercise lookup.
+  ///
+  /// Shared by the online context builder and the offline path so a confirmed
+  /// edit/delete can always resolve an id back to a full entity. Errors are
+  /// swallowed — an empty cache is acceptable; edit/delete simply reports it
+  /// could not find the row rather than crashing.
+  Future<void> _warmRecentCaches() async {
     try {
       // Warm the exercise lookup cache lazily (no-op if already populated).
       await _exerciseLookup.refreshIfEmpty();
 
-      // Last 5 workout sets from the past 7 days
+      // Datasource orders sets newest-first; take(5) = 5 most recent.
       final setsResult = await _getSetsByDateRange(
         startDate: DateTime.now().subtract(const Duration(days: 7)),
         endDate: DateTime.now(),
@@ -746,44 +754,52 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       final rawSets = setsResult.fold((_) => <WorkoutSet>[], (s) => s);
       _cachedWorkoutSets = rawSets.take(5).toList();
 
-      final recentSets = _cachedWorkoutSets
-          .map(
-            (s) => RecentSetContext(
-              setId: s.id,
-              exerciseName: _exerciseLookup.nameForId(s.exerciseId),
-              weight: s.weight,
-              reps: s.reps,
-              intensity: s.intensity,
-              date: s.date,
-            ),
-          )
-          .toList();
-
-      // Last 5 nutrition logs for today
       final logsResult = await _getLogsForDate(DateTime.now());
       final rawLogs = logsResult.fold((_) => <NutritionLog>[], (l) => l);
       _cachedNutritionLogs = rawLogs.take(5).toList();
-
-      final recentLogs = _cachedNutritionLogs
-          .map(
-            (l) => RecentNutritionLogContext(
-              logId: l.id,
-              mealName: l.mealName,
-              calories: l.calories,
-              date: l.loggedAt,
-            ),
-          )
-          .toList();
-
-      return (recentSets, recentLogs);
     } catch (e, st) {
       AppLogger.warning(
-        'VoiceBloc: _buildRecentContext failed',
+        'VoiceBloc: _warmRecentCaches failed',
         error: e,
         stackTrace: st,
       );
-      return (<RecentSetContext>[], <RecentNutritionLogContext>[]);
+      _cachedWorkoutSets = <WorkoutSet>[];
+      _cachedNutritionLogs = <NutritionLog>[];
     }
+  }
+
+  /// Builds the LLM recent-entity context (online path) from the warmed
+  /// caches. Errors are swallowed — empty context is acceptable; the LLM
+  /// simply won't propose edit/delete for unknown rows.
+  Future<(List<RecentSetContext>, List<RecentNutritionLogContext>)>
+  _buildRecentContext() async {
+    await _warmRecentCaches();
+
+    final recentSets = _cachedWorkoutSets
+        .map(
+          (s) => RecentSetContext(
+            setId: s.id,
+            exerciseName: _exerciseLookup.nameForId(s.exerciseId),
+            weight: s.weight,
+            reps: s.reps,
+            intensity: s.intensity,
+            date: s.date,
+          ),
+        )
+        .toList();
+
+    final recentLogs = _cachedNutritionLogs
+        .map(
+          (l) => RecentNutritionLogContext(
+            logId: l.id,
+            mealName: l.mealName,
+            calories: l.calories,
+            date: l.loggedAt,
+          ),
+        )
+        .toList();
+
+    return (recentSets, recentLogs);
   }
 
   // ---------------------------------------------------------------------------

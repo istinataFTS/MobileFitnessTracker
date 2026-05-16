@@ -103,6 +103,137 @@ ParsedIntent? matchDeleteNutrition(String normed) {
 }
 
 // ---------------------------------------------------------------------------
+// Edit nutrition log
+// ---------------------------------------------------------------------------
+
+/// Nutrition-domain words that anchor an edit to the nutrition log (vs a
+/// workout set). At least one must be present for an edit to match here.
+const _nutritionRefWords = {
+  'meal',
+  'nutrition',
+  'calorie',
+  'calories',
+  'cal',
+  'kcal',
+  'food',
+  'protein',
+  'proteins',
+  'carb',
+  'carbs',
+  'carbohydrate',
+  'carbohydrates',
+  'fat',
+  'fats',
+  'macro',
+  'macros',
+  'ate',
+  'eaten',
+};
+
+/// Extracts macro fields for an *edit*, where the macro keyword may appear
+/// either before the number ("calories to 300", "protein to 40") or after it
+/// ("300 calories", "40 grams of protein"). For each macro type the value is
+/// the number positionally closest to the keyword; ties resolve to the
+/// earlier number so "200 calories 20 protein" maps correctly.
+({double? calories, double? protein, double? carbs, double? fat})
+    _extractEditMacros(List<String> tokens) {
+  final numbers = <({int index, double value})>[];
+  for (int i = 0; i < tokens.length; i++) {
+    if (tokens[i] == 'a') continue;
+    final v = VoiceNumberGrammar.parseSingle(tokens[i]);
+    if (v != null) numbers.add((index: i, value: v.toDouble()));
+  }
+
+  double? nearest(Set<String> keywords) {
+    for (int i = 0; i < tokens.length; i++) {
+      if (!keywords.contains(tokens[i])) continue;
+      ({int index, double value})? pick;
+      int? pickDist;
+      for (final n in numbers) {
+        final dist = (n.index - i).abs();
+        if (pick == null ||
+            dist < pickDist! ||
+            (dist == pickDist && n.index < pick.index)) {
+          pick = n;
+          pickDist = dist;
+        }
+      }
+      if (pick != null) return pick.value;
+    }
+    return null;
+  }
+
+  return (
+    calories: nearest({'calories', 'calorie', 'cal', 'kcal'}),
+    protein: nearest({'protein', 'proteins'}),
+    carbs: nearest({'carbs', 'carb', 'carbohydrate', 'carbohydrates'}),
+    fat: nearest({'fat', 'fats'}),
+  );
+}
+
+/// Matches utterances that correct the most-recently logged nutrition entry.
+/// Only non-null macro fields are returned; the coordinator applies them as a
+/// patch over the existing log.
+///
+/// Examples:
+///   "change the calories to 300"        "update protein to 40 grams"
+///   "fix my last meal to 250 calories"  "actually it was 300 calories"
+///   "the carbs should be 50"            "i meant 40 grams of protein"
+ParsedIntent? matchEditNutrition(String normed) {
+  final tokens = normed.split(' ');
+
+  // Delete commands are handled by matchDeleteNutrition.
+  if (tokens.any(VoiceVerbGrammar.deleteVerbs.contains)) return null;
+
+  // Queries ("what are my macros") are not edits.
+  if (tokens.isNotEmpty && VoiceVerbGrammar.queryWords.contains(tokens[0])) {
+    return null;
+  }
+
+  // Must reference the nutrition domain to avoid stealing workout-set edits.
+  final hasNutritionRef =
+      _nutritionRefWords.any((kw) => RegExp(r'\b' + kw + r'\b').hasMatch(normed));
+  if (!hasNutritionRef) return null;
+
+  final hasEditVerb = tokens.any(VoiceVerbGrammar.editVerbs.contains);
+  final hasImplicitEdit = normed.contains('actually') ||
+      normed.contains('i meant') ||
+      normed.contains('i mean') ||
+      normed.contains('wrong') ||
+      normed.contains('should be') ||
+      normed.contains('was actually') ||
+      normed.contains('mistake');
+  if (!hasEditVerb && !hasImplicitEdit) return null;
+
+  final macros = _extractEditMacros(tokens);
+  double? calories = macros.calories;
+
+  // No explicit macro keyword matched a number — treat a lone number as the
+  // new calorie value (e.g. "change my last meal to 300").
+  if (calories == null &&
+      macros.protein == null &&
+      macros.carbs == null &&
+      macros.fat == null) {
+    calories = _scanForNumber(tokens);
+  }
+
+  // Edit verb present but no numeric value at all — ambiguous; do not match.
+  if (calories == null &&
+      macros.protein == null &&
+      macros.carbs == null &&
+      macros.fat == null) {
+    return null;
+  }
+
+  return ParsedEditNutrition(
+    calories: calories,
+    proteinGrams: macros.protein,
+    carbsGrams: macros.carbs,
+    fatGrams: macros.fat,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Log nutrition
 // ---------------------------------------------------------------------------
 

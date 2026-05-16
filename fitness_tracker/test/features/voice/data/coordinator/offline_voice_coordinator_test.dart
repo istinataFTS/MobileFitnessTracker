@@ -79,6 +79,7 @@ IntentParser _buildParser() => IntentParser([
   matchEditWorkoutSet,
   matchLogWorkoutSet,
   matchDeleteNutrition,
+  matchEditNutrition,
   matchLogNutrition,
   matchQueryWeeklyVolume,
   matchQueryDailyMacros,
@@ -273,6 +274,50 @@ void main() {
       final tc = (result as VoiceChatMutationCall).toolCall;
       expect(tc.args['proteinGrams'], 30.0);
       expect(tc.args['fatGrams'], 5.0);
+    });
+  });
+
+  // =========================================================================
+  // Edit nutrition
+  // =========================================================================
+
+  group('edit nutrition', () {
+    test('returns editNutritionLog mutation when recent log exists', () async {
+      when(() => recentEntityLookup.mostRecentLog())
+          .thenAnswer((_) async => _recentLog);
+
+      final result =
+          await coordinator.process('change the calories to 300');
+
+      expect(result, isA<VoiceChatMutationCall>());
+      final tc = (result as VoiceChatMutationCall).toolCall;
+      expect(tc.toolName, 'editNutritionLog');
+      expect(tc.args['logId'], 'log-1');
+      expect(tc.args['calories'], 300.0);
+      expect(tc.args.containsKey('proteinGrams'), isFalse);
+    });
+
+    test('patches only protein when protein-only edit', () async {
+      when(() => recentEntityLookup.mostRecentLog())
+          .thenAnswer((_) async => _recentLog);
+
+      final result =
+          await coordinator.process('update protein to 40 grams');
+
+      final tc = (result as VoiceChatMutationCall).toolCall;
+      expect(tc.toolName, 'editNutritionLog');
+      expect(tc.args['proteinGrams'], 40.0);
+      expect(tc.args.containsKey('calories'), isFalse);
+    });
+
+    test('returns error text when no recent log', () async {
+      final result = await coordinator.process('change the calories to 300');
+
+      expect(result, isA<VoiceChatTextResponse>());
+      expect(
+        (result as VoiceChatTextResponse).message.content,
+        AppStrings.voiceOfflineNoRecentLog,
+      );
     });
   });
 

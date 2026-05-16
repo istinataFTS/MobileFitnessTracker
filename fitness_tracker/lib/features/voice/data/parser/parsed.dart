@@ -77,6 +77,22 @@ final class ParsedLogNutrition extends ParsedIntent {
   final double? fatGrams;
 }
 
+/// Edit the most-recently logged nutrition entry.
+/// Only non-null fields are applied; all others keep their existing values.
+final class ParsedEditNutrition extends ParsedIntent {
+  const ParsedEditNutrition({
+    this.calories,
+    this.proteinGrams,
+    this.carbsGrams,
+    this.fatGrams,
+  });
+
+  final double? calories;
+  final double? proteinGrams;
+  final double? carbsGrams;
+  final double? fatGrams;
+}
+
 /// Delete the most-recently logged nutrition entry.
 final class ParsedDeleteNutrition extends ParsedIntent {
   const ParsedDeleteNutrition();

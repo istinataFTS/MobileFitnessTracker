@@ -10,7 +10,6 @@ import 'package:fitness_tracker/core/platform/wakelock_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/voice_budget.dart';
 import 'package:fitness_tracker/domain/entities/voice_chat_result.dart';
@@ -241,8 +240,8 @@ MockExerciseLookup _defaultExerciseLookup() {
   return m;
 }
 
-/// Configures [mock] so "Bench Press" resolves to "ex-bench" and vice versa â€”
-/// matching the [_benchExercise] fixture used by tool-dispatch tests.
+/// Configures [mock] so "Bench Press" resolves to "ex-bench" and vice versa,
+/// matching the exercise fixture used by tool-dispatch tests.
 void _setupBenchLookup(MockExerciseLookup mock) {
   when(() => mock.resolveId('Bench Press')).thenReturn('ex-bench');
   when(() => mock.nameForId('ex-bench')).thenReturn('Bench Press');
@@ -352,13 +351,6 @@ VoiceChatResult _assistantResult(String content) =>
 // ---------------------------------------------------------------------------
 
 final _now = DateTime(2026, 5, 13);
-
-final _benchExercise = Exercise(
-  id: 'ex-bench',
-  name: 'Bench Press',
-  muscleGroups: const ['chest'],
-  createdAt: _now,
-);
 
 VoiceToolCall _mutationToolCall(String toolName, Map<String, dynamic> args) =>
     VoiceToolCall(
@@ -1772,6 +1764,74 @@ void main() {
 
       expect(bloc.state.pendingConfirmation, isNotNull);
       expect(bloc.state.pendingConfirmation!.toolName, 'logWorkoutSet');
+
+      await bloc.close();
+    });
+
+    test(
+        'offline edit set — confirmed edit resolves id via warmed cache and '
+        'dispatches UpdateSetEvent', () async {
+      final editableSet = WorkoutSet(
+        id: 'set-edit-off',
+        exerciseId: 'ex-bench',
+        reps: 8,
+        weight: 80.0,
+        intensity: 3,
+        date: _now,
+        createdAt: _now,
+      );
+
+      const toolCall = VoiceToolCall(
+        id: 'offline-edit-1',
+        toolName: 'editWorkoutSet',
+        displaySummary: 'Edit set: weight → 90 kg',
+        args: {'setId': 'set-edit-off', 'weight': 90.0},
+      );
+
+      final offlineCoordinator = MockOfflineVoiceCoordinator();
+      when(
+        () => offlineCoordinator.process(any(),
+            weightUnit: any(named: 'weightUnit')),
+      ).thenAnswer(
+          (_) async => const VoiceChatMutationCall(toolCall: toolCall));
+
+      // The offline path must warm the recent-set cache so the confirmed
+      // edit can resolve set-edit-off back to a full WorkoutSet.
+      final getSetsByDateRange = MockGetSetsByDateRange();
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => Right([editableSet]));
+
+      final historyBloc = MockHistoryBloc();
+      final tts = FakeVoiceTtsService();
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        offlineCoordinator: offlineCoordinator,
+        getSetsByDateRange: getSetsByDateRange,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.emit(const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: false,
+      ));
+
+      bloc.add(const VoiceSendMessage('change the weight to 90 kg'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verify(() => historyBloc.add(any(that: isA<UpdateSetEvent>())))
+          .called(1);
+      expect(tts.lastSpoken, AppStrings.voiceSpokenSetUpdated);
 
       await bloc.close();
     });

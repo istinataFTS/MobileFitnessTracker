@@ -117,6 +117,7 @@ void registerVoiceModule(GetIt sl) {
         matchEditWorkoutSet,
         matchLogWorkoutSet,
         matchDeleteNutrition,
+        matchEditNutrition,
         matchLogNutrition,
         matchQueryWeeklyVolume,
         matchQueryDailyMacros,
