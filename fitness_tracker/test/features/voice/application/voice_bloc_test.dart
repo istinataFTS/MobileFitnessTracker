@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
@@ -10,7 +10,6 @@ import 'package:fitness_tracker/core/platform/wakelock_service.dart';
 import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
 import 'package:fitness_tracker/domain/entities/app_user.dart';
-import 'package:fitness_tracker/domain/entities/exercise.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/voice_budget.dart';
 import 'package:fitness_tracker/domain/entities/voice_chat_result.dart';
@@ -19,9 +18,10 @@ import 'package:fitness_tracker/domain/entities/voice_settings.dart';
 import 'package:fitness_tracker/domain/entities/voice_tool_call.dart';
 import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/domain/repositories/app_settings_repository.dart';
-import 'package:fitness_tracker/domain/usecases/exercises/get_all_exercises.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_daily_macros.dart';
 import 'package:fitness_tracker/domain/usecases/nutrition_logs/get_logs_for_date.dart';
+import 'package:fitness_tracker/features/voice/data/coordinator/offline_voice_coordinator.dart';
+import 'package:fitness_tracker/features/voice/data/lookup/exercise_lookup.dart';
 import 'package:fitness_tracker/domain/usecases/voice/delete_voice_history.dart';
 import 'package:fitness_tracker/domain/usecases/voice/get_voice_budget.dart';
 import 'package:fitness_tracker/domain/usecases/voice/send_voice_message.dart';
@@ -48,7 +48,7 @@ class MockDeleteVoiceHistory extends Mock implements DeleteVoiceHistory {}
 
 class MockAppSettingsRepository extends Mock implements AppSettingsRepository {}
 
-// C-5 mocks — target blocs and query use cases
+// C-5 mocks â€” target blocs and query use cases
 class MockWorkoutBloc extends MockBloc<WorkoutEvent, WorkoutState>
     implements WorkoutBloc {}
 
@@ -65,11 +65,14 @@ class MockGetDailyMacros extends Mock implements GetDailyMacros {}
 
 class MockGetWeeklySets extends Mock implements GetWeeklySets {}
 
-class MockGetAllExercises extends Mock implements GetAllExercises {}
+class MockExerciseLookup extends Mock implements ExerciseLookup {}
 
 class MockGetLogsForDate extends Mock implements GetLogsForDate {}
 
-// Fake event base types — required as registerFallbackValue targets
+class MockOfflineVoiceCoordinator extends Mock
+    implements OfflineVoiceCoordinator {}
+
+// Fake event base types â€” required as registerFallbackValue targets
 // for any(that: isA<XxxEvent>()) matchers in tool-dispatch tests.
 class _FakeWorkoutEvent extends Fake implements WorkoutEvent {}
 
@@ -165,7 +168,7 @@ class FakeVoiceSttService implements VoiceSttService {
   }
 }
 
-/// No-op [NetworkStatusService] — the bloc stores it but dispatches
+/// No-op [NetworkStatusService] â€” the bloc stores it but dispatches
 /// connectivity events via [VoiceConnectivityChanged] (fired by the overlay
 /// page), so the service itself is never called inside the bloc.
 class FakeNetworkStatusService implements NetworkStatusService {
@@ -179,7 +182,7 @@ class FakeNetworkStatusService implements NetworkStatusService {
   Stream<bool> get onConnectivityChanged => const Stream.empty();
 }
 
-/// Instrumented [WakelockService] — records how many times enable/disable
+/// Instrumented [WakelockService] â€” records how many times enable/disable
 /// were called so tests can assert correct wakelock behaviour.
 class FakeWakelockService implements WakelockService {
   int enableCount = 0;
@@ -192,7 +195,7 @@ class FakeWakelockService implements WakelockService {
   Future<void> disable() async => disableCount++;
 }
 
-/// Simple [VoiceWakeWordService] fake — the bloc stores it but its lifecycle
+/// Simple [VoiceWakeWordService] fake â€” the bloc stores it but its lifecycle
 /// (start/stop) is managed by [VoiceFab], not the bloc.
 class FakeVoiceWakeWordService implements VoiceWakeWordService {
   final StreamController<WakeWordPreset> _detectedController =
@@ -224,13 +227,24 @@ class FakeVoiceWakeWordService implements VoiceWakeWordService {
 }
 
 // ---------------------------------------------------------------------------
-// C-5 default stub factories — return empty results so existing tests are unaffected
+// C-5 / C-6 default stub factories â€” return empty results so existing tests are unaffected
 // ---------------------------------------------------------------------------
 
-MockGetAllExercises _defaultGetAllExercises() {
-  final m = MockGetAllExercises();
-  when(m.call).thenAnswer((_) async => const Right([]));
+MockExerciseLookup _defaultExerciseLookup() {
+  final m = MockExerciseLookup();
+  when(() => m.refreshIfEmpty()).thenAnswer((_) async {});
+  when(() => m.byName(any())).thenReturn(null);
+  when(() => m.resolveId(any())).thenReturn(null);
+  when(() => m.nameForId(any()))
+      .thenAnswer((inv) => inv.positionalArguments.first as String);
   return m;
+}
+
+/// Configures [mock] so "Bench Press" resolves to "ex-bench" and vice versa,
+/// matching the exercise fixture used by tool-dispatch tests.
+void _setupBenchLookup(MockExerciseLookup mock) {
+  when(() => mock.resolveId('Bench Press')).thenReturn('ex-bench');
+  when(() => mock.nameForId('ex-bench')).thenReturn('Bench Press');
 }
 
 MockGetSetsByDateRange _defaultGetSetsByDateRange() {
@@ -260,6 +274,19 @@ MockGetLogsForDate _defaultGetLogsForDate() {
   return m;
 }
 
+MockOfflineVoiceCoordinator _defaultOfflineCoordinator() {
+  final m = MockOfflineVoiceCoordinator();
+  when(() => m.process(any(), weightUnit: any(named: 'weightUnit')))
+      .thenAnswer((_) async => VoiceChatTextResponse(
+            message: VoiceMessage(
+              role: VoiceRole.assistant,
+              content: AppStrings.voiceOfflineUnrecognized,
+              createdAt: DateTime(2026),
+            ),
+          ));
+  return m;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -275,15 +302,17 @@ VoiceBloc _makeBloc({
   VoiceWakeWordService? wakeWord,
   WakelockService? wakelock,
   VoiceSettings settings = const VoiceSettings.defaults(),
-  // C-5 params — optional so existing tests remain unchanged
+  // C-5 params â€” optional so existing tests remain unchanged
   WorkoutBloc? workoutBloc,
   NutritionLogBloc? nutritionLogBloc,
   HistoryBloc? historyBloc,
   GetSetsByDateRange? getSetsByDateRange,
   GetDailyMacros? getDailyMacros,
   GetWeeklySets? getWeeklySets,
-  GetAllExercises? getAllExercises,
   GetLogsForDate? getLogsForDate,
+  // C-6 params
+  ExerciseLookup? exerciseLookup,
+  OfflineVoiceCoordinator? offlineCoordinator,
 }) {
   return VoiceBloc(
     sendVoiceMessage: sendVoiceMessage,
@@ -302,8 +331,9 @@ VoiceBloc _makeBloc({
     getSetsByDateRange: getSetsByDateRange ?? _defaultGetSetsByDateRange(),
     getDailyMacros: getDailyMacros ?? _defaultGetDailyMacros(),
     getWeeklySets: getWeeklySets ?? _defaultGetWeeklySets(),
-    getAllExercises: getAllExercises ?? _defaultGetAllExercises(),
     getLogsForDate: getLogsForDate ?? _defaultGetLogsForDate(),
+    exerciseLookup: exerciseLookup ?? _defaultExerciseLookup(),
+    offlineCoordinator: offlineCoordinator ?? _defaultOfflineCoordinator(),
   );
 }
 
@@ -321,13 +351,6 @@ VoiceChatResult _assistantResult(String content) =>
 // ---------------------------------------------------------------------------
 
 final _now = DateTime(2026, 5, 13);
-
-final _benchExercise = Exercise(
-  id: 'ex-bench',
-  name: 'Bench Press',
-  muscleGroups: const ['chest'],
-  createdAt: _now,
-);
 
 VoiceToolCall _mutationToolCall(String toolName, Map<String, dynamic> args) =>
     VoiceToolCall(
@@ -379,11 +402,11 @@ void main() {
   late MockDeleteVoiceHistory deleteHistory;
   late MockAppSettingsRepository settingsRepo;
   // Shared between `build` and `act` for the STT-driven blocTests
-  // below — the same fake instance must be reachable from both.
+  // below â€” the same fake instance must be reachable from both.
   late FakeVoiceSttService sharedStt;
-  // Tool-dispatch use-case mocks — default to empty results so existing
+  // Tool-dispatch use-case mocks â€” default to empty results so existing
   // tests are unaffected; individual tool tests override per-test.
-  late MockGetAllExercises getAllExercises;
+  late MockExerciseLookup exerciseLookup;
   late MockGetSetsByDateRange getSetsByDateRange;
   late MockGetLogsForDate getLogsForDate;
   late MockGetDailyMacros getDailyMacros;
@@ -394,7 +417,7 @@ void main() {
     deleteHistory = MockDeleteVoiceHistory();
     settingsRepo = MockAppSettingsRepository();
     sharedStt = FakeVoiceSttService();
-    getAllExercises = _defaultGetAllExercises();
+    exerciseLookup = _defaultExerciseLookup();
     getSetsByDateRange = _defaultGetSetsByDateRange();
     getLogsForDate = _defaultGetLogsForDate();
     getDailyMacros = _defaultGetDailyMacros();
@@ -474,7 +497,7 @@ void main() {
     );
 
     blocTest<VoiceBloc, VoiceState>(
-      'happy path: thinking → speaking → idle, TTS is invoked',
+      'happy path: thinking â†’ speaking â†’ idle, TTS is invoked',
       build: () {
         when(() => sendVoiceMessage(
               userMessage: any(named: 'userMessage'),
@@ -601,7 +624,7 @@ void main() {
     );
 
     blocTest<VoiceBloc, VoiceState>(
-      'partial → final transcript triggers VoiceSendMessage',
+      'partial â†’ final transcript triggers VoiceSendMessage',
       build: () {
         when(() => sendVoiceMessage(
               userMessage: any(named: 'userMessage'),
@@ -731,7 +754,7 @@ void main() {
   test('VoiceBloc constructor parameters expose use cases / services only',
       () {
     // The constructor takes the new params (compile-time check covered by
-    // this file). This test exists to make the rule grep-discoverable —
+    // this file). This test exists to make the rule grep-discoverable â€”
     // if someone re-introduces a `repository: VoiceRepository` param the
     // file won't compile and they'll see the rule next to the error.
     expect(VoiceBloc, isNotNull);
@@ -836,7 +859,7 @@ void main() {
         bloc.add(const VoiceConnectivityChanged(isOnline: false));
         await Future<void>.delayed(const Duration(milliseconds: 30));
       },
-      // Only one emit: isOnline → false. No second emit for announcement.
+      // Only one emit: isOnline â†’ false. No second emit for announcement.
       expect: () => <Matcher>[
         isA<VoiceState>()
             .having((s) => s.isOnline, 'isOnline', isFalse)
@@ -998,11 +1021,11 @@ void main() {
   });
 
   // ===========================================================================
-  // Tool dispatch — mutation tools
+  // Tool dispatch â€” mutation tools
   // ===========================================================================
 
   // Stubs sendVoiceMessage to return a mutation tool call then runs the full
-  // confirm flow: SessionStarted → SendMessage → ConfirmationAccepted.
+  // confirm flow: SessionStarted â†’ SendMessage â†’ ConfirmationAccepted.
   Future<void> runMutationFlow({
     required VoiceBloc bloc,
     required MockSendVoiceMessage sendVoiceMessage,
@@ -1039,8 +1062,7 @@ void main() {
 
   group('logWorkoutSet', () {
     test('dispatches AddWorkoutSetEvent when exerciseId is resolved', () async {
-      when(() => getAllExercises())
-          .thenAnswer((_) async => Right([_benchExercise]));
+      _setupBenchLookup(exerciseLookup);
 
       final workoutBloc = MockWorkoutBloc();
       final tts = FakeVoiceTtsService();
@@ -1050,7 +1072,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1078,9 +1100,7 @@ void main() {
 
     test('speaks voiceSpokenExerciseNotFound when exercise cannot be resolved',
         () async {
-      // Empty exercise list → name resolution fails
-      when(() => getAllExercises()).thenAnswer((_) async => const Right([]));
-
+      // Default exerciseLookup already returns null for all resolveId calls.
       final workoutBloc = MockWorkoutBloc();
       final tts = FakeVoiceTtsService();
 
@@ -1089,7 +1109,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1131,8 +1151,7 @@ void main() {
 
     test('dispatches UpdateSetEvent when setId is found in recent cache',
         () async {
-      when(() => getAllExercises())
-          .thenAnswer((_) async => Right([_benchExercise]));
+      _setupBenchLookup(exerciseLookup);
       when(() => getSetsByDateRange(
             startDate: any(named: 'startDate'),
             endDate: any(named: 'endDate'),
@@ -1147,7 +1166,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1173,10 +1192,7 @@ void main() {
 
     test('speaks voiceSpokenToolFailed when setId is not in recent cache',
         () async {
-      when(() => getAllExercises())
-          .thenAnswer((_) async => Right([_benchExercise]));
-      // Empty cache → _fetchSetById returns null
-
+      // Empty cache â†’ _fetchSetById returns null
       final historyBloc = MockHistoryBloc();
       final tts = FakeVoiceTtsService();
 
@@ -1185,7 +1201,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1223,7 +1239,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1258,7 +1274,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1316,7 +1332,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1357,7 +1373,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1381,11 +1397,11 @@ void main() {
   });
 
   // ===========================================================================
-  // Tool dispatch — query tools
+  // Tool dispatch â€” query tools
   // ===========================================================================
 
   // Stubs sendVoiceMessage to return a query tool call then runs the flow.
-  // Query tools execute immediately — no confirmation step.
+  // Query tools execute immediately â€” no confirmation step.
   Future<void> runQueryFlow({
     required VoiceBloc bloc,
     required MockSendVoiceMessage sendVoiceMessage,
@@ -1435,7 +1451,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1462,8 +1478,7 @@ void main() {
 
   group('getWeeklyVolume query', () {
     test('speaks set count and exercise breakdown', () async {
-      when(() => getAllExercises())
-          .thenAnswer((_) async => Right([_benchExercise]));
+      _setupBenchLookup(exerciseLookup);
       when(() => getSetsByDateRange(
             startDate: any(named: 'startDate'),
             endDate: any(named: 'endDate'),
@@ -1486,7 +1501,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1512,8 +1527,7 @@ void main() {
 
   group('getRecentSets query', () {
     test('speaks formatted recent sets with exercise name and weight', () async {
-      when(() => getAllExercises())
-          .thenAnswer((_) async => Right([_benchExercise]));
+      _setupBenchLookup(exerciseLookup);
       when(() => getSetsByDateRange(
             startDate: any(named: 'startDate'),
             endDate: any(named: 'endDate'),
@@ -1536,7 +1550,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1558,14 +1572,14 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // clarify — ambiguous input returns a clarifying question
+  // clarify â€” ambiguous input returns a clarifying question
   // -------------------------------------------------------------------------
 
   group('clarify', () {
     test('speaks clarifying question without showing confirmation card',
         () async {
       const question =
-          'Which exercise did you mean — bench press or overhead press?';
+          'Which exercise did you mean â€” bench press or overhead press?';
 
       when(() => sendVoiceMessage(
             userMessage: any(named: 'userMessage'),
@@ -1591,7 +1605,7 @@ void main() {
         getVoiceBudget: getBudget,
         deleteVoiceHistory: deleteHistory,
         appSettingsRepository: settingsRepo,
-        getAllExercises: getAllExercises,
+        exerciseLookup: exerciseLookup,
         getSetsByDateRange: getSetsByDateRange,
         getLogsForDate: getLogsForDate,
         getDailyMacros: getDailyMacros,
@@ -1610,7 +1624,7 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // VoiceConfirmationCancelled — no dispatch, clears card
+  // VoiceConfirmationCancelled â€” no dispatch, clears card
   // -------------------------------------------------------------------------
 
   group('VoiceConfirmationCancelled', () {
@@ -1638,5 +1652,225 @@ void main() {
             .having((s) => s.pendingConfirmation, 'pendingConfirmation', isNull),
       ],
     );
+  });
+
+  // =========================================================================
+  // C-6: Offline routing
+  // =========================================================================
+
+  group('C-6 offline routing', () {
+    late MockSendVoiceMessage sendVoiceMessage;
+    late MockGetVoiceBudget getBudget;
+    late MockDeleteVoiceHistory deleteHistory;
+    late MockAppSettingsRepository settingsRepo;
+
+    setUp(() {
+      sendVoiceMessage = MockSendVoiceMessage();
+      getBudget = MockGetVoiceBudget();
+      deleteHistory = MockDeleteVoiceHistory();
+      settingsRepo = MockAppSettingsRepository();
+
+      when(() => settingsRepo.getSettings()).thenAnswer(
+        (_) async => const Right(AppSettings.defaults()),
+      );
+      when(() => getBudget()).thenAnswer(
+        (_) async =>
+            const Right(VoiceBudget(usedUsd: 0, dailyCapUsd: 0.5)),
+      );
+    });
+
+    test('offline text response — coordinator called, online path skipped',
+        () async {
+      final offlineCoordinator = MockOfflineVoiceCoordinator();
+      when(
+        () => offlineCoordinator.process(any(),
+            weightUnit: any(named: 'weightUnit')),
+      ).thenAnswer(
+        (_) async => VoiceChatTextResponse(
+          message: VoiceMessage(
+            role: VoiceRole.assistant,
+            content: AppStrings.voiceOfflineUnrecognized,
+            createdAt: DateTime(2026),
+          ),
+        ),
+      );
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        offlineCoordinator: offlineCoordinator,
+      );
+
+      bloc.emit(const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: false,
+      ));
+
+      bloc.add(const VoiceSendMessage('log bench press'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => offlineCoordinator.process('log bench press',
+          weightUnit: any(named: 'weightUnit'))).called(1);
+
+      verifyNever(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          ));
+
+      await bloc.close();
+    });
+
+    test('offline mutation call — emits pending confirmation', () async {
+      const toolCall = VoiceToolCall(
+        id: 'offline-1',
+        toolName: 'logWorkoutSet',
+        displaySummary: 'Log Bench Press — 80 kg × 10 reps',
+        args: {'exerciseId': 'ex-bench', 'reps': 10, 'weight': 80.0},
+      );
+
+      final offlineCoordinator = MockOfflineVoiceCoordinator();
+      when(
+        () => offlineCoordinator.process(any(),
+            weightUnit: any(named: 'weightUnit')),
+      ).thenAnswer(
+          (_) async => const VoiceChatMutationCall(toolCall: toolCall));
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        offlineCoordinator: offlineCoordinator,
+      );
+
+      bloc.emit(const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: false,
+      ));
+
+      bloc.add(const VoiceSendMessage('log bench press 80 kg 10 reps'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bloc.state.pendingConfirmation, isNotNull);
+      expect(bloc.state.pendingConfirmation!.toolName, 'logWorkoutSet');
+
+      await bloc.close();
+    });
+
+    test(
+        'offline edit set — confirmed edit resolves id via warmed cache and '
+        'dispatches UpdateSetEvent', () async {
+      final editableSet = WorkoutSet(
+        id: 'set-edit-off',
+        exerciseId: 'ex-bench',
+        reps: 8,
+        weight: 80.0,
+        intensity: 3,
+        date: _now,
+        createdAt: _now,
+      );
+
+      const toolCall = VoiceToolCall(
+        id: 'offline-edit-1',
+        toolName: 'editWorkoutSet',
+        displaySummary: 'Edit set: weight → 90 kg',
+        args: {'setId': 'set-edit-off', 'weight': 90.0},
+      );
+
+      final offlineCoordinator = MockOfflineVoiceCoordinator();
+      when(
+        () => offlineCoordinator.process(any(),
+            weightUnit: any(named: 'weightUnit')),
+      ).thenAnswer(
+          (_) async => const VoiceChatMutationCall(toolCall: toolCall));
+
+      // The offline path must warm the recent-set cache so the confirmed
+      // edit can resolve set-edit-off back to a full WorkoutSet.
+      final getSetsByDateRange = MockGetSetsByDateRange();
+      when(() => getSetsByDateRange(
+            startDate: any(named: 'startDate'),
+            endDate: any(named: 'endDate'),
+            muscleGroup: any(named: 'muscleGroup'),
+          )).thenAnswer((_) async => Right([editableSet]));
+
+      final historyBloc = MockHistoryBloc();
+      final tts = FakeVoiceTtsService();
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        offlineCoordinator: offlineCoordinator,
+        getSetsByDateRange: getSetsByDateRange,
+        historyBloc: historyBloc,
+        tts: tts,
+      );
+
+      bloc.emit(const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: false,
+      ));
+
+      bloc.add(const VoiceSendMessage('change the weight to 90 kg'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      bloc.add(const VoiceConfirmationAccepted());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      verify(() => historyBloc.add(any(that: isA<UpdateSetEvent>())))
+          .called(1);
+      expect(tts.lastSpoken, AppStrings.voiceSpokenSetUpdated);
+
+      await bloc.close();
+    });
+
+    test('online path — coordinator is never called', () async {
+      final offlineCoordinator = MockOfflineVoiceCoordinator();
+
+      when(() => sendVoiceMessage(
+            userMessage: any(named: 'userMessage'),
+            sessionId: any(named: 'sessionId'),
+            history: any(named: 'history'),
+            settings: any(named: 'settings'),
+            weightUnit: any(named: 'weightUnit'),
+            recentSets: any(named: 'recentSets'),
+            recentNutritionLogs: any(named: 'recentNutritionLogs'),
+          )).thenAnswer((_) async => Right(_assistantResult('hello')));
+
+      final bloc = _makeBloc(
+        sendVoiceMessage: sendVoiceMessage,
+        getVoiceBudget: getBudget,
+        deleteVoiceHistory: deleteHistory,
+        appSettingsRepository: settingsRepo,
+        offlineCoordinator: offlineCoordinator,
+      );
+
+      bloc.emit(const VoiceState(
+        isGuest: false,
+        sessionId: 'sid',
+        isOnline: true,
+      ));
+
+      bloc.add(const VoiceSendMessage('hello'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => offlineCoordinator.process(any(),
+          weightUnit: any(named: 'weightUnit')));
+
+      await bloc.close();
+    });
   });
 }

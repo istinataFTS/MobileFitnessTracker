@@ -4,10 +4,12 @@ import 'package:get_it/get_it.dart';
 import '../../core/network/network_status_service.dart';
 import '../../core/platform/wakelock_service.dart';
 import '../../core/sync/remote_sync_runtime_policy.dart';
+import '../../core/time/clock.dart';
 import '../../data/datasources/remote/noop_voice_remote_datasource.dart';
 import '../../data/datasources/remote/supabase_voice_remote_datasource.dart';
 import '../../data/datasources/remote/voice_remote_datasource.dart';
 import '../../data/repositories/voice_repository_impl.dart';
+import '../../domain/repositories/meal_repository.dart';
 import '../../domain/repositories/voice_repository.dart';
 import '../../domain/usecases/exercises/get_all_exercises.dart';
 import '../../domain/usecases/nutrition_logs/get_daily_macros.dart';
@@ -22,6 +24,14 @@ import '../../features/log/log.dart';
 import '../../features/settings/application/app_settings_cubit.dart';
 import '../../features/voice/application/voice_bloc.dart';
 import '../../features/voice/application/voice_settings_cubit.dart';
+import '../../features/voice/data/coordinator/offline_voice_coordinator.dart';
+import '../../features/voice/data/lookup/exercise_lookup.dart';
+import '../../features/voice/data/lookup/meal_lookup.dart';
+import '../../features/voice/data/lookup/recent_entity_lookup.dart';
+import '../../features/voice/data/parser/intent_parser.dart';
+import '../../features/voice/data/parser/matchers/nutrition_matchers.dart';
+import '../../features/voice/data/parser/matchers/query_matchers.dart';
+import '../../features/voice/data/parser/matchers/workout_set_matchers.dart';
 import '../../features/voice/data/services/flutter_tts_voice_tts_service.dart';
 import '../../features/voice/data/services/porcupine_voice_wake_word_service.dart';
 import '../../features/voice/data/services/secure_storage_voice_credential_service.dart';
@@ -86,6 +96,39 @@ void registerVoiceModule(GetIt sl) {
   sl.registerLazySingleton(() => DeleteVoiceHistory(sl()));
   sl.registerLazySingleton(() => SendVoiceMessage(sl()));
 
+  // ── C-6: Lookup helpers (singletons — cache persists across sessions) ──
+  sl.registerLazySingleton<ExerciseLookup>(
+    () => ExerciseLookup(sl<GetAllExercises>()),
+  );
+  sl.registerLazySingleton<MealLookup>(() => MealLookup(sl<MealRepository>()));
+  sl.registerLazySingleton<RecentEntityLookup>(
+    () => RecentEntityLookup(
+      getSetsByDateRange: sl<GetSetsByDateRange>(),
+      getLogsForDate: sl<GetLogsForDate>(),
+      clock: sl<Clock>(),
+    ),
+  );
+
+  // ── C-6: Offline coordinator (factory — one per VoiceBloc instance) ────
+  sl.registerFactory<OfflineVoiceCoordinator>(
+    () => OfflineVoiceCoordinator(
+      parser: const IntentParser([
+        matchDeleteWorkoutSet,
+        matchEditWorkoutSet,
+        matchLogWorkoutSet,
+        matchDeleteNutrition,
+        matchEditNutrition,
+        matchLogNutrition,
+        matchQueryWeeklyVolume,
+        matchQueryDailyMacros,
+        matchQueryRecentSets,
+      ]),
+      exerciseLookup: sl<ExerciseLookup>(),
+      mealLookup: sl<MealLookup>(),
+      recentEntityLookup: sl<RecentEntityLookup>(),
+    ),
+  );
+
   // ── Cubits / blocs ─────────────────────────────────────────────────────
   // VoiceSettingsCubit: factory — each page gets its own subscription to
   // AppSettingsCubit's stream, but the *state* it mirrors comes from the
@@ -122,8 +165,9 @@ void registerVoiceModule(GetIt sl) {
       getSetsByDateRange: sl<GetSetsByDateRange>(),
       getDailyMacros: sl<GetDailyMacros>(),
       getWeeklySets: sl<GetWeeklySets>(),
-      getAllExercises: sl<GetAllExercises>(),
       getLogsForDate: sl<GetLogsForDate>(),
+      exerciseLookup: sl<ExerciseLookup>(),
+      offlineCoordinator: sl<OfflineVoiceCoordinator>(),
     ),
   );
 }

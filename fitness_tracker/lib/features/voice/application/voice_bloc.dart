@@ -13,7 +13,6 @@ import '../../../core/network/network_status_service.dart';
 import '../../../core/platform/wakelock_service.dart';
 import '../../../domain/entities/app_session.dart';
 import '../../../domain/entities/app_settings.dart' show WeightUnit;
-import '../../../domain/entities/exercise.dart';
 import '../../../domain/entities/nutrition_log.dart';
 import '../../../domain/entities/voice_budget.dart';
 import '../../../domain/entities/voice_chat_context.dart';
@@ -23,7 +22,6 @@ import '../../../domain/entities/voice_settings.dart';
 import '../../../domain/entities/voice_tool_call.dart';
 import '../../../domain/entities/workout_set.dart';
 import '../../../domain/repositories/app_settings_repository.dart';
-import '../../../domain/usecases/exercises/get_all_exercises.dart';
 import '../../../domain/usecases/nutrition_logs/get_daily_macros.dart';
 import '../../../domain/usecases/nutrition_logs/get_logs_for_date.dart';
 import '../../../domain/usecases/voice/delete_voice_history.dart';
@@ -34,6 +32,8 @@ import '../../../domain/usecases/workout_sets/get_weekly_sets.dart';
 import '../../../features/history/history.dart';
 import '../../../features/log/application/nutrition_log_bloc.dart';
 import '../../../features/log/application/workout_bloc.dart';
+import '../data/coordinator/offline_voice_coordinator.dart';
+import '../data/lookup/exercise_lookup.dart';
 import '../data/services/voice_stt_service.dart';
 import '../data/services/voice_tts_service.dart';
 import '../data/services/voice_wake_word_service.dart';
@@ -177,14 +177,7 @@ class VoiceConnectivityChanged extends VoiceEvent {
 // State
 // ---------------------------------------------------------------------------
 
-enum VoiceStatus {
-  idle,
-  listening,
-  transcribing,
-  thinking,
-  speaking,
-  error,
-}
+enum VoiceStatus { idle, listening, transcribing, thinking, speaking, error }
 
 class VoiceState extends Equatable {
   const VoiceState({
@@ -271,8 +264,9 @@ class VoiceState extends Equatable {
       sessionId: sessionId ?? this.sessionId,
       isGuest: isGuest ?? this.isGuest,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      liveTranscript:
-          clearTranscript ? '' : liveTranscript ?? this.liveTranscript,
+      liveTranscript: clearTranscript
+          ? ''
+          : liveTranscript ?? this.liveTranscript,
       pendingConfirmation: clearPendingConfirmation
           ? null
           : pendingConfirmation ?? this.pendingConfirmation,
@@ -285,18 +279,18 @@ class VoiceState extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        status,
-        messages,
-        budget,
-        sessionId,
-        isGuest,
-        errorMessage,
-        liveTranscript,
-        pendingConfirmation,
-        isWorkoutModeActive,
-        isOnline,
-        hasAnnouncedOfflineThisSession,
-      ];
+    status,
+    messages,
+    budget,
+    sessionId,
+    isGuest,
+    errorMessage,
+    liveTranscript,
+    pendingConfirmation,
+    isWorkoutModeActive,
+    isOnline,
+    hasAnnouncedOfflineThisSession,
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -337,28 +331,32 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     required GetSetsByDateRange getSetsByDateRange,
     required GetDailyMacros getDailyMacros,
     required GetWeeklySets getWeeklySets,
-    required GetAllExercises getAllExercises,
     required GetLogsForDate getLogsForDate,
-  })  : _sendVoiceMessage = sendVoiceMessage,
-        _getVoiceBudget = getVoiceBudget,
-        _deleteVoiceHistory = deleteVoiceHistory,
-        _stt = sttService,
-        _tts = ttsService,
-        _appSettingsRepository = appSettingsRepository,
-        _currentVoiceSettings = currentVoiceSettings,
-        _networkStatusService = networkStatusService,
-        _wakeWordService = wakeWordService,
-        _wakelock = wakelockService,
-        _workoutBloc = workoutBloc,
-        _nutritionLogBloc = nutritionLogBloc,
-        _historyBloc = historyBloc,
-        _getSetsByDateRange = getSetsByDateRange,
-        _getDailyMacros = getDailyMacros,
-        // ignore: unused_field
-        _getWeeklySets = getWeeklySets,
-        _getAllExercises = getAllExercises,
-        _getLogsForDate = getLogsForDate,
-        super(const VoiceState()) {
+    // C-6: shared lookup helpers
+    required ExerciseLookup exerciseLookup,
+    // C-6: offline coordinator
+    required OfflineVoiceCoordinator offlineCoordinator,
+  }) : _sendVoiceMessage = sendVoiceMessage,
+       _getVoiceBudget = getVoiceBudget,
+       _deleteVoiceHistory = deleteVoiceHistory,
+       _stt = sttService,
+       _tts = ttsService,
+       _appSettingsRepository = appSettingsRepository,
+       _currentVoiceSettings = currentVoiceSettings,
+       _networkStatusService = networkStatusService,
+       _wakeWordService = wakeWordService,
+       _wakelock = wakelockService,
+       _workoutBloc = workoutBloc,
+       _nutritionLogBloc = nutritionLogBloc,
+       _historyBloc = historyBloc,
+       _getSetsByDateRange = getSetsByDateRange,
+       _getDailyMacros = getDailyMacros,
+       // ignore: unused_field
+       _getWeeklySets = getWeeklySets,
+       _getLogsForDate = getLogsForDate,
+       _exerciseLookup = exerciseLookup,
+       _offlineCoordinator = offlineCoordinator,
+       super(const VoiceState()) {
     on<VoiceSessionStarted>(_onSessionStarted);
     on<VoiceListenRequested>(_onListenRequested);
     on<VoiceListenStopRequested>(_onListenStopRequested);
@@ -413,11 +411,13 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   final GetDailyMacros _getDailyMacros;
   // ignore: unused_field
   final GetWeeklySets _getWeeklySets;
-  final GetAllExercises _getAllExercises;
   final GetLogsForDate _getLogsForDate;
 
-  // C-5: exercise cache for name-to-ID resolution; refreshed lazily once per session
-  List<Exercise> _cachedExercises = <Exercise>[];
+  // C-6: shared lookup — singleton, cache persists across voice sessions
+  final ExerciseLookup _exerciseLookup;
+
+  // C-6: offline coordinator — factory, one per VoiceBloc instance
+  final OfflineVoiceCoordinator _offlineCoordinator;
 
   // C-5: recent-entity caches populated by _buildRecentContext; used for edit/delete lookups
   List<WorkoutSet> _cachedWorkoutSets = <WorkoutSet>[];
@@ -432,18 +432,21 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   void _onSessionStarted(VoiceSessionStarted event, Emitter<VoiceState> emit) {
     final isGuest = !event.session.isAuthenticated;
     final sessionId = isGuest ? null : _uuid.v4();
-    // Reset per-session caches on new session
-    _cachedExercises = <Exercise>[];
+    // Reset per-session recent-entity caches on new session.
+    // ExerciseLookup is a singleton whose cache persists across sessions
+    // (the exercise library is static) — it is NOT reset here.
     _cachedWorkoutSets = <WorkoutSet>[];
     _cachedNutritionLogs = <NutritionLog>[];
-    emit(state.copyWith(
-      isGuest: isGuest,
-      sessionId: sessionId,
-      messages: const <VoiceMessage>[],
-      status: VoiceStatus.idle,
-      clearError: true,
-      clearTranscript: true,
-    ));
+    emit(
+      state.copyWith(
+        isGuest: isGuest,
+        sessionId: sessionId,
+        messages: const <VoiceMessage>[],
+        status: VoiceStatus.idle,
+        clearError: true,
+        clearTranscript: true,
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -460,44 +463,59 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     try {
       await _stt.initialize();
     } catch (e, st) {
-      AppLogger.warning('VoiceBloc: STT initialize failed',
-          error: e, stackTrace: st);
-      emit(state.copyWith(
-        status: VoiceStatus.error,
-        errorMessage: 'Voice recognition is not available on this device.',
-      ));
+      AppLogger.warning(
+        'VoiceBloc: STT initialize failed',
+        error: e,
+        stackTrace: st,
+      );
+      emit(
+        state.copyWith(
+          status: VoiceStatus.error,
+          errorMessage: 'Voice recognition is not available on this device.',
+        ),
+      );
       return;
     }
 
     if (!_stt.isAvailable) {
-      emit(state.copyWith(
-        status: VoiceStatus.error,
-        errorMessage: 'Voice recognition is not available on this device.',
-      ));
+      emit(
+        state.copyWith(
+          status: VoiceStatus.error,
+          errorMessage: 'Voice recognition is not available on this device.',
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(
-      status: VoiceStatus.listening,
-      clearError: true,
-      clearTranscript: true,
-    ));
+    emit(
+      state.copyWith(
+        status: VoiceStatus.listening,
+        clearError: true,
+        clearTranscript: true,
+      ),
+    );
 
     await _sttSubscription?.cancel();
-    _sttSubscription = _stt.listen(localeId: 'en-US').listen(
-      (result) => add(VoiceTranscriptReceived(
-        transcript: result.transcript,
-        isFinal: result.isFinal,
-      )),
-      onError: (Object e) {
-        if (e is VoiceSttException) {
-          add(VoiceTranscriptFailed(e.kind, e.message));
-        } else {
-          add(VoiceTranscriptFailed(VoiceSttErrorKind.unknown, e.toString()));
-        }
-      },
-      cancelOnError: true,
-    );
+    _sttSubscription = _stt
+        .listen(localeId: 'en-US')
+        .listen(
+          (result) => add(
+            VoiceTranscriptReceived(
+              transcript: result.transcript,
+              isFinal: result.isFinal,
+            ),
+          ),
+          onError: (Object e) {
+            if (e is VoiceSttException) {
+              add(VoiceTranscriptFailed(e.kind, e.message));
+            } else {
+              add(
+                VoiceTranscriptFailed(VoiceSttErrorKind.unknown, e.toString()),
+              );
+            }
+          },
+          cancelOnError: true,
+        );
   }
 
   Future<void> _onListenStopRequested(
@@ -524,17 +542,13 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
     final text = event.transcript.trim();
     if (text.isEmpty) {
-      emit(state.copyWith(
-        status: VoiceStatus.idle,
-        clearTranscript: true,
-      ));
+      emit(state.copyWith(status: VoiceStatus.idle, clearTranscript: true));
       return;
     }
 
-    emit(state.copyWith(
-      status: VoiceStatus.transcribing,
-      liveTranscript: text,
-    ));
+    emit(
+      state.copyWith(status: VoiceStatus.transcribing, liveTranscript: text),
+    );
     add(VoiceSendMessage(text));
   }
 
@@ -548,11 +562,13 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     final uiMessage = _sttErrorMessage(event.kind);
     final spokenMessage = _sttSpokenMessage(event.kind);
 
-    emit(state.copyWith(
-      status: VoiceStatus.error,
-      errorMessage: uiMessage,
-      clearTranscript: true,
-    ));
+    emit(
+      state.copyWith(
+        status: VoiceStatus.error,
+        errorMessage: uiMessage,
+        clearTranscript: true,
+      ),
+    );
 
     // Speak asynchronously — do not await, do not block the emitter.
     if (spokenMessage != null) {
@@ -578,14 +594,33 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     );
 
     final updatedMessages = <VoiceMessage>[...state.messages, userMsg];
-    emit(state.copyWith(
-      status: VoiceStatus.thinking,
-      messages: updatedMessages,
-      clearError: true,
-      clearTranscript: true,
-    ));
+    emit(
+      state.copyWith(
+        status: VoiceStatus.thinking,
+        messages: updatedMessages,
+        clearError: true,
+        clearTranscript: true,
+      ),
+    );
 
     final weightUnit = await _readWeightUnit();
+
+    // C-6: Offline fallback — bypass the network entirely.
+    if (!state.isOnline) {
+      // Warm the recent-entity caches so a confirmed offline edit/delete can
+      // resolve the set/log id back to a full entity. The online path does
+      // this via _buildRecentContext(); offline must do it explicitly since
+      // it skips that call. The underlying use cases read local sqflite, so
+      // this works without a network connection.
+      await _warmRecentCaches();
+      final offlineResult = await _offlineCoordinator.process(
+        event.text,
+        weightUnit: weightUnit,
+      );
+      await _dispatchVoiceResult(offlineResult, updatedMessages, emit,
+          refreshBudget: false);
+      return;
+    }
 
     // Build extended context (recent sets + nutrition logs for edit/delete IDs)
     final (recentSets, recentLogs) = await _buildRecentContext();
@@ -604,46 +639,62 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     await chatResult.fold(
       (failure) async {
         final spokenMessage = _spokenMessageFor(failure);
-        emit(state.copyWith(
-          status: VoiceStatus.error,
-          errorMessage: _messageFor(failure),
-        ));
+        emit(
+          state.copyWith(
+            status: VoiceStatus.error,
+            errorMessage: _messageFor(failure),
+          ),
+        );
         if (spokenMessage != null) {
           unawaited(_speak(spokenMessage));
         }
       },
-      (result) async {
-        switch (result) {
-          case VoiceChatTextResponse(:final message):
-            final withReply = <VoiceMessage>[...updatedMessages, message];
-            emit(state.copyWith(status: VoiceStatus.speaking, messages: withReply));
-            await _speak(message.content);
-            emit(state.copyWith(status: VoiceStatus.idle));
-            _refreshBudget();
-
-          case VoiceChatMutationCall(:final toolCall):
-            // Don't add to messages yet; the confirmation card drives the next step.
-            emit(state.copyWith(
-              status: VoiceStatus.idle,
-              messages: updatedMessages,
-            ));
-            add(VoicePendingConfirmationSet(toolCall));
-
-          case VoiceChatQueryCall(:final toolName, :final args):
-            final spoken = await _executeQueryTool(toolName, args);
-            final assistantMsg = VoiceMessage(
-              role: VoiceRole.assistant,
-              content: spoken,
-              createdAt: DateTime.now(),
-            );
-            final withReply = <VoiceMessage>[...updatedMessages, assistantMsg];
-            emit(state.copyWith(status: VoiceStatus.speaking, messages: withReply));
-            await _speak(spoken);
-            emit(state.copyWith(status: VoiceStatus.idle));
-            _refreshBudget();
-        }
-      },
+      (result) async =>
+          _dispatchVoiceResult(result, updatedMessages, emit),
     );
+  }
+
+  Future<void> _dispatchVoiceResult(
+    VoiceChatResult result,
+    List<VoiceMessage> updatedMessages,
+    Emitter<VoiceState> emit, {
+    bool refreshBudget = true,
+  }) async {
+    switch (result) {
+      case VoiceChatTextResponse(:final message):
+        final withReply = <VoiceMessage>[...updatedMessages, message];
+        emit(
+          state.copyWith(status: VoiceStatus.speaking, messages: withReply),
+        );
+        await _speak(message.content);
+        emit(state.copyWith(status: VoiceStatus.idle));
+        if (refreshBudget) _refreshBudget();
+
+      case VoiceChatMutationCall(:final toolCall):
+        // Don't add to messages yet; the confirmation card drives the next step.
+        emit(
+          state.copyWith(
+            status: VoiceStatus.idle,
+            messages: updatedMessages,
+          ),
+        );
+        add(VoicePendingConfirmationSet(toolCall));
+
+      case VoiceChatQueryCall(:final toolName, :final args):
+        final spoken = await _executeQueryTool(toolName, args);
+        final assistantMsg = VoiceMessage(
+          role: VoiceRole.assistant,
+          content: spoken,
+          createdAt: DateTime.now(),
+        );
+        final withReply = <VoiceMessage>[...updatedMessages, assistantMsg];
+        emit(
+          state.copyWith(status: VoiceStatus.speaking, messages: withReply),
+        );
+        await _speak(spoken);
+        emit(state.copyWith(status: VoiceStatus.idle));
+        if (refreshBudget) _refreshBudget();
+    }
   }
 
   Future<void> _speak(String text) async {
@@ -683,25 +734,19 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   // C-5: Recent context builder
   // ---------------------------------------------------------------------------
 
-  /// Fetches the last 5 workout sets (past 7 days) and last 5 nutrition logs
-  /// (today) for use as edit/delete context. Caches raw entities for lookup.
-  /// Errors are swallowed — empty context is acceptable; the LLM simply
-  /// won't propose edit/delete for unknown rows.
-  Future<(List<RecentSetContext>, List<RecentNutritionLogContext>)>
-      _buildRecentContext() async {
+  /// Populates [_cachedWorkoutSets] / [_cachedNutritionLogs] (last 5 sets from
+  /// the past 7 days, last 5 logs from today) and warms the exercise lookup.
+  ///
+  /// Shared by the online context builder and the offline path so a confirmed
+  /// edit/delete can always resolve an id back to a full entity. Errors are
+  /// swallowed — an empty cache is acceptable; edit/delete simply reports it
+  /// could not find the row rather than crashing.
+  Future<void> _warmRecentCaches() async {
     try {
-      // Exercise cache — refresh lazily once per session
-      if (_cachedExercises.isEmpty) {
-        final exResult = await _getAllExercises();
-        _cachedExercises =
-            exResult.fold((_) => <Exercise>[], (list) => list);
-      }
+      // Warm the exercise lookup cache lazily (no-op if already populated).
+      await _exerciseLookup.refreshIfEmpty();
 
-      final exerciseMap = <String, String>{
-        for (final e in _cachedExercises) e.id: e.name,
-      };
-
-      // Last 5 workout sets from the past 7 days
+      // Datasource orders sets newest-first; take(5) = 5 most recent.
       final setsResult = await _getSetsByDateRange(
         startDate: DateTime.now().subtract(const Duration(days: 7)),
         endDate: DateTime.now(),
@@ -709,37 +754,52 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       final rawSets = setsResult.fold((_) => <WorkoutSet>[], (s) => s);
       _cachedWorkoutSets = rawSets.take(5).toList();
 
-      final recentSets = _cachedWorkoutSets
-          .map((s) => RecentSetContext(
-                setId: s.id,
-                exerciseName: exerciseMap[s.exerciseId] ?? s.exerciseId,
-                weight: s.weight,
-                reps: s.reps,
-                intensity: s.intensity,
-                date: s.date,
-              ))
-          .toList();
-
-      // Last 5 nutrition logs for today
       final logsResult = await _getLogsForDate(DateTime.now());
       final rawLogs = logsResult.fold((_) => <NutritionLog>[], (l) => l);
       _cachedNutritionLogs = rawLogs.take(5).toList();
-
-      final recentLogs = _cachedNutritionLogs
-          .map((l) => RecentNutritionLogContext(
-                logId: l.id,
-                mealName: l.mealName,
-                calories: l.calories,
-                date: l.loggedAt,
-              ))
-          .toList();
-
-      return (recentSets, recentLogs);
     } catch (e, st) {
-      AppLogger.warning('VoiceBloc: _buildRecentContext failed',
-          error: e, stackTrace: st);
-      return (<RecentSetContext>[], <RecentNutritionLogContext>[]);
+      AppLogger.warning(
+        'VoiceBloc: _warmRecentCaches failed',
+        error: e,
+        stackTrace: st,
+      );
+      _cachedWorkoutSets = <WorkoutSet>[];
+      _cachedNutritionLogs = <NutritionLog>[];
     }
+  }
+
+  /// Builds the LLM recent-entity context (online path) from the warmed
+  /// caches. Errors are swallowed — empty context is acceptable; the LLM
+  /// simply won't propose edit/delete for unknown rows.
+  Future<(List<RecentSetContext>, List<RecentNutritionLogContext>)>
+  _buildRecentContext() async {
+    await _warmRecentCaches();
+
+    final recentSets = _cachedWorkoutSets
+        .map(
+          (s) => RecentSetContext(
+            setId: s.id,
+            exerciseName: _exerciseLookup.nameForId(s.exerciseId),
+            weight: s.weight,
+            reps: s.reps,
+            intensity: s.intensity,
+            date: s.date,
+          ),
+        )
+        .toList();
+
+    final recentLogs = _cachedNutritionLogs
+        .map(
+          (l) => RecentNutritionLogContext(
+            logId: l.id,
+            mealName: l.mealName,
+            calories: l.calories,
+            date: l.loggedAt,
+          ),
+        )
+        .toList();
+
+    return (recentSets, recentLogs);
   }
 
   // ---------------------------------------------------------------------------
@@ -764,10 +824,12 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         content: spokenSuccess,
         createdAt: now,
       );
-      emit(state.copyWith(
-        status: VoiceStatus.speaking,
-        messages: <VoiceMessage>[...state.messages, confirmMsg],
-      ));
+      emit(
+        state.copyWith(
+          status: VoiceStatus.speaking,
+          messages: <VoiceMessage>[...state.messages, confirmMsg],
+        ),
+      );
       await _speak(spokenSuccess);
       emit(state.copyWith(status: VoiceStatus.idle));
     } else {
@@ -781,10 +843,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
   /// Dispatches the confirmed tool call to the appropriate target bloc.
   /// Returns the spoken success string, or null if dispatch failed.
-  Future<String?> _dispatchMutationTool(
-    VoiceToolCall tc,
-    DateTime now,
-  ) async {
+  Future<String?> _dispatchMutationTool(VoiceToolCall tc, DateTime now) async {
     try {
       switch (tc.toolName) {
         case 'logWorkoutSet':
@@ -832,8 +891,11 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
           return AppStrings.voiceSpokenToolFailed;
       }
     } catch (e, st) {
-      AppLogger.warning('VoiceBloc: tool dispatch failed',
-          error: e, stackTrace: st);
+      AppLogger.warning(
+        'VoiceBloc: tool dispatch failed',
+        error: e,
+        stackTrace: st,
+      );
       return AppStrings.voiceSpokenToolFailed;
     }
   }
@@ -857,14 +919,17 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
         exerciseId ?? _resolveExerciseIdFromCache(exerciseName);
     if (resolvedExerciseId == null) {
       AppLogger.warning(
-          'VoiceBloc: cannot resolve exerciseId for "$exerciseName"');
+        'VoiceBloc: cannot resolve exerciseId for "$exerciseName"',
+      );
       return null;
     }
 
     final intensityRaw =
         (args['intensity'] as num?)?.toInt() ?? MuscleStimulus.defaultIntensity;
     final intensity = intensityRaw.clamp(
-        MuscleStimulus.minIntensity, MuscleStimulus.maxIntensity);
+      MuscleStimulus.minIntensity,
+      MuscleStimulus.maxIntensity,
+    );
 
     final dateStr = args['date'] as String?;
     final date = dateStr != null ? _parseIsoDate(dateStr) ?? now : now;
@@ -886,8 +951,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
     final mealId = args['mealId'] as String?;
     final gramsConsumed = (args['gramsConsumed'] as num?)?.toDouble();
-    final proteinGrams =
-        (args['proteinGrams'] as num?)?.toDouble() ?? 0.0;
+    final proteinGrams = (args['proteinGrams'] as num?)?.toDouble() ?? 0.0;
     final carbsGrams = (args['carbsGrams'] as num?)?.toDouble() ?? 0.0;
     final fatGrams = (args['fatGrams'] as num?)?.toDouble() ?? 0.0;
     final calories = (args['calories'] as num?)?.toDouble() ?? 0.0;
@@ -910,20 +974,26 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   }
 
   WorkoutSet _applyWorkoutSetEdits(
-      WorkoutSet existing, Map<String, dynamic> args) {
+    WorkoutSet existing,
+    Map<String, dynamic> args,
+  ) {
     final newIntensity = (args['intensity'] as num?)?.toInt();
     return existing.copyWith(
       reps: (args['reps'] as num?)?.toInt() ?? existing.reps,
       weight: (args['weight'] as num?)?.toDouble() ?? existing.weight,
       intensity: newIntensity != null
           ? newIntensity.clamp(
-              MuscleStimulus.minIntensity, MuscleStimulus.maxIntensity)
+              MuscleStimulus.minIntensity,
+              MuscleStimulus.maxIntensity,
+            )
           : existing.intensity,
     );
   }
 
   NutritionLog _applyNutritionLogEdits(
-      NutritionLog existing, Map<String, dynamic> args) {
+    NutritionLog existing,
+    Map<String, dynamic> args,
+  ) {
     return existing.copyWith(
       gramsConsumed:
           (args['gramsConsumed'] as num?)?.toDouble() ?? existing.gramsConsumed,
@@ -958,20 +1028,10 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     return null;
   }
 
-  /// Attempts to match an exercise name against the cached exercise list.
-  /// Returns the exercise ID, or null if no match found.
-  String? _resolveExerciseIdFromCache(String exerciseName) {
-    final lower = exerciseName.toLowerCase();
-    // Exact name match
-    for (final ex in _cachedExercises) {
-      if (ex.name.toLowerCase() == lower) return ex.id;
-    }
-    // Starts-with fuzzy fallback for colloquial names ("bench" → "Bench Press")
-    for (final ex in _cachedExercises) {
-      if (ex.name.toLowerCase().startsWith(lower)) return ex.id;
-    }
-    return null;
-  }
+  /// Resolves an exercise name to its ID via the shared [ExerciseLookup] cache.
+  /// Returns null if no match is found (exact or starts-with prefix).
+  String? _resolveExerciseIdFromCache(String exerciseName) =>
+      _exerciseLookup.resolveId(exerciseName);
 
   // ---------------------------------------------------------------------------
   // C-5: Query tool runner
@@ -994,7 +1054,11 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
           return AppStrings.voiceSpokenGenericError;
       }
     } catch (e, st) {
-      AppLogger.warning('VoiceBloc: query tool failed', error: e, stackTrace: st);
+      AppLogger.warning(
+        'VoiceBloc: query tool failed',
+        error: e,
+        stackTrace: st,
+      );
       return AppStrings.voiceSpokenGenericError;
     }
   }
@@ -1018,61 +1082,56 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       muscleGroup: muscleGroup,
     );
 
-    return result.fold(
-      (_) => AppStrings.voiceQueryWorkoutUnavailable,
-      (sets) {
-        var filtered = sets;
-        if (exerciseName != null) {
-          final lower = exerciseName.toLowerCase();
-          filtered = sets.where((s) {
-            final name = _exerciseNameForId(s.exerciseId).toLowerCase();
-            return name.contains(lower);
-          }).toList();
-        }
+    return result.fold((_) => AppStrings.voiceQueryWorkoutUnavailable, (sets) {
+      var filtered = sets;
+      if (exerciseName != null) {
+        final lower = exerciseName.toLowerCase();
+        filtered = sets.where((s) {
+          final name = _exerciseNameForId(s.exerciseId).toLowerCase();
+          return name.contains(lower);
+        }).toList();
+      }
 
-        if (filtered.isEmpty) {
-          final period =
-              muscleGroup != null ? '$muscleGroup sets' : 'sets';
-          return AppStrings.voiceQueryNoSetsInPeriod(period);
-        }
+      if (filtered.isEmpty) {
+        final period = muscleGroup != null ? '$muscleGroup sets' : 'sets';
+        return AppStrings.voiceQueryNoSetsInPeriod(period);
+      }
 
-        // Group by exercise name
-        final counts = <String, int>{};
-        for (final s in filtered) {
-          final name = _exerciseNameForId(s.exerciseId);
-          counts[name] = (counts[name] ?? 0) + 1;
-        }
+      // Group by exercise name
+      final counts = <String, int>{};
+      for (final s in filtered) {
+        final name = _exerciseNameForId(s.exerciseId);
+        counts[name] = (counts[name] ?? 0) + 1;
+      }
 
-        final total = filtered.length;
-        final breakdown =
-            counts.entries.map((e) => '${e.value} ${e.key}').join(', ');
-        final groupLabel =
-            muscleGroup != null ? '$muscleGroup sets' : 'sets';
-        return AppStrings.voiceQueryVolumeResult(total, groupLabel, breakdown);
-      },
-    );
+      final total = filtered.length;
+      final breakdown = counts.entries
+          .map((e) => '${e.value} ${e.key}')
+          .join(', ');
+      final groupLabel = muscleGroup != null ? '$muscleGroup sets' : 'sets';
+      return AppStrings.voiceQueryVolumeResult(total, groupLabel, breakdown);
+    });
   }
 
   Future<String> _queryDailyMacros(Map<String, dynamic> args) async {
     final dateStr = args['date'] as String?;
-    final date =
-        dateStr != null ? _parseIsoDate(dateStr) ?? DateTime.now() : DateTime.now();
+    final date = dateStr != null
+        ? _parseIsoDate(dateStr) ?? DateTime.now()
+        : DateTime.now();
 
     final result = await _getDailyMacros(date);
 
-    return result.fold(
-      (_) => AppStrings.voiceQueryNutritionUnavailable,
-      (macros) {
-        final protein = (macros['protein'] ?? 0.0).round();
-        final carbs = (macros['carbs'] ?? 0.0).round();
-        final fats = (macros['fats'] ?? 0.0).round();
-        final calories = (macros['calories'] ?? 0.0).round();
+    return result.fold((_) => AppStrings.voiceQueryNutritionUnavailable, (
+      macros,
+    ) {
+      final protein = (macros['protein'] ?? 0.0).round();
+      final carbs = (macros['carbs'] ?? 0.0).round();
+      final fats = (macros['fats'] ?? 0.0).round();
+      final calories = (macros['calories'] ?? 0.0).round();
 
-        if (calories == 0) return AppStrings.voiceQueryNothingLogged;
-        return AppStrings.voiceQueryMacroResult(
-            calories, protein, carbs, fats);
-      },
-    );
+      if (calories == 0) return AppStrings.voiceQueryNothingLogged;
+      return AppStrings.voiceQueryMacroResult(calories, protein, carbs, fats);
+    });
   }
 
   Future<String> _queryRecentSets(Map<String, dynamic> args) async {
@@ -1085,35 +1144,34 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
       endDate: DateTime.now(),
     );
 
-    return result.fold(
-      (_) => AppStrings.voiceQueryRecentSetsUnavailable,
-      (sets) {
-        var filtered = sets;
-        if (exerciseName != null) {
-          final lower = exerciseName.toLowerCase();
-          filtered = sets.where((s) {
-            final name = _exerciseNameForId(s.exerciseId).toLowerCase();
-            return name.contains(lower);
-          }).toList();
-        }
+    return result.fold((_) => AppStrings.voiceQueryRecentSetsUnavailable, (
+      sets,
+    ) {
+      var filtered = sets;
+      if (exerciseName != null) {
+        final lower = exerciseName.toLowerCase();
+        filtered = sets.where((s) {
+          final name = _exerciseNameForId(s.exerciseId).toLowerCase();
+          return name.contains(lower);
+        }).toList();
+      }
 
-        final limited = filtered.take(limit).toList();
-        if (limited.isEmpty) {
-          return exerciseName != null
-              ? AppStrings.voiceQueryNoRecentSetsFor(exerciseName)
-              : AppStrings.voiceQueryNoRecentSets;
-        }
+      final limited = filtered.take(limit).toList();
+      if (limited.isEmpty) {
+        return exerciseName != null
+            ? AppStrings.voiceQueryNoRecentSetsFor(exerciseName)
+            : AppStrings.voiceQueryNoRecentSets;
+      }
 
-        final lines = limited
-            .map((s) {
-              final name = _exerciseNameForId(s.exerciseId);
-              return '$name: ${s.weight} × ${s.reps} reps';
-            })
-            .join('. ');
+      final lines = limited
+          .map((s) {
+            final name = _exerciseNameForId(s.exerciseId);
+            return '$name: ${s.weight} × ${s.reps} reps';
+          })
+          .join('. ');
 
-        return AppStrings.voiceQueryRecentSetsResult(lines);
-      },
-    );
+      return AppStrings.voiceQueryRecentSetsResult(lines);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -1128,10 +1186,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
   ) async {
     if (state.isGuest) return;
     final result = await _getVoiceBudget();
-    result.fold(
-      (_) {},
-      (budget) => emit(state.copyWith(budget: budget)),
-    );
+    result.fold((_) {}, (budget) => emit(state.copyWith(budget: budget)));
   }
 
   Future<void> _onHistoryDelete(
@@ -1141,14 +1196,14 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     if (state.isGuest) return;
     final result = await _deleteVoiceHistory();
     result.fold(
-      (failure) => emit(state.copyWith(
-        errorMessage: _messageFor(failure),
-      )),
-      (_) => emit(state.copyWith(
-        messages: const <VoiceMessage>[],
-        sessionId: _uuid.v4(),
-        clearError: true,
-      )),
+      (failure) => emit(state.copyWith(errorMessage: _messageFor(failure))),
+      (_) => emit(
+        state.copyWith(
+          messages: const <VoiceMessage>[],
+          sessionId: _uuid.v4(),
+          clearError: true,
+        ),
+      ),
     );
   }
 
@@ -1156,13 +1211,15 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     VoiceConversationCleared event,
     Emitter<VoiceState> emit,
   ) {
-    emit(state.copyWith(
-      messages: const <VoiceMessage>[],
-      sessionId: _uuid.v4(),
-      status: VoiceStatus.idle,
-      clearError: true,
-      clearTranscript: true,
-    ));
+    emit(
+      state.copyWith(
+        messages: const <VoiceMessage>[],
+        sessionId: _uuid.v4(),
+        status: VoiceStatus.idle,
+        clearError: true,
+        clearTranscript: true,
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1173,10 +1230,12 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     VoicePendingConfirmationSet event,
     Emitter<VoiceState> emit,
   ) {
-    emit(state.copyWith(
-      pendingConfirmation: event.toolCall,
-      clearPendingConfirmation: event.toolCall == null,
-    ));
+    emit(
+      state.copyWith(
+        pendingConfirmation: event.toolCall,
+        clearPendingConfirmation: event.toolCall == null,
+      ),
+    );
   }
 
   void _onConfirmationCancelled(
@@ -1221,10 +1280,12 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
   bool _rejectGuest(Emitter<VoiceState> emit) {
     if (!state.isGuest) return false;
-    emit(state.copyWith(
-      status: VoiceStatus.error,
-      errorMessage: 'Sign in to use the voice assistant.',
-    ));
+    emit(
+      state.copyWith(
+        status: VoiceStatus.error,
+        errorMessage: 'Sign in to use the voice assistant.',
+      ),
+    );
     return true;
   }
 
@@ -1246,14 +1307,10 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
     return 'Something went wrong.';
   }
 
-  /// Returns the human-readable exercise name for a given ID from the cache,
-  /// or the raw ID string if the exercise is not cached.
-  String _exerciseNameForId(String exerciseId) {
-    for (final ex in _cachedExercises) {
-      if (ex.id == exerciseId) return ex.name;
-    }
-    return exerciseId;
-  }
+  /// Returns the human-readable exercise name for [exerciseId] via the shared
+  /// [ExerciseLookup] cache, or the raw ID string as a fallback.
+  String _exerciseNameForId(String exerciseId) =>
+      _exerciseLookup.nameForId(exerciseId);
 
   /// Parses an ISO `yyyy-MM-dd` date string into a [DateTime].
   /// Returns null if the string is malformed.

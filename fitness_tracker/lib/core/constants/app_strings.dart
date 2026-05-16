@@ -552,6 +552,17 @@ class AppStrings {
   static String voiceQueryRecentSetsResult(String lines) =>
       'Most recent sets: $lines.';
 
+  // ── Voice offline coordinator strings ────────────────────────────────────
+  static const String voiceOfflineUnrecognized =
+      "I didn't understand that. Try something like: "
+      "'log bench 80 kg 10 reps'.";
+  static const String voiceOfflineNoRecentSet =
+      "I could not find a recent set to update.";
+  static const String voiceOfflineNoRecentLog =
+      "I could not find a recent nutrition entry to delete.";
+  static const String voiceOfflineExerciseNotFound =
+      "I could not find that exercise in your library.";
+
   // ── Wake word preset labels ────────────────────────────────────────────────
   static const String wakeWordSamoLevski = 'Samo Levski';
   static const String wakeWordTrainer = 'Trainer';
