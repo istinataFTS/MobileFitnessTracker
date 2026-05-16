@@ -16,7 +16,9 @@ class UserProfile extends Equatable {
   /// Primary key — same UUID as the Supabase auth user.
   final String id;
 
-  /// Unique handle chosen at registration. Treated as immutable after creation.
+  /// Unique handle chosen at registration and editable from Settings.
+  /// Globally unique — enforced by the `user_profiles_username_key`
+  /// constraint on the backend.
   final String username;
 
   /// Human-readable name shown in the UI (editable).
@@ -44,11 +46,9 @@ class UserProfile extends Equatable {
     return UserProfile(
       id: id,
       username: username ?? this.username,
-      displayName:
-          clearDisplayName ? null : (displayName ?? this.displayName),
+      displayName: clearDisplayName ? null : (displayName ?? this.displayName),
       bio: clearBio ? null : (bio ?? this.bio),
-      avatarUrl:
-          clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
+      avatarUrl: clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -56,12 +56,12 @@ class UserProfile extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        id,
-        username,
-        displayName,
-        bio,
-        avatarUrl,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    username,
+    displayName,
+    bio,
+    avatarUrl,
+    createdAt,
+    updatedAt,
+  ];
 }

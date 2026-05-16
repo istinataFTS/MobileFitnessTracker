@@ -21,11 +21,6 @@ class EnvConfig {
     defaultValue: '1.0.0',
   );
 
-  static const String userName = String.fromEnvironment(
-    'USER_NAME',
-    defaultValue: 'Fitness User',
-  );
-
   static const String environment = String.fromEnvironment(
     'ENVIRONMENT',
     defaultValue: 'development',

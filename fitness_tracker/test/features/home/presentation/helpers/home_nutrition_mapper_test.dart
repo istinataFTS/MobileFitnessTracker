@@ -61,6 +61,7 @@ void main() {
       homeData: homeData,
       muscleVisualState: const MuscleVisualInitial(),
       settings: settings,
+      userName: 'Tester',
     );
 
     expect(viewData.nutrition.caloriesLabel, '660 kcal');
@@ -84,6 +85,7 @@ void main() {
       homeData: homeData,
       muscleVisualState: const MuscleVisualInitial(),
       settings: settings,
+      userName: 'Tester',
     );
 
     expect(viewData.nutrition.caloriesLabel, '–');
@@ -107,6 +109,7 @@ void main() {
       homeData: homeData,
       muscleVisualState: const MuscleVisualInitial(),
       settings: settings,
+      userName: 'Tester',
     );
 
     expect(viewData.nutrition.proteinLabel, '100 g');

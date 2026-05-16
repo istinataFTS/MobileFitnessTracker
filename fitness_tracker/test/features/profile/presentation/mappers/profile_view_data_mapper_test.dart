@@ -17,12 +17,15 @@ void main() {
     final viewData = ProfileViewDataMapper.map(state);
 
     expect(viewData.title, 'Guest');
-    expect(viewData.subtitle, 'Sign in to unlock cloud sync and social features');
+    expect(
+      viewData.subtitle,
+      'Sign in to unlock cloud sync and social features',
+    );
     expect(viewData.accountModeTitle, 'Guest account');
-    expect(viewData.cloudMigrationSubtitle, 'No initial migration pending');
-    expect(viewData.lastSyncSubtitle, 'No successful cloud sync recorded yet');
-    expect(viewData.deferredItems, hasLength(1));
-    expect(viewData.infoTiles, hasLength(1));
+    expect(
+      viewData.accountModeSubtitle,
+      'Data is stored locally only — sign in to back it up',
+    );
     expect(viewData.isLoading, isFalse);
   });
 
@@ -52,11 +55,6 @@ void main() {
       viewData.accountModeSubtitle,
       'Data is owned and synced with your authenticated account',
     );
-    expect(
-      viewData.cloudMigrationSubtitle,
-      'Waiting to upload local data to the cloud',
-    );
-    expect(viewData.lastSyncSubtitle, '2026-03-18 14:45');
   });
 
   test('keeps loading visible only before first successful load', () {

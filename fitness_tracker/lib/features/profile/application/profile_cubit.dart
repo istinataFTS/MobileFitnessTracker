@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/auth/auth_session_service.dart';
 import '../../../core/session/session_sync_service.dart';
+import '../../../core/validation/username_validator.dart';
 import '../../../domain/entities/app_session.dart';
 import '../../../domain/entities/user_profile.dart';
 import '../../../domain/repositories/app_session_repository.dart';
@@ -46,21 +47,21 @@ class ProfileState extends Equatable {
       session: session ?? this.session,
       isLoading: isLoading ?? this.isLoading,
       hasLoaded: hasLoaded ?? this.hasLoaded,
-      userProfile:
-          clearUserProfile ? null : (userProfile ?? this.userProfile),
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      userProfile: clearUserProfile ? null : (userProfile ?? this.userProfile),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 
   @override
   List<Object?> get props => <Object?>[
-        session,
-        isLoading,
-        hasLoaded,
-        userProfile,
-        errorMessage,
-      ];
+    session,
+    isLoading,
+    hasLoaded,
+    userProfile,
+    errorMessage,
+  ];
 }
 
 class ProfileCubit extends Cubit<ProfileState> {
@@ -69,11 +70,11 @@ class ProfileCubit extends Cubit<ProfileState> {
     required SessionSyncService sessionSyncService,
     required AuthSessionService authSessionService,
     required UserProfileRepository userProfileRepository,
-  })  : _repository = repository,
-        _sessionSyncService = sessionSyncService,
-        _authSessionService = authSessionService,
-        _userProfileRepository = userProfileRepository,
-        super(ProfileState.initial());
+  }) : _repository = repository,
+       _sessionSyncService = sessionSyncService,
+       _authSessionService = authSessionService,
+       _userProfileRepository = userProfileRepository,
+       super(ProfileState.initial());
 
   final AppSessionRepository _repository;
   final SessionSyncService _sessionSyncService;
@@ -122,8 +123,9 @@ class ProfileCubit extends Cubit<ProfileState> {
             userProfile: userProfile,
             isLoading: false,
             hasLoaded: true,
-            errorMessage:
-                refreshResult.isSuccess ? null : refreshResult.message,
+            errorMessage: refreshResult.isSuccess
+                ? null
+                : refreshResult.message,
             clearErrorMessage: refreshResult.isSuccess,
           ),
         );
@@ -161,8 +163,9 @@ class ProfileCubit extends Cubit<ProfileState> {
             isLoading: false,
             hasLoaded: true,
             clearUserProfile: true,
-            errorMessage:
-                signOutResult.isSuccess ? null : signOutResult.message,
+            errorMessage: signOutResult.isSuccess
+                ? null
+                : signOutResult.message,
           ),
         );
       },
@@ -177,12 +180,7 @@ class ProfileCubit extends Cubit<ProfileState> {
 
     result.fold(
       (failure) {
-        emit(
-          state.copyWith(
-            isLoading: false,
-            errorMessage: failure.message,
-          ),
-        );
+        emit(state.copyWith(isLoading: false, errorMessage: failure.message));
       },
       (profile) {
         emit(
@@ -192,6 +190,59 @@ class ProfileCubit extends Cubit<ProfileState> {
             clearErrorMessage: true,
           ),
         );
+      },
+    );
+  }
+
+  /// Renames the signed-in user. Validates locally first, no-ops when the
+  /// username is unchanged, and otherwise persists via [upsertProfile].
+  ///
+  /// Returns `true` on success (or when there was nothing to change) and
+  /// `false` on validation/persistence failure, in which case
+  /// [ProfileState.errorMessage] carries a user-facing reason.
+  Future<bool> updateUsername(String rawUsername) async {
+    final UserProfile? profile = state.userProfile;
+    if (profile == null) {
+      emit(
+        state.copyWith(
+          errorMessage: 'You must be signed in to change your username.',
+        ),
+      );
+      return false;
+    }
+
+    final String username = rawUsername.trim();
+
+    final String? validationError = UsernameValidator.validate(username);
+    if (validationError != null) {
+      emit(state.copyWith(errorMessage: validationError));
+      return false;
+    }
+
+    if (username == profile.username) {
+      return true;
+    }
+
+    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
+
+    final result = await _userProfileRepository.upsertProfile(
+      profile.copyWith(username: username, updatedAt: DateTime.now()),
+    );
+
+    return result.fold(
+      (failure) {
+        emit(state.copyWith(isLoading: false, errorMessage: failure.message));
+        return false;
+      },
+      (updated) {
+        emit(
+          state.copyWith(
+            userProfile: updated,
+            isLoading: false,
+            clearErrorMessage: true,
+          ),
+        );
+        return true;
       },
     );
   }
@@ -248,8 +299,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       return null;
     }
 
-    final result =
-        await _userProfileRepository.getProfile(session.user!.id);
+    final result = await _userProfileRepository.getProfile(session.user!.id);
 
     return result.fold((_) => null, (profile) => profile);
   }

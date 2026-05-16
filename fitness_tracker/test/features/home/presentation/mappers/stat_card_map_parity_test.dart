@@ -87,6 +87,7 @@ void main() {
           },
         ),
         settings: settings,
+        userName: 'Tester',
       );
 
       // Only the trained muscle appears in the summary.
@@ -97,48 +98,44 @@ void main() {
     },
   );
 
-  test(
-    'zero trained muscles ⇒ empty muscle summary and no visual highlights '
-    '(empty-week parity)',
-    () {
-      final HomePageViewData result = HomeViewDataMapper.map(
-        homeData: homeDataWith(weeklySetCount: 0),
-        muscleVisualState: loadedState(
-          muscleData: <String, MuscleVisualData>{
-            'chest': untrained('chest'),
-            'lats': untrained('lats'),
-          },
-        ),
-        settings: settings,
-      );
+  test('zero trained muscles ⇒ empty muscle summary and no visual highlights '
+      '(empty-week parity)', () {
+    final HomePageViewData result = HomeViewDataMapper.map(
+      homeData: homeDataWith(weeklySetCount: 0),
+      muscleVisualState: loadedState(
+        muscleData: <String, MuscleVisualData>{
+          'chest': untrained('chest'),
+          'lats': untrained('lats'),
+        },
+      ),
+      settings: settings,
+      userName: 'Tester',
+    );
 
-      expect(result.progress.muscleSummary, isEmpty);
-      expect(result.progress.bodyVisual.hasHighlights, isFalse);
-      expect(result.progress.bodyVisual.frontLayers, isEmpty);
-      expect(result.progress.bodyVisual.backLayers, isEmpty);
-    },
-  );
+    expect(result.progress.muscleSummary, isEmpty);
+    expect(result.progress.bodyVisual.hasHighlights, isFalse);
+    expect(result.progress.bodyVisual.frontLayers, isEmpty);
+    expect(result.progress.bodyVisual.backLayers, isEmpty);
+  });
 
-  test(
-    'weeklySetCount from HomeDashboardData is available for derived uses — '
-    'regression guard for the SSOT fix',
-    () {
-      // If weeklySetCount is ever re-routed away from HomeDashboardData,
-      // both summary and visual consistency break.  The guard: when the
-      // resolver says 4 sets were effective, exactly 1 trained muscle appears
-      // in the loaded muscle data (same source of truth).
-      final HomePageViewData result = HomeViewDataMapper.map(
-        homeData: homeDataWith(weeklySetCount: 4),
-        muscleVisualState: loadedState(
-          muscleData: <String, MuscleVisualData>{
-            'mid-chest': trained('mid-chest'),
-          },
-        ),
-        settings: settings,
-      );
+  test('weeklySetCount from HomeDashboardData is available for derived uses — '
+      'regression guard for the SSOT fix', () {
+    // If weeklySetCount is ever re-routed away from HomeDashboardData,
+    // both summary and visual consistency break.  The guard: when the
+    // resolver says 4 sets were effective, exactly 1 trained muscle appears
+    // in the loaded muscle data (same source of truth).
+    final HomePageViewData result = HomeViewDataMapper.map(
+      homeData: homeDataWith(weeklySetCount: 4),
+      muscleVisualState: loadedState(
+        muscleData: <String, MuscleVisualData>{
+          'mid-chest': trained('mid-chest'),
+        },
+      ),
+      settings: settings,
+      userName: 'Tester',
+    );
 
-      expect(result.progress.muscleSummary, hasLength(1));
-      expect(result.progress.bodyVisual.hasHighlights, isTrue);
-    },
-  );
+    expect(result.progress.muscleSummary, hasLength(1));
+    expect(result.progress.bodyVisual.hasHighlights, isTrue);
+  });
 }

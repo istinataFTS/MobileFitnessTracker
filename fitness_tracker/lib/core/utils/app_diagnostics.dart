@@ -127,7 +127,8 @@ class AppDiagnostics {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
-      final testId = 'test_persistence_${DateTime.now().millisecondsSinceEpoch}';
+      final testId =
+          'test_persistence_${DateTime.now().millisecondsSinceEpoch}';
 
       await db.insert(DatabaseTables.exercises, {
         DatabaseTables.exerciseId: testId,
@@ -171,7 +172,7 @@ class AppDiagnostics {
       'Database name: Using EnvConfig.databaseName',
       'App version: Using EnvConfig.appVersion',
       'API endpoints: Using EnvConfig.apiBaseUrl',
-      'User name: Using EnvConfig.userName',
+      'User name: Resolved from the authenticated session',
       'Seeding: Using EnvConfig.seedDefaultData',
       'Web-only strings: Using AppStrings constants',
     ];

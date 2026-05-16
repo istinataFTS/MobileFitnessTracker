@@ -6,6 +6,11 @@ class SettingsPageViewData extends Equatable {
   const SettingsPageViewData({
     required this.infoMessage,
     required this.generalSectionTitle,
+    required this.accountSectionVisible,
+    required this.accountSectionTitle,
+    required this.usernameTitle,
+    required this.usernameValue,
+    required this.usernameSubtitle,
     required this.aboutSectionTitle,
     required this.deferredSectionTitle,
     required this.notificationsTitle,
@@ -32,6 +37,16 @@ class SettingsPageViewData extends Equatable {
 
   final String infoMessage;
   final String generalSectionTitle;
+
+  /// Whether the Account section (username editing) is shown. True only for
+  /// an authenticated user with a loaded profile.
+  final bool accountSectionVisible;
+  final String accountSectionTitle;
+  final String usernameTitle;
+
+  /// Current handle rendered as `@handle`; empty when not authenticated.
+  final String usernameValue;
+  final String usernameSubtitle;
   final String aboutSectionTitle;
   final String deferredSectionTitle;
   final String notificationsTitle;
@@ -57,31 +72,36 @@ class SettingsPageViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        infoMessage,
-        generalSectionTitle,
-        aboutSectionTitle,
-        deferredSectionTitle,
-        notificationsTitle,
-        notificationsSubtitle,
-        notificationsEnabled,
-        weekStartTitle,
-        weekStartSubtitle,
-        weekStartPreview,
-        weekStartOptions,
-        weightUnitTitle,
-        weightUnitSubtitle,
-        weightUnitPreview,
-        weightUnitOptions,
-        appVersionTitle,
-        appVersionSubtitle,
-        storageModeTitle,
-        storageModeSubtitle,
-        deferredItems,
-        isLoading,
-        isSaving,
-        errorMessage,
-        voiceSettings,
-      ];
+    infoMessage,
+    generalSectionTitle,
+    accountSectionVisible,
+    accountSectionTitle,
+    usernameTitle,
+    usernameValue,
+    usernameSubtitle,
+    aboutSectionTitle,
+    deferredSectionTitle,
+    notificationsTitle,
+    notificationsSubtitle,
+    notificationsEnabled,
+    weekStartTitle,
+    weekStartSubtitle,
+    weekStartPreview,
+    weekStartOptions,
+    weightUnitTitle,
+    weightUnitSubtitle,
+    weightUnitPreview,
+    weightUnitOptions,
+    appVersionTitle,
+    appVersionSubtitle,
+    storageModeTitle,
+    storageModeSubtitle,
+    deferredItems,
+    isLoading,
+    isSaving,
+    errorMessage,
+    voiceSettings,
+  ];
 }
 
 /// Subset of voice settings the main Settings page shows.
@@ -103,10 +123,10 @@ class VoiceSettingsViewData extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        sessionLoggingEnabled,
-        ttsSpeechRate,
-        ttsSpeechRatePreview,
-      ];
+    sessionLoggingEnabled,
+    ttsSpeechRate,
+    ttsSpeechRatePreview,
+  ];
 }
 
 class SettingsSelectionOptionViewData<T> extends Equatable {
@@ -121,11 +141,7 @@ class SettingsSelectionOptionViewData<T> extends Equatable {
   final bool selected;
 
   @override
-  List<Object?> get props => <Object?>[
-        value,
-        title,
-        selected,
-      ];
+  List<Object?> get props => <Object?>[value, title, selected];
 }
 
 class DeferredSettingsItemViewData extends Equatable {

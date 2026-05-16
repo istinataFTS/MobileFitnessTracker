@@ -1,8 +1,12 @@
 import 'package:bloc_test/bloc_test.dart';
+import 'package:fitness_tracker/core/enums/auth_mode.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/domain/entities/app_settings.dart';
+import 'package:fitness_tracker/domain/entities/app_user.dart';
 import 'package:fitness_tracker/domain/entities/muscle_visual_data.dart';
 import 'package:fitness_tracker/domain/entities/nutrition_log.dart';
 import 'package:fitness_tracker/domain/entities/time_period.dart';
+import 'package:fitness_tracker/domain/entities/user_profile.dart';
 import 'package:fitness_tracker/domain/muscle_visual/muscle_visual_contract.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
@@ -10,6 +14,7 @@ import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dar
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page_keys.dart';
 import 'package:fitness_tracker/features/home/presentation/widgets/period_selector_widget.dart';
+import 'package:fitness_tracker/features/profile/application/profile_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +25,28 @@ class MockHomeBloc extends MockBloc<HomeEvent, HomeState> implements HomeBloc {}
 class MockMuscleVisualBloc
     extends MockBloc<MuscleVisualEvent, MuscleVisualState>
     implements MuscleVisualBloc {}
+
+class MockProfileCubit extends MockCubit<ProfileState>
+    implements ProfileCubit {}
+
+ProfileState _authedProfileState({String displayName = 'Marin'}) =>
+    ProfileState(
+      session: AppSession(
+        authMode: AuthMode.authenticated,
+        user: AppUser(id: 'u1', email: 'a@b.com', displayName: displayName),
+        requiresInitialCloudMigration: false,
+        lastCloudSyncAt: null,
+      ),
+      isLoading: false,
+      hasLoaded: true,
+      userProfile: UserProfile(
+        id: 'u1',
+        username: 'marin',
+        displayName: displayName,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ),
+    );
 
 class FakeHomeEvent extends Fake implements HomeEvent {}
 
@@ -32,6 +59,7 @@ class FakeMuscleVisualState extends Fake implements MuscleVisualState {}
 void main() {
   late MockHomeBloc homeBloc;
   late MockMuscleVisualBloc muscleVisualBloc;
+  late MockProfileCubit profileCubit;
 
   final DateTime now = DateTime(2026, 3, 19, 10, 0);
 
@@ -58,9 +86,7 @@ void main() {
     },
   );
 
-  final HomeLoaded loadedHomeState = HomeLoaded(
-    data: loadedHomeData,
-  );
+  final HomeLoaded loadedHomeState = HomeLoaded(data: loadedHomeData);
 
   final MuscleVisualLoaded loadedMuscleState = MuscleVisualLoaded(
     muscleData: <String, MuscleVisualData>{
@@ -72,9 +98,7 @@ void main() {
         bucket: MuscleVisualBucket.maximum,
         coverageState: MuscleVisualCoverageState.full,
         aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-        visibleSurfaces: const <MuscleVisualSurface>{
-          MuscleVisualSurface.front,
-        },
+        visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
         overflowAmount: 0,
         hasTrained: true,
       ),
@@ -93,6 +117,15 @@ void main() {
   setUp(() {
     homeBloc = MockHomeBloc();
     muscleVisualBloc = MockMuscleVisualBloc();
+    profileCubit = MockProfileCubit();
+
+    final ProfileState profileState = _authedProfileState();
+    when(() => profileCubit.state).thenReturn(profileState);
+    whenListen<ProfileState>(
+      profileCubit,
+      const Stream<ProfileState>.empty(),
+      initialState: profileState,
+    );
 
     when(() => homeBloc.state).thenReturn(loadedHomeState);
     whenListen<HomeState>(
@@ -114,10 +147,9 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<HomeBloc>.value(value: homeBloc),
         BlocProvider<MuscleVisualBloc>.value(value: muscleVisualBloc),
+        BlocProvider<ProfileCubit>.value(value: profileCubit),
       ],
-      child: const MaterialApp(
-        home: HomePage(settings: settings),
-      ),
+      child: const MaterialApp(home: HomePage(settings: settings)),
     );
   }
 
@@ -195,30 +227,61 @@ void main() {
     expect(find.text('Progress • Month'), findsOneWidget);
   });
 
-  testWidgets('period selector exposes stable key and dispatches month change', (
+  testWidgets('greeting uses the resolved session display name', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 2000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(buildSubject());
     await tester.pump();
 
-    expect(find.byKey(PeriodSelectorWidget.dropdownKey), findsOneWidget);
-
-    await tester.tap(find.byKey(PeriodSelectorWidget.dropdownKey));
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(PeriodSelectorWidget.menuItemKey(TimePeriod.month)).last,
-    );
-    await tester.pumpAndSettle();
-
-    verify(
-      () => muscleVisualBloc.add(ChangePeriodEvent(TimePeriod.month)),
-    ).called(1);
+    expect(find.text('Hello, Marin!'), findsOneWidget);
   });
+
+  testWidgets('greeting falls back to Guest for an unauthenticated session', (
+    WidgetTester tester,
+  ) async {
+    const ProfileState guest = ProfileState(
+      session: AppSession.guest(),
+      isLoading: false,
+      hasLoaded: true,
+    );
+    when(() => profileCubit.state).thenReturn(guest);
+    whenListen<ProfileState>(
+      profileCubit,
+      const Stream<ProfileState>.empty(),
+      initialState: guest,
+    );
+
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    expect(find.text('Hello, Guest!'), findsOneWidget);
+  });
+
+  testWidgets(
+    'period selector exposes stable key and dispatches month change',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.byKey(PeriodSelectorWidget.dropdownKey), findsOneWidget);
+
+      await tester.tap(find.byKey(PeriodSelectorWidget.dropdownKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(PeriodSelectorWidget.menuItemKey(TimePeriod.month)).last,
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => muscleVisualBloc.add(ChangePeriodEvent(TimePeriod.month)),
+      ).called(1);
+    },
+  );
 
   testWidgets('visual retry uses progress retry button key', (
     WidgetTester tester,
@@ -260,9 +323,9 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    when(() => muscleVisualBloc.state).thenReturn(
-      const MuscleVisualLoading(TimePeriod.month),
-    );
+    when(
+      () => muscleVisualBloc.state,
+    ).thenReturn(const MuscleVisualLoading(TimePeriod.month));
     whenListen<MuscleVisualState>(
       muscleVisualBloc,
       const Stream<MuscleVisualState>.empty(),
@@ -318,20 +381,21 @@ void main() {
     expect(find.byKey(HomePage.progressCardKey), findsOneWidget);
   });
 
-  testWidgets('pull to refresh dispatches both refresh events from refresh list', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(buildSubject());
-    await tester.pump();
+  testWidgets(
+    'pull to refresh dispatches both refresh events from refresh list',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
 
-    await tester.drag(
-      find.byKey(HomePage.refreshListKey),
-      const Offset(0, 300),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+      await tester.drag(
+        find.byKey(HomePage.refreshListKey),
+        const Offset(0, 300),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-    verify(() => homeBloc.add(const RefreshHomeDataEvent())).called(1);
-    verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
-  });
+      verify(() => homeBloc.add(const RefreshHomeDataEvent())).called(1);
+      verify(() => muscleVisualBloc.add(const RefreshVisualsEvent())).called(1);
+    },
+  );
 }

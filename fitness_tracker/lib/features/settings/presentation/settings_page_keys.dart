@@ -6,9 +6,7 @@ class SettingsPageKeys {
   static const Key loadingIndicatorKey = ValueKey<String>(
     'settings_loading_indicator',
   );
-  static const Key refreshListKey = ValueKey<String>(
-    'settings_refresh_list',
-  );
+  static const Key refreshListKey = ValueKey<String>('settings_refresh_list');
   static const Key notificationsSwitchKey = ValueKey<String>(
     'settings_notifications_switch',
   );
@@ -21,10 +19,15 @@ class SettingsPageKeys {
   static const Key savingIndicatorKey = ValueKey<String>(
     'settings_saving_indicator',
   );
-  static const Key errorBannerKey = ValueKey<String>(
-    'settings_error_banner',
-  );
+  static const Key errorBannerKey = ValueKey<String>('settings_error_banner');
   static const Key voiceAssistantTileKey = ValueKey<String>(
     'settings_voice_assistant_tile',
+  );
+  static const Key usernameTileKey = ValueKey<String>('settings_username_tile');
+  static const Key usernameDialogFieldKey = ValueKey<String>(
+    'settings_username_dialog_field',
+  );
+  static const Key usernameDialogSaveKey = ValueKey<String>(
+    'settings_username_dialog_save',
   );
 }
