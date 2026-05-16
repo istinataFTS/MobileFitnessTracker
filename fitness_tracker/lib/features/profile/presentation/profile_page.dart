@@ -4,9 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/user_profile.dart';
 import '../../../features/auth/presentation/sign_in_page.dart';
-import '../../../features/history/history.dart';
 import '../../../features/settings/presentation/settings_page.dart';
-import '../../../features/settings/presentation/settings_scope.dart';
 import '../../../features/voice/application/voice_settings_cubit.dart';
 import '../../../features/voice/presentation/voice_settings_page.dart';
 import '../../../injection/injection_container.dart';
@@ -25,14 +23,7 @@ class ProfilePage extends StatelessWidget {
   static const Key subtitleKey = ProfilePageKeys.subtitleKey;
   static const Key sessionBannerKey = ProfilePageKeys.sessionBannerKey;
   static const Key settingsTileKey = ProfilePageKeys.settingsTileKey;
-  static const Key historyTileKey = ProfilePageKeys.historyTileKey;
-  static const Key accountStatusTileKey = ProfilePageKeys.accountStatusTileKey;
-  static const Key cloudMigrationTileKey =
-      ProfilePageKeys.cloudMigrationTileKey;
-  static const Key lastSyncTileKey = ProfilePageKeys.lastSyncTileKey;
   static const Key accountModeBannerKey = ProfilePageKeys.accountModeBannerKey;
-  static const Key deferredSectionKey = ProfilePageKeys.deferredSectionKey;
-  static const Key appVersionTileKey = ProfilePageKeys.appVersionTileKey;
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +57,9 @@ class _ProfileViewState extends State<_ProfileView> {
         final String? errorMessage = state.errorMessage;
         if (errorMessage == null || errorMessage.isEmpty) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage)));
 
         context.read<ProfileCubit>().clearError();
       },
@@ -88,10 +79,8 @@ class _ProfileViewState extends State<_ProfileView> {
                   tooltip: 'Edit profile',
                   onPressed: state.isLoading
                       ? null
-                      : () => _showEditProfileSheet(
-                            context,
-                            state.userProfile!,
-                          ),
+                      : () =>
+                            _showEditProfileSheet(context, state.userProfile!),
                 ),
               ],
               if (!state.session.isAuthenticated)
@@ -130,19 +119,7 @@ class _ProfileViewState extends State<_ProfileView> {
             onOpenSettings: () {
               Navigator.push(
                 context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-            onOpenHistory: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => HistoryPage(
-                    settings: SettingsScope.of(context),
-                  ),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
               );
             },
             onOpenVoiceAssistant: () {
@@ -184,10 +161,7 @@ class _ProfileViewState extends State<_ProfileView> {
 // ---------------------------------------------------------------------------
 
 class _EditProfileSheet extends StatefulWidget {
-  const _EditProfileSheet({
-    required this.profile,
-    required this.onSave,
-  });
+  const _EditProfileSheet({required this.profile, required this.onSave});
 
   final UserProfile profile;
   final void Function(UserProfile updated) onSave;
@@ -203,8 +177,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   void initState() {
     super.initState();
-    _displayNameController =
-        TextEditingController(text: widget.profile.displayName ?? '');
+    _displayNameController = TextEditingController(
+      text: widget.profile.displayName ?? '',
+    );
     _bioController = TextEditingController(text: widget.profile.bio ?? '');
   }
 
@@ -244,10 +219,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text(
-            'Edit Profile',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('Edit Profile', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
           Text(
             '@${widget.profile.username}',
@@ -275,10 +247,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _submit,
-            child: const Text('Save'),
-          ),
+          ElevatedButton(onPressed: _submit, child: const Text('Save')),
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

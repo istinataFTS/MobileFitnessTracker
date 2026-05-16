@@ -49,6 +49,7 @@ void main() {
         homeData: homeData,
         muscleVisualState: const MuscleVisualLoading(TimePeriod.month),
         settings: settings,
+        userName: 'Tester',
       );
 
       expect(result.progress.isLoading, isTrue);
@@ -66,6 +67,7 @@ void main() {
           period: TimePeriod.month,
         ),
         settings: settings,
+        userName: 'Tester',
       );
 
       expect(result.progress.isLoading, isFalse);
@@ -73,62 +75,70 @@ void main() {
       expect(result.progress.muscleSummary, isEmpty);
     });
 
-    test('loaded state populates muscle summary for hasTrained muscles only', () {
-      final HomeDashboardData homeData = buildHomeData(weeklySetCount: 9);
+    test(
+      'loaded state populates muscle summary for hasTrained muscles only',
+      () {
+        final HomeDashboardData homeData = buildHomeData(weeklySetCount: 9);
 
-      final MuscleVisualLoaded visualState = buildMuscleVisualState(
-        period: TimePeriod.month,
-        muscleData: <String, MuscleVisualData>{
-          'chest': const MuscleVisualData(
-            muscleGroup: 'chest',
-            totalStimulus: 18,
-            threshold: 20,
-            visualIntensity: 0.6,
-            bucket: MuscleVisualBucket.heavy,
-            coverageState: MuscleVisualCoverageState.partial,
-            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
-            overflowAmount: 0,
-            hasTrained: true,
-          ),
-          'back': const MuscleVisualData(
-            muscleGroup: 'back',
-            totalStimulus: 0,
-            threshold: 20,
-            visualIntensity: 0,
-            bucket: MuscleVisualBucket.empty,
-            coverageState: MuscleVisualCoverageState.empty,
-            aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.back},
-            overflowAmount: 0,
-            hasTrained: false,
-          ),
-        },
-      );
+        final MuscleVisualLoaded visualState = buildMuscleVisualState(
+          period: TimePeriod.month,
+          muscleData: <String, MuscleVisualData>{
+            'chest': const MuscleVisualData(
+              muscleGroup: 'chest',
+              totalStimulus: 18,
+              threshold: 20,
+              visualIntensity: 0.6,
+              bucket: MuscleVisualBucket.heavy,
+              coverageState: MuscleVisualCoverageState.partial,
+              aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+              visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.front},
+              overflowAmount: 0,
+              hasTrained: true,
+            ),
+            'back': const MuscleVisualData(
+              muscleGroup: 'back',
+              totalStimulus: 0,
+              threshold: 20,
+              visualIntensity: 0,
+              bucket: MuscleVisualBucket.empty,
+              coverageState: MuscleVisualCoverageState.empty,
+              aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
+              visibleSurfaces: <MuscleVisualSurface>{MuscleVisualSurface.back},
+              overflowAmount: 0,
+              hasTrained: false,
+            ),
+          },
+        );
 
-      final HomePageViewData result = HomeViewDataMapper.map(
-        homeData: homeData,
-        muscleVisualState: visualState,
-        settings: settings,
-      );
+        final HomePageViewData result = HomeViewDataMapper.map(
+          homeData: homeData,
+          muscleVisualState: visualState,
+          settings: settings,
+          userName: 'Tester',
+        );
 
-      expect(result.progress.isLoading, isFalse);
-      expect(result.progress.errorMessage, isNull);
-      // Only hasTrained=true muscles with totalStimulus > 0 appear.
-      expect(result.progress.muscleSummary, hasLength(1));
-    });
+        expect(result.progress.isLoading, isFalse);
+        expect(result.progress.errorMessage, isNull);
+        // Only hasTrained=true muscles with totalStimulus > 0 appear.
+        expect(result.progress.muscleSummary, hasLength(1));
+      },
+    );
 
-    test('volume mode shows period selector; initial state defaults to volume', () {
-      final HomeDashboardData homeData = buildHomeData();
+    test(
+      'volume mode shows period selector; initial state defaults to volume',
+      () {
+        final HomeDashboardData homeData = buildHomeData();
 
-      final HomePageViewData result = HomeViewDataMapper.map(
-        homeData: homeData,
-        muscleVisualState: const MuscleVisualInitial(),
-        settings: settings,
-      );
+        final HomePageViewData result = HomeViewDataMapper.map(
+          homeData: homeData,
+          muscleVisualState: const MuscleVisualInitial(),
+          settings: settings,
+          userName: 'Tester',
+        );
 
-      expect(result.progress.showPeriodSelector, isTrue);
-    });
+        expect(result.progress.showPeriodSelector, isTrue);
+      },
+    );
 
     test('macro strip shows dash when all macro values are zero', () {
       final HomeDashboardData homeData = buildHomeData();
@@ -137,6 +147,7 @@ void main() {
         homeData: homeData,
         muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
+        userName: 'Tester',
       );
 
       expect(result.nutrition.caloriesLabel, '–');
@@ -160,6 +171,7 @@ void main() {
         homeData: homeData,
         muscleVisualState: const MuscleVisualInitial(),
         settings: settings,
+        userName: 'Tester',
       );
 
       expect(result.nutrition.caloriesLabel, '1840 kcal');

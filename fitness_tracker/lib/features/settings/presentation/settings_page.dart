@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/themes/app_theme.dart';
+import '../../../core/validation/username_validator.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/voice_settings.dart';
+import '../../../features/profile/application/profile_cubit.dart';
 import '../../../features/voice/application/voice_settings_cubit.dart';
 import '../../../features/voice/presentation/voice_settings_page.dart';
 import '../application/app_settings_cubit.dart';
@@ -25,6 +27,11 @@ class SettingsPage extends StatefulWidget {
   static const Key weightUnitTileKey = SettingsPageKeys.weightUnitTileKey;
   static const Key savingIndicatorKey = SettingsPageKeys.savingIndicatorKey;
   static const Key errorBannerKey = SettingsPageKeys.errorBannerKey;
+  static const Key usernameTileKey = SettingsPageKeys.usernameTileKey;
+  static const Key usernameDialogFieldKey =
+      SettingsPageKeys.usernameDialogFieldKey;
+  static const Key usernameDialogSaveKey =
+      SettingsPageKeys.usernameDialogSaveKey;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -64,16 +71,22 @@ class _SettingsPageState extends State<SettingsPage> {
         context.read<AppSettingsCubit>().clearError();
       },
       builder: (BuildContext context, AppSettingsState state) {
-        final VoiceSettings voiceSettings =
-            context.watch<VoiceSettingsCubit>().state;
-        final SettingsPageViewData viewData =
-            SettingsPageViewDataMapper.map(state, voiceSettings: voiceSettings);
+        final VoiceSettings voiceSettings = context
+            .watch<VoiceSettingsCubit>()
+            .state;
+        final ProfileState profileState = context.watch<ProfileCubit>().state;
+        final String? username = profileState.session.isAuthenticated
+            ? profileState.userProfile?.username
+            : null;
+        final SettingsPageViewData viewData = SettingsPageViewDataMapper.map(
+          state,
+          voiceSettings: voiceSettings,
+          username: username,
+        );
 
         return Scaffold(
           backgroundColor: AppTheme.backgroundDark,
-          appBar: AppBar(
-            title: const Text('Settings'),
-          ),
+          appBar: AppBar(title: const Text('Settings')),
           body: SettingsContent(
             viewData: viewData,
             onRefresh: () => context.read<AppSettingsCubit>().refreshSettings(),
@@ -94,6 +107,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? () {}
                 : () => _selectWeightUnit(context, viewData, state.settings),
             onOpenVoiceSettings: () => _openVoiceSettings(context),
+            onUsernameTapped: profileState.isLoading
+                ? () {}
+                : () => _editUsername(context, username ?? ''),
           ),
         );
       },
@@ -111,6 +127,43 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _editUsername(
+    BuildContext context,
+    String currentUsername,
+  ) async {
+    final ProfileCubit profileCubit = context.read<ProfileCubit>();
+
+    final String? newUsername = await showDialog<String>(
+      context: context,
+      builder: (_) => _UsernameEditDialog(initialValue: currentUsername),
+    );
+
+    if (newUsername == null || !context.mounted) {
+      return;
+    }
+
+    final bool success = await profileCubit.updateUsername(newUsername);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Username updated.')));
+      return;
+    }
+
+    final String? error = profileCubit.state.errorMessage;
+    if (error != null && error.isNotEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      profileCubit.clearError();
+    }
+  }
+
   Future<void> _selectWeekStartDay(
     BuildContext context,
     SettingsPageViewData viewData,
@@ -123,14 +176,12 @@ class _SettingsPageState extends State<SettingsPage> {
         return SettingsOptionSheet<WeekStartDay>(
           options: viewData.weekStartOptions
               .map(
-                (
-                  SettingsSelectionOptionViewData<WeekStartDay> option,
-                ) =>
+                (SettingsSelectionOptionViewData<WeekStartDay> option) =>
                     SettingsOption<WeekStartDay>(
-                  value: option.value,
-                  title: option.title,
-                  selected: option.selected,
-                ),
+                      value: option.value,
+                      title: option.title,
+                      selected: option.selected,
+                    ),
               )
               .toList(growable: false),
         );
@@ -161,14 +212,12 @@ class _SettingsPageState extends State<SettingsPage> {
         return SettingsOptionSheet<WeightUnit>(
           options: viewData.weightUnitOptions
               .map(
-                (
-                  SettingsSelectionOptionViewData<WeightUnit> option,
-                ) =>
+                (SettingsSelectionOptionViewData<WeightUnit> option) =>
                     SettingsOption<WeightUnit>(
-                  value: option.value,
-                  title: option.title,
-                  selected: option.selected,
-                ),
+                      value: option.value,
+                      title: option.title,
+                      selected: option.selected,
+                    ),
               )
               .toList(growable: false),
         );
@@ -201,6 +250,84 @@ class _SettingsPageState extends State<SettingsPage> {
       const SnackBar(
         content: Text(SettingsDisplayFormatter.saveSuccessMessage),
       ),
+    );
+  }
+}
+
+/// Modal username editor. Validates inline via [UsernameValidator] before
+/// allowing submission, then pops the trimmed value back to the caller.
+class _UsernameEditDialog extends StatefulWidget {
+  const _UsernameEditDialog({required this.initialValue});
+
+  /// Current handle without the leading `@`.
+  final String initialValue;
+
+  @override
+  State<_UsernameEditDialog> createState() => _UsernameEditDialogState();
+}
+
+class _UsernameEditDialogState extends State<_UsernameEditDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String value = _controller.text.trim();
+    final String? validationError = UsernameValidator.validate(value);
+
+    if (validationError != null) {
+      setState(() => _errorText = validationError);
+      return;
+    }
+
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.surfaceDark,
+      title: const Text('Change username'),
+      content: TextField(
+        key: SettingsPageKeys.usernameDialogFieldKey,
+        controller: _controller,
+        autofocus: true,
+        maxLength: UsernameValidator.maxLength,
+        textInputAction: TextInputAction.done,
+        decoration: InputDecoration(
+          prefixText: '@',
+          labelText: 'Username',
+          errorText: _errorText,
+        ),
+        onChanged: (_) {
+          if (_errorText != null) {
+            setState(() => _errorText = null);
+          }
+        },
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          key: SettingsPageKeys.usernameDialogSaveKey,
+          onPressed: _submit,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

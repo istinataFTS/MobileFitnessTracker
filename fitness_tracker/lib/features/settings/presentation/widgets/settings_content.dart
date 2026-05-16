@@ -14,6 +14,7 @@ class SettingsContent extends StatelessWidget {
     required this.onWeekStartTapped,
     required this.onWeightUnitTapped,
     required this.onOpenVoiceSettings,
+    required this.onUsernameTapped,
   });
 
   final SettingsPageViewData viewData;
@@ -22,6 +23,7 @@ class SettingsContent extends StatelessWidget {
   final VoidCallback onWeekStartTapped;
   final VoidCallback onWeightUnitTapped;
   final VoidCallback onOpenVoiceSettings;
+  final VoidCallback onUsernameTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +87,23 @@ class SettingsContent extends StatelessWidget {
               ),
             ],
           ),
+          if (viewData.accountSectionVisible) ...<Widget>[
+            const SizedBox(height: 24),
+            _Section(
+              title: viewData.accountSectionTitle,
+              children: <Widget>[
+                _SelectionTile(
+                  tileKey: SettingsPageKeys.usernameTileKey,
+                  icon: Icons.alternate_email_outlined,
+                  title: viewData.usernameTitle,
+                  subtitle: viewData.usernameSubtitle,
+                  helperText: viewData.usernameValue,
+                  enabled: !viewData.isSaving,
+                  onTap: onUsernameTapped,
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
           _Section(
             title: viewData.aboutSectionTitle,
@@ -163,9 +182,7 @@ class SettingsContent extends StatelessWidget {
 }
 
 class _InfoBanner extends StatelessWidget {
-  const _InfoBanner({
-    required this.message,
-  });
+  const _InfoBanner({required this.message});
 
   final String message;
 
@@ -182,17 +199,14 @@ class _InfoBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Icon(
-            Icons.tune,
-            color: AppTheme.primaryOrange,
-          ),
+          const Icon(Icons.tune, color: AppTheme.primaryOrange),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textMedium,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
             ),
           ),
         ],
@@ -202,9 +216,7 @@ class _InfoBanner extends StatelessWidget {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({
-    required this.message,
-  });
+  const _ErrorBanner({required this.message});
 
   final String message;
 
@@ -217,24 +229,19 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.errorRed.withOpacity(0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.errorRed.withOpacity(0.4),
-        ),
+        border: Border.all(color: AppTheme.errorRed.withOpacity(0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Icon(
-            Icons.error_outline,
-            color: AppTheme.errorRed,
-          ),
+          const Icon(Icons.error_outline, color: AppTheme.errorRed),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textLight,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textLight),
             ),
           ),
         ],
@@ -244,10 +251,7 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.children,
-  });
+  const _Section({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -261,9 +265,9 @@ class _Section extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         ...children,
@@ -327,12 +331,11 @@ class _SelectionTile extends StatelessWidget {
           color: enabled ? AppTheme.primaryOrange : AppTheme.textDim,
         ),
         title: Text(title),
-        subtitle: Text(helperText.isEmpty ? subtitle : '$subtitle\n$helperText'),
-        isThreeLine: helperText.isNotEmpty,
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: AppTheme.textDim,
+        subtitle: Text(
+          helperText.isEmpty ? subtitle : '$subtitle\n$helperText',
         ),
+        isThreeLine: helperText.isNotEmpty,
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.textDim),
         onTap: enabled ? onTap : null,
       ),
     );
@@ -358,10 +361,7 @@ class _DeferredTile extends StatelessWidget {
         leading: Icon(icon, color: AppTheme.textMedium),
         title: Text(title),
         subtitle: Text(subtitle),
-        trailing: const Icon(
-          Icons.hourglass_top,
-          color: AppTheme.textDim,
-        ),
+        trailing: const Icon(Icons.hourglass_top, color: AppTheme.textDim),
       ),
     );
   }

@@ -35,8 +35,9 @@ void main() {
     authSessionService = MockAuthSessionService();
     userProfileRepository = MockUserProfileRepository();
 
-    when(() => repository.syncPolicy)
-        .thenReturn(AppSyncPolicy.productionDefault);
+    when(
+      () => repository.syncPolicy,
+    ).thenReturn(AppSyncPolicy.productionDefault);
 
     when(() => sessionSyncService.runManualRefresh()).thenAnswer(
       (_) async => const SessionSyncActionResult(
@@ -48,8 +49,9 @@ void main() {
     // getProfile is called when the session is authenticated.
     // Return a Left so the cubit falls back to null profile — sufficient
     // for the presentation tests that only inspect session/user fields.
-    when(() => userProfileRepository.getProfile(any()))
-        .thenAnswer((_) async => const Left(CacheFailure('no profile')));
+    when(
+      () => userProfileRepository.getProfile(any()),
+    ).thenAnswer((_) async => const Left(CacheFailure('no profile')));
   });
 
   // ProfilePage reads ProfileCubit from its ancestor. Each test pumps a
@@ -62,24 +64,21 @@ void main() {
         authSessionService: authSessionService,
         userProfileRepository: userProfileRepository,
       ),
-      child: const MaterialApp(
-        home: ProfilePage(),
-      ),
+      child: const MaterialApp(home: ProfilePage()),
     );
   }
 
   testWidgets('shows dedicated loading indicator before session resolves', (
     WidgetTester tester,
   ) async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        return const Right(AppSession.guest());
-      },
-    );
+    when(() => repository.getCurrentSession()).thenAnswer((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      return const Right(AppSession.guest());
+    });
 
     await tester.pumpWidget(buildSubject());
-    await tester.pump(); // process post-frame callbacks so loading state renders
+    await tester
+        .pump(); // process post-frame callbacks so loading state renders
 
     expect(find.byKey(ProfilePage.loadingIndicatorKey), findsOneWidget);
 
@@ -95,9 +94,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    when(
+      () => repository.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     await tester.pumpWidget(buildSubject());
     await tester.pumpAndSettle();
@@ -107,17 +106,9 @@ void main() {
     expect(find.byKey(ProfilePage.sessionBannerKey), findsOneWidget);
     expect(find.byKey(ProfilePage.accountModeBannerKey), findsOneWidget);
     expect(find.byKey(ProfilePage.settingsTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.historyTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.accountStatusTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.cloudMigrationTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.lastSyncTileKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.deferredSectionKey), findsOneWidget);
-    expect(find.byKey(ProfilePage.appVersionTileKey), findsOneWidget);
 
     expect(find.text('Guest'), findsOneWidget);
     expect(find.text('Guest account'), findsWidgets);
-    expect(find.text('No initial migration pending'), findsOneWidget);
-    expect(find.text('No successful cloud sync recorded yet'), findsOneWidget);
   });
 
   testWidgets('renders authenticated profile shell through stable keys', (
@@ -151,38 +142,34 @@ void main() {
     expect(find.text('Marin Dinchev'), findsOneWidget);
     expect(find.text('marin@test.com'), findsOneWidget);
     expect(find.text('Cloud account'), findsWidgets);
-    expect(
-      find.text('Waiting to upload local data to the cloud'),
-      findsOneWidget,
-    );
-    expect(find.text('2026-03-18 14:45'), findsOneWidget);
   });
 
-  testWidgets('authenticated session without display name uses fallback title', (
-    WidgetTester tester,
-  ) async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => Right(
-        AppSession(
-          authMode: AuthMode.authenticated,
-          user: const AppUser(
-            id: 'user-1',
-            email: 'marin@test.com',
-            displayName: '',
+  testWidgets(
+    'authenticated session without display name uses fallback title',
+    (WidgetTester tester) async {
+      when(() => repository.getCurrentSession()).thenAnswer(
+        (_) async => Right(
+          AppSession(
+            authMode: AuthMode.authenticated,
+            user: const AppUser(
+              id: 'user-1',
+              email: 'marin@test.com',
+              displayName: '',
+            ),
+            requiresInitialCloudMigration: false,
+            lastCloudSyncAt: null,
           ),
-          requiresInitialCloudMigration: false,
-          lastCloudSyncAt: null,
         ),
-      ),
-    );
+      );
 
-    await tester.pumpWidget(buildSubject());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(ProfilePage.titleKey), findsOneWidget);
-    expect(find.text('Signed-in User'), findsOneWidget);
-    expect(find.text('marin@test.com'), findsOneWidget);
-  });
+      expect(find.byKey(ProfilePage.titleKey), findsOneWidget);
+      expect(find.text('Signed-in User'), findsOneWidget);
+      expect(find.text('marin@test.com'), findsOneWidget);
+    },
+  );
 
   testWidgets('authenticated session without email uses fallback subtitle', (
     WidgetTester tester,
@@ -212,11 +199,9 @@ void main() {
   testWidgets('failure falls back to guest shell and shows snackbar', (
     WidgetTester tester,
   ) async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Left(
-        CacheFailure('session unavailable'),
-      ),
-    );
+    when(
+      () => repository.getCurrentSession(),
+    ).thenAnswer((_) async => const Left(CacheFailure('session unavailable')));
 
     await tester.pumpWidget(buildSubject());
     await tester.pump();
@@ -230,9 +215,9 @@ void main() {
   testWidgets('pull to refresh runs manual refresh and reloads session', (
     WidgetTester tester,
   ) async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    when(
+      () => repository.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     await tester.pumpWidget(buildSubject());
     await tester.pumpAndSettle();
@@ -245,15 +230,17 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     verify(() => sessionSyncService.runManualRefresh()).called(1);
-    verify(() => repository.getCurrentSession()).called(greaterThanOrEqualTo(2));
+    verify(
+      () => repository.getCurrentSession(),
+    ).called(greaterThanOrEqualTo(2));
   });
 
   testWidgets('manual refresh failure is shown in snackbar', (
     WidgetTester tester,
   ) async {
-    when(() => repository.getCurrentSession()).thenAnswer(
-      (_) async => const Right(AppSession.guest()),
-    );
+    when(
+      () => repository.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     when(() => sessionSyncService.runManualRefresh()).thenAnswer(
       (_) async => const SessionSyncActionResult(

@@ -9,7 +9,9 @@ import 'package:fitness_tracker/domain/entities/workout_set.dart';
 import 'package:fitness_tracker/features/home/application/home_bloc.dart';
 import 'package:fitness_tracker/features/home/application/models/home_dashboard_data.dart';
 import 'package:fitness_tracker/features/home/application/muscle_visual_bloc.dart';
+import 'package:fitness_tracker/domain/entities/app_session.dart';
 import 'package:fitness_tracker/features/home/presentation/home_page.dart';
+import 'package:fitness_tracker/features/profile/application/profile_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +22,9 @@ class MockHomeBloc extends MockBloc<HomeEvent, HomeState> implements HomeBloc {}
 class MockMuscleVisualBloc
     extends MockBloc<MuscleVisualEvent, MuscleVisualState>
     implements MuscleVisualBloc {}
+
+class MockProfileCubit extends MockCubit<ProfileState>
+    implements ProfileCubit {}
 
 class FakeHomeEvent extends Fake implements HomeEvent {}
 
@@ -32,6 +37,7 @@ class FakeMuscleVisualState extends Fake implements MuscleVisualState {}
 void main() {
   late MockHomeBloc homeBloc;
   late MockMuscleVisualBloc muscleVisualBloc;
+  late MockProfileCubit profileCubit;
 
   final DateTime now = DateTime(2026, 3, 19, 10, 0);
 
@@ -56,6 +62,19 @@ void main() {
   setUp(() {
     homeBloc = MockHomeBloc();
     muscleVisualBloc = MockMuscleVisualBloc();
+    profileCubit = MockProfileCubit();
+
+    const ProfileState guest = ProfileState(
+      session: AppSession.guest(),
+      isLoading: false,
+      hasLoaded: true,
+    );
+    when(() => profileCubit.state).thenReturn(guest);
+    whenListen<ProfileState>(
+      profileCubit,
+      const Stream<ProfileState>.empty(),
+      initialState: guest,
+    );
 
     when(() => homeBloc.state).thenReturn(loadedHomeState);
     whenListen<HomeState>(
@@ -70,42 +89,42 @@ void main() {
       providers: <BlocProvider<dynamic>>[
         BlocProvider<HomeBloc>.value(value: homeBloc),
         BlocProvider<MuscleVisualBloc>.value(value: muscleVisualBloc),
+        BlocProvider<ProfileCubit>.value(value: profileCubit),
       ],
-      child: const MaterialApp(
-        home: HomePage(settings: settings),
-      ),
+      child: const MaterialApp(home: HomePage(settings: settings)),
     );
   }
 
   group('HomePage muscle summary rendering', () {
-    testWidgets('shows empty summary list when no trained muscles are present', (
-      WidgetTester tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 2000);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final MuscleVisualLoaded emptyState = MuscleVisualLoaded(
-        muscleData: const <String, MuscleVisualData>{},
-        currentPeriod: TimePeriod.today,
-        loadedAt: now,
-      );
+    testWidgets(
+      'shows empty summary list when no trained muscles are present',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final MuscleVisualLoaded emptyState = MuscleVisualLoaded(
+          muscleData: const <String, MuscleVisualData>{},
+          currentPeriod: TimePeriod.today,
+          loadedAt: now,
+        );
 
-      when(() => muscleVisualBloc.state).thenReturn(emptyState);
-      whenListen<MuscleVisualState>(
-        muscleVisualBloc,
-        const Stream<MuscleVisualState>.empty(),
-        initialState: emptyState,
-      );
+        when(() => muscleVisualBloc.state).thenReturn(emptyState);
+        whenListen<MuscleVisualState>(
+          muscleVisualBloc,
+          const Stream<MuscleVisualState>.empty(),
+          initialState: emptyState,
+        );
 
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
+        await tester.pumpWidget(buildSubject());
+        await tester.pump();
 
-      expect(find.textContaining('Progress'), findsOneWidget);
-      expect(find.text('Chest'), findsNothing);
-      expect(find.text('Biceps'), findsNothing);
-      expect(find.text('Lats'), findsNothing);
-    });
+        expect(find.textContaining('Progress'), findsOneWidget);
+        expect(find.text('Chest'), findsNothing);
+        expect(find.text('Biceps'), findsNothing);
+        expect(find.text('Lats'), findsNothing);
+      },
+    );
 
     testWidgets('shows ranked trained muscles in display order', (
       WidgetTester tester,
@@ -124,7 +143,9 @@ void main() {
             bucket: MuscleVisualBucket.maximum,
             coverageState: MuscleVisualCoverageState.full,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.back},
+            visibleSurfaces: const <MuscleVisualSurface>{
+              MuscleVisualSurface.back,
+            },
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -136,7 +157,9 @@ void main() {
             bucket: MuscleVisualBucket.heavy,
             coverageState: MuscleVisualCoverageState.partial,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
+            visibleSurfaces: const <MuscleVisualSurface>{
+              MuscleVisualSurface.front,
+            },
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -148,7 +171,9 @@ void main() {
             bucket: MuscleVisualBucket.light,
             coverageState: MuscleVisualCoverageState.partial,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
+            visibleSurfaces: const <MuscleVisualSurface>{
+              MuscleVisualSurface.front,
+            },
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -207,7 +232,9 @@ void main() {
             bucket: MuscleVisualBucket.heavy,
             coverageState: MuscleVisualCoverageState.partial,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.front},
+            visibleSurfaces: const <MuscleVisualSurface>{
+              MuscleVisualSurface.front,
+            },
             overflowAmount: 0,
             hasTrained: true,
           ),
@@ -219,7 +246,9 @@ void main() {
             bucket: MuscleVisualBucket.empty,
             coverageState: MuscleVisualCoverageState.empty,
             aggregationMode: MuscleVisualAggregationMode.rollingWeeklyLoad,
-            visibleSurfaces: const <MuscleVisualSurface>{MuscleVisualSurface.back},
+            visibleSurfaces: const <MuscleVisualSurface>{
+              MuscleVisualSurface.back,
+            },
             overflowAmount: 0,
             hasTrained: false,
           ),

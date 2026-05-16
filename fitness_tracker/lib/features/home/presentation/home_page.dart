@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/app_strings.dart';
+import '../../../core/session/session_display_name.dart';
 import '../../../core/themes/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
+import '../../../features/profile/application/profile_cubit.dart';
 import '../application/home_bloc.dart';
 import '../application/muscle_visual_bloc.dart';
 import 'home_page_keys.dart';
@@ -12,10 +14,7 @@ import 'models/home_view_data.dart';
 import 'widgets/home_content.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({
-    required this.settings,
-    super.key,
-  });
+  const HomePage({required this.settings, super.key});
 
   final AppSettings settings;
 
@@ -25,8 +24,7 @@ class HomePage extends StatelessWidget {
   static const Key progressCardKey = HomePageKeys.progressCardKey;
   static const Key progressLoadingIndicatorKey =
       HomePageKeys.progressLoadingIndicatorKey;
-  static const Key progressRetryButtonKey =
-      HomePageKeys.progressRetryButtonKey;
+  static const Key progressRetryButtonKey = HomePageKeys.progressRetryButtonKey;
   static const Key homeRetryButtonKey = HomePageKeys.homeRetryButtonKey;
   static const Key macroStripKey = HomePageKeys.macroStripKey;
 
@@ -57,40 +55,41 @@ class HomePage extends StatelessWidget {
             final HomeLoaded loadedState = homeState as HomeLoaded;
 
             return BlocBuilder<MuscleVisualBloc, MuscleVisualState>(
-              builder: (
-                BuildContext context,
-                MuscleVisualState muscleState,
-              ) {
+              builder: (BuildContext context, MuscleVisualState muscleState) {
+                final ProfileState profileState = context
+                    .watch<ProfileCubit>()
+                    .state;
+                final String userName = SessionDisplayName.resolve(
+                  profileState.session,
+                  profileState.userProfile,
+                );
                 final HomePageViewData viewData = HomeViewDataMapper.map(
                   homeData: loadedState.data,
                   muscleVisualState: muscleState,
                   settings: settings,
+                  userName: userName,
                 );
 
                 return HomeContent(
                   viewData: viewData,
                   onRefresh: () async {
-                    context.read<HomeBloc>().add(
-                          const RefreshHomeDataEvent(),
-                        );
+                    context.read<HomeBloc>().add(const RefreshHomeDataEvent());
                     context.read<MuscleVisualBloc>().add(
-                          const RefreshVisualsEvent(),
-                        );
+                      const RefreshVisualsEvent(),
+                    );
                   },
                   onPeriodChanged: (period) {
                     context.read<MuscleVisualBloc>().add(
-                          ChangePeriodEvent(period),
-                        );
+                      ChangePeriodEvent(period),
+                    );
                   },
                   onRetryVisuals: () {
                     context.read<MuscleVisualBloc>().add(
-                          const RefreshVisualsEvent(),
-                        );
+                      const RefreshVisualsEvent(),
+                    );
                   },
                   onModeChanged: (mode) {
-                    context.read<MuscleVisualBloc>().add(
-                          ChangeModeEvent(mode),
-                        );
+                    context.read<MuscleVisualBloc>().add(ChangeModeEvent(mode));
                   },
                 );
               },
@@ -103,10 +102,7 @@ class HomePage extends StatelessWidget {
 }
 
 class _HomeErrorState extends StatelessWidget {
-  const _HomeErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _HomeErrorState({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -119,25 +115,21 @@ class _HomeErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppTheme.errorRed,
-            ),
+            const Icon(Icons.error_outline, size: 64, color: AppTheme.errorRed),
             const SizedBox(height: 16),
             Text(
               AppStrings.error,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textMedium,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMedium),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(

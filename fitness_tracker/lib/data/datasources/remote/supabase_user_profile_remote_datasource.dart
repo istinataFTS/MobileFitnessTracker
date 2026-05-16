@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
+
 import '../../../core/errors/sync_exceptions.dart';
 import '../../../domain/entities/user_profile.dart';
 import '../../../domain/entities/user_profile_summary.dart';
@@ -48,16 +50,36 @@ class SupabaseUserProfileRemoteDataSource
 
       final dto = SupabaseUserProfileDto.fromEntity(profile);
 
-      final dynamic data = await clientProvider.client
-          .from(_tableName)
-          .upsert(dto.toMap())
-          .select()
-          .single();
+      try {
+        final dynamic data = await clientProvider.client
+            .from(_tableName)
+            .upsert(dto.toMap())
+            .select()
+            .single();
 
-      return SupabaseUserProfileDto.fromMap(
-        Map<String, dynamic>.from(data as Map),
-      ).toEntity();
+        return SupabaseUserProfileDto.fromMap(
+          Map<String, dynamic>.from(data as Map),
+        ).toEntity();
+      } on PostgrestException catch (e) {
+        if (_isUsernameUniqueViolation(e)) {
+          throw const RemoteSyncException(
+            'That username is already taken. Please choose another.',
+          );
+        }
+        rethrow;
+      }
     });
+  }
+
+  /// Postgres raises SQLSTATE 23505 (unique_violation) when the chosen
+  /// username collides with the `user_profiles_username_key` constraint.
+  bool _isUsernameUniqueViolation(PostgrestException e) {
+    if (e.code != '23505') {
+      return false;
+    }
+    final String message = e.message.toLowerCase();
+    return message.contains('username') ||
+        message.contains('user_profiles_username_key');
   }
 
   @override
@@ -78,9 +100,11 @@ class SupabaseUserProfileRemoteDataSource
           .limit(limit);
 
       return (data as List<dynamic>)
-          .map((dynamic row) => SupabaseUserProfileSummaryDto.fromMap(
-                Map<String, dynamic>.from(row as Map),
-              ).toEntity())
+          .map(
+            (dynamic row) => SupabaseUserProfileSummaryDto.fromMap(
+              Map<String, dynamic>.from(row as Map),
+            ).toEntity(),
+          )
           .toList();
     });
   }

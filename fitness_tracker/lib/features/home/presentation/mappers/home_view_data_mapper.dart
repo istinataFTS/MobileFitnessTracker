@@ -1,5 +1,3 @@
-
-import '../../../../config/env_config.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/muscle_stimulus_constants.dart'
     show MuscleStimulus;
@@ -18,98 +16,77 @@ class HomeViewDataMapper {
   /// the front-side body overlay assets.  Keys are typed constants — any key
   /// mismatch (slug changed, typo) fails at compile-time, not silently at
   /// runtime.
-  static const Map<String, List<String>> _frontBodyAssetMap =
-      <String, List<String>>{
-        MuscleStimulus.frontDelts: <String>[
-          'assets/images/body/front_delts.png',
-        ],
-        MuscleStimulus.sideDelts: <String>[
-          'assets/images/body/front_delts.png',
-          'assets/images/body/front_reardelt.png',
-        ],
-        MuscleStimulus.upperTraps: <String>[
-          'assets/images/body/front_uppertraps.png',
-          'assets/images/body/front_neck.png',
-        ],
-        MuscleStimulus.upperChest: <String>[
-          'assets/images/body/front_chest.png',
-        ],
-        MuscleStimulus.midChest: <String>[
-          'assets/images/body/front_chest.png',
-        ],
-        MuscleStimulus.lowerChest: <String>[
-          'assets/images/body/front_chest.png',
-        ],
-        MuscleStimulus.biceps: <String>['assets/images/body/front_biceps.png'],
-        MuscleStimulus.forearms: <String>[
-          'assets/images/body/front_forearms.png',
-        ],
-        MuscleStimulus.abs: <String>['assets/images/body/front_abs.png'],
-        MuscleStimulus.obliques: <String>[
-          'assets/images/body/front_obliques.png',
-        ],
-        MuscleStimulus.lovehandles: <String>[
-          'assets/images/body/front_lovehandles.png',
-        ],
-        MuscleStimulus.hipadductors: <String>[
-          'assets/images/body/front_hipadductors.png',
-        ],
-        MuscleStimulus.quads: <String>['assets/images/body/front_quads.png'],
-        MuscleStimulus.calves: <String>['assets/images/body/front_calves.png'],
-      };
+  static const Map<String, List<String>>
+  _frontBodyAssetMap = <String, List<String>>{
+    MuscleStimulus.frontDelts: <String>['assets/images/body/front_delts.png'],
+    MuscleStimulus.sideDelts: <String>[
+      'assets/images/body/front_delts.png',
+      'assets/images/body/front_reardelt.png',
+    ],
+    MuscleStimulus.upperTraps: <String>[
+      'assets/images/body/front_uppertraps.png',
+      'assets/images/body/front_neck.png',
+    ],
+    MuscleStimulus.upperChest: <String>['assets/images/body/front_chest.png'],
+    MuscleStimulus.midChest: <String>['assets/images/body/front_chest.png'],
+    MuscleStimulus.lowerChest: <String>['assets/images/body/front_chest.png'],
+    MuscleStimulus.biceps: <String>['assets/images/body/front_biceps.png'],
+    MuscleStimulus.forearms: <String>['assets/images/body/front_forearms.png'],
+    MuscleStimulus.abs: <String>['assets/images/body/front_abs.png'],
+    MuscleStimulus.obliques: <String>['assets/images/body/front_obliques.png'],
+    MuscleStimulus.lovehandles: <String>[
+      'assets/images/body/front_lovehandles.png',
+    ],
+    MuscleStimulus.hipadductors: <String>[
+      'assets/images/body/front_hipadductors.png',
+    ],
+    MuscleStimulus.quads: <String>['assets/images/body/front_quads.png'],
+    MuscleStimulus.calves: <String>['assets/images/body/front_calves.png'],
+  };
 
   /// Maps fine-grained muscle-group slugs to the back-side body overlay assets.
-  static const Map<String, List<String>> _backBodyAssetMap =
-      <String, List<String>>{
-        MuscleStimulus.rearDelts: <String>[
-          'assets/images/body/back_reardelt.png',
-        ],
-        MuscleStimulus.sideDelts: <String>[
-          'assets/images/body/back_reardelt.png',
-        ],
-        MuscleStimulus.upperTraps: <String>[
-          'assets/images/body/back_uppertraps.png',
-        ],
-        MuscleStimulus.middleTraps: <String>[
-          'assets/images/body/back_middletraps.png',
-        ],
-        MuscleStimulus.lowerTraps: <String>[
-          'assets/images/body/back_lowertraps.png',
-        ],
-        MuscleStimulus.lats: <String>[
-          'assets/images/body/back_lats.png',
-          'assets/images/body/back_smalllats.png',
-        ],
-        MuscleStimulus.triceps: <String>[
-          'assets/images/body/back_triceps.png',
-        ],
-        MuscleStimulus.forearms: <String>[
-          'assets/images/body/back_forearms.png',
-        ],
-        MuscleStimulus.lowerBack: <String>[
-          'assets/images/body/back_lowerback.png',
-        ],
-        MuscleStimulus.glutes: <String>['assets/images/body/back_glutes.png'],
-        MuscleStimulus.hipadductors: <String>[
-          'assets/images/body/back_hipadductors.png',
-        ],
-        MuscleStimulus.quads: <String>['assets/images/body/back_quads.png'],
-        MuscleStimulus.hamstrings: <String>[
-          'assets/images/body/back_hamstring.png',
-        ],
-        MuscleStimulus.calves: <String>['assets/images/body/back_calves.png'],
-      };
+  static const Map<String, List<String>>
+  _backBodyAssetMap = <String, List<String>>{
+    MuscleStimulus.rearDelts: <String>['assets/images/body/back_reardelt.png'],
+    MuscleStimulus.sideDelts: <String>['assets/images/body/back_reardelt.png'],
+    MuscleStimulus.upperTraps: <String>[
+      'assets/images/body/back_uppertraps.png',
+    ],
+    MuscleStimulus.middleTraps: <String>[
+      'assets/images/body/back_middletraps.png',
+    ],
+    MuscleStimulus.lowerTraps: <String>[
+      'assets/images/body/back_lowertraps.png',
+    ],
+    MuscleStimulus.lats: <String>[
+      'assets/images/body/back_lats.png',
+      'assets/images/body/back_smalllats.png',
+    ],
+    MuscleStimulus.triceps: <String>['assets/images/body/back_triceps.png'],
+    MuscleStimulus.forearms: <String>['assets/images/body/back_forearms.png'],
+    MuscleStimulus.lowerBack: <String>['assets/images/body/back_lowerback.png'],
+    MuscleStimulus.glutes: <String>['assets/images/body/back_glutes.png'],
+    MuscleStimulus.hipadductors: <String>[
+      'assets/images/body/back_hipadductors.png',
+    ],
+    MuscleStimulus.quads: <String>['assets/images/body/back_quads.png'],
+    MuscleStimulus.hamstrings: <String>[
+      'assets/images/body/back_hamstring.png',
+    ],
+    MuscleStimulus.calves: <String>['assets/images/body/back_calves.png'],
+  };
 
   static HomePageViewData map({
     required HomeDashboardData homeData,
     required MuscleVisualState muscleVisualState,
     required AppSettings settings,
+    required String userName,
   }) {
     final TimePeriod currentPeriod = _resolveCurrentPeriod(muscleVisualState);
     final MuscleMapMode currentMode = _resolveCurrentMode(muscleVisualState);
 
     return HomePageViewData(
-      greeting: '${AppStrings.hello}, ${EnvConfig.userName}!',
+      greeting: '${AppStrings.hello}, $userName!',
       weekRangeLabel: WeekRangeLabelFormatter.formatForDate(
         DateTime.now(),
         weekStartDay: settings.weekStartDay,
@@ -140,7 +117,9 @@ class HomeViewDataMapper {
     return TimePeriod.month;
   }
 
-  static MuscleMapMode _resolveCurrentMode(MuscleVisualState muscleVisualState) {
+  static MuscleMapMode _resolveCurrentMode(
+    MuscleVisualState muscleVisualState,
+  ) {
     if (muscleVisualState is MuscleVisualLoaded) return muscleVisualState.mode;
     if (muscleVisualState is MuscleVisualLoading) return muscleVisualState.mode;
     if (muscleVisualState is MuscleVisualError) return muscleVisualState.mode;
@@ -299,8 +278,7 @@ class HomeViewDataMapper {
       }
     }
 
-    final bool hasHighlights =
-        frontLayers.isNotEmpty || backLayers.isNotEmpty;
+    final bool hasHighlights = frontLayers.isNotEmpty || backLayers.isNotEmpty;
 
     return HomeBodyVisualViewData(
       frontLayers: frontLayers.values.toList(growable: false),
@@ -314,7 +292,9 @@ class HomeViewDataMapper {
     required MuscleMapMode mode,
   }) {
     if (mode == MuscleMapMode.fatigue) {
-      return hasHighlights ? 'Current fatigue level' : 'Muscles fully recovered';
+      return hasHighlights
+          ? 'Current fatigue level'
+          : 'Muscles fully recovered';
     }
     return hasHighlights ? 'Front and back load' : 'No training load yet';
   }

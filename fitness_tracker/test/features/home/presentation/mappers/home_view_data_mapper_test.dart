@@ -46,8 +46,10 @@ void main() {
         loadedAt: DateTime(2026, 3, 27),
       ),
       settings: const AppSettings.defaults(),
+      userName: 'Tester',
     );
 
+    expect(viewData.greeting, 'Hello, Tester!');
     expect(viewData.progress.bodyVisual.frontLayers, isNotEmpty);
     expect(viewData.progress.bodyVisual.backLayers, isNotEmpty);
     expect(

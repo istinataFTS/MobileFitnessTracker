@@ -11,12 +11,19 @@ class SettingsPageViewDataMapper {
   static SettingsPageViewData map(
     AppSettingsState state, {
     VoiceSettings voiceSettings = const VoiceSettings.defaults(),
+    String? username,
   }) {
     final AppSettings settings = state.settings;
+    final bool hasUsername = username != null && username.isNotEmpty;
 
     return SettingsPageViewData(
       infoMessage: SettingsDisplayFormatter.infoMessage,
       generalSectionTitle: 'General',
+      accountSectionVisible: hasUsername,
+      accountSectionTitle: 'Account',
+      usernameTitle: 'Username',
+      usernameValue: hasUsername ? '@$username' : '',
+      usernameSubtitle: 'Your unique handle — visible to other users',
       aboutSectionTitle: 'About',
       deferredSectionTitle: 'Deferred Until Auth / Cloud',
       notificationsTitle: 'Notifications',

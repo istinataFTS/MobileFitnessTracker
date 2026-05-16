@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/auth/auth_session_service.dart';
+import '../../../core/validation/username_validator.dart';
 
 enum SignUpStatus {
   initial,
@@ -21,11 +22,7 @@ class SignUpState extends Equatable {
   final String? errorMessage;
   final String? email;
 
-  const SignUpState({
-    required this.status,
-    this.errorMessage,
-    this.email,
-  });
+  const SignUpState({required this.status, this.errorMessage, this.email});
 
   factory SignUpState.initial() =>
       const SignUpState(status: SignUpStatus.initial);
@@ -45,8 +42,9 @@ class SignUpState extends Equatable {
   }) {
     return SignUpState(
       status: status ?? this.status,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       email: email ?? this.email,
     );
   }
@@ -57,15 +55,12 @@ class SignUpState extends Equatable {
 
 class SignUpCubit extends Cubit<SignUpState> {
   static const int _minPasswordLength = 8;
-  static const int _minUsernameLength = 3;
-  static const int _maxUsernameLength = 30;
-  static final RegExp _usernamePattern = RegExp(r'^[a-zA-Z0-9_]+$');
 
   final AuthSessionService _authSessionService;
 
   SignUpCubit({required AuthSessionService authSessionService})
-      : _authSessionService = authSessionService,
-        super(SignUpState.initial());
+    : _authSessionService = authSessionService,
+      super(SignUpState.initial());
 
   Future<void> submit({
     required String email,
@@ -95,10 +90,7 @@ class SignUpCubit extends Cubit<SignUpState> {
     }
 
     emit(
-      state.copyWith(
-        status: SignUpStatus.submitting,
-        clearErrorMessage: true,
-      ),
+      state.copyWith(status: SignUpStatus.submitting, clearErrorMessage: true),
     );
 
     final result = await _authSessionService.signUpWithEmail(
@@ -128,12 +120,7 @@ class SignUpCubit extends Cubit<SignUpState> {
       return;
     }
 
-    emit(
-      state.copyWith(
-        status: SignUpStatus.success,
-        clearErrorMessage: true,
-      ),
-    );
+    emit(state.copyWith(status: SignUpStatus.success, clearErrorMessage: true));
   }
 
   void clearError() {
@@ -141,12 +128,7 @@ class SignUpCubit extends Cubit<SignUpState> {
       return;
     }
 
-    emit(
-      state.copyWith(
-        status: SignUpStatus.initial,
-        clearErrorMessage: true,
-      ),
-    );
+    emit(state.copyWith(status: SignUpStatus.initial, clearErrorMessage: true));
   }
 
   // ---------------------------------------------------------------------------
@@ -178,16 +160,6 @@ class SignUpCubit extends Cubit<SignUpState> {
       return 'Passwords do not match.';
     }
 
-    if (trimmedUsername.length < _minUsernameLength ||
-        trimmedUsername.length > _maxUsernameLength) {
-      return 'Username must be between $_minUsernameLength and '
-          '$_maxUsernameLength characters.';
-    }
-
-    if (!_usernamePattern.hasMatch(trimmedUsername)) {
-      return 'Username may only contain letters, numbers, and underscores.';
-    }
-
-    return null;
+    return UsernameValidator.validate(trimmedUsername);
   }
 }

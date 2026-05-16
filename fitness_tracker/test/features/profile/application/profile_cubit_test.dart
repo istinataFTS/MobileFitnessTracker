@@ -90,10 +90,12 @@ void main() {
   // ensureLoaded — skips when already loaded
   // ---------------------------------------------------------------------------
   test('ensureLoaded does nothing when already hasLoaded', () async {
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => Right(testProfile));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
 
     await sut.loadProfile();
     clearInteractions(mockSessionRepo);
@@ -107,10 +109,12 @@ void main() {
   // loadProfile — authenticated with profile
   // ---------------------------------------------------------------------------
   test('loadProfile emits session + userProfile on success', () async {
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => Right(testProfile));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
 
     await sut.loadProfile();
 
@@ -124,26 +128,31 @@ void main() {
   // ---------------------------------------------------------------------------
   // loadProfile — authenticated but no profile row yet
   // ---------------------------------------------------------------------------
-  test('loadProfile emits null userProfile when no profile row exists',
-      () async {
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => const Right(null));
+  test(
+    'loadProfile emits null userProfile when no profile row exists',
+    () async {
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => Right(authenticatedSession));
+      when(
+        () => mockProfileRepo.getProfile('user-1'),
+      ).thenAnswer((_) async => const Right(null));
 
-    await sut.loadProfile();
+      await sut.loadProfile();
 
-    expect(sut.state.userProfile, isNull);
-    expect(sut.state.session.isAuthenticated, isTrue);
-    expect(sut.state.hasLoaded, isTrue);
-  });
+      expect(sut.state.userProfile, isNull);
+      expect(sut.state.session.isAuthenticated, isTrue);
+      expect(sut.state.hasLoaded, isTrue);
+    },
+  );
 
   // ---------------------------------------------------------------------------
   // loadProfile — guest session (no profile fetch attempted)
   // ---------------------------------------------------------------------------
   test('loadProfile does not fetch profile for guest session', () async {
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => const Right(AppSession.guest()));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     await sut.loadProfile();
 
@@ -156,9 +165,9 @@ void main() {
   // loadProfile — session repository failure
   // ---------------------------------------------------------------------------
   test('loadProfile emits error when session repository fails', () async {
-    when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-      (_) async => Left(DatabaseFailure('db error')),
-    );
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Left(DatabaseFailure('db error')));
 
     await sut.loadProfile();
 
@@ -172,15 +181,18 @@ void main() {
   // ---------------------------------------------------------------------------
   test('updateProfile emits updated profile on success', () async {
     // Pre-load so hasLoaded = true
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => Right(testProfile));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
     await sut.loadProfile();
 
     final updated = testProfile.copyWith(displayName: 'Alice B');
-    when(() => mockProfileRepo.upsertProfile(updated))
-        .thenAnswer((_) async => Right(updated));
+    when(
+      () => mockProfileRepo.upsertProfile(updated),
+    ).thenAnswer((_) async => Right(updated));
 
     await sut.updateProfile(updated);
 
@@ -193,15 +205,17 @@ void main() {
   // updateProfile — failure
   // ---------------------------------------------------------------------------
   test('updateProfile emits error on repository failure', () async {
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => Right(testProfile));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
     await sut.loadProfile();
 
-    when(() => mockProfileRepo.upsertProfile(any())).thenAnswer(
-      (_) async => Left(UnexpectedFailure('network error')),
-    );
+    when(
+      () => mockProfileRepo.upsertProfile(any()),
+    ).thenAnswer((_) async => Left(UnexpectedFailure('network error')));
 
     await sut.updateProfile(testProfile);
 
@@ -210,25 +224,111 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // updateUsername
+  // ---------------------------------------------------------------------------
+  Future<void> preloadAuthenticated() async {
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
+    await sut.loadProfile();
+  }
+
+  test('updateUsername fails for a guest with no loaded profile', () async {
+    final bool result = await sut.updateUsername('newhandle');
+
+    expect(result, isFalse);
+    expect(sut.state.errorMessage, isNotNull);
+    verifyNever(() => mockProfileRepo.upsertProfile(any()));
+  });
+
+  test(
+    'updateUsername rejects an invalid username without calling remote',
+    () async {
+      await preloadAuthenticated();
+
+      final bool result = await sut.updateUsername('ab!');
+
+      expect(result, isFalse);
+      expect(
+        sut.state.errorMessage,
+        'Username may only contain letters, numbers, and underscores.',
+      );
+      verifyNever(() => mockProfileRepo.upsertProfile(any()));
+    },
+  );
+
+  test('updateUsername is a no-op success when unchanged', () async {
+    await preloadAuthenticated();
+
+    final bool result = await sut.updateUsername(testProfile.username);
+
+    expect(result, isTrue);
+    verifyNever(() => mockProfileRepo.upsertProfile(any()));
+  });
+
+  test('updateUsername persists and updates state on success', () async {
+    await preloadAuthenticated();
+
+    final UserProfile renamed = testProfile.copyWith(username: 'alice_2');
+    when(
+      () => mockProfileRepo.upsertProfile(any()),
+    ).thenAnswer((_) async => Right(renamed));
+
+    final bool result = await sut.updateUsername('alice_2');
+
+    expect(result, isTrue);
+    expect(sut.state.userProfile?.username, 'alice_2');
+    expect(sut.state.errorMessage, isNull);
+  });
+
+  test('updateUsername surfaces repository failure message', () async {
+    await preloadAuthenticated();
+
+    when(() => mockProfileRepo.upsertProfile(any())).thenAnswer(
+      (_) async => const Left(
+        UnexpectedFailure(
+          'That username is already taken. '
+          'Please choose another.',
+        ),
+      ),
+    );
+
+    final bool result = await sut.updateUsername('takenname');
+
+    expect(result, isFalse);
+    expect(
+      sut.state.errorMessage,
+      'That username is already taken. Please choose another.',
+    );
+    expect(sut.state.userProfile, testProfile);
+  });
+
+  // ---------------------------------------------------------------------------
   // signOut — clears userProfile
   // ---------------------------------------------------------------------------
   test('signOut clears userProfile', () async {
     // Pre-load with profile
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession));
-    when(() => mockProfileRepo.getProfile('user-1'))
-        .thenAnswer((_) async => Right(testProfile));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
+    when(
+      () => mockProfileRepo.getProfile('user-1'),
+    ).thenAnswer((_) async => Right(testProfile));
     await sut.loadProfile();
     expect(sut.state.userProfile, testProfile);
 
     when(() => mockAuthService.signOut()).thenAnswer(
       (_) async => const SessionSyncActionResult(
-          status: SessionSyncActionStatus.completed,
-          message: 'signed out',
-        ),
+        status: SessionSyncActionStatus.completed,
+        message: 'signed out',
+      ),
     );
-    when(() => mockSessionRepo.getCurrentSession())
-        .thenAnswer((_) async => const Right(AppSession.guest()));
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => const Right(AppSession.guest()));
 
     await sut.signOut();
 
@@ -240,9 +340,9 @@ void main() {
   // clearError
   // ---------------------------------------------------------------------------
   test('clearError clears the error message', () async {
-    when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-      (_) async => Left(DatabaseFailure('db error')),
-    );
+    when(
+      () => mockSessionRepo.getCurrentSession(),
+    ).thenAnswer((_) async => Left(DatabaseFailure('db error')));
     await sut.loadProfile();
     expect(sut.state.errorMessage, isNotNull);
 
