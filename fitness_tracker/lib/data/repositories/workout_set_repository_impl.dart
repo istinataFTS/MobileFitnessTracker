@@ -3,6 +3,8 @@ import 'package:dartz/dartz.dart';
 import '../../core/enums/data_source_preference.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/repository_guard.dart';
+import '../../core/errors/sync_exceptions.dart';
+import '../../core/logging/app_logger.dart';
 import '../../core/sync/local_remote_merge.dart';
 import '../../domain/entities/workout_set.dart';
 import '../../domain/repositories/workout_set_repository.dart';
@@ -182,8 +184,11 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
           return local;
         }
 
-        final remote = await remoteDataSource.getAllSets();
-        if (remote.isNotEmpty) {
+        final remote = await _tryRemoteFetch(
+          remoteDataSource.getAllSets,
+          context: 'getAllSets(localThenRemote)',
+        );
+        if (remote != null && remote.isNotEmpty) {
           await localDataSource.mergeRemoteSets(remote);
         }
         return await localDataSource.getAllSets();
@@ -194,9 +199,12 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
         }
 
         final local = await localDataSource.getAllSets();
-        final remote = await remoteDataSource.getAllSets();
+        final remote = await _tryRemoteFetch(
+          remoteDataSource.getAllSets,
+          context: 'getAllSets(remoteThenLocal)',
+        );
 
-        if (remote.isEmpty) {
+        if (remote == null || remote.isEmpty) {
           return local;
         }
 
@@ -207,6 +215,36 @@ class WorkoutSetRepositoryImpl implements WorkoutSetRepository {
 
         await localDataSource.mergeRemoteSets(merged);
         return await localDataSource.getAllSets();
+    }
+  }
+
+  /// Runs [fetch] and returns `null` on any transient remote failure
+  /// (auth, network, or backend error), logging a warning with [context].
+  /// Local DB exceptions propagate unchanged so they surface as real errors.
+  static Future<List<WorkoutSet>?> _tryRemoteFetch(
+    Future<List<WorkoutSet>> Function() fetch, {
+    required String context,
+  }) async {
+    try {
+      return await fetch();
+    } on AuthSyncException catch (e) {
+      AppLogger.warning(
+        '$context: auth failure, will use local cache — $e',
+        category: 'workout_set_repository',
+      );
+      return null;
+    } on NetworkSyncException catch (e) {
+      AppLogger.warning(
+        '$context: network failure, will use local cache — $e',
+        category: 'workout_set_repository',
+      );
+      return null;
+    } on RemoteSyncException catch (e) {
+      AppLogger.warning(
+        '$context: remote failure, will use local cache — $e',
+        category: 'workout_set_repository',
+      );
+      return null;
     }
   }
 }
