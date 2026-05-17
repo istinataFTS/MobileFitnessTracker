@@ -26,17 +26,17 @@ Users can log workouts, record meals, monitor nutrition, create/remove/edit exer
 
 ## Features
 
-✅ Workout logging
-✅ Meal logging
-✅ Macro tracking
-✅ Exercise library management
-✅ Meal library management
-✅ History and progress tracking
-✅ Personal targets and goal tracking
-✅ Profile and app session support
-✅ Voice-based AI assistant for hands-free workout, meal, and nutrition logging
-✅ Supabase-powered synchronization for authenticated users
-✅ Offline fallback support when internet connection is unavailable
+- ✅ Workout logging
+- ✅ Meal logging
+- ✅ Macro tracking
+- ✅ Exercise library management
+- ✅ Meal library management
+- ✅ History and progress tracking
+- ✅ Personal targets and goal tracking
+- ✅ Profile and app session support
+- ✅ Voice-based AI assistant for hands-free workout, meal, and nutrition logging
+- ✅ Supabase-powered synchronization for authenticated users
+- ✅ Offline fallback support when internet connection is unavailable
 
 ## Main App Sections
 
