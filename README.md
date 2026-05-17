@@ -40,12 +40,12 @@ Users can log workouts, record meals, monitor nutrition, create/remove/edit exer
 
 ## Main App Sections
 
-Home – overview of progress and fitness activity
-Log – log exercises, meals, and macros
-History – review past activity and tracking data
-Library – manage reusable exercises and meals
-Targets – manage training and nutrition goals
-Profile – user and app-related information
+- Home – overview of progress and fitness activity
+- Log – log exercises, meals, and macros
+- History – review past activity and tracking data
+- Library – manage reusable exercises and meals
+- Targets – manage training and nutrition goals
+- Profile – user and app-related information
 
 ## Planned Features
 - Deeper AI integration for personalized workout and nutrition recommendations
