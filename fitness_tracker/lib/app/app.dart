@@ -17,6 +17,7 @@ import '../injection/injection_container.dart' as di;
 import '../presentation/navigation/bottom_navigation.dart';
 import 'auth_session_shell.dart';
 import 'listeners/app_domain_effects_listener.dart';
+import 'listeners/sync_completion_listener.dart';
 import 'startup/app_startup_listener.dart';
 
 class AppHost extends StatelessWidget {
@@ -84,7 +85,7 @@ class FitnessTrackerApp extends StatelessWidget {
             // all routes pushed onto the navigator and every modal sheet.
             home: const AppStartupListener(
               child: AppDomainEffectsListener(
-                child: BottomNavigation(),
+                child: SyncCompletionListener(child: BottomNavigation()),
               ),
             ),
           ),
@@ -124,7 +125,9 @@ class _WebPhoneFrame extends StatelessWidget {
               height: phoneHeight,
               decoration: BoxDecoration(
                 color: AppTheme.backgroundDark,
-                borderRadius: BorderRadius.circular(AppDimensions.webPhoneFrameRadius),
+                borderRadius: BorderRadius.circular(
+                  AppDimensions.webPhoneFrameRadius,
+                ),
                 border: Border.all(color: AppTheme.borderDark, width: 1.5),
                 boxShadow: const <BoxShadow>[
                   BoxShadow(
@@ -135,7 +138,9 @@ class _WebPhoneFrame extends StatelessWidget {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppDimensions.webPhoneContentRadius),
+                borderRadius: BorderRadius.circular(
+                  AppDimensions.webPhoneContentRadius,
+                ),
                 child: Stack(
                   children: <Widget>[
                     Positioned.fill(child: child),

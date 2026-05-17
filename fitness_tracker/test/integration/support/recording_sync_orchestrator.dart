@@ -37,6 +37,10 @@ class RecordingSyncOrchestrator implements SyncOrchestrator {
   }
 
   @override
+  Stream<SyncRunResult> get onSyncCompleted =>
+      const Stream<SyncRunResult>.empty();
+
+  @override
   Future<SyncRunResult> run(SyncTrigger trigger) async {
     triggers.add(trigger);
     if (_queuedResults.isNotEmpty) {

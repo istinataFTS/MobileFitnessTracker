@@ -85,8 +85,8 @@ abstract class BaseEntitySyncCoordinator<T> {
       serverId: existingLocalMetadata?.serverId ?? incomingMetadata.serverId,
       status: isRemoteSyncEnabled
           ? (wasPreviouslySynced
-              ? SyncStatus.pendingUpdate
-              : SyncStatus.pendingUpload)
+                ? SyncStatus.pendingUpdate
+                : SyncStatus.pendingUpload)
           : SyncStatus.localOnly,
       lastSyncedAt: existingLocalMetadata?.lastSyncedAt,
     );
@@ -110,7 +110,8 @@ abstract class BaseEntitySyncCoordinator<T> {
         serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
         syncedAt: DateTime.now(),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _logSyncFailure('upload', getEntityId(localEntity), error, stackTrace);
       await markAsPendingUpload(
         getEntityId(localEntity),
         errorMessage: error.toString(),
@@ -145,7 +146,8 @@ abstract class BaseEntitySyncCoordinator<T> {
         serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
         syncedAt: DateTime.now(),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _logSyncFailure('update', getEntityId(localEntity), error, stackTrace);
       if (wasPreviouslySynced) {
         await markAsPendingUpdate(
           getEntityId(localEntity),
@@ -209,10 +211,7 @@ abstract class BaseEntitySyncCoordinator<T> {
   /// > arriving via pull would be inserted as a new row rather than merged.
   /// > In practice this scenario only occurs during simultaneous multi-device
   /// > edits, which are out of scope for the current release.
-  Future<List<T>> fetchSince({
-    required String userId,
-    DateTime? since,
-  });
+  Future<List<T>> fetchSince({required String userId, DateTime? since});
 
   Future<void> pullRemoteChanges({
     required String userId,
@@ -310,13 +309,11 @@ abstract class BaseEntitySyncCoordinator<T> {
           serverId: remoteMetadata.serverId ?? getEntityId(remoteEntity),
           syncedAt: DateTime.now(),
         );
-      } catch (error) {
+      } catch (error, stackTrace) {
         failedUpsertEntityIds.add(getEntityId(entity));
 
-        await _markEntitySyncFailure(
-          entity,
-          errorMessage: error.toString(),
-        );
+        _logSyncFailure('push', getEntityId(entity), error, stackTrace);
+        await _markEntitySyncFailure(entity, errorMessage: error.toString());
       }
     }
 
@@ -345,9 +342,10 @@ abstract class BaseEntitySyncCoordinator<T> {
 
         await pendingSyncDeleteLocalDataSource.remove(operation.id);
         await deleteLocal(operation.localEntityId);
-      } catch (error) {
+      } catch (error, stackTrace) {
         failedDeleteEntityIds.add(operation.localEntityId);
 
+        _logSyncFailure('delete', operation.localEntityId, error, stackTrace);
         await pendingSyncDeleteLocalDataSource.markAttempted(
           operation.id,
           attemptedAt: DateTime.now(),
@@ -359,6 +357,28 @@ abstract class BaseEntitySyncCoordinator<T> {
     return failedDeleteEntityIds;
   }
 
+  /// Logs the *underlying* cause of a per-entity sync failure.
+  ///
+  /// The entity is re-queued for retry (so this is a recoverable warning,
+  /// not an error), but without this the only signal that ever surfaced was
+  /// the orchestrator's aggregate [EntitySyncBatchFailure], which lists IDs
+  /// with no root cause — making server-side rejections (RLS, schema, FK)
+  /// effectively undiagnosable from logs.
+  void _logSyncFailure(
+    String operation,
+    String entityId,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    AppLogger.warning(
+      'Sync $operation failed for ${descriptor.entityLabel} id=$entityId; '
+      'entity re-queued for retry',
+      category: 'sync',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   Future<void> _markEntitySyncFailure(
     T entity, {
     required String errorMessage,
@@ -367,17 +387,11 @@ abstract class BaseEntitySyncCoordinator<T> {
     final status = getSyncMetadata(entity).status;
 
     if (status == SyncStatus.pendingUpdate) {
-      await markAsPendingUpdate(
-        localId,
-        errorMessage: errorMessage,
-      );
+      await markAsPendingUpdate(localId, errorMessage: errorMessage);
       return;
     }
 
-    await markAsPendingUpload(
-      localId,
-      errorMessage: errorMessage,
-    );
+    await markAsPendingUpload(localId, errorMessage: errorMessage);
   }
 
   bool _shouldQueueRemoteDelete(T entity) {
