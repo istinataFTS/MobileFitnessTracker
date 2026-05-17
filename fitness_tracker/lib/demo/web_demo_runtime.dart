@@ -1342,7 +1342,10 @@ class WebDemoMuscleStimulusRepository implements MuscleStimulusRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteOlderThan(String userId, DateTime date) async {
+  Future<Either<Failure, void>> deleteOlderThan(
+    String userId,
+    DateTime date,
+  ) async {
     final cutoff = _startOfDay(date);
     _store.muscleStimulusRecords.removeWhere(
       (record) => record.date.isBefore(cutoff),
@@ -1486,6 +1489,10 @@ class WebDemoAuthSessionService implements AuthSessionService {
 
 class WebDemoSyncOrchestrator implements SyncOrchestrator {
   const WebDemoSyncOrchestrator();
+
+  @override
+  Stream<SyncRunResult> get onSyncCompleted =>
+      const Stream<SyncRunResult>.empty();
 
   @override
   Future<SyncRunResult> run(SyncTrigger trigger) async {

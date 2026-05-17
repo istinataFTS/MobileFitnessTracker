@@ -98,15 +98,20 @@ class MuscleVisualLoaded extends MuscleVisualState {
   final DateTime loadedAt;
   final MuscleMapMode mode;
 
-  int get trainedMuscleCount =>
-      muscleData.values.where((MuscleVisualData data) => data.hasTrained).length;
+  int get trainedMuscleCount => muscleData.values
+      .where((MuscleVisualData data) => data.hasTrained)
+      .length;
 
   bool get hasAnyTraining =>
       muscleData.values.any((MuscleVisualData data) => data.hasTrained);
 
   @override
-  List<Object?> get props =>
-      <Object?>[muscleData, currentPeriod, loadedAt, mode];
+  List<Object?> get props => <Object?>[
+    muscleData,
+    currentPeriod,
+    loadedAt,
+    mode,
+  ];
 }
 
 class MuscleVisualError extends MuscleVisualState {
@@ -129,10 +134,11 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     required this.getMuscleVisualData,
     required this.appSessionRepository,
     Clock clock = const SystemClock(),
-  })  : _userIdResolver =
-            CurrentUserIdResolver(appSessionRepository: appSessionRepository),
-        _clock = clock,
-        super(const MuscleVisualInitial()) {
+  }) : _userIdResolver = CurrentUserIdResolver(
+         appSessionRepository: appSessionRepository,
+       ),
+       _clock = clock,
+       super(const MuscleVisualInitial()) {
     on<LoadMuscleVisualsEvent>(_onLoadMuscleVisuals);
     on<ChangePeriodEvent>(_onChangePeriod);
     on<ChangeModeEvent>(_onChangeMode);
@@ -160,12 +166,6 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
   // still reflects recent training.
   TimePeriod _currentPeriod = TimePeriod.month;
   MuscleMapMode _currentMode = MuscleMapMode.volume;
-
-  /// Short TTL keeps the display reactive to changes that happen outside the
-  /// BLoC (e.g. a workout logged in another screen).  Explicit invalidation via
-  /// [ClearCacheEvent] is the primary freshness mechanism; the TTL is a safety
-  /// net for edge cases where the explicit signal is never sent.
-  static const Duration _cacheValidityDuration = Duration(seconds: 30);
 
   /// Resolves the current user id via the shared [CurrentUserIdResolver], so
   /// readers always see the same identifier that writers used.  Returns
@@ -299,8 +299,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     _currentMode = event.mode;
 
     // Fatigue always reads the rolling weekly load, regardless of selected period.
-    final TimePeriod periodToFetch =
-        _currentMode == MuscleMapMode.fatigue ? TimePeriod.week : _currentPeriod;
+    final TimePeriod periodToFetch = _currentMode == MuscleMapMode.fatigue
+        ? TimePeriod.week
+        : _currentPeriod;
 
     // Resolve userId upfront for the userId-scoped cache key.
     final String userId = await _resolveUserId();
@@ -351,8 +352,9 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     RefreshVisualsEvent event,
     Emitter<MuscleVisualState> emit,
   ) async {
-    final TimePeriod periodToRefresh =
-        _currentMode == MuscleMapMode.fatigue ? TimePeriod.week : _currentPeriod;
+    final TimePeriod periodToRefresh = _currentMode == MuscleMapMode.fatigue
+        ? TimePeriod.week
+        : _currentPeriod;
 
     // Resolve userId to correctly identify and remove the right cache entry.
     final String userId = await _resolveUserId();
@@ -399,19 +401,18 @@ class MuscleVisualBloc extends Bloc<MuscleVisualEvent, MuscleVisualState> {
     add(LoadMuscleVisualsEvent(_currentPeriod));
   }
 
-  /// Returns `true` when a valid, non-stale cache entry exists for [period]
-  /// scoped to [userId].  A separate entry per user prevents stale data from
-  /// being served after a sign-out / sign-in switch.
+  /// Returns `true` when a cache entry exists for [period] scoped to
+  /// [userId]. Freshness is purely event-driven: the cache is invalidated
+  /// explicitly via [ClearCacheEvent] (dispatched on sync completion) and
+  /// [RefreshVisualsEvent] (dispatched after a local log). There is no TTL —
+  /// a time-based window let a background sync's rebuilt projection sit
+  /// unseen for up to the TTL duration, which is exactly the staleness this
+  /// removes. A separate entry per user prevents stale data from being
+  /// served after a sign-out / sign-in switch.
   bool _isCacheValid(TimePeriod period, String userId) {
     final (TimePeriod, String) key = (period, userId);
 
-    if (!_periodCache.containsKey(key) || !_cacheTimestamps.containsKey(key)) {
-      return false;
-    }
-
-    final Duration cacheAge = _clock.now().difference(_cacheTimestamps[key]!);
-
-    return cacheAge <= _cacheValidityDuration;
+    return _periodCache.containsKey(key) && _cacheTimestamps.containsKey(key);
   }
 
   @override

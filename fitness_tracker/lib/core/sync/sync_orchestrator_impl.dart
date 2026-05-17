@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../data/sync/entity_sync_batch_failure.dart';
 import '../../domain/entities/app_session.dart';
 import '../../domain/repositories/app_session_repository.dart';
@@ -21,6 +23,15 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
 
   bool _isSyncing = false;
 
+  /// Broadcast so the stream can outlive individual listeners: the
+  /// orchestrator is an app-lifetime singleton while UI listeners are
+  /// recreated on every session switch.
+  final StreamController<SyncRunResult> _syncCompletedController =
+      StreamController<SyncRunResult>.broadcast();
+
+  @override
+  Stream<SyncRunResult> get onSyncCompleted => _syncCompletedController.stream;
+
   SyncOrchestratorImpl({
     required this.appSessionRepository,
     required this.syncPolicy,
@@ -32,6 +43,17 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
 
   @override
   Future<SyncRunResult> run(SyncTrigger trigger) async {
+    final SyncRunResult result = await _run(trigger);
+
+    if (result.status == SyncRunStatus.completed ||
+        result.status == SyncRunStatus.failed) {
+      _syncCompletedController.add(result);
+    }
+
+    return result;
+  }
+
+  Future<SyncRunResult> _run(SyncTrigger trigger) async {
     if (_isSyncing) {
       AppLogger.info(
         'Sync orchestration skipped for $trigger: sync already in progress',
@@ -111,7 +133,8 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
       category: 'sync',
     );
 
-    final migrationResult = await initialCloudMigrationCoordinator.runIfRequired();
+    final migrationResult = await initialCloudMigrationCoordinator
+        .runIfRequired();
 
     switch (migrationResult.status) {
       case InitialCloudMigrationStatus.completed:
@@ -172,10 +195,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     SyncTrigger trigger,
     AppSession session,
   ) async {
-    AppLogger.info(
-      'Sync orchestration started for $trigger',
-      category: 'sync',
-    );
+    AppLogger.info('Sync orchestration started for $trigger', category: 'sync');
 
     final userId = session.user?.id ?? '';
     final since = session.lastCloudSyncAt;
@@ -192,9 +212,7 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
 
         await feature.syncPendingChanges();
 
-        featureResults.add(
-          SyncFeatureRunResult.success(feature.name),
-        );
+        featureResults.add(SyncFeatureRunResult.success(feature.name));
 
         AppLogger.info(
           'Feature sync completed: ${feature.name}',
@@ -219,11 +237,24 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
       }
     }
 
-    final bool hasFailures = featureResults.any(
-      (result) => !result.isSuccess,
+    final bool hasFailures = featureResults.any((result) => !result.isSuccess);
+
+    // Post-sync hooks run regardless of feature-push failures. The always-run
+    // hooks (factor heal, stimulus rebuild) operate purely on local data
+    // scoped to the user and are idempotent, so a failed remote push (e.g. a
+    // workout_sets upsert rejected by the server) must not leave the local
+    // muscle-stimulus projection stale. Hooks gated on a specific feature
+    // still only fire when that feature actually pulled successfully, since
+    // `pulledFeatures` only contains features whose pull completed.
+    await _runPostSyncHooks(
+      trigger: trigger,
+      session: session,
+      pulledFeatures: pulledFeatures,
     );
 
     if (hasFailures) {
+      // Deliberately do NOT advance lastCloudSyncAt: the next sync must
+      // re-attempt the failed features with the same `since` watermark.
       return SyncRunResult(
         status: SyncRunStatus.failed,
         trigger: trigger,
@@ -233,11 +264,6 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
     }
 
     await _recordSuccessfulCloudSync();
-    await _runPostSyncHooks(
-      trigger: trigger,
-      session: session,
-      pulledFeatures: pulledFeatures,
-    );
 
     return SyncRunResult(
       status: SyncRunStatus.completed,
@@ -318,9 +344,8 @@ class SyncOrchestratorImpl implements SyncOrchestrator {
   }
 
   Future<void> _recordSuccessfulCloudSync() async {
-    final recordSyncResult = await appSessionRepository.recordSuccessfulCloudSync(
-      DateTime.now(),
-    );
+    final recordSyncResult = await appSessionRepository
+        .recordSuccessfulCloudSync(DateTime.now());
 
     recordSyncResult.fold(
       (failure) {
