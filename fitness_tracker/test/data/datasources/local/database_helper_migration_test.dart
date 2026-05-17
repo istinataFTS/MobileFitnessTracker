@@ -1,4 +1,4 @@
-// Regression suite for schema migrations v18 and v19.
+// Regression suite for schema migrations v18, v19 and v20.
 //
 // Three things are verified:
 //   1. Fresh-install path (`DatabaseHelper.createSchema`): the per-owner
@@ -39,35 +39,33 @@ void main() {
     required String name,
     String? owner,
     String updatedAt = '2026-01-01T10:00:00.000',
-  }) =>
-      {
-        DatabaseTables.exerciseId: id,
-        DatabaseTables.ownerUserId: owner,
-        DatabaseTables.exerciseName: name,
-        DatabaseTables.exerciseMuscleGroups: '["chest"]',
-        DatabaseTables.exerciseCreatedAt: '2026-01-01T09:00:00.000',
-        DatabaseTables.exerciseUpdatedAt: updatedAt,
-        DatabaseTables.exerciseSyncStatus: 'localOnly',
-      };
+  }) => {
+    DatabaseTables.exerciseId: id,
+    DatabaseTables.ownerUserId: owner,
+    DatabaseTables.exerciseName: name,
+    DatabaseTables.exerciseMuscleGroups: '["chest"]',
+    DatabaseTables.exerciseCreatedAt: '2026-01-01T09:00:00.000',
+    DatabaseTables.exerciseUpdatedAt: updatedAt,
+    DatabaseTables.exerciseSyncStatus: 'localOnly',
+  };
 
   Map<String, Object?> mealRow({
     required String id,
     required String name,
     String? owner,
-  }) =>
-      {
-        DatabaseTables.mealId: id,
-        DatabaseTables.ownerUserId: owner,
-        DatabaseTables.mealName: name,
-        DatabaseTables.mealServingSize: 100.0,
-        DatabaseTables.mealCarbsPer100g: 30.0,
-        DatabaseTables.mealProteinPer100g: 20.0,
-        DatabaseTables.mealFatPer100g: 10.0,
-        DatabaseTables.mealCaloriesPer100g: 290.0,
-        DatabaseTables.mealCreatedAt: '2026-01-01T09:00:00.000',
-        DatabaseTables.mealUpdatedAt: '2026-01-01T10:00:00.000',
-        DatabaseTables.mealSyncStatus: 'localOnly',
-      };
+  }) => {
+    DatabaseTables.mealId: id,
+    DatabaseTables.ownerUserId: owner,
+    DatabaseTables.mealName: name,
+    DatabaseTables.mealServingSize: 100.0,
+    DatabaseTables.mealCarbsPer100g: 30.0,
+    DatabaseTables.mealProteinPer100g: 20.0,
+    DatabaseTables.mealFatPer100g: 10.0,
+    DatabaseTables.mealCaloriesPer100g: 290.0,
+    DatabaseTables.mealCreatedAt: '2026-01-01T09:00:00.000',
+    DatabaseTables.mealUpdatedAt: '2026-01-01T10:00:00.000',
+    DatabaseTables.mealSyncStatus: 'localOnly',
+  };
 
   // -------------------------------------------------------------------------
   // v17-schema helpers (old global UNIQUE(name) on each table)
@@ -168,9 +166,7 @@ void main() {
       'INSERT INTO meals_v18 SELECT * FROM ${DatabaseTables.meals}',
     );
     await db.execute('DROP TABLE ${DatabaseTables.meals}');
-    await db.execute(
-      'ALTER TABLE meals_v18 RENAME TO ${DatabaseTables.meals}',
-    );
+    await db.execute('ALTER TABLE meals_v18 RENAME TO ${DatabaseTables.meals}');
     await db.execute('''
       CREATE UNIQUE INDEX idx_meals_name_owner
       ON ${DatabaseTables.meals}(
@@ -184,8 +180,7 @@ void main() {
   // 1. Fresh-install schema (DatabaseHelper.createSchema)
   // =========================================================================
 
-  group('DatabaseHelper.createSchema — per-owner uniqueness (fresh v19 install)',
-      () {
+  group('DatabaseHelper.createSchema — per-owner uniqueness (fresh v19 install)', () {
     late Database db;
 
     setUp(() async {
@@ -218,10 +213,10 @@ void main() {
 
         final rows = await db.query(DatabaseTables.exercises);
         expect(rows, hasLength(2));
-        expect(
-          rows.map((r) => r[DatabaseTables.exerciseId]).toSet(),
-          {'sys', 'usr'},
-        );
+        expect(rows.map((r) => r[DatabaseTables.exerciseId]).toSet(), {
+          'sys',
+          'usr',
+        });
       },
     );
 
@@ -277,10 +272,10 @@ void main() {
 
         final rows = await db.query(DatabaseTables.meals);
         expect(rows, hasLength(2));
-        expect(
-          rows.map((r) => r[DatabaseTables.mealId]).toSet(),
-          {'sys', 'usr'},
-        );
+        expect(rows.map((r) => r[DatabaseTables.mealId]).toSet(), {
+          'sys',
+          'usr',
+        });
       },
     );
 
@@ -302,15 +297,12 @@ void main() {
       },
     );
 
-    test(
-      'targets table is absent from fresh v19 schema',
-      () async {
-        final tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
-        );
-        expect(tables, isEmpty);
-      },
-    );
+    test('targets table is absent from fresh v19 schema', () async {
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+      );
+      expect(tables, isEmpty);
+    });
   });
 
   // =========================================================================
@@ -330,22 +322,24 @@ void main() {
     // --- exercises ---
 
     group('exercises', () {
-      test('pre-migration rows are preserved with original IDs and field values',
-          () async {
-        await createV17ExerciseSchema(db);
-        await db.insert(
-          DatabaseTables.exercises,
-          exerciseRow(id: 'seeded-1', name: 'Barbell Row', owner: null),
-        );
+      test(
+        'pre-migration rows are preserved with original IDs and field values',
+        () async {
+          await createV17ExerciseSchema(db);
+          await db.insert(
+            DatabaseTables.exercises,
+            exerciseRow(id: 'seeded-1', name: 'Barbell Row', owner: null),
+          );
 
-        await applyExerciseMigrationV18(db);
+          await applyExerciseMigrationV18(db);
 
-        final rows = await db.query(DatabaseTables.exercises);
-        expect(rows, hasLength(1));
-        expect(rows.first[DatabaseTables.exerciseId], 'seeded-1');
-        expect(rows.first[DatabaseTables.exerciseName], 'Barbell Row');
-        expect(rows.first[DatabaseTables.ownerUserId], isNull);
-      });
+          final rows = await db.query(DatabaseTables.exercises);
+          expect(rows, hasLength(1));
+          expect(rows.first[DatabaseTables.exerciseId], 'seeded-1');
+          expect(rows.first[DatabaseTables.exerciseName], 'Barbell Row');
+          expect(rows.first[DatabaseTables.ownerUserId], isNull);
+        },
+      );
 
       test(
         'after migration a user exercise with the same name as a system '
@@ -366,10 +360,10 @@ void main() {
           );
 
           final rows = await db.query(DatabaseTables.exercises);
-          expect(
-            rows.map((r) => r[DatabaseTables.exerciseId]).toSet(),
-            {'sys', 'usr'},
-          );
+          expect(rows.map((r) => r[DatabaseTables.exerciseId]).toSet(), {
+            'sys',
+            'usr',
+          });
         },
       );
 
@@ -398,47 +392,46 @@ void main() {
     // --- meals ---
 
     group('meals', () {
-      test('pre-migration rows are preserved with original IDs and field values',
-          () async {
-        await createV17MealSchema(db);
-        await db.insert(
-          DatabaseTables.meals,
-          mealRow(id: 'seeded-1', name: 'Oats', owner: null),
-        );
-
-        await applyMealMigrationV18(db);
-
-        final rows = await db.query(DatabaseTables.meals);
-        expect(rows, hasLength(1));
-        expect(rows.first[DatabaseTables.mealId], 'seeded-1');
-        expect(rows.first[DatabaseTables.mealName], 'Oats');
-        expect(rows.first[DatabaseTables.ownerUserId], isNull);
-      });
-
       test(
-        'after migration a user meal with the same name as a system meal '
-        'can be inserted — previously blocked by UNIQUE(name)',
+        'pre-migration rows are preserved with original IDs and field values',
         () async {
           await createV17MealSchema(db);
           await db.insert(
             DatabaseTables.meals,
-            mealRow(id: 'sys', name: 'Oats', owner: null),
+            mealRow(id: 'seeded-1', name: 'Oats', owner: null),
           );
 
           await applyMealMigrationV18(db);
 
-          await db.insert(
-            DatabaseTables.meals,
-            mealRow(id: 'usr', name: 'Oats', owner: 'user-1'),
-          );
-
           final rows = await db.query(DatabaseTables.meals);
-          expect(
-            rows.map((r) => r[DatabaseTables.mealId]).toSet(),
-            {'sys', 'usr'},
-          );
+          expect(rows, hasLength(1));
+          expect(rows.first[DatabaseTables.mealId], 'seeded-1');
+          expect(rows.first[DatabaseTables.mealName], 'Oats');
+          expect(rows.first[DatabaseTables.ownerUserId], isNull);
         },
       );
+
+      test('after migration a user meal with the same name as a system meal '
+          'can be inserted — previously blocked by UNIQUE(name)', () async {
+        await createV17MealSchema(db);
+        await db.insert(
+          DatabaseTables.meals,
+          mealRow(id: 'sys', name: 'Oats', owner: null),
+        );
+
+        await applyMealMigrationV18(db);
+
+        await db.insert(
+          DatabaseTables.meals,
+          mealRow(id: 'usr', name: 'Oats', owner: 'user-1'),
+        );
+
+        final rows = await db.query(DatabaseTables.meals);
+        expect(rows.map((r) => r[DatabaseTables.mealId]).toSet(), {
+          'sys',
+          'usr',
+        });
+      });
 
       test(
         'after migration same-name same-owner meals still violate UNIQUE',
@@ -495,39 +488,36 @@ void main() {
       )
     ''');
 
-    test(
-      'targets table is dropped when it exists on a v18 device',
-      () async {
-        await createV18TargetsTable(db);
-        await db.insert('targets', {
-          'id': 'target-1',
-          'owner_user_id': null,
-          'type': 'macro',
-          'category_key': 'protein',
-          'target_value': 180.0,
-          'unit': 'grams',
-          'period': 'daily',
-          'created_at': '2026-01-01T09:00:00.000',
-          'updated_at': '2026-01-01T09:00:00.000',
-          'sync_status': 'localOnly',
-        });
+    test('targets table is dropped when it exists on a v18 device', () async {
+      await createV18TargetsTable(db);
+      await db.insert('targets', {
+        'id': 'target-1',
+        'owner_user_id': null,
+        'type': 'macro',
+        'category_key': 'protein',
+        'target_value': 180.0,
+        'unit': 'grams',
+        'period': 'daily',
+        'created_at': '2026-01-01T09:00:00.000',
+        'updated_at': '2026-01-01T09:00:00.000',
+        'sync_status': 'localOnly',
+      });
 
-        // Verify the table exists before migration.
-        var tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
-        );
-        expect(tables, hasLength(1));
+      // Verify the table exists before migration.
+      var tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+      );
+      expect(tables, hasLength(1));
 
-        // Apply v19 migration.
-        await db.execute('DROP TABLE IF EXISTS targets');
+      // Apply v19 migration.
+      await db.execute('DROP TABLE IF EXISTS targets');
 
-        // Verify the table no longer exists.
-        tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
-        );
-        expect(tables, isEmpty);
-      },
-    );
+      // Verify the table no longer exists.
+      tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='targets'",
+      );
+      expect(tables, isEmpty);
+    });
 
     test(
       'DROP TABLE IF EXISTS is a no-op when targets table is absent',
@@ -546,4 +536,204 @@ void main() {
       },
     );
   });
+
+  // =========================================================================
+  // 4. v19 → v20 upgrade path — NULL catalog owners collapse to guest ''
+  //
+  // Mirrors production `_collapseNullCatalogOwnersToGuestBucket`: a pure
+  // in-place UPDATE, no deletes, no child repointing. Asserts NULL→'',
+  // cross-bucket rows preserved, child rows untouched, and idempotency.
+  // =========================================================================
+
+  group(
+    'v19 to v20 migration DDL — NULL owners collapse to guest sentinel',
+    () {
+      late Database db;
+
+      // Exact SQL run by `_collapseNullCatalogOwnersToGuestBucket`.
+      Future<List<int>> runV20Collapse(Database database) async {
+        final exercises = await database.update(
+          DatabaseTables.exercises,
+          <String, Object?>{DatabaseTables.ownerUserId: ''},
+          where: '${DatabaseTables.ownerUserId} IS NULL',
+        );
+        final meals = await database.update(
+          DatabaseTables.meals,
+          <String, Object?>{DatabaseTables.ownerUserId: ''},
+          where: '${DatabaseTables.ownerUserId} IS NULL',
+        );
+        return <int>[exercises, meals];
+      }
+
+      setUp(() async {
+        db = await databaseFactoryFfi.openDatabase(
+          inMemoryDatabasePath,
+          options: OpenDatabaseOptions(
+            version: 1,
+            onCreate: (db, _) async => DatabaseHelper.createSchema(db),
+          ),
+        );
+
+        // Legacy seeded (NULL owner) + cross-bucket user copy (same name).
+        await db.insert(
+          DatabaseTables.exercises,
+          exerciseRow(id: 'sys-ex', name: 'Bench Press', owner: null),
+        );
+        await db.insert(
+          DatabaseTables.exercises,
+          exerciseRow(id: 'usr-ex', name: 'Bench Press', owner: 'user-1'),
+        );
+        // Already on the guest sentinel — must stay untouched.
+        await db.insert(
+          DatabaseTables.exercises,
+          exerciseRow(id: 'guest-ex', name: 'Plank', owner: ''),
+        );
+
+        await db.insert(
+          DatabaseTables.meals,
+          mealRow(id: 'sys-meal', name: 'Oats', owner: null),
+        );
+        await db.insert(
+          DatabaseTables.meals,
+          mealRow(id: 'usr-meal', name: 'Oats', owner: 'user-1'),
+        );
+
+        // Child rows pointing at the NULL-owner catalog entries.
+        await db.insert(DatabaseTables.workoutSets, <String, Object?>{
+          DatabaseTables.setId: 'set-1',
+          DatabaseTables.setExerciseId: 'sys-ex',
+          DatabaseTables.setReps: 10,
+          DatabaseTables.setWeight: 50.0,
+          DatabaseTables.setDate: '2026-01-02T10:00:00.000',
+          DatabaseTables.setCreatedAt: '2026-01-02T10:00:00.000',
+          DatabaseTables.setUpdatedAt: '2026-01-02T10:00:00.000',
+        });
+        await db.insert(DatabaseTables.exerciseMuscleFactors, <String, Object?>{
+          DatabaseTables.factorId: 'f-1',
+          DatabaseTables.factorExerciseId: 'sys-ex',
+          DatabaseTables.factorMuscleGroup: 'chest',
+          DatabaseTables.factorValue: 1.0,
+        });
+        await db.insert(DatabaseTables.nutritionLogs, <String, Object?>{
+          DatabaseTables.nutritionLogId: 'log-1',
+          DatabaseTables.nutritionLogMealId: 'sys-meal',
+          DatabaseTables.nutritionLogMealName: 'Oats',
+          DatabaseTables.nutritionLogCarbs: 30.0,
+          DatabaseTables.nutritionLogProtein: 20.0,
+          DatabaseTables.nutritionLogFat: 10.0,
+          DatabaseTables.nutritionLogCalories: 290.0,
+          DatabaseTables.nutritionLogDate: '2026-01-02T10:00:00.000',
+          DatabaseTables.nutritionLogCreatedAt: '2026-01-02T10:00:00.000',
+          DatabaseTables.nutritionLogUpdatedAt: '2026-01-02T10:00:00.000',
+        });
+      });
+
+      tearDown(() async => db.close());
+
+      test(
+        'NULL owners become the guest sentinel; other owners untouched',
+        () async {
+          final affected = await runV20Collapse(db);
+          expect(affected, <int>[1, 1]); // one exercise, one meal updated
+
+          Future<String?> ownerOf(String table, String idCol, String id) async {
+            final rows = await db.query(
+              table,
+              columns: <String>[DatabaseTables.ownerUserId],
+              where: '$idCol = ?',
+              whereArgs: <Object?>[id],
+            );
+            return rows.single[DatabaseTables.ownerUserId] as String?;
+          }
+
+          expect(
+            await ownerOf(
+              DatabaseTables.exercises,
+              DatabaseTables.exerciseId,
+              'sys-ex',
+            ),
+            '',
+          );
+          expect(
+            await ownerOf(
+              DatabaseTables.exercises,
+              DatabaseTables.exerciseId,
+              'usr-ex',
+            ),
+            'user-1',
+          );
+          expect(
+            await ownerOf(
+              DatabaseTables.exercises,
+              DatabaseTables.exerciseId,
+              'guest-ex',
+            ),
+            '',
+          );
+          expect(
+            await ownerOf(
+              DatabaseTables.meals,
+              DatabaseTables.mealId,
+              'sys-meal',
+            ),
+            '',
+          );
+          expect(
+            await ownerOf(
+              DatabaseTables.meals,
+              DatabaseTables.mealId,
+              'usr-meal',
+            ),
+            'user-1',
+          );
+        },
+      );
+
+      test(
+        'cross-bucket rows are preserved — no merge, no data loss',
+        () async {
+          await runV20Collapse(db);
+
+          final exercises = await db.query(DatabaseTables.exercises);
+          final meals = await db.query(DatabaseTables.meals);
+          // sys-ex ('') and usr-ex ('user-1') both survive (distinct accounts).
+          expect(exercises, hasLength(3));
+          expect(meals, hasLength(2));
+        },
+      );
+
+      test('child rows are untouched (no delete, no repoint)', () async {
+        await runV20Collapse(db);
+
+        final sets = await db.query(DatabaseTables.workoutSets);
+        expect(sets, hasLength(1));
+        expect(sets.single[DatabaseTables.setExerciseId], 'sys-ex');
+
+        final factors = await db.query(DatabaseTables.exerciseMuscleFactors);
+        expect(factors, hasLength(1));
+        expect(factors.single[DatabaseTables.factorExerciseId], 'sys-ex');
+
+        final logs = await db.query(DatabaseTables.nutritionLogs);
+        expect(logs, hasLength(1));
+        expect(logs.single[DatabaseTables.nutritionLogMealId], 'sys-meal');
+      });
+
+      test('idempotent — a second pass changes nothing', () async {
+        await runV20Collapse(db);
+        final secondPass = await runV20Collapse(db);
+        expect(secondPass, <int>[0, 0]);
+
+        final nullExercises = await db.query(
+          DatabaseTables.exercises,
+          where: '${DatabaseTables.ownerUserId} IS NULL',
+        );
+        final nullMeals = await db.query(
+          DatabaseTables.meals,
+          where: '${DatabaseTables.ownerUserId} IS NULL',
+        );
+        expect(nullExercises, isEmpty);
+        expect(nullMeals, isEmpty);
+      });
+    },
+  );
 }

@@ -474,7 +474,48 @@ class DatabaseHelper {
       }
     }
 
+    if (oldVersion < 20) {
+      // Per-user catalog model: owner_user_id must never be NULL. Legacy
+      // seeded exercises/meals were created with NULL owner; collapse them
+      // to the guest sentinel '' (the same sentinel muscle_stimulus has used
+      // since v17). Pure in-place UPDATE — no rows are deleted, so no child
+      // FK repointing is needed.
+      //
+      // Why no dedupe pass: the v18 expression index
+      // UNIQUE(name, COALESCE(owner_user_id, '')) already guarantees at most
+      // one row per (name, owner-bucket), and COALESCE(NULL,'') == '' means
+      // NULL→'' leaves every index key unchanged — it can neither create a
+      // collision nor merge distinct accounts (NULL/'' vs a real uid stay
+      // separate by design; that convergence is user-scoped and happens at
+      // sign-in, not in this user-agnostic migration).
+      await _collapseNullCatalogOwnersToGuestBucket(db);
+    }
+
     await _createIndexes(db);
+  }
+
+  /// Rewrites `owner_user_id IS NULL` to the guest sentinel `''` for the
+  /// exercise and meal catalogs (db v20).
+  ///
+  /// Safe to re-run: the predicate only matches genuine NULLs, so a second
+  /// pass is a no-op.
+  Future<void> _collapseNullCatalogOwnersToGuestBucket(Database db) async {
+    final exercisesUpdated = await db.update(
+      DatabaseTables.exercises,
+      <String, Object?>{DatabaseTables.ownerUserId: ''},
+      where: '${DatabaseTables.ownerUserId} IS NULL',
+    );
+    final mealsUpdated = await db.update(
+      DatabaseTables.meals,
+      <String, Object?>{DatabaseTables.ownerUserId: ''},
+      where: '${DatabaseTables.ownerUserId} IS NULL',
+    );
+
+    AppLogger.info(
+      'v20 migration: collapsed $exercisesUpdated exercise and '
+      '$mealsUpdated meal row(s) from NULL owner to guest sentinel',
+      category: 'db_migration',
+    );
   }
 
   void _ensureSupportedUpgradePath(int oldVersion, int newVersion) {
@@ -510,21 +551,16 @@ class DatabaseHelper {
     final legacyTargets = await db.query('targets_legacy');
 
     for (final legacyTarget in legacyTargets) {
-      await db.insert(
-        'targets',
-        <String, Object?>{
-          'id': legacyTarget['id'] as String,
-          DatabaseTables.ownerUserId: null,
-          'type': 'muscle_sets',
-          'category_key': legacyTarget['muscle_group'] as String,
-          'target_value':
-              (legacyTarget['weekly_goal'] as num).toDouble(),
-          'unit': 'sets',
-          'period': 'weekly',
-          'created_at': legacyTarget['created_at'] as String,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert('targets', <String, Object?>{
+        'id': legacyTarget['id'] as String,
+        DatabaseTables.ownerUserId: null,
+        'type': 'muscle_sets',
+        'category_key': legacyTarget['muscle_group'] as String,
+        'target_value': (legacyTarget['weekly_goal'] as num).toDouble(),
+        'unit': 'sets',
+        'period': 'weekly',
+        'created_at': legacyTarget['created_at'] as String,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     await db.execute('DROP TABLE targets_legacy');
@@ -579,24 +615,16 @@ class DatabaseHelper {
 
   // ignore: unused_element — kept for upgrade path from db versions < 11.
   Future<void> _migrateTargetsForRemoteReadiness(Database db) async {
-    await db.execute(
-      'ALTER TABLE targets ADD COLUMN updated_at TEXT',
-    );
+    await db.execute('ALTER TABLE targets ADD COLUMN updated_at TEXT');
     await db.execute(
       'UPDATE targets SET updated_at = created_at WHERE updated_at IS NULL',
     );
-    await db.execute(
-      'ALTER TABLE targets ADD COLUMN server_id TEXT',
-    );
+    await db.execute('ALTER TABLE targets ADD COLUMN server_id TEXT');
     await db.execute(
       "ALTER TABLE targets ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'localOnly'",
     );
-    await db.execute(
-      'ALTER TABLE targets ADD COLUMN last_synced_at TEXT',
-    );
-    await db.execute(
-      'ALTER TABLE targets ADD COLUMN last_sync_error TEXT',
-    );
+    await db.execute('ALTER TABLE targets ADD COLUMN last_synced_at TEXT');
+    await db.execute('ALTER TABLE targets ADD COLUMN last_sync_error TEXT');
   }
 
   Future<void> _migrateExercisesForRemoteReadiness(Database db) async {
@@ -744,17 +772,13 @@ class DatabaseHelper {
     required String columnName,
   }) async {
     final columns = await db.rawQuery('PRAGMA table_info($tableName)');
-    final exists = columns.any(
-      (row) => row['name'] == columnName,
-    );
+    final exists = columns.any((row) => row['name'] == columnName);
 
     if (exists) {
       return;
     }
 
-    await db.execute(
-      'ALTER TABLE $tableName ADD COLUMN $columnName TEXT',
-    );
+    await db.execute('ALTER TABLE $tableName ADD COLUMN $columnName TEXT');
   }
 
   /// Migrates [exercises] to use per-owner uniqueness.
@@ -890,9 +914,7 @@ class DatabaseHelper {
       'INSERT INTO meals_v18 SELECT * FROM ${DatabaseTables.meals}',
     );
     await db.execute('DROP TABLE ${DatabaseTables.meals}');
-    await db.execute(
-      'ALTER TABLE meals_v18 RENAME TO ${DatabaseTables.meals}',
-    );
+    await db.execute('ALTER TABLE meals_v18 RENAME TO ${DatabaseTables.meals}');
   }
 
   /// Returns the set of IDs that should be retained when deduplicating
@@ -931,10 +953,12 @@ class DatabaseHelper {
     String createdAtKey,
     String idKey,
   ) {
-    final tA = (candidate[updatedAtKey] as String?) ??
+    final tA =
+        (candidate[updatedAtKey] as String?) ??
         (candidate[createdAtKey] as String?) ??
         '';
-    final tB = (current[updatedAtKey] as String?) ??
+    final tB =
+        (current[updatedAtKey] as String?) ??
         (current[createdAtKey] as String?) ??
         '';
     final cmp = tA.compareTo(tB);
