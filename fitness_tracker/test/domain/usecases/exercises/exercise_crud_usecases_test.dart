@@ -47,6 +47,10 @@ final _exerciseFixture = Exercise(
   createdAt: DateTime(2026),
 );
 
+// Per-user catalog model: AddExercise always stamps the resolved owner.
+// Guest / failed-session resolves to the guest sentinel '' (kGuestUserId).
+final _guestOwnedFixture = _exerciseFixture.copyWith(ownerUserId: '');
+
 const _authenticatedSession = AppSession(
   authMode: AuthMode.authenticated,
   user: AppUser(id: 'user-1', email: 'test@example.com'),
@@ -90,35 +94,37 @@ void main() {
       );
     });
 
-    test('does not set ownerUserId when session fails', () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Left(CacheFailure('no session')),
-      );
-      when(() => mockExerciseRepo.addExercise(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(() => mockSyncFactors(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
+    test('stamps the guest sentinel owner when session fails', () async {
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Left(CacheFailure('no session')));
+      when(
+        () => mockExerciseRepo.addExercise(_guestOwnedFixture),
+      ).thenAnswer((_) async => const Right(null));
+      when(
+        () => mockSyncFactors(_guestOwnedFixture),
+      ).thenAnswer((_) async => const Right(null));
 
       final result = await useCase(_exerciseFixture);
 
       expect(result.isRight(), isTrue);
-      verify(() => mockExerciseRepo.addExercise(_exerciseFixture)).called(1);
+      verify(() => mockExerciseRepo.addExercise(_guestOwnedFixture)).called(1);
     });
 
     test('sets ownerUserId when session is authenticated', () async {
-      final exerciseWithOwner = _exerciseFixture.copyWith(ownerUserId: 'user-1');
+      final exerciseWithOwner = _exerciseFixture.copyWith(
+        ownerUserId: 'user-1',
+      );
 
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Right(_authenticatedSession),
-      );
-      when(() => mockExerciseRepo.addExercise(exerciseWithOwner)).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(() => mockSyncFactors(exerciseWithOwner)).thenAnswer(
-        (_) async => const Right(null),
-      );
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Right(_authenticatedSession));
+      when(
+        () => mockExerciseRepo.addExercise(exerciseWithOwner),
+      ).thenAnswer((_) async => const Right(null));
+      when(
+        () => mockSyncFactors(exerciseWithOwner),
+      ).thenAnswer((_) async => const Right(null));
 
       final result = await useCase(_exerciseFixture);
 
@@ -127,12 +133,12 @@ void main() {
     });
 
     test('propagates repository failure', () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Left(CacheFailure('no session')),
-      );
-      when(() => mockExerciseRepo.addExercise(_exerciseFixture)).thenAnswer(
-        (_) async => const Left(_dbFailure),
-      );
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Left(CacheFailure('no session')));
+      when(
+        () => mockExerciseRepo.addExercise(_guestOwnedFixture),
+      ).thenAnswer((_) async => const Left(_dbFailure));
 
       final result = await useCase(_exerciseFixture);
 
@@ -141,19 +147,19 @@ void main() {
     });
 
     test('triggers syncExerciseMuscleFactors on success', () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Left(CacheFailure('no session')),
-      );
-      when(() => mockExerciseRepo.addExercise(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(() => mockSyncFactors(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Left(CacheFailure('no session')));
+      when(
+        () => mockExerciseRepo.addExercise(_guestOwnedFixture),
+      ).thenAnswer((_) async => const Right(null));
+      when(
+        () => mockSyncFactors(_guestOwnedFixture),
+      ).thenAnswer((_) async => const Right(null));
 
       await useCase(_exerciseFixture);
 
-      verify(() => mockSyncFactors(_exerciseFixture)).called(1);
+      verify(() => mockSyncFactors(_guestOwnedFixture)).called(1);
     });
   });
 
@@ -173,34 +179,36 @@ void main() {
       );
     });
 
-    test('deletes exercise, factors, and rebuilds stimulus on success',
-        () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Right(_authenticatedSession),
-      );
-      when(() => mockExerciseRepo.deleteExercise('ex-1')).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(
-        () => mockMuscleFactorRepo.deleteMuscleFactorsByExerciseId('ex-1'),
-      ).thenAnswer((_) async => const Right(null));
-      when(() => mockRebuild('user-1')).thenAnswer(
-        (_) async => const Right(null),
-      );
+    test(
+      'deletes exercise, factors, and rebuilds stimulus on success',
+      () async {
+        when(
+          () => mockSessionRepo.getCurrentSession(),
+        ).thenAnswer((_) async => const Right(_authenticatedSession));
+        when(
+          () => mockExerciseRepo.deleteExercise('ex-1'),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockMuscleFactorRepo.deleteMuscleFactorsByExerciseId('ex-1'),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockRebuild('user-1'),
+        ).thenAnswer((_) async => const Right(null));
 
-      final result = await useCase('ex-1');
+        final result = await useCase('ex-1');
 
-      expect(result.isRight(), isTrue);
-      verify(() => mockRebuild('user-1')).called(1);
-    });
+        expect(result.isRight(), isTrue);
+        verify(() => mockRebuild('user-1')).called(1);
+      },
+    );
 
     test('propagates repository failure without deleting factors', () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Right(_authenticatedSession),
-      );
-      when(() => mockExerciseRepo.deleteExercise('ex-1')).thenAnswer(
-        (_) async => const Left(_dbFailure),
-      );
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Right(_authenticatedSession));
+      when(
+        () => mockExerciseRepo.deleteExercise('ex-1'),
+      ).thenAnswer((_) async => const Left(_dbFailure));
 
       final result = await useCase('ex-1');
 
@@ -224,9 +232,9 @@ void main() {
         mockExerciseRepo,
         sourcePreferenceResolver: mockResolver,
       );
-      when(() => mockResolver.resolveReadPreference()).thenAnswer(
-        (_) async => DataSourcePreference.localOnly,
-      );
+      when(
+        () => mockResolver.resolveReadPreference(),
+      ).thenAnswer((_) async => DataSourcePreference.localOnly);
     });
 
     test('returns list of exercises from repository', () async {
@@ -267,9 +275,9 @@ void main() {
         mockExerciseRepo,
         sourcePreferenceResolver: mockResolver,
       );
-      when(() => mockResolver.resolveReadPreference()).thenAnswer(
-        (_) async => DataSourcePreference.localOnly,
-      );
+      when(
+        () => mockResolver.resolveReadPreference(),
+      ).thenAnswer((_) async => DataSourcePreference.localOnly);
     });
 
     test('returns exercise when found', () async {
@@ -324,9 +332,9 @@ void main() {
         mockExerciseRepo,
         sourcePreferenceResolver: mockResolver,
       );
-      when(() => mockResolver.resolveReadPreference()).thenAnswer(
-        (_) async => DataSourcePreference.localOnly,
-      );
+      when(
+        () => mockResolver.resolveReadPreference(),
+      ).thenAnswer((_) async => DataSourcePreference.localOnly);
     });
 
     test('returns filtered list for the given muscle group', () async {
@@ -373,33 +381,35 @@ void main() {
       );
     });
 
-    test('updates exercise, syncs factors, and rebuilds stimulus on success',
-        () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Left(CacheFailure('no session')),
-      );
-      when(() => mockExerciseRepo.updateExercise(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(() => mockSyncFactors(_exerciseFixture)).thenAnswer(
-        (_) async => const Right(null),
-      );
-      when(() => mockRebuild('')).thenAnswer((_) async => const Right(null));
+    test(
+      'updates exercise, syncs factors, and rebuilds stimulus on success',
+      () async {
+        when(
+          () => mockSessionRepo.getCurrentSession(),
+        ).thenAnswer((_) async => const Left(CacheFailure('no session')));
+        when(
+          () => mockExerciseRepo.updateExercise(_exerciseFixture),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockSyncFactors(_exerciseFixture),
+        ).thenAnswer((_) async => const Right(null));
+        when(() => mockRebuild('')).thenAnswer((_) async => const Right(null));
 
-      final result = await useCase(_exerciseFixture);
+        final result = await useCase(_exerciseFixture);
 
-      expect(result.isRight(), isTrue);
-      verify(() => mockSyncFactors(_exerciseFixture)).called(1);
-      verify(() => mockRebuild('')).called(1);
-    });
+        expect(result.isRight(), isTrue);
+        verify(() => mockSyncFactors(_exerciseFixture)).called(1);
+        verify(() => mockRebuild('')).called(1);
+      },
+    );
 
     test('propagates repository failure without syncing', () async {
-      when(() => mockSessionRepo.getCurrentSession()).thenAnswer(
-        (_) async => const Left(CacheFailure('no session')),
-      );
-      when(() => mockExerciseRepo.updateExercise(_exerciseFixture)).thenAnswer(
-        (_) async => const Left(_dbFailure),
-      );
+      when(
+        () => mockSessionRepo.getCurrentSession(),
+      ).thenAnswer((_) async => const Left(CacheFailure('no session')));
+      when(
+        () => mockExerciseRepo.updateExercise(_exerciseFixture),
+      ).thenAnswer((_) async => const Left(_dbFailure));
 
       final result = await useCase(_exerciseFixture);
 

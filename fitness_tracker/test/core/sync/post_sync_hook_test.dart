@@ -85,7 +85,8 @@ void main() {
         networkStatusService: networkStatusService,
       ),
       initialCloudMigrationCoordinator: migrationCoordinator,
-      features: features ??
+      features:
+          features ??
           <SyncFeature>[
             SyncFeature(
               name: 'exercises',
@@ -107,12 +108,15 @@ void main() {
     networkStatusService = MockNetworkStatusService();
     migrationCoordinator = MockInitialCloudMigrationCoordinator();
 
-    when(() => repository.syncPolicy)
-        .thenReturn(AppSyncPolicy.productionDefault);
-    when(() => repository.recordSuccessfulCloudSync(any()))
-        .thenAnswer((_) async => const Right(null));
-    when(() => networkStatusService.isNetworkAvailable())
-        .thenAnswer((_) async => true);
+    when(
+      () => repository.syncPolicy,
+    ).thenReturn(AppSyncPolicy.productionDefault);
+    when(
+      () => repository.recordSuccessfulCloudSync(any()),
+    ).thenAnswer((_) async => const Right(null));
+    when(
+      () => networkStatusService.isNetworkAvailable(),
+    ).thenAnswer((_) async => true);
     when(() => migrationCoordinator.runIfRequired()).thenAnswer(
       (_) async => const InitialCloudMigrationResult(
         status: InitialCloudMigrationStatus.completed,
@@ -122,8 +126,7 @@ void main() {
   });
 
   group('feature sync', () {
-    test(
-        'runs hooks in registration order after a successful pull, with the '
+    test('runs hooks in registration order after a successful pull, with the '
         'correct pulledFeatures set', () async {
       final factorHook = _RecordingHook(
         name: 'factor_heal',
@@ -138,8 +141,9 @@ void main() {
         hooks: <PostSyncHook>[factorHook, stimulusHook],
       );
 
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
+      when(
+        () => repository.getCurrentSession(),
+      ).thenAnswer((_) async => Right(authenticatedSession()));
 
       final result = await orchestrator.run(SyncTrigger.appLaunch);
 
@@ -171,41 +175,46 @@ void main() {
         ],
       );
 
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
+      when(
+        () => repository.getCurrentSession(),
+      ).thenAnswer((_) async => Right(authenticatedSession()));
 
       await orchestrator.run(SyncTrigger.appLaunch);
 
       expect(unrelatedHook.invocations, isEmpty);
     });
 
-    test('runs always-run hooks (empty triggeringFeatures) unconditionally',
-        () async {
-      final alwaysHook = _RecordingHook(
-        name: 'always',
-        triggeringFeatures: const <String>{},
-      );
+    test(
+      'runs always-run hooks (empty triggeringFeatures) unconditionally',
+      () async {
+        final alwaysHook = _RecordingHook(
+          name: 'always',
+          triggeringFeatures: const <String>{},
+        );
 
-      final orchestrator = buildOrchestrator(
-        hooks: <PostSyncHook>[alwaysHook],
-        features: <SyncFeature>[
-          SyncFeature(
-            name: 'targets',
-            syncPendingChanges: () async {},
-            pullRemoteChanges: (_, __) async {},
-          ),
-        ],
-      );
+        final orchestrator = buildOrchestrator(
+          hooks: <PostSyncHook>[alwaysHook],
+          features: <SyncFeature>[
+            SyncFeature(
+              name: 'targets',
+              syncPendingChanges: () async {},
+              pullRemoteChanges: (_, __) async {},
+            ),
+          ],
+        );
 
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
+        when(
+          () => repository.getCurrentSession(),
+        ).thenAnswer((_) async => Right(authenticatedSession()));
 
-      await orchestrator.run(SyncTrigger.appLaunch);
+        await orchestrator.run(SyncTrigger.appLaunch);
 
-      expect(alwaysHook.invocations, hasLength(1));
-    });
+        expect(alwaysHook.invocations, hasLength(1));
+      },
+    );
 
-    test('does not run hooks when a feature sync operation fails', () async {
+    test('runs hooks for successfully-pulled features even when a feature '
+        'push fails', () async {
       final hook = _RecordingHook(
         name: 'factor_heal',
         triggeringFeatures: const {'exercises'},
@@ -216,58 +225,67 @@ void main() {
         features: <SyncFeature>[
           SyncFeature(
             name: 'exercises',
+            // Pull succeeds, push fails.
             syncPendingChanges: () async => throw StateError('boom'),
             pullRemoteChanges: (_, __) async {},
           ),
         ],
       );
 
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
+      when(
+        () => repository.getCurrentSession(),
+      ).thenAnswer((_) async => Right(authenticatedSession()));
 
       final result = await orchestrator.run(SyncTrigger.appLaunch);
 
+      // The push failure marks the run failed...
       expect(result.status, SyncRunStatus.failed);
-      expect(hook.invocations, isEmpty);
-    });
-
-    test('does not include a feature in pulledFeatures if its pull threw',
-        () async {
-      final hook = _RecordingHook(
-        name: 'factor_heal',
-        triggeringFeatures: const {'exercises'},
-      );
-
-      final orchestrator = buildOrchestrator(
-        hooks: <PostSyncHook>[hook],
-        features: <SyncFeature>[
-          SyncFeature(
-            name: 'exercises',
-            syncPendingChanges: () async {},
-            pullRemoteChanges: (_, __) async => throw StateError('no pull'),
-          ),
-          SyncFeature(
-            name: 'workout_sets',
-            syncPendingChanges: () async {},
-            pullRemoteChanges: (_, __) async {},
-          ),
-        ],
-      );
-
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
-
-      final result = await orchestrator.run(SyncTrigger.appLaunch);
-
-      // Feature sync failed overall (exercises threw), so hooks must not
-      // run — asserting both properties in one test keeps the contract
-      // easy to read.
-      expect(result.status, SyncRunStatus.failed);
-      expect(hook.invocations, isEmpty);
+      // ...but 'exercises' pulled successfully, so its post-sync hook
+      // still runs. Derived local projections (muscle factors, stimulus)
+      // must not be left stale just because an unrelated push was
+      // rejected by the server.
+      expect(hook.invocations, hasLength(1));
     });
 
     test(
-        'a throwing hook does not downgrade the sync result and does not '
+      'does not include a feature in pulledFeatures if its pull threw',
+      () async {
+        final hook = _RecordingHook(
+          name: 'factor_heal',
+          triggeringFeatures: const {'exercises'},
+        );
+
+        final orchestrator = buildOrchestrator(
+          hooks: <PostSyncHook>[hook],
+          features: <SyncFeature>[
+            SyncFeature(
+              name: 'exercises',
+              syncPendingChanges: () async {},
+              pullRemoteChanges: (_, __) async => throw StateError('no pull'),
+            ),
+            SyncFeature(
+              name: 'workout_sets',
+              syncPendingChanges: () async {},
+              pullRemoteChanges: (_, __) async {},
+            ),
+          ],
+        );
+
+        when(
+          () => repository.getCurrentSession(),
+        ).thenAnswer((_) async => Right(authenticatedSession()));
+
+        final result = await orchestrator.run(SyncTrigger.appLaunch);
+
+        // Feature sync failed overall (exercises threw), so hooks must not
+        // run — asserting both properties in one test keeps the contract
+        // easy to read.
+        expect(result.status, SyncRunStatus.failed);
+        expect(hook.invocations, isEmpty);
+      },
+    );
+
+    test('a throwing hook does not downgrade the sync result and does not '
         'prevent later hooks from running', () async {
       final failingHook = _RecordingHook(
         name: 'failing',
@@ -283,8 +301,9 @@ void main() {
         hooks: <PostSyncHook>[failingHook, followingHook],
       );
 
-      when(() => repository.getCurrentSession())
-          .thenAnswer((_) async => Right(authenticatedSession()));
+      when(
+        () => repository.getCurrentSession(),
+      ).thenAnswer((_) async => Right(authenticatedSession()));
 
       final result = await orchestrator.run(SyncTrigger.appLaunch);
 
@@ -295,36 +314,38 @@ void main() {
 
   group('initial cloud migration', () {
     test(
-        'runs every hook after a completed migration with every feature marked '
-        'as pulled', () async {
-      final factorHook = _RecordingHook(
-        name: 'factor_heal',
-        triggeringFeatures: const {'exercises'},
-      );
-      final stimulusHook = _RecordingHook(
-        name: 'stimulus_rebuild',
-        triggeringFeatures: const {'exercises', 'workout_sets'},
-      );
+      'runs every hook after a completed migration with every feature marked '
+      'as pulled',
+      () async {
+        final factorHook = _RecordingHook(
+          name: 'factor_heal',
+          triggeringFeatures: const {'exercises'},
+        );
+        final stimulusHook = _RecordingHook(
+          name: 'stimulus_rebuild',
+          triggeringFeatures: const {'exercises', 'workout_sets'},
+        );
 
-      final orchestrator = buildOrchestrator(
-        hooks: <PostSyncHook>[factorHook, stimulusHook],
-      );
+        final orchestrator = buildOrchestrator(
+          hooks: <PostSyncHook>[factorHook, stimulusHook],
+        );
 
-      when(() => repository.getCurrentSession()).thenAnswer(
-        (_) async =>
-            Right(authenticatedSession(requiresInitialCloudMigration: true)),
-      );
+        when(() => repository.getCurrentSession()).thenAnswer(
+          (_) async =>
+              Right(authenticatedSession(requiresInitialCloudMigration: true)),
+        );
 
-      final result = await orchestrator.run(SyncTrigger.initialSignIn);
+        final result = await orchestrator.run(SyncTrigger.initialSignIn);
 
-      expect(result.status, SyncRunStatus.completed);
-      expect(factorHook.invocations, hasLength(1));
-      expect(stimulusHook.invocations, hasLength(1));
-      expect(
-        factorHook.invocations.single.pulledFeatures,
-        equals(<String>{'exercises', 'workout_sets'}),
-      );
-    });
+        expect(result.status, SyncRunStatus.completed);
+        expect(factorHook.invocations, hasLength(1));
+        expect(stimulusHook.invocations, hasLength(1));
+        expect(
+          factorHook.invocations.single.pulledFeatures,
+          equals(<String>{'exercises', 'workout_sets'}),
+        );
+      },
+    );
 
     test('does not run hooks when the initial migration fails', () async {
       final hook = _RecordingHook(
@@ -351,22 +372,25 @@ void main() {
     });
   });
 
-  test('hooks are not run when sync is skipped for a non-auth reason',
-      () async {
-    final hook = _RecordingHook(
-      name: 'factor_heal',
-      triggeringFeatures: const {'exercises'},
-    );
+  test(
+    'hooks are not run when sync is skipped for a non-auth reason',
+    () async {
+      final hook = _RecordingHook(
+        name: 'factor_heal',
+        triggeringFeatures: const {'exercises'},
+      );
 
-    final orchestrator = buildOrchestrator(hooks: <PostSyncHook>[hook]);
-    when(() => repository.getCurrentSession())
-        .thenAnswer((_) async => const Right(AppSession.guest()));
+      final orchestrator = buildOrchestrator(hooks: <PostSyncHook>[hook]);
+      when(
+        () => repository.getCurrentSession(),
+      ).thenAnswer((_) async => const Right(AppSession.guest()));
 
-    final result = await orchestrator.run(SyncTrigger.appLaunch);
+      final result = await orchestrator.run(SyncTrigger.appLaunch);
 
-    expect(result.status, SyncRunStatus.skipped);
-    expect(hook.invocations, isEmpty);
-  });
+      expect(result.status, SyncRunStatus.skipped);
+      expect(hook.invocations, isEmpty);
+    },
+  );
 
   test('pulledFeatures set handed to hooks is immutable', () async {
     final hook = _RecordingHook(
@@ -375,8 +399,9 @@ void main() {
     );
 
     final orchestrator = buildOrchestrator(hooks: <PostSyncHook>[hook]);
-    when(() => repository.getCurrentSession())
-        .thenAnswer((_) async => Right(authenticatedSession()));
+    when(
+      () => repository.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession()));
 
     await orchestrator.run(SyncTrigger.appLaunch);
 
@@ -387,8 +412,7 @@ void main() {
     );
   });
 
-  test(
-      'default constructor uses an empty hook list so existing orchestrator '
+  test('default constructor uses an empty hook list so existing orchestrator '
       'wiring remains backwards-compatible', () {
     final orchestrator = SyncOrchestratorImpl(
       appSessionRepository: repository,

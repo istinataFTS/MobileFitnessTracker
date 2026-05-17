@@ -4,6 +4,7 @@ import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/session/current_user_id_resolver.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/exercise_model.dart';
@@ -103,9 +104,9 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   @override
   Future<ExerciseModel?> getExerciseByName(String name) async {
     try {
-      final userId = await _getCurrentUserId();
+      final ownerId = await _resolveOwnerId();
       final filter = _visibilityFilter(
-        userId,
+        ownerId,
         extraPrefix: 'LOWER(${DatabaseTables.exerciseName}) = LOWER(?)',
       );
       final db = await databaseHelper.database;
@@ -149,20 +150,17 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       }
       return ExerciseModel.fromMap(maps.first);
     } catch (e) {
-      throw CacheDatabaseException(
-        'Failed to get exercise by name+owner: $e',
-      );
+      throw CacheDatabaseException('Failed to get exercise by name+owner: $e');
     }
   }
 
   @override
   Future<List<ExerciseModel>> getExercisesForMuscle(String muscleGroup) async {
     try {
-      final userId = await _getCurrentUserId();
+      final ownerId = await _resolveOwnerId();
       final filter = _visibilityFilter(
-        userId,
-        extraPrefix:
-            '${DatabaseTables.exerciseMuscleGroups} LIKE ?',
+        ownerId,
+        extraPrefix: '${DatabaseTables.exerciseMuscleGroups} LIKE ?',
       );
       final db = await databaseHelper.database;
       final maps = await db.query(
@@ -249,7 +247,8 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
       final ownerKey = ownerUserId ?? '';
       final maps = await db.query(
         DatabaseTables.exercises,
-        where: '${DatabaseTables.exerciseName} = ? '
+        where:
+            '${DatabaseTables.exerciseName} = ? '
             "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
         whereArgs: <Object?>[name, ownerKey],
         limit: 1,
@@ -461,9 +460,7 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
         whereArgs: [userId],
       );
     } catch (e) {
-      throw CacheDatabaseException(
-        'Failed to clear user-owned exercises: $e',
-      );
+      throw CacheDatabaseException('Failed to clear user-owned exercises: $e');
     }
   }
 
@@ -471,54 +468,48 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /// Returns the authenticated user's id, or `null` for guest sessions.
-  Future<String?> _getCurrentUserId() async {
+  /// Resolves the active account's owner id: the authenticated user's id, or
+  /// [kGuestUserId] (`''`) for guest sessions.
+  ///
+  /// Never null — under the per-user catalog model (db v20+) every row is
+  /// owned, so readers and writers share one non-null identifier.
+  Future<String> _resolveOwnerId() async {
     final result = await appSessionRepository.getCurrentSession();
-    return result.fold((_) => null, (session) => session.user?.id);
-  }
-
-  /// Builds the WHERE clause and bound args for user-visibility filtering.
-  ///
-  /// Rules:
-  /// - Soft-deleted exercises (sync_status = pendingDelete) are always excluded.
-  /// - NULL-owner (system/seeded) exercises are visible to everyone.
-  /// - User-owned exercises are visible only to that user.
-  ///
-  /// When [userId] is null (guest / signed-out), the second branch is omitted
-  /// entirely so we never pass a null value to sqflite's [whereArgs], which
-  /// would otherwise throw `Invalid argument null`.
-  ({String where, List<Object?> whereArgs}) _visibilityFilter(
-    String? userId, {
-    String? extraPrefix,
-  }) {
-    final prefix =
-        extraPrefix != null ? '$extraPrefix AND ' : '';
-    if (userId == null) {
-      return (
-        where: '${prefix}'
-            '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-            '${DatabaseTables.exerciseSyncStatus} != ?) AND '
-            '${DatabaseTables.ownerUserId} IS NULL',
-        whereArgs: <Object?>[SyncStatus.pendingDelete.name],
-      );
-    }
-    return (
-      where: '${prefix}'
-          '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
-          '${DatabaseTables.exerciseSyncStatus} != ?) AND '
-          '(${DatabaseTables.ownerUserId} IS NULL OR '
-          '${DatabaseTables.ownerUserId} = ?)',
-      whereArgs: <Object?>[SyncStatus.pendingDelete.name, userId],
+    return result.fold(
+      (_) => kGuestUserId,
+      (session) => session.user?.id ?? kGuestUserId,
     );
   }
 
-  /// Exercises visible to the current user:
-  /// - Seeded/system exercises (owner_user_id IS NULL) are visible to everyone.
-  /// - User-created exercises (owner_user_id = currentUserId) are private.
+  /// Builds the WHERE clause and bound args for strict per-account
+  /// visibility.
+  ///
+  /// Every catalog row is owned (guest = `''`, authenticated = `uid`;
+  /// db v20+). A row is visible only to its owning account — there is no
+  /// shared NULL-owner bucket — so cross-account exposure is impossible by
+  /// construction. Soft-deleted rows (sync_status = pendingDelete) are
+  /// always excluded.
+  ({String where, List<Object?> whereArgs}) _visibilityFilter(
+    String ownerId, {
+    String? extraPrefix,
+  }) {
+    final prefix = extraPrefix != null ? '$extraPrefix AND ' : '';
+    return (
+      where:
+          '${prefix}'
+          '(${DatabaseTables.exerciseSyncStatus} IS NULL OR '
+          '${DatabaseTables.exerciseSyncStatus} != ?) AND '
+          '${DatabaseTables.ownerUserId} = ?',
+      whereArgs: <Object?>[SyncStatus.pendingDelete.name, ownerId],
+    );
+  }
+
+  /// Exercises visible to the active account:
+  /// - Only rows owned by the active account (guest `''` or `uid`).
   /// - Soft-deleted exercises (sync_status = pendingDelete) are excluded.
   Future<List<ExerciseModel>> _getVisibleExercises() async {
-    final userId = await _getCurrentUserId();
-    final filter = _visibilityFilter(userId);
+    final ownerId = await _resolveOwnerId();
+    final filter = _visibilityFilter(ownerId);
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.exercises,
@@ -530,9 +521,9 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   }
 
   Future<ExerciseModel?> _getVisibleExerciseById(String id) async {
-    final userId = await _getCurrentUserId();
+    final ownerId = await _resolveOwnerId();
     final filter = _visibilityFilter(
-      userId,
+      ownerId,
       extraPrefix: '${DatabaseTables.exerciseId} = ?',
     );
     final db = await databaseHelper.database;
@@ -664,10 +655,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   ) {
     final seen = <String, ExerciseModel>{};
     for (final exercise in exercises) {
-      final key = '${exercise.name.toLowerCase()}|${exercise.ownerUserId ?? ''}';
+      final key =
+          '${exercise.name.toLowerCase()}|${exercise.ownerUserId ?? ''}';
       final existing = seen[key];
-      if (existing == null ||
-          exercise.updatedAt.isAfter(existing.updatedAt)) {
+      if (existing == null || exercise.updatedAt.isAfter(existing.updatedAt)) {
         seen[key] = exercise;
       }
     }

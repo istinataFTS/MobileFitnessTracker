@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 
 import '../../../core/errors/failures.dart';
+import '../../../core/session/current_user_id_resolver.dart';
 import '../../entities/exercise.dart';
 import '../../repositories/app_session_repository.dart';
 import '../../repositories/exercise_repository.dart';
@@ -23,20 +24,19 @@ class AddExercise {
   }) async {
     // Muscle-group canonicalisation (lowercase + trim) is handled at the
     // model boundary in `ExerciseModel` and inside `SyncExerciseMuscleFactors`,
-    // so we do not pre-normalise here.  Adding the user id is the only
+    // so we do not pre-normalise here.  Stamping the owner id is the only
     // decoration this use case owns.
-    final sessionResult = await appSessionRepository.getCurrentSession();
+    //
+    // Every exercise is owned (per-user catalog model): the resolver returns
+    // the authenticated user's id, or the guest sentinel `''`
+    // ([kGuestUserId]) for guest/unauthenticated sessions — never null. This
+    // is the same identifier readers use, so a row is always visible to the
+    // account that created it.
+    final ownerId = await CurrentUserIdResolver(
+      appSessionRepository: appSessionRepository,
+    ).resolve();
 
-    final preparedExercise = sessionResult.fold(
-      (_) => exercise,
-      (session) {
-        if (!session.isAuthenticated || session.user == null) {
-          return exercise;
-        }
-
-        return exercise.copyWith(ownerUserId: session.user!.id);
-      },
-    );
+    final preparedExercise = exercise.copyWith(ownerUserId: ownerId);
 
     final addResult = await repository.addExercise(preparedExercise);
 
