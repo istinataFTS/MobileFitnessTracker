@@ -31,7 +31,9 @@ class AppDataSeeder {
     if (EnvConfig.seedDefaultData) {
       await _seedDemoData();
     } else {
-      debugPrint('Demo-data seeding disabled (EnvConfig.seedDefaultData=false)');
+      debugPrint(
+        'Demo-data seeding disabled (EnvConfig.seedDefaultData=false)',
+      );
     }
 
     // Always run the heal step — factors are domain data, not demo data.
@@ -50,8 +52,18 @@ class AppDataSeeder {
     debugPrint('Seeding database...');
     final seedStart = DateTime.now();
 
+    // Per-user catalog model: seed for the active account — the guest
+    // sentinel '' on a fresh launch, or a restored authenticated uid. The
+    // resolved owner is exactly the owner SeedExercises' owner-scoped
+    // "already seeded" check evaluates against, so the check and the stamp
+    // always agree and seeding stays per-account idempotent.
+    final resolver = CurrentUserIdResolver(
+      appSessionRepository: di.sl<AppSessionRepository>(),
+    );
+    final ownerId = await resolver.resolve();
+
     final seedExercises = di.sl<SeedExercises>();
-    final exercisesResult = await seedExercises();
+    final exercisesResult = await seedExercises(ownerUserId: ownerId);
 
     await exercisesResult.fold(
       (failure) async {
@@ -69,13 +81,10 @@ class AppDataSeeder {
 
         await factorsResult.fold(
           (failure) async {
-            debugPrint(
-              '⚠️ Muscle factor seeding failed: ${failure.message}',
-            );
+            debugPrint('⚠️ Muscle factor seeding failed: ${failure.message}');
           },
           (factorCount) async {
-            final factorDuration =
-                DateTime.now().difference(factorSeedStart);
+            final factorDuration = DateTime.now().difference(factorSeedStart);
             debugPrint(
               '✅ Seeded $factorCount muscle factors in: ${factorDuration.inMilliseconds}ms',
             );
@@ -112,9 +121,7 @@ class AppDataSeeder {
 
     await healResult.fold(
       (failure) async {
-        debugPrint(
-          '⚠️ Muscle factor heal failed: ${failure.message}',
-        );
+        debugPrint('⚠️ Muscle factor heal failed: ${failure.message}');
       },
       (factorCount) async {
         if (factorCount <= 0) {
@@ -168,9 +175,7 @@ class AppDataSeeder {
 
     rebuildResult.fold(
       (failure) {
-        debugPrint(
-          '⚠️ Muscle stimulus rebuild failed: ${failure.message}',
-        );
+        debugPrint('⚠️ Muscle stimulus rebuild failed: ${failure.message}');
       },
       (_) {
         debugPrint(
