@@ -39,15 +39,14 @@ class SessionSyncServiceImpl implements SessionSyncService {
   Future<SessionSyncActionResult> establishAuthenticatedSession(
     AppUser user,
   ) async {
-    final bool requiresInitialCloudMigration = appSessionRepository
-        .syncPolicy
-        .initialCloudSyncUploadsLocalData;
+    final bool requiresInitialCloudMigration =
+        appSessionRepository.syncPolicy.initialCloudSyncUploadsLocalData;
 
     final startSessionResult = await appSessionRepository
         .startAuthenticatedSession(
-      user,
-      requiresInitialCloudMigration: requiresInitialCloudMigration,
-    );
+          user,
+          requiresInitialCloudMigration: requiresInitialCloudMigration,
+        );
 
     return await startSessionResult.fold(
       (failure) async {
@@ -59,7 +58,8 @@ class SessionSyncServiceImpl implements SessionSyncService {
 
         return SessionSyncActionResult(
           status: SessionSyncActionStatus.failed,
-          message: 'failed to persist authenticated session: ${failure.message}',
+          message:
+              'failed to persist authenticated session: ${failure.message}',
         );
       },
       (_) async {
@@ -139,10 +139,7 @@ class SessionSyncServiceImpl implements SessionSyncService {
     try {
       await authRemoteDataSource.signOut();
     } catch (error) {
-      AppLogger.warning(
-        'Remote sign-out failed: $error',
-        category: 'session',
-      );
+      AppLogger.warning('Remote sign-out failed: $error', category: 'session');
 
       return SessionSyncActionResult(
         status: SessionSyncActionStatus.failed,
@@ -228,8 +225,9 @@ class SessionSyncServiceImpl implements SessionSyncService {
   /// Ordering matters for FK integrity:
   /// - meals before nutrition_logs (nutrition_logs.meal_id → meals.id)
   /// - workout_sets and muscle_stimulus are independent of the above
-  /// - exercises: only user-owned rows; seeded exercises (owner_user_id IS NULL)
-  ///   are never deleted
+  /// - exercises: only the signing-out user's own rows (owner_user_id =
+  ///   userId); the guest '' catalog and other accounts' rows are preserved
+  ///   (per-user catalog model, db v20+)
   Future<void> _clearAllLocalUserData(String? userId) async {
     try {
       // meals first — nutrition_logs reference meal_id via FK
@@ -242,7 +240,8 @@ class SessionSyncServiceImpl implements SessionSyncService {
       // present.  Guest sessions have no owned rows to remove.
       if (userId != null) {
         await Future.wait(<Future<void>>[
-          // exercises: targeted delete to preserve seeded data
+          // exercises: targeted delete (owner_user_id = userId) so the
+          // guest '' catalog and any other account's rows are preserved.
           exerciseLocalDataSource.clearUserOwnedExercises(userId),
           // Scope muscle_stimulus removal to the signing-out user only so
           // other profiles' training history is not affected.
