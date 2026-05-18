@@ -36,9 +36,12 @@ void main() {
 
   final DateTime baseDate = DateTime(2026, 3, 22, 10, 0);
 
+  // Per-user catalog model: every row is owned. Default to the current
+  // (authenticated) user so a row is visible under the default session
+  // unless a test explicitly overrides the owner for an isolation scenario.
   ExerciseModel buildExercise({
     required String id,
-    String? ownerUserId,
+    String? ownerUserId = currentUserId,
     required String name,
     List<String> muscleGroups = const <String>['chest', 'triceps'],
     DateTime? updatedAt,
@@ -109,9 +112,9 @@ void main() {
     when(() => databaseHelper.database).thenAnswer((_) async => database);
 
     appSessionRepository = MockAppSessionRepository();
-    when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-      (_) async => Right(authenticatedSession),
-    );
+    when(
+      () => appSessionRepository.getCurrentSession(),
+    ).thenAnswer((_) async => Right(authenticatedSession));
 
     dataSource = ExerciseLocalDataSourceImpl(
       databaseHelper: databaseHelper,
@@ -213,75 +216,82 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl user isolation', () {
-    test('getAllExercises returns seeded (null owner) exercises to all users',
-        () async {
+    test('getAllExercises excludes legacy NULL-owner rows for an authed user '
+        '(strict per-owner; no shared bucket)', () async {
       await dataSource.insertExercise(
-        buildExercise(
-          id: 'seeded-1',
-          ownerUserId: null,
-          name: 'Squat',
-        ),
+        buildExercise(id: 'mine', ownerUserId: currentUserId, name: 'Squat'),
+      );
+      // A leftover NULL-owner row (pre-v20). It belongs to no account and
+      // must not surface for an authenticated user.
+      await dataSource.insertExercise(
+        buildExercise(id: 'legacy-null', ownerUserId: null, name: 'Deadlift'),
       );
 
       final exercises = await dataSource.getAllExercises();
 
-      expect(exercises.map((e) => e.id).toList(), <String>['seeded-1']);
+      expect(exercises.map((e) => e.id).toList(), <String>['mine']);
     });
 
-    test('getAllExercises returns current user exercises but not other users',
-        () async {
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'mine',
-          ownerUserId: currentUserId,
-          name: 'My Exercise',
-        ),
-      );
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'theirs',
-          ownerUserId: otherUserId,
-          name: 'Their Exercise',
-        ),
-      );
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'seeded',
-          ownerUserId: null,
-          name: 'Seeded Exercise',
-        ),
-      );
+    test(
+      'getAllExercises returns only current-user rows, not other accounts',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'mine',
+            ownerUserId: currentUserId,
+            name: 'My Exercise',
+          ),
+        );
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'theirs',
+            ownerUserId: otherUserId,
+            name: 'Their Exercise',
+          ),
+        );
+        // Guest-owned ('') row — a different account, must stay hidden.
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'guest-owned',
+            ownerUserId: '',
+            name: 'Guest Exercise',
+          ),
+        );
 
-      final exercises = await dataSource.getAllExercises();
-      final ids = exercises.map((e) => e.id).toSet();
+        final exercises = await dataSource.getAllExercises();
+        final ids = exercises.map((e) => e.id).toSet();
 
-      expect(ids, containsAll(<String>['mine', 'seeded']));
-      expect(ids, isNot(contains('theirs')));
-    });
+        expect(ids, <String>{'mine'});
+        expect(ids, isNot(contains('theirs')));
+        expect(ids, isNot(contains('guest-owned')));
+      },
+    );
 
-    test('getAllExercises returns only seeded exercises for guest session',
-        () async {
-      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
-        (_) async => const Right(AppSession.guest()),
-      );
+    test(
+      "getAllExercises returns only guest-owned ('') rows for a guest session",
+      () async {
+        when(
+          () => appSessionRepository.getCurrentSession(),
+        ).thenAnswer((_) async => const Right(AppSession.guest()));
 
-      await dataSource.insertExercise(
-        buildExercise(id: 'seeded', ownerUserId: null, name: 'Squat'),
-      );
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'user-owned',
-          ownerUserId: currentUserId,
-          name: 'My Custom',
-        ),
-      );
+        await dataSource.insertExercise(
+          buildExercise(id: 'guest-ex', ownerUserId: '', name: 'Squat'),
+        );
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'user-owned',
+            ownerUserId: currentUserId,
+            name: 'My Custom',
+          ),
+        );
 
-      final exercises = await dataSource.getAllExercises();
-      final ids = exercises.map((e) => e.id).toSet();
+        final exercises = await dataSource.getAllExercises();
+        final ids = exercises.map((e) => e.id).toSet();
 
-      expect(ids, contains('seeded'));
-      expect(ids, isNot(contains('user-owned')));
-    });
+        expect(ids, <String>{'guest-ex'});
+        expect(ids, isNot(contains('user-owned')));
+      },
+    );
 
     test('getExerciseById respects owner filter', () async {
       await dataSource.insertExercise(
@@ -305,11 +315,7 @@ void main() {
 
     test('getExerciseByName respects owner filter', () async {
       await dataSource.insertExercise(
-        buildExercise(
-          id: 'theirs',
-          ownerUserId: otherUserId,
-          name: 'Deadlift',
-        ),
+        buildExercise(id: 'theirs', ownerUserId: otherUserId, name: 'Deadlift'),
       );
 
       expect(await dataSource.getExerciseByName('Deadlift'), isNull);
@@ -408,6 +414,49 @@ void main() {
 
       expect(ids, containsAll(<String>['seeded-1', 'seeded-2']));
       expect(ids, isNot(contains('mine')));
+    });
+
+    test('sign-out isolation: cleared catalog is invisible to a later guest or '
+        "other user, and the guest '' catalog survives", () async {
+      // user-1's adopted catalog + a guest-bucket row + another user.
+      await dataSource.insertExercise(
+        buildExercise(id: 'a-ex', ownerUserId: currentUserId, name: 'A Custom'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(id: 'guest-cat', ownerUserId: '', name: 'Squat'),
+      );
+      await dataSource.insertExercise(
+        buildExercise(id: 'b-ex', ownerUserId: otherUserId, name: 'B Custom'),
+      );
+
+      // Sign-out cleanup for user-1.
+      await dataSource.clearUserOwnedExercises(currentUserId);
+
+      // Physically: only user-1's row is gone; guest + other-user survive.
+      final rawIds = (await database.query(
+        DatabaseTables.exercises,
+      )).map((r) => r[DatabaseTables.exerciseId]).toSet();
+      expect(rawIds, <Object?>{'guest-cat', 'b-ex'});
+
+      // A subsequent guest session sees only its own '' catalog —
+      // never user-1's cleared data or user-2's rows.
+      when(
+        () => appSessionRepository.getCurrentSession(),
+      ).thenAnswer((_) async => const Right(AppSession.guest()));
+      final asGuest = await dataSource.getAllExercises();
+      expect(asGuest.map((e) => e.id).toList(), <String>['guest-cat']);
+
+      // A different signed-in user sees only their own rows.
+      when(() => appSessionRepository.getCurrentSession()).thenAnswer(
+        (_) async => Right(
+          AppSession(
+            authMode: AuthMode.authenticated,
+            user: const AppUser(id: otherUserId, email: 'b@test.com'),
+          ),
+        ),
+      );
+      final asOther = await dataSource.getAllExercises();
+      expect(asOther.map((e) => e.id).toList(), <String>['b-ex']);
     });
   });
 
@@ -606,73 +655,104 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('ExerciseLocalDataSourceImpl prepareForInitialCloudMigration', () {
-    // System exercises — never claimed or uploaded
+    // Guest catalog adoption — on sign-in the guest catalog ('' sentinel,
+    // or a legacy NULL row pre-v20) is reassigned to the signing-in user
+    // and queued for upload so workout sets that reference it can sync.
 
-    test('leaves system localOnly exercise unchanged', () async {
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'exercise-1',
-          ownerUserId: null,
-          name: 'Bench Press',
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.localOnly,
-          ),
-        ),
-      );
-
-      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
-
-      final rawRows = await database.query(
+    Future<Map<String, Object?>> rawExercise(String id) async {
+      final rows = await database.query(
         DatabaseTables.exercises,
         where: '${DatabaseTables.exerciseId} = ?',
-        whereArgs: <Object?>['exercise-1'],
+        whereArgs: <Object?>[id],
       );
-      expect(rawRows, hasLength(1));
-      expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
-      expect(
-        rawRows.single[DatabaseTables.exerciseSyncStatus],
-        SyncStatus.localOnly.name,
-      );
-    });
-
-    test('leaves system syncError exercise unchanged', () async {
-      await dataSource.insertExercise(
-        buildExercise(
-          id: 'exercise-1',
-          ownerUserId: null,
-          name: 'Bench Press',
-          syncMetadata: const EntitySyncMetadata(
-            status: SyncStatus.syncError,
-            lastSyncError: 'prior error',
-          ),
-        ),
-      );
-
-      await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
-
-      final rawRows = await database.query(
-        DatabaseTables.exercises,
-        where: '${DatabaseTables.exerciseId} = ?',
-        whereArgs: <Object?>['exercise-1'],
-      );
-      expect(rawRows, hasLength(1));
-      expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
-      expect(
-        rawRows.single[DatabaseTables.exerciseSyncStatus],
-        SyncStatus.syncError.name,
-      );
-    });
-
-    // Corruption healing — system exercises incorrectly stuck in pendingUpload
-    // or pendingUpdate must be reset to localOnly so they do not block migration.
+      expect(rows, hasLength(1));
+      return rows.single;
+    }
 
     test(
-      'resets system pendingUpload exercise to localOnly (corruption heal)',
+      "adopts guest-sentinel ('') localOnly exercise as pendingUpload",
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'exercise-1',
+            ownerUserId: '',
+            name: 'Bench Press',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.localOnly,
+            ),
+          ),
+        );
+
+        await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+        final row = await rawExercise('exercise-1');
+        expect(row[DatabaseTables.ownerUserId], 'user-1');
+        expect(
+          row[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingUpload.name,
+        );
+      },
+    );
+
+    test(
+      'adopts legacy NULL-owner localOnly exercise as pendingUpload',
       () async {
         await dataSource.insertExercise(
           buildExercise(
             id: 'exercise-1',
             ownerUserId: null,
+            name: 'Bench Press',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.localOnly,
+            ),
+          ),
+        );
+
+        await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+        final row = await rawExercise('exercise-1');
+        expect(row[DatabaseTables.ownerUserId], 'user-1');
+        expect(
+          row[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingUpload.name,
+        );
+      },
+    );
+
+    test(
+      'adopts guest syncError exercise as pendingUpload and clears error',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'exercise-1',
+            ownerUserId: '',
+            name: 'Bench Press',
+            syncMetadata: const EntitySyncMetadata(
+              status: SyncStatus.syncError,
+              lastSyncError: 'prior error',
+            ),
+          ),
+        );
+
+        await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
+
+        final row = await rawExercise('exercise-1');
+        expect(row[DatabaseTables.ownerUserId], 'user-1');
+        expect(
+          row[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingUpload.name,
+        );
+        expect(row[DatabaseTables.exerciseLastSyncError], isNull);
+      },
+    );
+
+    test(
+      'adopts guest pendingUpload exercise (kept pendingUpload, error cleared)',
+      () async {
+        await dataSource.insertExercise(
+          buildExercise(
+            id: 'exercise-1',
+            ownerUserId: '',
             name: 'Bench Press',
             syncMetadata: const EntitySyncMetadata(
               status: SyncStatus.pendingUpload,
@@ -683,28 +763,23 @@ void main() {
 
         await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
 
-        final rawRows = await database.query(
-          DatabaseTables.exercises,
-          where: '${DatabaseTables.exerciseId} = ?',
-          whereArgs: <Object?>['exercise-1'],
-        );
-        expect(rawRows, hasLength(1));
-        expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+        final row = await rawExercise('exercise-1');
+        expect(row[DatabaseTables.ownerUserId], 'user-1');
         expect(
-          rawRows.single[DatabaseTables.exerciseSyncStatus],
-          SyncStatus.localOnly.name,
+          row[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingUpload.name,
         );
-        expect(rawRows.single[DatabaseTables.exerciseLastSyncError], isNull);
+        expect(row[DatabaseTables.exerciseLastSyncError], isNull);
       },
     );
 
     test(
-      'resets system pendingUpdate exercise to localOnly (corruption heal)',
+      'adopts guest pendingUpdate exercise (owner reassigned, metadata kept)',
       () async {
         await dataSource.insertExercise(
           buildExercise(
             id: 'exercise-1',
-            ownerUserId: null,
+            ownerUserId: '',
             name: 'Bench Press',
             syncMetadata: const EntitySyncMetadata(
               status: SyncStatus.pendingUpdate,
@@ -715,18 +790,14 @@ void main() {
 
         await dataSource.prepareForInitialCloudMigration(userId: 'user-1');
 
-        final rawRows = await database.query(
-          DatabaseTables.exercises,
-          where: '${DatabaseTables.exerciseId} = ?',
-          whereArgs: <Object?>['exercise-1'],
-        );
-        expect(rawRows, hasLength(1));
-        expect(rawRows.single[DatabaseTables.ownerUserId], isNull);
+        final row = await rawExercise('exercise-1');
+        expect(row[DatabaseTables.ownerUserId], 'user-1');
+        // pendingUpdate is preserved as-is by the status switch.
         expect(
-          rawRows.single[DatabaseTables.exerciseSyncStatus],
-          SyncStatus.localOnly.name,
+          row[DatabaseTables.exerciseSyncStatus],
+          SyncStatus.pendingUpdate.name,
         );
-        expect(rawRows.single[DatabaseTables.exerciseLastSyncError], isNull);
+        expect(row[DatabaseTables.exerciseLastSyncError], 'prior error');
       },
     );
 
@@ -890,14 +961,14 @@ void main() {
 
   group('ExerciseLocalDataSourceImpl multi-owner name coexistence', () {
     test(
-      'system (owner=null) and user-owned exercise with the same name coexist '
-      'and are both visible to an authenticated user',
+      "guest ('') and user-owned exercise with the same name coexist in "
+      'storage; only the current-user row is visible (strict per-owner)',
       () async {
-        // System exercise seeded at install time.
+        // Guest-bucket row (legacy seeded catalog collapsed to '' by v20).
         await dataSource.insertExercise(
           buildExercise(
-            id: 'sys-barbell-row',
-            ownerUserId: null,
+            id: 'guest-barbell-row',
+            ownerUserId: '',
             name: 'Barbell Row',
           ),
         );
@@ -915,56 +986,42 @@ void main() {
           ),
         ]);
 
-        // Raw DB should contain exactly two rows.
+        // Both rows coexist in storage — distinct (name, owner) buckets.
         final rawRows = await database.query(DatabaseTables.exercises);
         expect(rawRows, hasLength(2));
 
-        // Both must be visible to the authenticated user.
+        // But only the current user's row is visible — no shared bucket.
         final visible = await dataSource.getAllExercises();
-        expect(
-          visible.map((e) => e.id).toSet(),
-          {'sys-barbell-row', 'usr-barbell-row'},
-        );
+        expect(visible.map((e) => e.id).toSet(), {'usr-barbell-row'});
       },
     );
 
-    test(
-      'insertExercise rejects a duplicate (name, owner) pair '
-      'while allowing same name for a different owner',
-      () async {
-        await dataSource.insertExercise(
+    test('insertExercise rejects a duplicate (name, owner) pair '
+        'while allowing same name for a different owner', () async {
+      await dataSource.insertExercise(
+        buildExercise(id: 'sys-squat', ownerUserId: null, name: 'Squat'),
+      );
+
+      // Different owner — must succeed.
+      await expectLater(
+        dataSource.insertExercise(
           buildExercise(
-            id: 'sys-squat',
-            ownerUserId: null,
+            id: 'usr-squat',
+            ownerUserId: currentUserId,
             name: 'Squat',
           ),
-        );
+        ),
+        completes,
+      );
 
-        // Different owner — must succeed.
-        await expectLater(
-          dataSource.insertExercise(
-            buildExercise(
-              id: 'usr-squat',
-              ownerUserId: currentUserId,
-              name: 'Squat',
-            ),
-          ),
-          completes,
-        );
-
-        // Same owner as the first insert (null) — must fail.
-        await expectLater(
-          dataSource.insertExercise(
-            buildExercise(
-              id: 'sys-squat-dup',
-              ownerUserId: null,
-              name: 'Squat',
-            ),
-          ),
-          throwsA(isA<Object>()),
-        );
-      },
-    );
+      // Same owner as the first insert (null) — must fail.
+      await expectLater(
+        dataSource.insertExercise(
+          buildExercise(id: 'sys-squat-dup', ownerUserId: null, name: 'Squat'),
+        ),
+        throwsA(isA<Object>()),
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -975,31 +1032,28 @@ void main() {
   // the most-recently-updated entry and not trip the UNIQUE index.
 
   group('ExerciseLocalDataSourceImpl incoming duplicate deduplication', () {
-    test(
-      'replaceAllExercises with duplicate (name, owner) in the incoming list '
-      'keeps only the most-recently-updated row',
-      () async {
-        final older = buildExercise(
-          id: 'e-old',
-          ownerUserId: currentUserId,
-          name: 'Squat',
-          updatedAt: baseDate,
-        );
-        final newer = buildExercise(
-          id: 'e-new',
-          ownerUserId: currentUserId,
-          name: 'Squat',
-          updatedAt: baseDate.add(const Duration(hours: 1)),
-        );
+    test('replaceAllExercises with duplicate (name, owner) in the incoming list '
+        'keeps only the most-recently-updated row', () async {
+      final older = buildExercise(
+        id: 'e-old',
+        ownerUserId: currentUserId,
+        name: 'Squat',
+        updatedAt: baseDate,
+      );
+      final newer = buildExercise(
+        id: 'e-new',
+        ownerUserId: currentUserId,
+        name: 'Squat',
+        updatedAt: baseDate.add(const Duration(hours: 1)),
+      );
 
-        // Both share (name='Squat', owner=currentUserId) — only 'e-new' survives.
-        await dataSource.replaceAllExercises(<ExerciseModel>[older, newer]);
+      // Both share (name='Squat', owner=currentUserId) — only 'e-new' survives.
+      await dataSource.replaceAllExercises(<ExerciseModel>[older, newer]);
 
-        final rawRows = await database.query(DatabaseTables.exercises);
-        expect(rawRows, hasLength(1));
-        expect(rawRows.first[DatabaseTables.exerciseId], 'e-new');
-      },
-    );
+      final rawRows = await database.query(DatabaseTables.exercises);
+      expect(rawRows, hasLength(1));
+      expect(rawRows.first[DatabaseTables.exerciseId], 'e-new');
+    });
 
     test(
       'replaceAllExercises with different (name, owner) pairs inserts all rows',

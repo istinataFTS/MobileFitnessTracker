@@ -6,6 +6,7 @@ import '../core/auth/auth_session_service.dart';
 import '../core/auth/auth_session_service_impl.dart';
 import '../core/session/session_sync_service.dart';
 import '../core/session/session_sync_service_impl.dart';
+import '../core/sync/hooks/account_catalog_provision_hook.dart';
 import '../core/sync/hooks/muscle_factor_heal_hook.dart';
 import '../core/sync/hooks/muscle_stimulus_rebuild_hook.dart';
 import '../core/sync/initial_cloud_migration_coordinator.dart';
@@ -15,6 +16,7 @@ import '../core/sync/post_sync_hook.dart';
 import '../core/sync/sync_feature.dart';
 import '../core/sync/sync_orchestrator.dart';
 import '../core/sync/sync_orchestrator_impl.dart';
+import '../domain/usecases/exercises/seed_exercises.dart';
 import '../domain/usecases/muscle_factors/seed_exercise_factors.dart';
 import '../domain/usecases/muscle_stimulus/rebuild_muscle_stimulus_from_workout_history.dart';
 import '../data/datasources/local/database_helper.dart';
@@ -141,34 +143,38 @@ void _registerAppComposition(GetIt sl) {
       SyncFeature(
         name: 'exercises',
         syncPendingChanges: sl<ExerciseSyncCoordinator>().syncPendingChanges,
-        pullRemoteChanges: (userId, since) =>
-            sl<ExerciseSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
+        pullRemoteChanges: (userId, since) => sl<ExerciseSyncCoordinator>()
+            .pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'meals',
         syncPendingChanges: sl<MealSyncCoordinator>().syncPendingChanges,
-        pullRemoteChanges: (userId, since) =>
-            sl<MealSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
+        pullRemoteChanges: (userId, since) => sl<MealSyncCoordinator>()
+            .pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'workout_sets',
         syncPendingChanges: sl<WorkoutSetSyncCoordinator>().syncPendingChanges,
-        pullRemoteChanges: (userId, since) =>
-            sl<WorkoutSetSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
+        pullRemoteChanges: (userId, since) => sl<WorkoutSetSyncCoordinator>()
+            .pullRemoteChanges(userId: userId, since: since),
       ),
       SyncFeature(
         name: 'nutrition_logs',
-        syncPendingChanges: sl<NutritionLogSyncCoordinator>().syncPendingChanges,
-        pullRemoteChanges: (userId, since) =>
-            sl<NutritionLogSyncCoordinator>().pullRemoteChanges(userId: userId, since: since),
+        syncPendingChanges:
+            sl<NutritionLogSyncCoordinator>().syncPendingChanges,
+        pullRemoteChanges: (userId, since) => sl<NutritionLogSyncCoordinator>()
+            .pullRemoteChanges(userId: userId, since: since),
       ),
     ],
   );
 
-  // Hook order matters: stimulus rebuild depends on factors being present
-  // for every exercise, so heal must run first.
+  // Hook order matters and is strictly: catalog provision → factor heal →
+  // stimulus rebuild. Provisioning must run first so the account owns its
+  // exercises before factors (keyed by exercise id) are healed, which in
+  // turn must precede the stimulus rebuild that reads those factors.
   sl.registerLazySingleton<List<PostSyncHook>>(
     () => <PostSyncHook>[
+      AccountCatalogProvisionHook(seedExercises: sl<SeedExercises>()),
       MuscleFactorHealHook(seedExerciseFactors: sl<SeedExerciseFactors>()),
       MuscleStimulusRebuildHook(
         rebuild: sl<RebuildMuscleStimulusFromWorkoutHistory>(),
@@ -219,9 +225,5 @@ void _registerAppComposition(GetIt sl) {
     ),
   );
 
-  sl.registerFactory(
-    () => HomeBloc(
-      loadHomeDashboardData: sl(),
-    ),
-  );
+  sl.registerFactory(() => HomeBloc(loadHomeDashboardData: sl()));
 }

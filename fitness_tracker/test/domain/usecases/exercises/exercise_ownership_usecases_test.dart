@@ -161,18 +161,29 @@ void main() {
     },
   );
 
-  test('AddExercise leaves exercise unchanged for guest session', () async {
-    when(
-      () => appSessionRepository.getCurrentSession(),
-    ).thenAnswer((_) async => const Right(AppSession.guest()));
+  test(
+    "AddExercise stamps the guest sentinel '' for a guest session",
+    () async {
+      when(
+        () => appSessionRepository.getCurrentSession(),
+      ).thenAnswer((_) async => const Right(AppSession.guest()));
 
-    final result = await addExercise(baseExercise);
+      final result = await addExercise(baseExercise);
 
-    expect(result, const Right(null));
+      expect(result, const Right(null));
 
-    verify(() => exerciseRepository.addExercise(baseExercise)).called(1);
-    verify(() => muscleFactorRepository.addMuscleFactorsBatch(any())).called(1);
-  });
+      // Per-user catalog model: guests own their catalog under '' so it is
+      // visible to the guest session and adoptable on sign-in.
+      verify(
+        () => exerciseRepository.addExercise(
+          baseExercise.copyWith(ownerUserId: ''),
+        ),
+      ).called(1);
+      verify(
+        () => muscleFactorRepository.addMuscleFactorsBatch(any()),
+      ).called(1);
+    },
+  );
 
   test(
     'UpdateExercise leaves exercise unchanged when session lookup fails',

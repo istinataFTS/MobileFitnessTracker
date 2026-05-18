@@ -75,9 +75,11 @@ class EnvConfig {
   /// Version 18: Replaced global UNIQUE(name) on exercises and meals with per-owner expression index
   ///             UNIQUE(name, COALESCE(owner_user_id, '')) so system and user rows may share a name.
   /// Version 19: Dropped the targets table — the Targets feature has been removed from the app.
+  /// Version 20: Collapsed legacy NULL owner_user_id on exercises and meals to the guest
+  ///             sentinel '' so ownership is never NULL (per-user catalog model).
   static const int databaseVersion = int.fromEnvironment(
     'DATABASE_VERSION',
-    defaultValue: 19,
+    defaultValue: 20,
   );
 
   static const bool seedDefaultData = bool.fromEnvironment(

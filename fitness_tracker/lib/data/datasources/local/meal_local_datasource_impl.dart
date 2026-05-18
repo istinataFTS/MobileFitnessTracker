@@ -4,6 +4,7 @@ import '../../../core/constants/database_tables.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/enums/sync_status.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/session/current_user_id_resolver.dart';
 import '../../../core/sync/local_remote_merge.dart';
 import '../../../domain/repositories/app_session_repository.dart';
 import '../../models/meal_model.dart';
@@ -25,9 +26,16 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
     required this.appSessionRepository,
   });
 
-  Future<String?> _getCurrentUserId() async {
+  /// Active account owner id; [kGuestUserId] (`''`) for guest sessions.
+  ///
+  /// Never null — under the per-user catalog model (db v20+) every meal row
+  /// is owned, so visibility is strict per-account with no shared bucket.
+  Future<String> _resolveOwnerId() async {
     final result = await appSessionRepository.getCurrentSession();
-    return result.fold((_) => null, (session) => session.user?.id);
+    return result.fold(
+      (_) => kGuestUserId,
+      (session) => session.user?.id ?? kGuestUserId,
+    );
   }
 
   @override
@@ -51,14 +59,14 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<MealModel?> getMealByName(String name) async {
     try {
-      final userId = await _getCurrentUserId();
-      final userFilter =
-          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
-      final userArgs = userId != null ? [userId] : <Object?>[];
+      final ownerId = await _resolveOwnerId();
+      const userFilter = ' AND ${DatabaseTables.ownerUserId} = ?';
+      final userArgs = <Object?>[ownerId];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.meals,
-        where: 'LOWER(${DatabaseTables.mealName}) = LOWER(?) AND '
+        where:
+            'LOWER(${DatabaseTables.mealName}) = LOWER(?) AND '
             '(${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)$userFilter',
         whereArgs: [name, SyncStatus.pendingDelete.name, ...userArgs],
         limit: 1,
@@ -77,16 +85,20 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<List<MealModel>> searchMealsByName(String searchTerm) async {
     try {
-      final userId = await _getCurrentUserId();
-      final userFilter =
-          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
-      final userArgs = userId != null ? [userId] : <Object?>[];
+      final ownerId = await _resolveOwnerId();
+      const userFilter = ' AND ${DatabaseTables.ownerUserId} = ?';
+      final userArgs = <Object?>[ownerId];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.meals,
-        where: 'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?) AND '
+        where:
+            'LOWER(${DatabaseTables.mealName}) LIKE LOWER(?) AND '
             '(${DatabaseTables.mealSyncStatus} IS NULL OR ${DatabaseTables.mealSyncStatus} != ?)$userFilter',
-        whereArgs: ['%$searchTerm%', SyncStatus.pendingDelete.name, ...userArgs],
+        whereArgs: [
+          '%$searchTerm%',
+          SyncStatus.pendingDelete.name,
+          ...userArgs,
+        ],
         orderBy: DatabaseTables.mealName,
       );
       return maps.map(MealModel.fromMap).toList();
@@ -98,10 +110,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<List<MealModel>> getRecentMeals({int limit = 10}) async {
     try {
-      final userId = await _getCurrentUserId();
-      final userFilter =
-          userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
-      final userArgs = userId != null ? [userId] : <Object?>[];
+      final ownerId = await _resolveOwnerId();
+      const userFilter = ' AND ${DatabaseTables.ownerUserId} = ?';
+      final userArgs = <Object?>[ownerId];
       final db = await databaseHelper.database;
       final maps = await db.query(
         DatabaseTables.meals,
@@ -189,7 +200,8 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
       final ownerKey = ownerUserId ?? '';
       final maps = await db.query(
         DatabaseTables.meals,
-        where: '${DatabaseTables.mealName} = ? '
+        where:
+            '${DatabaseTables.mealName} = ? '
             "AND COALESCE(${DatabaseTables.ownerUserId}, '') = ?",
         whereArgs: <Object?>[name, ownerKey],
         limit: 1,
@@ -385,11 +397,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   @override
   Future<int> getMealsCount() async {
     try {
-      final userId = await _getCurrentUserId();
-      final userFilter = userId != null
-          ? 'AND ${DatabaseTables.ownerUserId} = ?'
-          : '';
-      final userArgs = userId != null ? [userId] : <Object?>[];
+      final ownerId = await _resolveOwnerId();
+      const userFilter = 'AND ${DatabaseTables.ownerUserId} = ?';
+      final userArgs = <Object?>[ownerId];
       final db = await databaseHelper.database;
       final result = await db.rawQuery(
         '''
@@ -408,10 +418,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   Future<List<MealModel>> _getVisibleMeals() async {
-    final userId = await _getCurrentUserId();
-    final userFilter =
-        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
-    final userArgs = userId != null ? [userId] : <Object?>[];
+    final ownerId = await _resolveOwnerId();
+    const userFilter = ' AND ${DatabaseTables.ownerUserId} = ?';
+    final userArgs = <Object?>[ownerId];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.meals,
@@ -425,10 +434,9 @@ class MealLocalDataSourceImpl implements MealLocalDataSource {
   }
 
   Future<MealModel?> _getVisibleMealById(String id) async {
-    final userId = await _getCurrentUserId();
-    final userFilter =
-        userId != null ? ' AND ${DatabaseTables.ownerUserId} = ?' : '';
-    final userArgs = userId != null ? [userId] : <Object?>[];
+    final ownerId = await _resolveOwnerId();
+    const userFilter = ' AND ${DatabaseTables.ownerUserId} = ?';
+    final userArgs = <Object?>[ownerId];
     final db = await databaseHelper.database;
     final maps = await db.query(
       DatabaseTables.meals,

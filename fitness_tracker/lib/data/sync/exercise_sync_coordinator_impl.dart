@@ -67,12 +67,18 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
     );
   }
 
-  /// Returns [SyncStatus.localOnly] for system exercises (no owner) so they
-  /// are never queued for a remote upsert that would always fail — the
-  /// Supabase DTO requires a non-null [ownerUserId] and the RLS policy
-  /// requires [user_id = auth.uid()].
+  /// A guest-owned exercise: `null` (legacy) or the guest sentinel `''`.
+  ///
+  /// The guest catalog must never be queued for a remote upsert — it would
+  /// always fail: the Supabase DTO requires a non-empty [ownerUserId] and
+  /// the RLS policy requires `user_id = auth.uid()`. Only exercises owned by
+  /// a real authenticated user id are syncable. Guest rows become syncable
+  /// only after sign-in adoption rewrites their owner to the user's id.
+  bool _isGuestOwned(String? ownerUserId) =>
+      ownerUserId == null || ownerUserId.isEmpty;
+
   EntitySyncMetadata _syncMetadataForAdd(Exercise entity) {
-    if (entity.ownerUserId == null) {
+    if (_isGuestOwned(entity.ownerUserId)) {
       return entity.syncMetadata.copyWith(
         status: SyncStatus.localOnly,
         clearLastSyncError: true,
@@ -85,7 +91,7 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
     required Exercise entity,
     required Exercise? existingLocal,
   }) {
-    if (entity.ownerUserId == null) {
+    if (_isGuestOwned(entity.ownerUserId)) {
       return (existingLocal?.syncMetadata ?? entity.syncMetadata).copyWith(
         status: SyncStatus.localOnly,
         clearLastSyncError: true,
@@ -133,16 +139,12 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
       return;
     }
 
-    await localDataSource.insertExercise(
-      ExerciseModel.fromEntity(entity),
-    );
+    await localDataSource.insertExercise(ExerciseModel.fromEntity(entity));
   }
 
   @override
   Future<void> updateLocal(Exercise entity) {
-    return localDataSource.updateExercise(
-      ExerciseModel.fromEntity(entity),
-    );
+    return localDataSource.updateExercise(ExerciseModel.fromEntity(entity));
   }
 
   @override
@@ -217,10 +219,7 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   }
 
   @override
-  Future<List<Exercise>> fetchSince({
-    required String userId,
-    DateTime? since,
-  }) {
+  Future<List<Exercise>> fetchSince({required String userId, DateTime? since}) {
     return remoteDataSource.fetchSince(userId: userId, since: since);
   }
 
@@ -245,8 +244,7 @@ class ExerciseSyncCoordinatorImpl extends BaseEntitySyncCoordinator<Exercise>
   @override
   Future<bool> persistRemotePulledRow(Exercise remote) async {
     final byId = await localDataSource.getExerciseById(remote.id);
-    final byNameOwner = await localDataSource
-        .findStoredExerciseByNameAndOwner(
+    final byNameOwner = await localDataSource.findStoredExerciseByNameAndOwner(
       name: remote.name,
       ownerUserId: remote.ownerUserId,
     );
