@@ -58,8 +58,13 @@ abstract class ExerciseLocalDataSource {
   Future<void> deleteExercise(String id);
   Future<void> clearAllExercises();
 
-  /// Deletes only exercises owned by [userId]. Seeded/system exercises
-  /// (owner_user_id IS NULL) are never touched.
+  /// Deletes only exercises owned by [userId] — invoked on sign-out so the
+  /// next account can never see the signed-out user's catalog.
+  ///
+  /// Per-user catalog model (db v20+): every row is owned, so this only
+  /// removes `owner_user_id = userId` rows. Other accounts' rows and the
+  /// guest catalog (the `''` sentinel) are untouched, so a subsequent guest
+  /// session still resolves its own catalog.
   Future<void> clearUserOwnedExercises(String userId);
 }
 
