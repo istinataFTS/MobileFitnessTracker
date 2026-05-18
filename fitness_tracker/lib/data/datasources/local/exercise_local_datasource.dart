@@ -671,38 +671,20 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
   ) {
     final ownerUserId = exercise.ownerUserId;
 
-    // System / shared exercises (owner_user_id IS NULL) must never be uploaded
-    // to the cloud — the Supabase DTO requires a non-null owner and the RLS
-    // policy enforces user_id = auth.uid().
-    //
-    // If one ended up with a pending-upload or pending-update status (e.g.
-    // seeded while remote sync was configured but before the owner guard was
-    // in place), reset it to localOnly so it is excluded from
-    // syncPendingChanges and cannot block migration.
-    if (ownerUserId == null || ownerUserId.isEmpty) {
-      final status = exercise.syncMetadata.status;
-      if (status == SyncStatus.pendingUpload ||
-          status == SyncStatus.pendingUpdate) {
-        return ExerciseModel.fromEntity(
-          exercise.copyWith(
-            syncMetadata: exercise.syncMetadata.copyWith(
-              status: SyncStatus.localOnly,
-              clearLastSyncError: true,
-            ),
-          ),
-        );
-      }
+    // A different account's exercise — never touch it.
+    if (ownerUserId != null &&
+        ownerUserId.isNotEmpty &&
+        ownerUserId != userId) {
       return exercise;
     }
 
-    // Don't touch exercises that belong to a different user.
-    if (ownerUserId != userId) {
-      return exercise;
-    }
-
-    // This exercise already belongs to the current user.
-    // Leave the owner as-is and update the sync metadata so it gets
-    // uploaded to the cloud on the next sync pass.
+    // Guest catalog (the '' sentinel, or a legacy NULL row pre-v20) or a
+    // row already owned by the signing-in user: adopt it to that user and
+    // queue it for upload. This is the step that makes a workout set logged
+    // against a default exercise pushable — the Supabase FK
+    // workout_sets.exercise_id -> exercises(id) is only satisfiable once the
+    // referenced exercise is owned by the user and synced. Mirrors the
+    // meals / workout_sets prepare logic so all three behave identically.
     final currentMetadata = exercise.syncMetadata;
     final updatedMetadata = switch (currentMetadata.status) {
       SyncStatus.localOnly => currentMetadata.copyWith(
@@ -722,7 +704,10 @@ class ExerciseLocalDataSourceImpl implements ExerciseLocalDataSource {
     };
 
     return ExerciseModel.fromEntity(
-      exercise.copyWith(syncMetadata: updatedMetadata),
+      exercise.copyWith(
+        ownerUserId: ownerUserId == null || ownerUserId.isEmpty ? userId : null,
+        syncMetadata: updatedMetadata,
+      ),
     );
   }
 }
